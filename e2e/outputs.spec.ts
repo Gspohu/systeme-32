@@ -1,4 +1,4 @@
-import { download, expect, lastToast, openTemplate, outputsTab, test, unzip } from "./helpers";
+import { download, expect, expectToast, openTemplate, outputsTab, test, unzip } from "./helpers";
 import { strFromU8 } from "fflate";
 
 const BOM = [0xef, 0xbb, 0xbf];
@@ -129,7 +129,7 @@ test.describe("plans and lists", () =>
         const pitch = page.locator(".field", { hasText: "Pas de coupe LED" }).locator("input");
         await pitch.fill("0");
         await pitch.press("Tab");
-        expect(await lastToast(page)).toBe("Réglage Pas de coupe LED invalide (0). Saisir un nombre positif.");
+        await expectToast(page, "Réglage Pas de coupe LED invalide (0). Saisir un nombre positif.");
         await outputsTab(page, "Calepinage");
         await expect(page.locator(".tab-content p.muted").first()).toContainText("trait de scie 5 mm");
     });

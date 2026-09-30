@@ -1,4 +1,4 @@
-import { addCarcass, download, expect, lastToast, openBlank, selectItem, test, unzip } from "./helpers";
+import { addCarcass, download, expect, expectToast, openBlank, selectItem, test, unzip } from "./helpers";
 import { strFromU8 } from "fflate";
 import type { Locator, Page } from "@playwright/test";
 
@@ -60,7 +60,7 @@ test.describe("files", () =>
         await expect(page.locator(".facade .grip")).toHaveCount(0);
         await choose(page, page.getByRole("button", { name: "Ouvrir", exact: true }), saved.name,
                      "application/zip", Buffer.from(saved.bytes));
-        expect(await lastToast(page)).toBe("Buffet de Sélestat ouvert");
+        await expectToast(page, "Buffet de Sélestat ouvert");
         await expect(page.locator(".facade .grip")).toHaveCount(1);
         await expect(name).toHaveValue("Buffet de Sélestat");
     });
@@ -71,7 +71,7 @@ test.describe("files", () =>
         await openBlank(page);
         await choose(page, page.getByRole("button", { name: "Ouvrir", exact: true }), "liste.json",
                      "application/json", Buffer.from("pas du json"));
-        expect(await lastToast(page)).toMatch(/^Fichier projet illisible/);
+        await expectToast(page, /^Fichier projet illisible/);
     });
 
     test("keeps the work in the browser across a reload and lists it", async ({ page }) =>
@@ -112,7 +112,7 @@ test.describe("files", () =>
         await selectItem(page);
         const picker = page.locator(".inspector-body").getByRole("button", { name: "Importer une photo" }).first();
         await choose(page, picker, "faux.png", "image/png", Buffer.from("ceci n'est pas une image"));
-        expect(await lastToast(page)).toBe("Image non reconnue. Importer une photo PNG, JPEG ou WebP.");
+        await expectToast(page, "Image non reconnue. Importer une photo PNG, JPEG ou WebP.");
         await choose(page, picker, "blanc.png", "image/png", PNG);
         await expect(page.locator(".inspector-body").getByRole("button", { name: "Remplacer la photo" })).toBeVisible();
         const saved = await download(page, page.getByRole("button", { name: "Enregistrer", exact: true }));

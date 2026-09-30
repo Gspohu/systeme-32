@@ -1,5 +1,5 @@
-import { addCarcass, cells, centreOf, check, checkLines, drop, errorCount, expect, field, openBlank, selectItem,
-    setField, test, toClient, dragBetween } from "./helpers";
+import { addCarcass, cells, centreOf, check, checkLines, drop, errorCount, expect, expectToast, field, openBlank,
+    selectItem, setField, test, toClient, dragBetween } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // The front outline of the first carcass, world millimetres with y pointing down
@@ -23,6 +23,15 @@ test.describe("inspector", () =>
         await setField(page, "Largeur", "900");
         await setField(page, "Hauteur", "1200");
         await expect(body(page)).toHaveAttribute("points", "0,0 900,0 900,-1200 0,-1200");
+    });
+
+    test("puts the stored value back in a field whose entry was refused", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await check(page, "Éclairage LED").check();
+        await setField(page, "Retrait (mm)", "-5");
+        await expectToast(page, /^Retrait du profilé LED négatif/);
+        await expect(field(page, "Retrait (mm)")).toHaveValue("40");
     });
 
 

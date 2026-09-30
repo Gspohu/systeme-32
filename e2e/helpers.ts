@@ -206,6 +206,24 @@ export async function lastToast(page: Page): Promise<string>
 }
 
 
+// Waits for the newest toast to say it, the toast of the previous action may still be on top
+export async function expectToast(page: Page, expected: string | RegExp): Promise<void>
+{
+    const newest = expect.poll(() =>
+    {
+        return lastToast(page);
+    });
+    if (typeof expected === "string")
+    {
+        await newest.toBe(expected);
+    }
+    else
+    {
+        await newest.toMatch(expected);
+    }
+}
+
+
 // Clicks what starts a download and returns the downloaded bytes with their file name
 export async function download(page: Page, trigger: Locator): Promise<{ name: string; bytes: Uint8Array }>
 {
