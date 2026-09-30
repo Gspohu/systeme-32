@@ -1,0 +1,18 @@
+{
+    "name": "systeme-32, conception de meubles",
+    "short_name": "systeme-32",
+    "description": "Conception de meubles sur mesure, vue 3D et plans d'atelier, hors ligne",
+    "lang": "fr",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#171210",
+    "theme_color": "#171210",
+    "icons": [
+        { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ]
+}

@@ -1,0 +1,238 @@
+// Commands on fronts, cell linings, rails, lights and rounded ends
+
+import type { CellLight, End, Front, FrontSpec, HangingRail, Lining, Project } from "./model";
+import { newFront, newId } from "./factory";
+import { findNode, findParent, resolveLayout, subtreeIds } from "./layout";
+import { CommandError, byId, carcassOf, edit, withoutId } from "./edit";
+
+
+function frontOfNode(fronts: Front[], node: string): Front | undefined
+{
+    for (const f of fronts)
+    {
+        if (f.node === node)
+        {
+            return f;
+        }
+    }
+    return undefined;
+}
+
+
+export function setFront(p: Project, carcassId: string, nodeId: string, spec: FrontSpec, opts?: Partial<Front>): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const node = findNode(c.root, nodeId);
+        if (node === null)
+        {
+            throw new CommandError("Zone introuvable.");
+        }
+        if (spec.type === "drawers" && node.kind !== "cell")
+        {
+            throw new CommandError("Des tiroirs se posent dans une case sans séparation intérieure.");
+        }
+        // a new front replces those on the node, inside it and around it
+        const covered = new Set(subtreeIds(node));
+        let up = findParent(c.root, nodeId);
+        while (up !== null)
+        {
+            covered.add(up.id);
+            up = findParent(c.root, up.id);
+        }
+        const kept: Front[] = [];
+        for (const f of c.fronts)
+        {
+            if (!covered.has(f.node))
+            {
+                kept.push(f);
+            }
+        }
+        kept.push(newFront(nodeId, spec, opts));
+        c.fronts = kept;
+    });
+}
+
+
+export function removeFront(p: Project, carcassId: string, frontId: string): Project 
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        c.fronts = withoutId(c.fronts, frontId);
+    });
+}
+
+
+export function updateFront(p: Project, carcassId: string, frontId: string, patch: Partial<Front>): Project
+{
+    return edit(p, (q) =>
+    {
+        const f = byId(carcassOf(q, carcassId).fronts, frontId);
+        if (f === undefined)
+        {
+            throw new CommandError("Façade introuvable.");
+        }
+        Object.assign(f, patch);
+    });
+}
+
+
+// Moves a front onto another node, swapping with the front already there, across carcasses too
+export function moveFront(p: Project, fromCarcass: string, frontId: string, toCarcass: string, toNode: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const source = carcassOf(q, fromCarcass);
+        const target = carcassOf(q, toCarcass);
+        const f = byId(source.fronts, frontId);
+        const node = findNode(target.root, toNode);
+        if (f === undefined || node === null)
+        {
+            throw new CommandError("Façade ou zone introuvable.");
+        }
+        if (f.spec.type === "drawers" && node.kind !== "cell")
+        {
+            throw new CommandError("Des tiroirs se posent dans une case sans séparation intérieure.");
+        }
+        const other = frontOfNode(target.fronts, toNode);
+        const fromNode = f.node;
+        if (other !== undefined && other.id !== f.id)
+        {
+            if (other.spec.type === "drawers" && findNode(source.root, fromNode)?.kind !== "cell")
+            {
+                throw new CommandError("Échange impossible : les tiroirs de la cible n'iraient pas dans une zone recoupée.");
+            }
+            target.fronts = withoutId(target.fronts, other.id);
+            source.fronts.push({ ...other, node: fromNode });
+        }
+        source.fronts = withoutId(source.fronts, f.id);
+        target.fronts.push({ ...f, node: toNode });
+    });
+}
+
+
+// Door to one track sliding leaf covering half the opening : the SlideLine M overlay case
+export function toSliding(p: Project, carcassId: string, frontId: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const f = byId(c.fronts, frontId);
+        const nb = f === undefined ? undefined : resolveLayout(c).nodes.get(f.node);
+        if (f === undefined || nb === undefined)
+        {
+            throw new CommandError("Façade introuvable.");
+        }
+        f.spec = { type: "sliding", leaves: 1, leafWidth: Math.round((nb.w + 2 * c.thickness) / 2), damped: true };
+    });
+}
+
+
+export function toDoor(p: Project, carcassId: string, frontId: string, hinge: "left" | "right" = "left"): Project
+{
+    return updateFront(p, carcassId, frontId, { spec: { type: "door", hinge } });
+}
+
+
+export function setLining(p: Project, carcassId: string, cellId: string, lining: Omit<Lining, "id" |
+                          "cell"> | null): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const kept: Lining[] = [];
+        for (const l of c.linings)
+        {
+            if (l.cell !== cellId)
+            {
+                kept.push(l);
+            }
+        }
+        if (lining !== null)
+        {
+            kept.push({ ...lining, id: newId("l"), cell: cellId });
+        }
+        c.linings = kept;
+    });
+}
+
+
+// A clothes rail in a cell, or none : one rail at most per cell
+export function setRail(p: Project, carcassId: string, cellId: string, on: boolean,
+    kind: HangingRail["kind"] = "fixed"): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        if (findNode(c.root, cellId)?.kind !== "cell")
+        {
+            throw new CommandError("Une penderie se pose dans une case. Choisir une case sans séparation.");
+        }
+        c.rails = c.rails.filter((r) => { return r.cell !== cellId; });
+        if (on)
+        {
+            c.rails.push({ id: newId("r"), cell: cellId, kind });
+        }
+    });
+}
+
+
+export function setLight(p: Project, carcassId: string, cellId: string, light: Omit<CellLight, "id" | "cell"> |
+                         null): Project 
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        if (findNode(c.root, cellId)?.kind !== "cell")
+        {
+            throw new CommandError("Un éclairage se pose dans une case. Choisir une case sans séparation.");
+        }
+        if (light !== null && (!Number.isFinite(light.setback) || light.setback < 0))
+        {
+            throw new CommandError("Retrait du profilé LED négatif ou illisible. Saisir une distance en mm depuis le chant avant.");
+        }
+        if (light !== null && light.kind === "spots" && (!Number.isInteger(light.spots) || light.spots < 1))
+        {
+            throw new CommandError("Nombre de spots illisible. Saisir un entier, 1 au moins.");
+        }
+        c.lights = c.lights.filter((l) => { return l.cell !== cellId; });
+        if (light !== null)
+        {
+            c.lights.push({ ...light, id: newId("e"), cell: cellId });
+        }
+    });
+}
+
+
+// Shoe racks on the floor of a cell, levels of them, or none with 0
+export function setShoeRack(p: Project, carcassId: string, cellId: string, levels: number): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        if (findNode(c.root, cellId)?.kind !== "cell")
+        {
+            throw new CommandError("Un range-chaussures se pose dans une case. Choisir une case sans séparation.");
+        }
+        if (!Number.isInteger(levels) || levels < 0)
+        {
+            throw new CommandError("Nombre de niveaux illisible. Saisir un entier, 0 pour retirer.");
+        }
+        c.shoeRacks = c.shoeRacks.filter((s) => { return s.cell !== cellId; });
+        if (levels > 0)
+        {
+            c.shoeRacks.push({ id: newId("h"), cell: cellId, levels });
+        }
+    });
+}
+
+
+export function setEnd(p: Project, carcassId: string, side: "left" | "right", end: End): Project
+{
+    return edit(p, (q) =>
+    {
+        carcassOf(q, carcassId).ends[side] = structuredClone(end);
+    });
+}

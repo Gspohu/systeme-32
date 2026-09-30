@@ -1,0 +1,47 @@
+# Tests, builds and publishes the static site on GitLab Pages under /<project>
+# No lockfile in the repository : every dependency is pinned to an exact version in package.json
+image: node:22
+
+stages:
+  - test
+  - deploy
+
+cache:
+  key:
+    files:
+      - package.json
+  paths:
+    - .npm/
+
+test:
+  stage: test
+  script:
+    - npm install --cache .npm --prefer-offline --no-fund --no-audit
+    - npm test
+
+e2e:
+  stage: test
+  # the Playwright image of the pinned version brings its own Chromium, no Google Chrome in it
+  image: mcr.microsoft.com/playwright:v1.63.0-noble
+  variables:
+    E2E_CHANNEL: ""
+  script:
+    - npm install --cache .npm --prefer-offline --no-fund --no-audit
+    - npm run e2e
+  artifacts:
+    when: on_failure
+    paths:
+      - playwright-report
+
+pages:
+  stage: deploy
+  script:
+    - npm install --cache .npm --prefer-offline --no-fund --no-audit
+    - BASE_PATH="/${CI_PROJECT_NAME}" npm run build
+    - rm -rf public
+    - mv build public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

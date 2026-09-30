@@ -1,0 +1,392 @@
+// Masses, sliding leaves, shelf pins, carcass ojinery and base : hardware lines and drilling
+
+import type { Carcass, Settings } from "./model";
+import type { ResolvedLayout } from "./layout";
+import type { FrontPanel } from "./fronts";
+import { sideFace } from "./locate"; 
+import { byId } from "./edit";
+import { topAngle } from "./slope";
+import { polygonArea, tessellate } from "./geometry";
+import type { Build, Joint, Part } from "./parts";
+import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
+import {
+    AXILO_ADJUST_MAX_CABINET, AXILO_FEET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type Foot, type ShelfSupport,
+} from "../data/hardware";
+import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
+import { DIAM } from "./text";
+
+
+// Workshop conventions, stated in the drawings as such
+const PIN_BELOW_SHELF = 4;
+const PIN_SPARE_HOLES = 3;
+const FOOT_INSET = 50;
+const FOOT_MAX_SPACING = 800;
+// anti-tip brackets : one central up to 500 wide, else 100 to 150 from each end (Furnica guide)
+// no more than 800 apart and 20 from the back edge of the top (convention)
+const ANTI_TIP_SINGLE_MAX_WIDTH = 500;
+const ANTI_TIP_INSET = 120;
+const ANTI_TIP_MAX_SPACING = 800;
+const ANTI_TIP_FROM_BACK = 20;
+
+
+export function partMass(p: Part, check: boolean): number
+{
+    const m = MATERIALS[p.material];
+    const rho = m === undefined ? 700 : check ? m.densityCheck : m.density;
+    // the real outline, a quarter disc or a panel under a slope weighs less than its blank, less its openings
+    let area = polygonArea(tessellate(p.outline));
+    for (const c of p.cutouts ?? [])
+    {
+        area -= polygonArea(tessellate(c));
+    }
+    return area * p.thickness * 1e-9 * rho * p.quantity;
+}
+
+
+export function panelMass(fp: FrontPanel, check: boolean): number
+{
+    const m = materialOfDecor(decorById(fp.decor));
+    return fp.rect.w * fp.rect.h * fp.thickness * 1e-9 * (check ? m.densityCheck : m.density);
+}
+
+
+export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
+{
+    for (const front of c.fronts)
+    {
+        if (front.spec.type !== "sliding")
+        {
+            continue;
+        }
+        const nb = lay.nodes.get(front.node)!;
+        const leaves: FrontPanel[] = [];
+        let total = 0;
+        for (const p of b.fronts.get(c.id) ?? [])
+        {
+            if (p.front === front.id)
+            {
+                leaves.push(p);
+                total += p.rect.w;
+            }
+        }
+        total += (leaves.length - 1) * s.frontGap;
+        const L = SLIDELINE_M;
+        const minW = front.spec.damped ? L.minWidthDamped : L.minWidth;
+        for (const lp of leaves) 
+        {
+            const kg = panelMass(lp, true);
+            const name = `${c.name}, vantail ${lp.index + 1}`;
+            if (lp.rect.w < minW || lp.rect.w > L.maxWidth)
+            {
+                b.errors.push(`${name} : largeur ${Math.round(lp.rect.w)} mm hors de ${minW} à ${L.maxWidth} `
+                    + "(SlideLine M).");
+            }
+            if (lp.rect.h > L.maxHeight || lp.rect.h > L.heightToWidth * lp.rect.w)
+            {
+                b.errors.push(`${name} : hauteur ${Math.round(lp.rect.h)} mm, maxi ${L.maxHeight} `
+                    + "et 2 x la largeur (SlideLine M).");
+            }
+            if (kg > L.maxKg)
+            {
+                b.errors.push(`${name} : ${kg.toFixed(1)} kg, 30 kg maxi (SlideLine M).`);
+            }
+            if (lp.thickness < L.minThickness || lp.thickness > L.maxThickness)
+            {
+                b.errors.push(`${name} : épaisseur ${lp.thickness} mm hors de 16 à 25 (SlideLine M).`);
+            }
+            b.hardware.push({ ref: front.spec.damped ? "9156338" : "9156339", qty: 1, item: c.id, itemName: c.name,
+                             target: lp.id, note: null });
+        }
+        if (!L.shelfThicknesses.includes(c.thickness))
+        {
+            b.errors.push(`${c.name} : profilés SlideLine M indisponibles pour ${c.thickness} mm d'étagère.`);
+        }
+        const track = nb.w + 2 * c.thickness;
+        if (total >= track - 50)
+        {
+            b.errors.push(`${c.name} : les vantaux couvrent toute la voie de ${Math.round(track)} mm `
+                + "et ne peuvent plus coulisser (une seule voie en applique).");
+        }
+        b.hardware.push({ ref: track <= 2500 ? "9209167" : "9209218", qty: 1, item: c.id, itemName: c.name,
+                         target: front.id, note: `profilés haut et bas recoupés à ${Math.round(track)} mm` });
+    }
+}
+
+
+export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
+{   
+    for (const d of lay.dividers)
+    {
+        const shelf = d.axis === "h" && d.kind === "adjustable" ? byId(b.parts, `${c.id}/div/${d.id}`) : undefined;
+        if (shelf === undefined)
+        {
+            continue;
+        }
+        const loadKg = shelf.length * shelf.width * 1e-4 * s.shelfLoad + partMass(shelf, true);
+        let sup: ShelfSupport | undefined;
+        if (shelf.material === "glass")
+        {
+            const ref = GLASS_SUPPORTS[shelf.thickness];
+            sup = ref === undefined ? undefined : { ref, label: "", kgFor4: Infinity };
+        }
+        for (const x of shelf.material === "glass" ? [] : SHELF_SUPPORTS)
+        {
+            if (sup === undefined && x.kgFor4 >= loadKg)
+            {
+                sup = x;
+            }
+        }
+        if (sup === undefined)
+        {
+            b.errors.push(`${c.name}, ${shelf.label.toLowerCase()} : ${loadKg.toFixed(1)} kg, `
+                + `au-delà des taquets ${DIAM}5 sourcés (150 kg pour 4), ou verre sans support sourcé.`);
+            continue;
+        }
+        b.hardware.push({ ref: sup.ref, qty: 4, item: c.id, itemName: c.name, target: shelf.id,
+                         note: shelf.material === "glass" ? `charge d'essai ${loadKg.toFixed(1)} kg, aucune charge admise `
+                             + "publiée pour ce support" : `charge d'essai ${loadKg.toFixed(1)} kg` });
+        const node = { id: d.split, kind: "cell" as const, parent: null, x: d.x, y: d.y, w: d.w, h: d.h,
+                      left: "outer" as const, right: "outer" as const, bottom: "outer" as const,
+                      top: "outer" as const };
+        const yPin = d.y - PIN_BELOW_SHELF;
+        const rows = [37, c.depth - lay.zBack - 37];
+        for (const side of ["left", "right"] as const)
+        {
+            const face = sideFace(c, lay, b, node, side);
+            if (face === null)
+            {
+                continue;
+            }
+            let k = -PIN_SPARE_HOLES;
+            while (k <= PIN_SPARE_HOLES)
+            {
+                for (const v of rows)
+                {
+                    face.part.holes.push({ u: yPin + k * s.grid - face.uOrigin, v, diameter: 5,
+                                          depth: s.pinDepth, face: face.face,
+                                          label: k === 0 ? `Taquet ${sup.ref}` : `Réglage étagère ${DIAM}5` });
+                }
+                k++;
+            }
+        }
+    }
+}
+
+
+// Connector positions along a joint : at the inset from both ends, spread so that no gap excees `max`
+export function spread(length: number, inset: number, max: number): number[]
+{
+    if (length <= 2 * inset)
+    {
+        return [length / 2];
+    }
+    const a = inset;
+    const z = length - inset;
+    const n = Math.max(1, Math.ceil((z - a) / max)); 
+    const out: number[] = [];
+    let k = 0;
+    while (k <= n)
+    {
+        out.push(a + (z - a) * k / n);
+        k++;
+    }
+    return out;
+}
+
+
+export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string, itemName: string): void
+{
+    let minifix = 0;
+    let dowels = 0;
+    let clamex = 0;
+    for (const joint of joints)
+    {
+        const ep = byId(b.parts, joint.edgePart);
+        const fpart = byId(b.parts, joint.facePart);
+        if (ep === undefined || fpart === undefined)
+        {
+            continue;
+        }
+        const len = joint.to - joint.from;
+        const edgeThickness = ep.thickness;
+        const edgeU = joint.edge === "u0" ? 0 : ep.length;
+        const inward = joint.edge === "u0" ? 1 : -1;
+        const alongU = joint.lineAxis === "u";
+        const onFace = (pos: number): { u: number; v: number } =>
+        {
+            return alongU ? { u: joint.line, v: joint.from + pos } : { u: joint.from + pos, v: joint.line };
+        };
+        if (s.joinery === "clamex")
+        {
+            for (const pos of spread(len, Math.max(60, s.connectorInset), 400))
+            {
+                const f = onFace(pos);
+                const mid = alongU ? f.v : f.u;
+                fpart.grooves.push({ face: joint.face, along: alongU ? "v" : "u", at: alongU ? f.u : f.v,
+                                     from: mid - 35, to: mid + 35, width: LAMELLO_P14.grooveWidth,
+                                     depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 (Zeta P2 ou CN)" });
+                ep.grooves.push({ face: "A", along: "v", at: edgeU, from: joint.edgeFrom + pos - 35,
+                                  to: joint.edgeFrom + pos + 35, width: LAMELLO_P14.grooveWidth,
+                                  depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 dans le chant" }); 
+                ep.holes.push({ u: edgeU + inward * 13.5, v: joint.edgeFrom + pos,
+                                diameter: LAMELLO_P14.accessDiameter, depth: 0, face: "A",
+                                label: `Accès levier Clamex ${DIAM}6, position selon notice Lamello` });
+                clamex++;
+            }
+            continue;
+        }
+        const positions = spread(len, s.connectorInset, 256);
+        let k = 0;
+        while (k < positions.length)
+        {
+            const pos = positions[k]!;
+            const f = onFace(pos);
+            const endConnector = s.joinery === "minifix" && (k === 0 || k === positions.length - 1);
+            if (endConnector)
+            {
+                fpart.holes.push({ ...f, diameter: MINIFIX.boltPilot, depth: MINIFIX.boltDepth, face: joint.face,
+                                   label: `Goujon Minifix 262.28.020, avant-trou ${DIAM}5` });
+                ep.holes.push({ u: edgeU + inward * MINIFIX.distanceB, v: joint.edgeFrom + pos,
+                                diameter: MINIFIX.housingDiameter, depth: MINIFIX.housingDepth, face: "A",
+                                label: `Boîtier Minifix 262.25.035 ${DIAM}15` });
+                ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: MINIFIX.distanceB,
+                                face: joint.edge, w: edgeThickness / 2, label: `Passage du goujon ${DIAM}8` });
+                minifix++;
+            }
+            else
+            {
+                fpart.holes.push({ ...f, diameter: 8, depth: s.dowelFaceDepth, face: joint.face,
+                                   label: `Tourillon ${DIAM}8 x 35` });
+                ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: s.dowelEdgeDepth,
+                                face: joint.edge, w: edgeThickness / 2, label: `Tourillon ${DIAM}8 x 35` });
+                dowels++;
+            }
+            k++;
+        }
+    }
+    if (minifix > 0)
+    {
+        b.hardware.push({ ref: "262.25.035", qty: minifix, item: itemId, itemName, target: null, note: null });
+        b.hardware.push({ ref: "262.28.020", qty: minifix, item: itemId, itemName, target: null, note: null });
+    }
+    if (dowels > 0)
+    {
+        b.hardware.push({ ref: "DOWEL_8x35", qty: dowels, item: itemId, itemName, target: null, note: "collés" });
+    }
+    if (clamex > 0)
+    {
+        b.hardware.push({ ref: "145334", qty: Math.ceil(clamex / 80), item: itemId, itemName, target: null,
+                         note: `${clamex} paires utilisées` });
+    }
+}
+
+
+export function fitBase(c: Carcass, totalKg: number, b: Build): void
+{
+    if (c.base.type === "plinth" || c.base.type === "feet")
+    {
+        const h = c.base.height;
+        let foot: Foot | undefined;
+        for (const f of AXILO_FEET)
+        {
+            if (foot === undefined && h >= f.min && h <= f.max)
+            {
+                foot = f;
+            }
+        }
+        if (foot === undefined)
+        {
+            b.errors.push(`${c.name} : hauteur de socle ${h} mm hors de la gamme AXILO 78 (53 à 200).`);
+            return;
+        }
+        const perRow = Math.max(2, Math.ceil((c.width - 2 * FOOT_INSET) / FOOT_MAX_SPACING) + 1);
+        const count = 2 * perRow;
+        b.hardware.push({ ref: "637.76.333", qty: count, item: c.id, itemName: c.name, target: null, note: null });
+        b.hardware.push({ ref: foot.ref, qty: count, item: c.id, itemName: c.name, target: null,
+                         note: `réglage ${foot.min}-${foot.max} mm` });
+        if (c.base.type === "plinth")
+        {
+            b.hardware.push({ ref: "637.38.054", qty: perRow, item: c.id, itemName: c.name, target: null, note: null });
+        }
+        if (totalKg / count > AXILO_LOAD_PER_FOOT)
+        {
+            b.errors.push(`${c.name} : ${(totalKg / count).toFixed(0)} kg par pied, `
+                + `${AXILO_LOAD_PER_FOOT} kg maxi (AXILO 78).`);
+        }
+        const bottom = byId(b.parts, `${c.id}/bottom`);
+        if (bottom !== undefined)
+        {
+            if (totalKg > AXILO_ADJUST_MAX_CABINET)
+            {
+                bottom.notes.push(`Meuble de ${totalKg.toFixed(0)} kg chargé : régler les pieds AXILO `
+                    + "avant chargement (réglage sous charge limité à 80 kg)");
+            }
+            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (entraxe de rive ${FOOT_INSET} mm, convention)`;
+            let i = 0;
+            while (i < perRow)
+            {
+                const x = FOOT_INSET + (c.width - 2 * FOOT_INSET) * i / (perRow - 1) - c.thickness;
+                for (const v of [FOOT_INSET, bottom.width - FOOT_INSET])
+                {
+                    bottom.holes.push({ u: Math.min(Math.max(x, 20), bottom.length - 20), v, diameter: 0, depth: 0,
+                                        face: "B", label });
+                }
+                i++;
+            }
+        }
+    }
+    else if (c.base.type === "wall")
+    {
+        b.hardware.push({ ref: "48N0510.02", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
+        b.hardware.push({ ref: "48N0510.03", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
+        if (totalKg > 130)
+        {
+            b.errors.push(`${c.name} : ${totalKg.toFixed(0)} kg suspendus, une paire de ferrures 48N0510 `
+                + "porte 130 kg (Blum p. 586). Alléger le meuble ou le poser au sol.");
+        }
+    }
+}
+
+
+// Centres of the anti-tip brackets along the carcass width, from its left outer face
+export function antiTipPositions(width: number): number[]
+{
+    if (width <= ANTI_TIP_SINGLE_MAX_WIDTH)
+    {
+        return [width / 2];
+    }
+    return spread(width, ANTI_TIP_INSET, ANTI_TIP_MAX_SPACING);
+}
+
+
+// Brackets on the top of a standing carcass, screwed to the wall with the plug its material needs
+export function fitWallFixing(c: Carcass, s: Settings, b: Build): void
+{
+    const top = byId(b.parts, `${c.id}/top`);
+    if (!c.fixToWall || c.base.type === "wall" || top === undefined)
+    {
+        return;
+    }
+    const at = antiTipPositions(c.width);
+    for (const x of at)
+    {
+        // measured along a sloped top
+        const u = (x - c.thickness) / Math.cos(topAngle(c));
+        top.holes.push({ u, v: top.width - ANTI_TIP_FROM_BACK, diameter: 0, depth: 0, face: "B",
+                         label: `Équerre anti-basculement : vis 4 x 16, à ${ANTI_TIP_FROM_BACK} mm du chant arrière (convention)` });
+    }
+    const n = at.length;
+    const line = (ref: string, note: string | null): void =>
+    {
+        b.hardware.push({ ref, qty: n, item: c.id, itemName: c.name, target: top.id, note });
+    };
+    line("ANTI_TIP_BRACKET", "sur le dessus, jamais dans le fond");
+    line("SCREW_4x16", null);
+    if (s.wallType === "plasterboard")
+    {
+        line("PLUG_HOLLOW_METAL", null);
+        return;
+    }
+    line("WALL_SCREW_5x50", null);
+    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", null);
+}

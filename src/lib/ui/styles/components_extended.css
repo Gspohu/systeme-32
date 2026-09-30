@@ -1,0 +1,198 @@
+/* ── Extended Components ──────────────────────────────────────────────
+   Import AFTER components.css. No external dependencies
+   ──────────────────────────────────────────────────────────────────── */
+
+
+/* ── Select ───────────────────────────────────────────────────────── */
+/* Styled native <select>                                             */
+
+.select
+{
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    background: var(--colour-bg-primary);
+    color: var(--colour-text-primary);
+    border: var(--border-width) solid var(--colour-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239191b0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color var(--transition-base);
+}
+
+.select:hover
+{
+    border-color: var(--colour-border-hover);
+}
+
+.select:focus
+{
+    border-color: var(--colour-border-focus);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--colour-focus-ring);
+}
+
+
+/* ── Empty State ──────────────────────────────────────────────────── */
+
+.empty-state
+{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-3xl) var(--spacing-lg);
+    text-align: center;
+}
+
+.empty-state-title
+{
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--colour-text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.empty-state-description
+{
+    font-size: var(--font-size-base);
+    color: var(--colour-text-secondary);
+    max-width: 360px;
+    line-height: var(--line-height-normal);
+    margin-bottom: var(--spacing-lg);
+}
+
+
+/* ── Alert / Banner ───────────────────────────────────────────────── */
+/* Inline notification, not a toast : stays in the document flow      */
+
+.alert
+{
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    border-left: 3px solid;
+}
+
+.alert-info
+{
+    background: var(--colour-info-muted);
+    border-left-color: var(--colour-info);
+    color: var(--colour-text-primary);
+}
+
+.alert-success
+{
+    background: var(--colour-success-muted);
+    border-left-color: var(--colour-success);
+    color: var(--colour-text-primary);
+}
+
+.alert-warning
+{
+    background: var(--colour-warning-muted);
+    border-left-color: var(--colour-warning);
+    color: var(--colour-text-primary);
+}
+
+.alert-danger
+{
+    background: var(--colour-danger-muted);
+    border-left-color: var(--colour-danger);
+    color: var(--colour-text-primary);
+}
+
+.alert-dismiss
+{
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.5;
+    padding: 0;
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.alert-dismiss:hover
+{
+    opacity: 1;
+}
+
+
+/* ── Radio & Checkbox ─────────────────────────────────────────────── */
+
+.form-check
+{
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    color: var(--colour-text-primary);
+}
+
+.form-check input[type="checkbox"],
+.form-check input[type="radio"]
+{
+    width: 18px;
+    height: 18px;
+    accent-color: var(--colour-accent);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+
+/* ── Segmented Control ────────────────────────────────────────────── */
+/* Button group where exactly one is active                           */
+
+.segmented
+{
+    display: inline-flex;
+    border: var(--border-width) solid var(--colour-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.segmented-item
+{
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    background: var(--colour-bg-surface);
+    color: var(--colour-text-secondary);
+    border: none;
+    border-right: var(--border-width) solid var(--colour-border);
+    cursor: pointer;
+    transition: background var(--transition-fast),
+                color var(--transition-fast);
+    font: inherit;
+}
+
+.segmented-item:last-child
+{
+    border-right: none;
+}
+
+.segmented-item:hover
+{
+    background: var(--colour-bg-surface-hover);
+    color: var(--colour-text-primary);
+}
+
+.segmented-item.active
+{
+    background: var(--colour-accent);
+    color: white;
+}

@@ -1,0 +1,130 @@
+/* ── Data & Navigation Components ─────────────────────────────────────
+   Import AFTER components_extended.css. No external dependencies
+   Covers: tables, tabs, the only ones this app uses
+   ──────────────────────────────────────────────────────────────────── */
+
+
+/* ── Data Table ───────────────────────────────────────────────────── */
+/* Sortable, striped, responsive. Wraps in a scrollable container     */
+
+.table-container
+{
+    width: 100%;
+    overflow-x: auto;
+    border: var(--border-width) solid var(--colour-border);
+    border-radius: var(--radius-lg);
+}
+
+.table
+{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-base);
+}
+
+.table th,
+.table td
+{
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    border-bottom: var(--border-width) solid var(--colour-border);
+    white-space: nowrap;
+}
+
+.table th
+{
+    background: var(--colour-bg-surface);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    letter-spacing: var(--letter-spacing-wide);
+    color: var(--colour-text-secondary);
+    user-select: none;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.table tbody tr
+{
+    transition: background var(--transition-fast);
+}
+
+.table tbody tr:hover
+{
+    background: var(--colour-bg-surface-hover);
+}
+
+/* Striped variant */
+.table-striped tbody tr:nth-child(even)
+{
+    background: var(--colour-bg-surface);
+}
+
+.table-striped tbody tr:nth-child(even):hover
+{
+    background: var(--colour-bg-surface-hover);
+}
+
+/* Compact variant */
+.table-compact th,
+.table-compact td
+{
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+}
+
+/* Last row no border */
+.table tbody tr:last-child td
+{
+    border-bottom: none;
+}
+
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+/* Real tab navigation. Active tab has underline indicator            */
+
+.tabs
+{
+    display: flex;
+    border-bottom: var(--border-width) solid var(--colour-border);
+    gap: 0;
+    overflow-x: auto;
+}
+
+.tab
+{
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    color: var(--colour-text-secondary);
+    background: none;
+    border: none;
+    border-bottom: var(--border-width-thick) solid transparent;
+    cursor: pointer;
+    transition: color var(--transition-base),
+                border-color var(--transition-base);
+    white-space: nowrap;
+    font: inherit;
+}
+
+.tab:hover
+{
+    color: var(--colour-text-primary);
+}
+
+.tab.active
+{
+    color: var(--colour-text-primary);
+    border-bottom-color: var(--colour-accent);
+}
+
+.tab-content
+{
+    display: none;
+    padding: var(--spacing-lg) 0;
+}
+
+.tab-content.active
+{
+    display: block;
+}

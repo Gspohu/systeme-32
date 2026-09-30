@@ -1,0 +1,37 @@
+{
+    "name": "systeme-32",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "license": "GPL-3.0-or-later",
+    "description": "Furniture design, real-time preview and workshop drawings, fully client side",
+    "scripts": {
+        "dev": "vite dev",
+        "build": "vite build",
+        "preview": "vite preview",
+        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "e2e": "playwright test"
+    },
+    "dependencies": {
+        "@threlte/core": "8.6.1",
+        "@threlte/extras": "9.22.0",
+        "fflate": "0.8.3",
+        "idb": "8.0.3",
+        "three": "0.186.1"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.63.0",
+        "@sveltejs/adapter-static": "3.0.10",
+        "@sveltejs/kit": "2.70.3",
+        "@sveltejs/vite-plugin-svelte": "7.3.1",
+        "@types/node": "22.20.4",
+        "@types/three": "0.186.0",
+        "svelte": "5.57.1",
+        "svelte-check": "4.7.6",
+        "typescript": "6.0.3",
+        "vite": "8.3.1",
+        "vitest": "5.0.2"
+    }
+}

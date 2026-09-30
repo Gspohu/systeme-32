@@ -1,0 +1,223 @@
+/* Application layout, built only from the design system tokens */
+
+html,
+body
+{
+    height: 100%;
+    overflow: hidden;
+    background: var(--colour-bg-primary);
+    color: var(--colour-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-sm);
+}
+
+.app
+{
+    display: grid;
+    height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* the static shell of app.html, painted before the scripts run and gone once the application is mounted */
+body:has(.app) .boot
+{
+    display: none;
+}
+
+/* a line of controls that wraps on a narrow screen */
+.bar
+{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.toolbar
+{
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--colour-bg-surface);
+    border-bottom: var(--border-width) solid var(--colour-border);
+}
+
+.toolbar .spacer
+{
+    flex: 1;
+}
+
+/* the design system inputs are full width by default, the toolbar keeps them to their content */
+.toolbar .input,
+.toolbar .select
+{
+    width: auto;
+}
+
+.toolbar .name
+{
+    min-width: 12rem;
+    max-width: 22rem;
+}
+
+.workspace
+{
+    display: grid;
+    min-height: 0;
+    grid-template-columns: 11rem minmax(0, 1fr) minmax(22rem, 30rem);
+    grid-template-rows: minmax(0, 1fr) minmax(8rem, 14rem);
+    grid-template-areas:
+        "palette facade side"
+        "palette checks side";
+}
+
+.pane
+{
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    background: var(--colour-bg-surface);
+    border: var(--border-width) solid var(--colour-border);
+}
+
+.pane-palette
+{
+    grid-area: palette;
+}
+
+.pane-facade
+{
+    grid-area: facade;
+    background: var(--colour-bg-primary);
+    overflow: hidden;
+    position: relative;
+}
+
+.pane-checks
+{
+    grid-area: checks;
+}
+
+.pane-side
+{
+    grid-area: side;
+    display: grid;
+    grid-template-rows: minmax(14rem, 42%) minmax(0, 1fr);
+}
+
+.pane-side .viewer
+{
+    min-height: 0;
+    border-bottom: var(--border-width) solid var(--colour-border);
+    position: relative;
+}
+
+.pane-side .inspector
+{
+    min-height: 0;
+    overflow: auto;
+    padding: var(--spacing-sm);
+}
+
+.pane-full
+{
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    overflow: auto;
+    padding: var(--spacing-md);
+}
+
+.section-title
+{
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-wide);
+    text-transform: uppercase;
+    color: var(--colour-text-secondary);
+    margin: var(--spacing-sm) 0 var(--spacing-xs);
+}
+
+.field
+{
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+}
+
+.field .input,
+.field .select
+{
+    min-height: var(--control-height-sm);
+}
+
+.row
+{
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-xs) 0;
+}
+
+.muted
+{
+    color: var(--colour-text-muted);
+}
+
+.drag-ghost
+{
+    position: fixed;
+    z-index: var(--z-overlay);
+    pointer-events: none;
+    transform: translate(-50%, -120%);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--colour-accent);
+    color: var(--colour-text-inverse);
+    box-shadow: var(--shadow-md);
+    font-weight: var(--font-weight-medium);
+}
+
+.toast-container
+{
+    position: fixed;
+    right: var(--spacing-md);
+    bottom: var(--spacing-md);
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-width: 28rem;
+}
+
+/* Tablet and phone : tabs, the palette becomes a strip above the front view */
+.narrow
+{
+    display: grid;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.narrow .tabs
+{
+    overflow-x: auto;
+}
+
+.narrow-body
+{
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.narrow-body.single
+{
+    grid-template-rows: minmax(0, 1fr);
+}
+
+/* the named areas of the wide grid do not exist here, placing a pane in one would spawn implicit tracks */
+.narrow-body > .pane
+{
+    grid-area: auto;
+    min-height: 0;
+}

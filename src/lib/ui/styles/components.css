@@ -1,0 +1,234 @@
+/* ── Component Patterns ───────────────────────────────────────────────
+   Common UI patterns. Import AFTER tokens.css
+   These are opt-in classes, not global styles
+   ──────────────────────────────────────────────────────────────────── */
+
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+
+.btn
+{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-pill);
+    background: none;
+    cursor: pointer;
+    user-select: none;
+    transition: transform var(--transition-fast),
+                background var(--transition-base),
+                box-shadow var(--transition-base),
+                border-color var(--transition-base);
+}
+
+.btn:active
+{
+    transform: scale(0.94);
+}
+
+.btn-primary
+{
+    background: var(--colour-accent);
+    color: white;
+    box-shadow: var(--shadow-md);
+    min-width: var(--control-min-width);
+}
+
+.btn-primary:hover
+{
+    background: var(--colour-accent-hover);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-secondary
+{
+    background: var(--colour-bg-surface);
+    color: var(--colour-text-secondary);
+    border-color: var(--colour-border);
+}
+
+.btn-secondary:hover
+{
+    background: var(--colour-bg-surface-hover);
+    border-color: var(--colour-border-hover);
+    color: var(--colour-text-primary);
+}
+
+.btn-ghost
+{
+    padding: var(--spacing-sm) var(--spacing-base);
+    font-size: var(--font-size-sm);
+    color: var(--colour-text-secondary);
+}
+
+.btn-ghost:hover
+{
+    background: var(--colour-bg-surface-hover);
+    color: var(--colour-text-primary);
+}
+
+.btn-danger
+{
+    background: var(--colour-danger);
+    color: white;
+}
+
+.btn-danger:hover
+{
+    opacity: 0.9;
+}
+
+.btn-icon
+{
+    width: var(--control-height);
+    height: var(--control-height);
+    padding: 0;
+    border-radius: var(--radius-circle);
+    font-size: var(--font-size-md);
+    color: var(--colour-text-secondary);
+}
+
+.btn-icon:hover
+{
+    background: var(--colour-bg-surface-hover);
+    color: var(--colour-text-primary);
+}
+
+.btn:disabled
+{
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+
+/* ── Inputs ───────────────────────────────────────────────────────── */
+
+.input
+{
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-base);
+    background: var(--colour-bg-primary);
+    color: var(--colour-text-primary);
+    border: var(--border-width) solid var(--colour-border);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-base);
+}
+
+.input:hover
+{
+    border-color: var(--colour-border-hover);
+}
+
+.input:focus
+{
+    border-color: var(--colour-border-focus);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--colour-focus-ring);
+}
+
+.input::placeholder
+{
+    color: var(--colour-text-muted);
+}
+
+.label
+{
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: var(--letter-spacing-wide);
+    color: var(--colour-text-secondary);
+}
+
+
+/* ── Modal / Dialogue ───────────────────────────────────────────────── */
+
+.modal-overlay
+{
+    position: fixed;
+    inset: 0;
+    background: var(--colour-bg-overlay);
+    backdrop-filter: blur(var(--blur-overlay));
+    -webkit-backdrop-filter: blur(var(--blur-overlay));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-base);
+}
+
+.modal-overlay.active
+{
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal
+{
+    background: var(--colour-bg-surface);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    width: min(420px, 90vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: translateY(12px);
+    transition: transform var(--transition-base);
+}
+
+.modal-overlay.active .modal
+{
+    transform: translateY(0);
+}
+
+.modal-title
+{
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--spacing-lg);
+}
+
+.modal-actions
+{
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: flex-end;
+    margin-top: var(--spacing-lg);
+}
+
+
+/* ── Badges ───────────────────────────────────────────────────────── */
+
+.badge
+{
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-2xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: var(--letter-spacing-wide);
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+}
+
+.badge-warning
+{
+    background: var(--colour-warning-muted);
+    color: var(--colour-warning);
+}
+
+.badge-danger
+{
+    background: var(--colour-danger-muted);
+    color: var(--colour-danger);
+}
