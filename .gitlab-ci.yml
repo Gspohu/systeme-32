@@ -6,6 +6,11 @@ stages:
   - test
   - deploy
 
+default:
+  # the npm 10 bundled with node 22 crashes on the vitest 5 peer set ("reading 'edgesOut'")
+  before_script:
+    - npm install --global npm@12.0.2 --no-fund --no-audit
+
 cache:
   key:
     files:
