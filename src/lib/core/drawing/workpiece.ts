@@ -2,8 +2,9 @@
 
 import type { Bom, CutRow } from "../bom";
 import { edgeNotation } from "../bom";
-import type { Part } from "../parts";
-import { tessellate } from "../geometry";
+import type { Fitted, Part } from "../parts";
+import { tessellate, type Vec3 } from "../geometry";
+import { fittedExtent } from "../fitted";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
 import type { Draft } from "./draft";
 import { DIAM } from "../text";
@@ -24,10 +25,27 @@ const DEFAULT_ORIGIN = "u selon la longueur, v selon la largeur, origine au coin
 
 const BOX_W = 185;
 const BOX_H = 120;
-const ROW = 3.4;
+// a part alone on its sheet
+const WIDE_W = 390;
+const WIDE_H = 150;
+const ROW = 3.6;
+const TABLE_COL_W = 198;
 
 
-export function partSheets(bom: Bom): Draft[]
+// A long or much drilled part reads better alone on its sheet than in half of it
+function wantsWholeSheet(row: CutRow): boolean
+{
+    const part = row.parts[0]!;
+    if (part.holes.length > 36)
+    {
+        return true;
+    }
+    return pickScale(part.length, part.width, WIDE_W - 20, WIDE_H - 20) < pickScale(part.length, part.width, BOX_W - 20,
+                                                                                    BOX_H - 20);
+}
+
+
+export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
 {
     const sheets: Draft[] = [];
     const rows = [...bom.cut, ...bom.offSheet];
@@ -38,12 +56,21 @@ export function partSheets(bom: Bom): Draft[]
         const scales = new Set<number>();
         const codes: string[] = [];
         let k = 0;
-        while (k < 2 && i + k < rows.length)
+        if (wantsWholeSheet(rows[i]!))
         {
-            const row = rows[i + k]!;
-            scales.add(drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5));
-            codes.push(row.code.split(",")[0]!);
-            k++;
+            scales.add(drawWorkpiece(canvas, rows[i]!, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 2));
+            codes.push(rows[i]!.code.split(",")[0]!);
+            k = 1;
+        }
+        else
+        {
+            while (k < 2 && i + k < rows.length && !wantsWholeSheet(rows[i + k]!))
+            {
+                const row = rows[i + k]!;
+                scales.add(drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1));
+                codes.push(row.code.split(",")[0]!);
+                k++;
+            }
         }
         const scale = [...scales].map((s) =>
         {
@@ -57,13 +84,14 @@ export function partSheets(bom: Bom): Draft[]
 
 
 // A workpiece in a 195 x 255 box : header, drawing at a drafting scale, then the table of holes
-function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number): number
+function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW: number, boxH: number,
+                       fitted: Fitted[], tableCols: number): number
 {
     const part = row.parts[0]!;
     const details = `${row.items.join(", ")} : quantité ${row.quantity}, ${row.decorLabel}, ép. ${row.thickness} mm`;
-    canvas.text(x0, y0 + 5, fit(`${row.code}  ${row.label}`, 3.5, 190), 3.5, "start", true);
-    canvas.text(x0, y0 + 10, fit(`${details}, chants ${edgeNotation(row.edges)}`, 2.3, 190), 2.3);
-    canvas.text(x0, y0 + 14, fit(`Origine : ${ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN}`, 2.1, 190), 2.1);
+    canvas.text(x0, y0 + 5, fit(`${row.code}  ${row.label}`, 3.5, boxW + 5), 3.5, "start", true);
+    canvas.text(x0, y0 + 10, fit(`${details}, chants ${edgeNotation(row.edges)}`, 2.5, boxW + 5), 2.5);
+    canvas.text(x0, y0 + 14, fit(`Origine : ${ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN}`, 2.5, boxW + 5), 2.5);
     const outline = tessellate(part.outline);
     let maxU = 0;
     let maxV = 0;  
@@ -72,7 +100,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number): num
         maxU = Math.max(maxU, u);
         maxV = Math.max(maxV, v);
     }
-    const scale = pickScale(maxU, maxV, BOX_W - 20, BOX_H - 20);
+    const scale = pickScale(maxU, maxV, boxW - 20, boxH - 20);
     const ox = x0 + 12;
     const oy = y0 + 24 + maxV / scale;
     const pageU = (u: number): number =>
@@ -173,9 +201,74 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number): num
     canvas.text(pageU(0) - 1.5, pageV(0) + 3, "0", 2, "end");
     canvas.dimH(pageU(0), pageU(maxU), pageV(0) + 1, pageV(0) + 7, `${Math.round(maxU * 10) / 10}`);
     canvas.dimV(pageV(maxV), pageV(0), pageU(0) - 1, pageU(0) - 7, `${Math.round(maxV * 10) / 10}`);
-    canvas.text(x0 + BOX_W, y0 + 18, `1:${scale}`, 2.5, "end");
-    holeTable(canvas, row, part, x0, oy + 18);
+    drawFootprints(canvas, part, fitted, pageU, pageV);
+    canvas.text(x0 + boxW, y0 + 18, `1:${scale}`, 2.5, "end");
+    holeTable(canvas, row, part, x0, oy + 18, tableCols);
     return scale;
+}
+
+
+// The outline of the hardware this part carries the screws of, dashed, with its reference
+// TODO on a narrow footprint the reference runs across the dashes, it wants a leader line
+function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[], pageU: (u: number) => number,
+                        pageV: (v: number) => number): void
+{
+    const fr = part.frame;
+    if (fr === null)
+    {
+        return;
+    }
+    for (const f of fitted)
+    {
+        if (f.host !== null || !part.holes.some((h) =>
+        {
+            return h.label.includes(f.ref);
+        }))
+        {
+            continue;
+        }
+        const e = fittedExtent(f);
+        let u0 = Infinity;
+        let u1 = -Infinity;
+        let v0 = Infinity;
+        let v1 = -Infinity;
+        let w0 = Infinity;
+        let w1 = -Infinity;
+        for (const x of [e.min[0], e.max[0]])
+        {
+            for (const y of [e.min[1], e.max[1]])
+            {
+                for (const z of [e.min[2], e.max[2]])
+                {
+                    const d: Vec3 = [x - fr.o[0], y - fr.o[1], z - fr.o[2]];
+                    const u = d[0] * fr.u[0] + d[1] * fr.u[1] + d[2] * fr.u[2];
+                    const v = d[0] * fr.v[0] + d[1] * fr.v[1] + d[2] * fr.v[2];
+                    const w = d[0] * fr.n[0] + d[1] * fr.n[1] + d[2] * fr.n[2];
+                    u0 = Math.min(u0, u);
+                    u1 = Math.max(u1, u);
+                    v0 = Math.min(v0, v);
+                    v1 = Math.max(v1, v);
+                    w0 = Math.min(w0, w);
+                    w1 = Math.max(w1, w);
+                }
+            }
+        }
+        // the hardware lies against one face of the part, never away from it
+        if (w1 < -1 || w0 > part.thickness + 1)
+        {
+            continue;
+        }
+        u0 = Math.max(0, u0);
+        u1 = Math.min(part.length, u1);
+        v0 = Math.max(0, v0);
+        v1 = Math.min(part.width, v1);
+        if (u1 <= u0 || v1 <= v0)
+        {
+            continue;
+        }
+        canvas.rect(pageU(u0), pageV(v1), pageU(u1) - pageU(u0), pageV(v0) - pageV(v1), "dashed");
+        canvas.text((pageU(u0) + pageU(u1)) / 2, (pageV(v0) + pageV(v1)) / 2 + 0.7, f.ref, 1.8, "middle");
+    }
 }
 
 
@@ -185,66 +278,84 @@ function round1(v: number): string
 }
 
 
-function holeTable(canvas: Canvas, row: CutRow, part: Part, x0: number, top: number): void
+// Holes, then grooves and notes, run down as many columns as the sheet gives the part
+function holeTable(canvas: Canvas, row: CutRow, part: Part, x0: number, top: number, tableCols: number): void
 {
-    let ty = top;
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 6;
-    const rowsMax = Math.max(4, Math.floor((bottom - ty - 4 - ROW * Math.min(4, row.notes.length)) / ROW));
     const cols = [16, 16, 10, 11, 24, 111];
     const holes = [...part.holes].sort((a, b) =>
     {
         return a.face.localeCompare(b.face) || a.u - b.u || a.v - b.v;
     });
     const grooves = part.grooves.length > 0 ? `, rainures (${part.grooves.length})` : "";
-    canvas.text(x0, ty - 5, `Perçages (${holes.length})${grooves}`, 2.8, "start", true);
-    let cx = x0;
-    let c = 0;
-    for (const title of ["u", "v", DIAM, "prof.", "face", "usage"])
-    {
-        canvas.text(cx, ty, title, 2.2, "start", true);
-        cx += cols[c]!;
-        c++;
-    }
-    ty += 3.6;
-    let n = 0;
+    canvas.text(x0, top - 5, `Perçages (${holes.length})${grooves}`, 2.8, "start", true);
+    const lines: string[][] = [];
     for (const h of holes)
     {
-        if (n >= rowsMax)
-        {
-            canvas.text(x0, ty, `... ${holes.length - n} autres perçages : voir le DXF de la pièce`, 2.2);
-            break;
-        }
         let face: string = h.face;
         if (h.face !== "A" && h.face !== "B")
         {
             face = h.w === undefined ? `chant ${h.face}` : `chant ${h.face} w${round1(h.w)}`;
         }
-        const cells = [round1(h.u), round1(h.v), h.diameter === 0 ? "vis" : `${h.diameter}`,
-                       h.depth === 0 ? "-" : `${h.depth}`, face, h.label];
-        cx = x0;
-        c = 0;
-        for (const text of cells)
-        {
-            canvas.text(cx, ty, fit(text, 2.1, cols[c]! - 1), 2.1);
-            cx += cols[c]!;
-            c++;
-        }
-        ty += ROW;
-        n++;
+        lines.push([round1(h.u), round1(h.v), h.diameter === 0 ? "vis" : `${h.diameter}`,
+                    h.depth === 0 ? "-" : `${h.depth}`, face, h.label]);
     }
-    if (n < rowsMax)
+    for (const g of part.grooves)
     {
-        for (const g of part.grooves)
-        {
-            const where = `le long de ${g.along} à ${round1(g.at)}, de ${Math.round(g.from)} à ${Math.round(g.to)}`;
-            canvas.text(x0, ty, fit(`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`, 2.1,
-                                    190), 2.1);
-            ty += ROW;
-        }
+        const where = `le long de ${g.along} à ${round1(g.at)}, de ${Math.round(g.from)} à ${Math.round(g.to)}`;
+        lines.push([`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`]);
     }
     for (const note of row.notes.slice(0, 4))
     {
-        canvas.text(x0, ty, fit(`Note : ${note}`, 2.1, 190), 2.1);
+        lines.push([`Note : ${note}`]);
+    }
+    const perCol = Math.max(4, Math.floor((bottom - top - 3.6) / ROW));
+    let col = -1;
+    let ty = bottom + 1;
+    let n = 0;
+    for (const cells of lines)
+    {
+        if (ty > bottom)
+        {
+            col++;
+            if (col >= tableCols)
+            {
+                break;
+            }
+            ty = top;
+            let cx = x0 + col * TABLE_COL_W;
+            let c = 0;
+            for (const title of ["u", "v", DIAM, "prof.", "face", "usage"])
+            {
+                canvas.text(cx, ty, title, 2.4, "start", true);
+                cx += cols[c]!;
+                c++;
+            }
+            ty += 3.6;
+        }
+        const x = x0 + col * TABLE_COL_W;
+        // the last free line tells what did not fit, the DXF holds every hole
+        if (n === perCol * tableCols - 1 && lines.length > n + 1)
+        {
+            canvas.text(x, ty, `... ${lines.length - n} autres lignes : voir le DXF de la pièce`, 2.4);
+            break;
+        }
+        if (cells.length === 1)
+        {
+            canvas.text(x, ty, fit(cells[0]!, 2.4, TABLE_COL_W - 5), 2.4);
+        }
+        else
+        {
+            let cx = x;
+            let c = 0;
+            for (const text of cells)
+            {
+                canvas.text(cx, ty, fit(text, 2.4, cols[c]! - 1), 2.4);
+                cx += cols[c]!;
+                c++;
+            }
+        }
         ty += ROW;
+        n++;
     }
 }

@@ -1,23 +1,24 @@
-// Composition sheet and one sheet of views per carcass : front, plan and side, with their main dimensions
+// Front views of the items, the composition sheet of each wall and the room lpan
 
 import type { Carcass, Item, Project, Wall } from "../model";
 import { roomBox, WALL_LABELS } from "../room";
 import { openingPoints } from "../cutouts";
 import type { Analysis } from "../analysis";
 import { PLINTH_FOOT_GAP, baseHeight } from "../parts";
-import { endReach, itemExtent, projectExtent, screenSize, usableDepth } from "../extent";
+import { endReach, itemExtent, projectExtent, screenSize } from "../extent";
 import { slatLayout } from "../slats";
-import { ceilingAt, frontOutline, sideHeights, topAngle } from "../slope";
+import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, SPOT_RIM, railPlan, spotCentres } from "../wardrobe";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
 import { BODY, heading, type Draft } from "./draft";
-import { decorById } from "../../data/materials";
+import { fittedExtent } from "../fitted";
 
 type ToPage = (value: number) => number;
 
 
 // Front view of one item, world x and y mapped at 1:scale with the world origin on page point (ox, oy)
-export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, oy: number, a: Analysis): void
+export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, oy: number, a: Analysis,
+                          withFronts = true): void
 {
     const pageX: ToPage = (x) =>
     {
@@ -29,7 +30,7 @@ export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, o
     };
     if (it.kind === "carcass")
     {
-        drawCarcass(canvas, it, scale, pageX, pageY, a);
+        drawCarcass(canvas, it, scale, pageX, pageY, a, withFronts);
         return;
     }
     if (it.kind === "corner")
@@ -85,7 +86,8 @@ export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, o
 }
 
 
-function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, pageY: ToPage, a: Analysis): void
+function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, pageY: ToPage, a: Analysis,
+                     withFronts: boolean): void
 {
     const bh = baseHeight(k);
     const t = k.thickness;
@@ -123,10 +125,16 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
     {
         canvas.rect(pageX(k.x), pageY(k.y - PLINTH_FOOT_GAP), k.width / scale, (bh - PLINTH_FOOT_GAP) / scale, "thin");
     }
-    else if (k.base.type === "feet")
+    // the feet behind a plinth are hidden lines, the runner spaces only show where no front covers them
+    for (const f of a.build.fitted)
     {
-        canvas.rect(pageX(k.x + 30), pageY(k.y), 30 / scale, bh / scale, "thin");
-        canvas.rect(pageX(k.x + k.width - 60), pageY(k.y), 30 / scale, bh / scale, "thin");
+        if (f.item !== k.id || f.host !== null || (f.hidden && withFronts))
+        {
+            continue;
+        }
+        const e = fittedExtent(f);
+        canvas.rect(pageX(e.min[0]), pageY(e.max[1]), (e.max[0] - e.min[0]) / scale, (e.max[1] - e.min[1]) / scale,
+                    f.hidden || k.base.type === "plinth" ? "dashed" : "thin");
     }
     for (const side of ["left", "right"] as const)
     {
@@ -202,7 +210,7 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
             canvas.line(pageX(k.x + nb.x + FIT_PLAY), y, pageX(k.x + nb.x + nb.w - FIT_PLAY), y, "dashed");
         }
     }
-    for (const fp of a.build.fronts.get(k.id) ?? [])
+    for (const fp of withFronts ? a.build.fronts.get(k.id) ?? [] : [])
     {
         const x0 = pageX(k.x + fp.rect.x);
         const x1 = pageX(k.x + fp.rect.x + fp.rect.w);
@@ -327,157 +335,4 @@ export function roomPlan(p: Project): Draft
 }
 
 
-export function itemViews(k: Carcass, a: Analysis): Draft
-{
-    const canvas = new Canvas();
-    heading(canvas, `${k.name} : vues`);
-    const bh = baseHeight(k);
-    const reachLeft = endReach(k, "left");
-    const reachRight = endReach(k, "right");
-    const fullHeight = k.height + bh;
-    // front view with the plna under it on the left, side view on the right when it fits
-    const scale = pickScale(k.width + reachLeft + reachRight, fullHeight + k.depth, 290, 185);
-    const fx = MARGIN + 30 + reachLeft / scale;
-    const fy = MARGIN + 36 + fullHeight / scale;
-    const topY = fy - fullHeight / scale;
-    drawFront(canvas, { ...k, x: 0, y: bh }, scale, fx, fy, a);
-    canvas.text(fx + k.width / scale / 2, topY - 12, "Vue de face", 3, "middle", true);
-    canvas.dimH(fx, fx + k.width / scale, fy + 1, fy + 8, `${k.width}`);
-    if (k.slope === null)
-    {
-        canvas.dimV(topY, fy, fx - reachLeft / scale - 1, fx - reachLeft / scale - 8, `${fullHeight}`);
-    }
-    else
-    {
-        // each side dimensioned on its own, the low one would read as the full height otherwise
-        const sides = sideHeights(k);
-        const xr = fx + (k.width + reachRight) / scale;
-        canvas.dimV(fy - (sides.left + bh) / scale, fy, fx - reachLeft / scale - 1, fx - reachLeft / scale - 8,
-                    `${sides.left + bh}`);
-        canvas.dimV(fy - (sides.right + bh) / scale, fy, xr + 1, xr + 8, `${sides.right + bh}`);
-    }
-    const lay = a.build.layouts.get(k.id);
-    if (lay !== undefined && k.root.kind === "split" && k.root.axis === "v")
-    {
-        // chain of the inner widths of the first level of columns
-        const edges = [k.thickness];
-        for (const d of lay.dividers)
-        {
-            if (d.split === k.root.id)
-            {
-                edges.push(d.x, d.x + d.w);
-            }
-        }
-        edges.push(k.width - k.thickness);
-        let i = 0;
-        while (i + 1 < edges.length)
-        {
-            const width = Math.round(edges[i + 1]! - edges[i]!);
-            canvas.dimH(fx + edges[i]! / scale, fx + edges[i + 1]! / scale, topY - 1, topY - 6, `${width}`, 1.8);
-            i += 2;
-        }
-    }
-    const planTop = fy + 18;
-    canvas.text(fx + k.width / scale / 2, planTop - 2, "Vue de dessus", 3, "middle", true);
-    drawPlan(canvas, k, scale, fx, planTop, reachRight);
-    const planBottom = planTop + k.depth / scale;
 
-    const frontRight = fx + (k.width + reachRight) / scale + 12;
-    const besides = frontRight + k.depth / scale + 20 < A3.w - MARGIN;
-    const sideX = besides ? frontRight + 10 : fx;
-    const sideY = besides ? fy : planBottom + 20 + fullHeight / scale;  
-    canvas.text(sideX + k.depth / scale / 2, sideY - fullHeight / scale - 4, "Vue de côté", 3, "middle", true);
-    canvas.rect(sideX, sideY - fullHeight / scale, k.depth / scale, k.height / scale, "normal");
-    if (bh > 0)
-    {
-        const setback = k.base.type === "plinth" ? k.base.setback : 30;
-        canvas.rect(sideX, sideY - bh / scale, (k.depth - setback) / scale, bh / scale, "thin");
-    }
-    canvas.dimH(sideX, sideX + k.depth / scale, sideY + 1, sideY + 8, `${k.depth}`);
-
-
-    let listY = besides ? planBottom + 14 : planBottom + 16;
-    const listX = besides ? MARGIN + 25 : sideX + k.depth / scale + 20;
-    if (k.slope !== null)
-    {
-        const deg = (topAngle(k) * 180 / Math.PI).toFixed(1).replace(".", ",");
-        const where = k.slope.low === "left" ? "gauche" : "droite";
-        canvas.text(listX, listY, `Dessus en pente à ${deg}°, joue basse de ${k.slope.height} mm à ${where}`, 2.6);
-        listY += 8;
-    }
-    canvas.text(listX, listY, "Façades", 3, "start", true);
-    listY += 5;
-    for (const fp of a.build.fronts.get(k.id) ?? [])
-    {
-        let kind = ("vantail coulissant");
-        if (fp.role === "door")
-        {
-            kind = `porte, charnières à ${fp.hinge === "left" ? "gauche" : "droite"}`;
-        }
-        else if (fp.role === "drawer")
-        {
-            kind = ("façade de tiroir");
-        }
-        else if (fp.role === "flap")
-        {
-            kind = "abattant relevant";
-        }
-        else if (fp.role === "panel")
-        {
-            kind = "façade fixe";
-        }
-        const size = `${Math.round(fp.rect.w)} x ${Math.round(fp.rect.h)} x ${fp.thickness}`;
-        canvas.text(listX + 3, listY, `${size}, ${kind}, ${decorById(fp.decor).label}`, 2.2);
-        listY += 4;
-        if (listY > A3.h - MARGIN - TITLE_BLOCK_H - 4)
-        {
-            break;
-        }
-    }
-    return { title: `${k.name}, vues`, scale: `1:${scale}`, canvas };
-}
-
-
-// Plan view with the rounded ends drawn as their real arcs
-function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop: number, reachRight: number): void
-{
-    const planX: ToPage = (x) =>
-    {
-        return fx + x / scale;
-    };
-    const planY: ToPage = (z) =>
-    {
-        return planTop + (k.depth - z) / scale;
-    };
-    canvas.rect(planX(0), planY(k.depth), k.width / scale, k.depth / scale, "normal");
-    for (const side of ["left", "right"] as const)
-    {
-        const end = k.ends[side];
-        if (end.type !== "rounded")
-        {
-            continue;
-        }
-        const r = endReach(k, side);
-        const usable = usableDepth(k);
-        const dir = side === "right" ? 1 : -1;
-        const xFace = side === "right" ? k.width : 0;
-        const arc: [number, number][] = [];
-        const start = end.sweep === 180 ? -Math.PI / 2 : 0;
-        let j = 0;
-        while (j <= 24)
-        {
-            const ang = start + (Math.PI / 2 - start) * j / 24;
-            arc.push([planX(xFace + dir * r * Math.cos(ang)), planY(k.depth - r + r * Math.sin(ang))]);
-            j++;
-        }
-        // the straight run of a quarter round stops against the applied back, like the skin that gets built
-        if (end.sweep === 90 && usable > r)
-        {
-            arc.unshift([planX(xFace + dir * r), planY(k.depth - usable)]);
-        }
-        canvas.poly(arc, false, "normal");
-        canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2), `R ${Math.round(r)}`, 2, "middle");
-    }
-    const dimX = planX(k.width) + reachRight / scale;
-    canvas.dimV(planY(k.depth), planY(0), dimX + 1, dimX + 8, `${k.depth}`);
-}

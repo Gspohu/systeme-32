@@ -7,7 +7,8 @@ import { EDGE_OVERLENGTH } from "../bom";
 import type { NestResult } from "../nesting";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, frameAndTitle, type Page } from "./display";
 import { BODY, heading, type Draft } from "./draft";
-import { composition, itemViews, roomPlan } from "./views";
+import { composition, roomPlan } from "./views";
+import { itemViews } from "./item_views";
 import { partSheets } from "./workpiece";
 import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
 import { CUBED, DIAM } from "../text";
@@ -44,7 +45,7 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
             drafts.push(itemViews(it, a));
         }
     }
-    drafts.push(...partSheets(bom), ...cutListSheets(bom), ...hardwareSheets(bom));
+    drafts.push(...partSheets(bom, a.build.fitted), ...cutListSheets(bom), ...hardwareSheets(bom));
     drafts.push(...nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
     const date = new Date(p.updated).toLocaleDateString("fr-FR");
     const pages: Page[] = [];
