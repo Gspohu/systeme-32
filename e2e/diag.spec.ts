@@ -1,6 +1,6 @@
 import { addCarcass, cells, check, field, openBlank, selectItem, test } from "./helpers";
 
-// FIXME temporary : traces the refused entry that keeps "-5" on GitHub runners only, drop it once understood
+// FIXME tepmorary : traces the refused entry that keeps "-5" on GitHub runners only, drop it once understood
 test("diag refused entry events", async ({ page }) =>
 {
     page.on("console", (m) =>
@@ -31,6 +31,34 @@ test("diag refused entry events", async ({ page }) =>
                 }, capture);
             }
         }
+        new MutationObserver((records) =>
+        {
+            for (const r of records)
+            {
+                for (const n of r.addedNodes)
+                {
+                    if (n instanceof HTMLElement && n.classList.contains("alert"))
+                    {
+                        console.log(`diag ${Math.round(performance.now() - t0)} toast ${n.innerText.slice(0, 40)}`);
+                    }
+                }
+            }
+        }).observe(document.body, { childList: true, subtree: true });
+        let last = "";
+        setInterval(() =>
+        {
+            const label = [...document.querySelectorAll(".inspector-body .field span.label")]
+                .find((s) =>
+                {
+                    return s.textContent === "Retrait (mm)";
+                });
+            const v = label?.parentElement?.querySelector("input")?.value ?? "absent";
+            if (v !== last)
+            {
+                console.log(`diag ${Math.round(performance.now() - t0)} retrait=${v}`);
+                last = v;
+            }
+        }, 10);
     });
     const f = field(page, "Retrait (mm)");
     await f.fill("-5");
