@@ -8,7 +8,10 @@ test.describe("application", () =>
         await page.goto("/");
         await expect(page.locator(".facade svg")).toBeVisible();
         await expect(page.getByLabel("Nom du projet")).not.toHaveValue("");
-        expect(await page.locator(".facade .grip").count()).toBeGreaterThan(3);
+        await expect.poll(() =>
+        {
+            return page.locator(".facade .grip").count();
+        }).toBeGreaterThan(3);
         expect(await errorCount(page)).toBe(0);
     });
 

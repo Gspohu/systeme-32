@@ -74,7 +74,10 @@ test.describe("plans and lists", () =>
     {
         await outputsTab(page, "Débit");
         const rows = page.locator(".tab-content tbody tr");
-        expect(await rows.count()).toBeGreaterThan(10);
+        await expect.poll(() =>
+        {
+            return rows.count();
+        }).toBeGreaterThan(10);
         const csv = await download(page, page.locator(".tab-content").getByRole("button").first());
         expect(csv.name.endsWith("_fiche_de_debit.csv")).toBe(true);
         // one lien per row of the table, plus the header
