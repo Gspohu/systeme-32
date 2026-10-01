@@ -4,6 +4,7 @@ import type { PriceEntry, Project } from "./model";
 import type { Bom } from "./bom";
 import type { NestResult } from "./nesting";
 import { SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
+import { DEFAULT_PRICES } from "../data/prices";
 
 
 export interface CostLine
@@ -40,6 +41,10 @@ export function hardwareKey(ref: string): string
 {
     return `hw:${ref}`;
 }
+
+
+export const SERVICE_CUT = "service:cut";
+export const SERVICE_EDGING = "service:edging";
 
 
 export function computeCost(p: Project, bom: Bom, nesting: NestResult): Cost
@@ -82,11 +87,32 @@ export function computeCost(p: Project, bom: Bom, nesting: NestResult): Cost
         lines.push({ key: hardwareKey(h.id), label: `${h.brand} ${h.ref} ${h.label}`.trim(), qty: h.qty,
                     unit: "u", price: null, total: null });
     }
+    // what a panel merchant charges to saw and band the parts, quoted on request only
+    const pieces = nesting.sheets.reduce((n, s) =>
+    {
+        return n + s.placements.length;
+    }, 0);
+    if (pieces > 0)
+    {
+        lines.push({ key: SERVICE_CUT, label: `Débit à façon, ${pieces} pièces (tarif sur devis)`, qty: pieces,
+                    unit: "u",
+                    price: null, total: null });
+    }
+    const banded = bom.edges.reduce((m, e) =>
+    {
+        return m + e.metres;
+    }, 0);
+    if (banded > 0)
+    {
+        lines.push({ key: SERVICE_EDGING, label: "Placage des chants à façon (tarif sur devis)", qty: banded, unit: "m",
+                    price: null, total: null });
+    }
     let total = 0;
     const missing: CostLine[] = [];
     for (const l of lines)
     {
-        const price = p.prices[l.key] ?? null;
+        // a price typed in the project wins, else the dated public one
+        const price = p.prices[l.key] ?? DEFAULT_PRICES[l.key] ?? null;
         l.price = price;
         if (price === null || price.unit !== l.unit)
         {

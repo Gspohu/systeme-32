@@ -277,8 +277,9 @@ describe("anti-tip fixing", () =>
         const lines = computeOutputs(priced).cost.lines;
         const bracket = lines.find((l) => { return l.label.includes("Équerre anti-basculement"); })!;
         const screw = lines.find((l) => { return l.label.includes("Vis aggloméré 4 x 16"); })!;
+        // the price typed in wins over the default one, the screw keeps its own default
         expect(bracket.total).toBeCloseTo(2.4, 9);
-        expect(screw.price).toBeNull();
+        expect(screw.price!.source).toContain("vis fischer 4 x 16");
     }); 
 
 

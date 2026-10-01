@@ -190,7 +190,7 @@ export const DECORS: Decor[] = [
         colourSource: "Image décor Egger",
         references: "NCS S5010-G30Y, RAL 7033, Pantone 5635U",
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/U604_9?country=FR",
-        edge: "Chant assorti non confirmé",
+        edge: "Chant ABS U604 ST9 23x0,8 (Jean Hue Socoda)",
     },
     {
         id: "W1000_ST9",
