@@ -291,9 +291,48 @@
             shelfDecors.push(d);
         }
     }
+
+    // A refused command leaves the store as it was : the field gets back what it showed when entered
+    // Rebuilding the whole inspector on each refusal lost the focus, and on GitHub runners never happened
+    type Entered = { field: HTMLInputElement | HTMLSelectElement; value: string; checked: boolean; refusals: number };
+    let entered: Entered | null = null;
+
+    function remember(e: FocusEvent): void
+    {
+        const t = e.target;
+        if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement)
+        {
+            entered = { field: t, value: t.value, checked: t instanceof HTMLInputElement && t.checked,
+                        refusals: app.refusals };
+        }
+    }
+
+    function restoreRefused(e: Event): void
+    {
+        if (entered === null || e.target !== entered.field)
+        {
+            return;
+        }
+        const f = entered.field;
+        if (app.refusals !== entered.refusals)
+        {
+            f.value = entered.value;
+            if (f instanceof HTMLInputElement)
+            {
+                f.checked = entered.checked;
+            }
+            entered.refusals = app.refusals;
+        }
+        else
+        {
+            entered.value = f.value;
+            entered.checked = f instanceof HTMLInputElement && f.checked;
+        }
+    }
 </script>
 
-<div class="inspector-body">
+<!-- the field handlers run first, the delegated change reaches this container after them -->
+<div class="inspector-body" onfocusin={remember} onchange={restoreRefused}>
     {#if sel === null || item === null}
         <div class="empty-state">
             <div class="empty-state-title">Rien de sélectionné</div>
@@ -496,7 +535,7 @@
                         onchange={(e) => frontPatch({ spec: { ...spec, loadKg: num(e) } })} />
                 </label>
                 <div class="row">
-                    {#each Array.from({ length: spec.count }) as _, i}
+                    {#each { length: spec.count }, i}
                         <label class="form-check"><input type="checkbox" checked={spec.cutlery?.[i] === true}
                             onchange={(e) =>
                             {

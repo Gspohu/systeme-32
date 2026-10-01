@@ -10,9 +10,7 @@ export default defineConfig({
     testDir: "e2e",
     fullyParallel: true,
     forbidOnly: process.env.CI !== undefined,
-    // TODO the refused-entry test of inspector.spec.ts once kept "-5" on a GitHub runner, never reproduced here
-    // (110 runs, loaded, recent Chromium) : a test that only passes on retry shows up as flaky in the report
-    retries: process.env.CI !== undefined ? 2 : 0,
+    retries: 0,
     reporter: process.env.CI !== undefined ? [["list"], ["html", { open: "never" }]] : "list",
     timeout: 60000,
     use: {
