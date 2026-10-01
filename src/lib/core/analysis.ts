@@ -15,7 +15,10 @@ import { fitVentGrills } from "./vents";
 import { buildLadder, ladderChecks } from "./ladder";
 import { buildCeilingFiller, ceilingChecks } from "./ceiling";
 import { deskChecks } from "./desk";
-import { FRONT_FOOT_INSET, itemMass, shelfDeflection, tipping, type Deflection, type Tipping } from "./mechanics";
+import { itemMass, shelfDeflection, tipping, topDrawerExtension, type Deflection, type Tipping } from "./mechanics";
+import { frontFootInset } from "./feet";
+import { solidChecks } from "./solid_checks";
+import { letInFittings } from "./fitted";
 import { findNode, subtreeIds } from "./layout";
 import { screenSize } from "./extent";
 import { boxesMeet, roomBox, type Box3 } from "./room";
@@ -143,6 +146,7 @@ export function analyse(p: Project): Analysis
         }
     }
     packRailBars(b);
+    b.fitted.push(...letInFittings(b.parts));
     const masses = new Map<string, number>();
     for (const it of p.items)
     {
@@ -157,7 +161,7 @@ export function analyse(p: Project): Analysis
         {
             continue;
         }
-        const tp = tipping(it, b, FRONT_FOOT_INSET, topDrawerExtension(it));
+        const tp = tipping(it, b, frontFootInset(it), topDrawerExtension(it));
         if (tp !== null)
         {
             tippings.push(tp);
@@ -180,7 +184,7 @@ export function analyse(p: Project): Analysis
                           + "de la plaque. Vérifier la charge admise par la cheville choisie." });
     }
     checks.push(...seatChecks(p, b), ...screenChecks(p), ...wardrobeChecks(p, b), ...liftChecks(p, b),
-                ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p));
+                ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p), ...solidChecks(p, b));
     return { build: b, checks, masses, deflections: partReport.deflections, tippings };
 }
 
@@ -195,19 +199,6 @@ function anchored(p: Project): boolean
         }
     }
     return false;
-}
-
-
-function topDrawerExtension(c: Carcass): number
-{
-    for (const f of c.fronts)
-    {
-        if (f.spec.type === "drawers")
-        {
-            return c.depth;
-        }
-    }
-    return 0;
 }
 
 
@@ -290,7 +281,8 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
             checks.push({ level: "info", item: part.item, target: part.id,
                           message: `${name} : flèche ${d.instant.toFixed(1)} mm à l'essai (conforme), environ `
                               + `${d.final.toFixed(1)} mm à long terme avec le fluage (kdef `
-                              + `${MATERIALS[part.material]!.kdef}, EN 1995-1-1:2004). Aucune limite normative sur ce chiffre.` });
+                              + `${MATERIALS[part.material]!.kdef} en classe de service 1, EN 1995-1-1:2004). `
+                              + "Aucune limite normative sur ce chiffre." });
         }
     }
     for (const u of unverified.values())
@@ -375,25 +367,8 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
         }
         i++;
     }
-    for (const { it, box } of boxes)
+    for (const { it } of boxes)
     {
-        if (it.kind === "carcass" && (it.base.type === "plinth" || it.base.type === "feet" || it.base.type === "floor"))
-        {
-            const onFloor = Math.abs(box.min[1]) < 0.5;
-            let onTop = false;
-            for (const o of boxes)
-            {
-                const under = Math.abs(o.box.max[1] - box.min[1]) < 0.5 && o.box.min[0] < box.max[0]
-                    && o.box.max[0] > box.min[0] && o.box.min[2] < box.max[2] && o.box.max[2] > box.min[2];
-                onTop = onTop || (o.it.id !== it.id && under);
-            }
-            if (!onFloor && !onTop)
-            {
-                checks.push({ level: "warning", item: it.id, target: null,
-                              message: `${it.name} n'est ni au sol ni posé sur un autre meuble. Le poser ou choisir `
-                                  + "une suspension murale." });
-            }
-        }
         const m = masses.get(it.id) ?? 0;
         const load = loads.get(it.id) ?? 0;
         const loaded = load > 0 ? `, ${(m + load).toFixed(0)} kg chargé (charges d'essai)` : "";

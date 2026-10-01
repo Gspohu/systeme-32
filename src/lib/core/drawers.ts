@@ -5,6 +5,7 @@ import type { ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
 import { type Build, newPart } from "./parts";
 import { sideFace } from "./locate";
+import { box } from "./fitted";
 import { X, Y, Z, neg } from "./geometry";
 import { MOVENTO } from "../data/rules";
 import { MOVENTO_760H, MOVENTO_766H, TIPON_BLUMOTION_SETS } from "../data/hardware";
@@ -200,6 +201,15 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
                 bottomP.notes.push("Range-couverts : insert à façonner (ORGA-LINE n'existe que pour TANDEMBOX)");
             }
             b.parts.push(sideL, sideR, endF, endB, bottomP);
+            // the space Blum reserves for each runner (p. 419) : 21 against the cell side, under the drawer side
+            // over NL from the front of the box
+            // TODO the runner profile itself is not dimensionned on p. 419, only the space it takes
+            const zs: [number, number] = [oz + zFront - runner.nl, oz + zFront];
+            for (const [side, x0] of [["gauche", ox + nb.x], ["droite", ox + nb.x + LW - MOVENTO.sideInset]] as const)
+            {
+                b.fitted.push(box(`${tag}/coulisse-${side}`, c.id, runner.ref, `${name}, coulisse ${side}`,
+                                  [x0, oy + low, zs[0]], [x0 + MOVENTO.sideInset, oy + sideBottom, zs[1]], true));
+            }
 
             // runner screws on both faces bounding the cell
             const offs = [...MOVENTO.frontHoles];

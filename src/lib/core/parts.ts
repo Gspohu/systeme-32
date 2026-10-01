@@ -80,6 +80,9 @@ export interface Part
     curve: CurveShape | null;
     // lacquer colour of a lacquered MDF part, shown in 3D and noted for the painter
     colour: string | null;
+    // where each end of the board lies on face B, along u, measured from where it lies on face A : a plumb cut
+    // under a roof or a chamfered head, the outline being face A only
+    bevel: { u0: number; u1: number };
 }
 
 export interface CurveShape
@@ -143,11 +146,49 @@ export interface Build
     midLoads: Map<string, number>;
     // tube lengths to cut, packed into bars over the whole project once every item is built
     railCuts: { item: string; itemName: string; length: number }[];
+    // hardware as volumes, for the 3D view, the clash checks and the drawings
+    fitted: Fitted[];
+}
+
+
+// A piece of hardware or the space its maker reserves for it, in the frame of the wall of its item : a box, or
+// a cylinder along `axes[2]` of radius `half[0]`
+export interface Fitted
+{
+    key: string;
+    item: string;
+    ref: string;
+    label: string;
+    shape: "box" | "cylinder";
+    centre: Vec3;
+    axes: [Vec3, Vec3, Vec3];
+    half: Vec3;
+    // the part it is let into, never counted as clashing with it
+    host: string | null;
+    // inside a closed carcass : drawn in 3D only when the hardware is asked for
+    hidden: boolean;
+}
+
+
+// A face A position along u carried to depth w of a bevelled board, its ends moving in proportion
+export function bevelU(p: Part, u: number, w: number): number
+{
+    const a = p.bevel.u0 * w / p.thickness;
+    const b = p.length + p.bevel.u1 * w / p.thickness;
+    return a + u * (b - a) / p.length;
+}
+
+
+export function unbevelU(p: Part, u: number, w: number): number
+{
+    const a = p.bevel.u0 * w / p.thickness;
+    const b = p.length + p.bevel.u1 * w / p.thickness;
+    return (u - a) * p.length / (b - a);
 }
 
 
 export function newPart(p: Omit<Part, "outline" | "cutouts" | "holes" | "grooves" | "notes" | "curve" | "quantity" |
-                        "grain" | "material" | "colour"> & Partial<Part>): Part
+                        "grain" | "material" | "colour" | "bevel"> & Partial<Part>): Part
 {
     const decor = decorById(p.decor);
     const mat = p.material ?? materialOfDecor(decor).id;
@@ -160,6 +201,7 @@ export function newPart(p: Omit<Part, "outline" | "cutouts" | "holes" | "grooves
         notes: [],
         curve: null,
         colour: null,
+        bevel: { u0: 0, u1: 0 },
         grain: decor.grain,
         ...p,
         material: mat,
@@ -193,7 +235,7 @@ export function boxOrigin(c: Carcass): Vec3
 export function emptyBuild(): Build
 {
     return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], midLoads: new Map(),
-             railCuts: [] };
+             railCuts: [], fitted: [] };
 }
 
 
@@ -244,8 +286,12 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build): void
     {
         const deg = (angle * 180 / Math.PI).toFixed(1).replace(".", ",");
         top.notes.push(`Dessus sous rampant à ${deg}° : extrémités coupées d'aplomb`);
+        // plumb ends : on face B both ends sit t.tan further along u
+        top.bevel = { u0: t * sin / cos, u1: t * sin / cos };
         // the low side would pierce the roof line by t.tan over its thickness, the high one stays square
-        (c.slope.low === "left" ? left : right).notes.push(`Tête chanfreinée à ${deg}° dans la pente du dessus`);
+        const low = c.slope.low === "left" ? left : right;
+        low.notes.push(`Tête chanfreinée à ${deg}° dans la pente du dessus`);
+        low.bevel = { u0: 0, u1: -t * Math.tan(angle) };
     }
     b.parts.push(left, right, bottom, top);
     // Four corner joints : the ends of top and bottom against the inner faces of the sides

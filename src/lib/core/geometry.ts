@@ -14,7 +14,6 @@ export interface Frame
 
 export function at(f: Frame, u: number, v: number, w: number): Vec3
 {
-console.log("chien03");
     return [
         f.o[0] + u * f.u[0] + v * f.v[0] + w * f.n[0],
         f.o[1] + u * f.u[1] + v * f.v[1] + w * f.n[1],
@@ -38,7 +37,7 @@ export function add(a: Vec3, b: Vec3): Vec3
 }
 
 
-// Outline in part coordinates, counter clockwise, arcs kept exact for DXF and CNC
+// Outline in part coordinates, counter clockwise, arcs kept exact : the DXF and the CNC program need them
 export type Segment =
     | { kind: "line"; x: number; y: number }
     | { kind: "arc"; x: number; y: number; cx: number; cy: number; ccw: boolean };

@@ -3,8 +3,9 @@
     import { OrbitControls, Grid } from "@threlte/extras";
     import * as THREE from "three";
     import { untrack } from "svelte";
+    import { MediaQuery } from "svelte/reactivity";
     import { app } from "./app_state.svelte";
-    import { cushionMesh, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
+    import { cushionMesh, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
             type MeshSpec } from "../view3d/meshes";
     import { roomBox, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
@@ -137,7 +138,9 @@
         const user = colour === null ? app.project.textures[decor] : undefined;
         const photo = user === undefined ? undefined : photos.get(user.file);
         const tag = user === undefined || photo === undefined ? "" : `${photo.version}@${user.tileMm}`;
-        const key = `${decor}|${colour ?? ""}|${tag}`;
+        // boards turn see-through while the hardware inside is shown
+        const see = app.showHardware;
+        const key = `${decor}|${colour ?? ""}|${tag}|${see}`;
         const hit = materials.get(key);
         if (hit !== undefined)
         {
@@ -158,6 +161,9 @@
             roughness: 0.72,
             metalness: 0,
             side: THREE.DoubleSide,
+            transparent: see,
+            opacity: see ? 0.22 : 1,
+            depthWrite: !see,
         });
         materials.set(key, m);
         return m;
@@ -165,6 +171,14 @@
 
     const screenGeo = $derived(app.project.screen === null ? null : screenMesh(app.project.screen));
     const screenMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.3 });
+    $effect(() =>
+    {
+        const current = screenGeo;
+        return () =>
+        {
+            current?.dispose();
+        };
+    });
 
 
     // the fabric is not chosen yet : a plain neutral cushion
@@ -182,6 +196,48 @@
         return list;
     });
     const cushionMat = new THREE.MeshStandardMaterial({ color: 0x9a948c, roughness: 1 });
+
+    // hardware of the build : the feet always, what hides inside the carcasses once asked for
+    const hardware = $derived.by(() =>
+    {
+        const walls = new Map(app.project.items.map((it) =>
+        {
+            return [it.id, it.wall];
+        }));
+        const list: { key: string; wall: Wall; hidden: boolean; ref: string; geometry: THREE.BufferGeometry }[] = [];
+        const refs = new Map(build.fitted.map((f) =>
+        {
+            return [f.key, f.ref];
+        }));
+        for (const m of fittedMeshes(build.fitted))
+        {
+            list.push({ ...m, wall: walls.get(m.item) ?? "back", ref: refs.get(m.key) ?? "" });
+        }
+        return list;
+    });
+    // AXILO feet in the black plastic Häfele sells, runner spaces in the accent colour as a reserved volume
+    const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+    const spaceMat = new THREE.MeshStandardMaterial({ color: 0x1c7aaf, transparent: true, opacity: 0.35,
+                                                      depthWrite: false });
+    function hardwareMat(ref: string): THREE.MeshStandardMaterial
+    {
+        if (ref.startsWith("637.76"))
+        {
+            return footMat;
+        }
+        return ref.startsWith("760H") || ref.startsWith("766H") ? spaceMat : tubeMat;
+    }
+    $effect(() =>
+    {
+        const current = hardware;
+        return () =>
+        {
+            for (const f of current)
+            {
+                f.geometry.dispose();
+            }
+        };
+    });
 
     // rails and LED profiles follow the layouts of the analysis
     const fittings = $derived.by(() =>
@@ -242,10 +298,15 @@
     });
 
 
-    // grid colours follow the design system tokens of the current theme
-    const css = typeof document === "undefined" ? null : getComputedStyle(document.documentElement);
-    const gridCell = css?.getPropertyValue("--colour-border").trim() || "#46372c";
-    const gridSection = css?.getPropertyValue("--colour-text-secondary").trim() || "#a5988a";
+    // grid colours follow the design system tokens, read again when the system theme flips
+    const dark = new MediaQuery("prefers-color-scheme: dark");
+    const grid = $derived.by(() =>
+    {
+        void dark.current;
+        const css = getComputedStyle(document.documentElement);
+        return { cell: css.getPropertyValue("--colour-border").trim() || "#46372c",
+                 section: css.getPropertyValue("--colour-text-secondary").trim() || "#a5988a" };
+    });
 
     function computeFrame(): { target: [number, number, number]; camera: [number, number, number] }  
     {
@@ -276,7 +337,7 @@
 <T.DirectionalLight position={[-4, 3, 2]} intensity={0.5} />
 
 <Grid plane="xz" cellSize={100 * MM} sectionSize={1000 * MM} gridSize={[12, 12]} fadeDistance={14}
-    cellColor={gridCell} sectionColor={gridSection} />
+    cellColor={grid.cell} sectionColor={grid.section} />
 
 {#each app.project.items as it (it.id)}
     {@const pl = placement(it.wall)}
@@ -290,6 +351,12 @@
 {#each cushions as c (c.key)}
     {@const pl = placement(c.wall)}
     <T.Mesh geometry={c.geometry} material={cushionMat} rotation={pl.rotation} position={pl.position} />
+{/each}
+{#each hardware as f (f.key)}
+    {#if !f.hidden || app.showHardware}
+        {@const pl = placement(f.wall)}
+        <T.Mesh geometry={f.geometry} material={hardwareMat(f.ref)} rotation={pl.rotation} position={pl.position} />
+    {/if}
 {/each}
 {#each fittings as f (f.key)}
     {@const pl = placement(f.wall)}

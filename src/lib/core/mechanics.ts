@@ -33,7 +33,7 @@ export function shelfDeflection(p: Part, loadKgPerDm2: number, midN = 0): Deflec
     // line load in N/mm : kg/dm2 x width in dm gives kg per dm of span, 1 dm = 100 mm
     const qLoad = loadKgPerDm2 * (b / 100) * GRAVITY / 100;
     const qSelf = m.density * 1e-9 * b * t * GRAVITY;
-    // a groove along the span comes off the whole thickness : the grooved section contains what is left
+    // a groove along the span comes off the whole thickness : the grooved section hold what is left
     // its stiffness can only be higher
     let stiff = b;
     for (const g of p.grooves)
@@ -64,8 +64,18 @@ export function itemMass(b: Build, itemId: string): number
 }
 
 
-// the front feet stand this far behind the front of the box
-export const FRONT_FOOT_INSET = 50;
+// full extension runners : an open drawer reaches the depth of its carcass past the front
+export function topDrawerExtension(c: Carcass): number
+{
+    for (const f of c.fronts)
+    {
+        if (f.spec.type === "drawers")
+        {
+            return c.depth;
+        }
+    }
+    return 0;
+}
 
 
 export interface Tipping

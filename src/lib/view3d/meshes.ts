@@ -1,12 +1,12 @@
 // Three.js geometry for every part : flat parts extruedd from their outline, skins and battens on their arcs
 
 import * as THREE from "three";
-import type { Part, CurveShape } from "../core/parts";
+import { bevelU, type Fitted, type Part, type CurveShape } from "../core/parts";
 import type { Carcass, LadderRail, Screen } from "../core/model";
 import { tessellate } from "../core/geometry";
 import { screenSize } from "../core/extent";
 import type { ResolvedLayout } from "../core/layout";
-import { FIT_PLAY, LED_GROOVE_W, RAIL_D, SPOT_RIM, railPlan, spotCentres } from "../core/wardrobe";  
+import { FIT_PLAY, LED_GROOVE_W, RAIL_D, SPOT_RIM, railPlan, spotCentres } from "../core/wardrobe";
 
 // scene unit is the metre
 export const MM = 0.001;
@@ -52,6 +52,17 @@ function flatGeometry(p: Part): THREE.BufferGeometry
 {
     const f = p.frame!;
     const geo = new THREE.ExtrudeGeometry(shapeOf(p), { depth: p.thickness, bevelEnabled: false, curveSegments: 4 });
+    // a plumb cut or a chamfered head moves the ends of face B along u
+    if (p.bevel.u0 !== 0 || p.bevel.u1 !== 0)
+    {
+        const pos = geo.getAttribute("position");
+        let i = 0;
+        while (i < pos.count)
+        {
+            pos.setX(i, bevelU(p, pos.getX(i), pos.getZ(i)));
+            i++;
+        }
+    }
     // u, v, w of the part become world axes, then millimetres become metres
     const m = new THREE.Matrix4().makeBasis(
         new THREE.Vector3(...f.u),
@@ -260,6 +271,40 @@ export function fittingMeshes(c: Carcass,
         geo.translate(c.x + nb.x + nb.w / 2, c.y + nb.y + nb.h - 1, front - l.setback - LED_GROOVE_W / 2);
         geo.scale(MM, MM, MM);
         out.push({ key: l.id, light: true, geometry: geo });
+    }
+    return out;
+}
+
+
+// Hardware of the build : Häfele feet, runner spaces, hinge cups and Minifix housings, in the frame of their wall
+// TODO hinge arms and plates once their sizes are sourced
+export function fittedMeshes(list: Fitted[]): { key: string; item: string; hidden: boolean;
+                                                 geometry: THREE.BufferGeometry }[]
+{
+    const out: { key: string; item: string; hidden: boolean; geometry: THREE.BufferGeometry }[] = [];
+    for (const f of list)
+    {
+        const [a, b, c] = f.axes.map((v) =>
+        {
+            return new THREE.Vector3(...v);
+        }) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+        let geo: THREE.BufferGeometry;
+        const m = new THREE.Matrix4();
+        if (f.shape === "box")
+        {
+            geo = new THREE.BoxGeometry(2 * f.half[0], 2 * f.half[1], 2 * f.half[2]);
+            m.makeBasis(a, b, new THREE.Vector3().crossVectors(a, b));
+        }
+        else
+        {
+            // a three.js cylinder stands on y : y becomes the axis, a right handed basis keeps the faces outwards
+            geo = new THREE.CylinderGeometry(f.half[0], f.half[0], 2 * f.half[2], 24);
+            m.makeBasis(a, c, new THREE.Vector3().crossVectors(a, c));
+        }
+        m.setPosition(f.centre[0], f.centre[1], f.centre[2]);
+        geo.applyMatrix4(m);
+        geo.scale(MM, MM, MM);
+        out.push({ key: f.key, item: f.item, hidden: f.hidden, geometry: geo });
     }
     return out;
 }

@@ -7,7 +7,8 @@ import type { Check } from "./analysis";
 import { byId } from "./edit";
 import { itemExtent } from "./extent";
 import { boxToRoom, roomBox } from "./room";
-import { FRONT_FOOT_INSET, tipping } from "./mechanics";
+import { tipping } from "./mechanics";
+import { frontFootInset } from "./feet";
 import { MATERIALS } from "../data/materials";
 import { GRAVITY } from "../data/rules";
 
@@ -16,8 +17,9 @@ import { GRAVITY } from "../data/rules";
 export const SEAT_LOAD_N = 1600;
 // same report, seat front edge static load : someone sat on the very edge, the case that tips a bench
 export const SEAT_EDGE_N = 1300;
-// EN 1995-1-1:2004 partial factor for particleboard, MDF and solid timber (COFORD Handbook table D.1). The
-// Eurocode divides a characteristic value by it, the makers publish a mean : used here as a margin on the mean
+// EN 1995-1-1:2004 partial factor of a fundamental combination for particleboard, MDF and solid timber
+// (COFORD table D.1, Irish NA), 1.0 being for accidental ones only. It divides a characteristic value, the
+// makers publish a mean : a margin on the mean here
 export const GAMMA_M = 1.3;
 
 
@@ -104,7 +106,7 @@ export function seatChecks(p: Project, b: Build): Check[]
                               + "vise normalement une valeur caractéristique, non publiée." });
         }
         top.notes.push(`Assise : ${SEAT_LOAD_N} N au milieu de la portée de ${Math.round(r.span)} mm, rien ne se pose dessus`);
-        const edge = tipping(it, b, FRONT_FOOT_INSET, 0);
+        const edge = tipping(it, b, frontFootInset(it), 0);
         const fixed = it.fixToWall && it.base.type !== "wall";
         if (edge !== null && !fixed && edge.criticalKg < SEAT_EDGE_N / GRAVITY)
         {

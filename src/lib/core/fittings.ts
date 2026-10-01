@@ -10,8 +10,9 @@ import { polygonArea, tessellate } from "./geometry";
 import type { Build, Joint, Part } from "./parts";
 import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
 import {
-    AXILO_ADJUST_MAX_CABINET, AXILO_FEET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type Foot, type ShelfSupport,
+    AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
+import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset } from "./feet";
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
 
@@ -19,8 +20,6 @@ import { DIAM } from "./text";
 // Workshop conventions, stated in the drawings as such
 const PIN_BELOW_SHELF = 4;
 const PIN_SPARE_HOLES = 3;
-const FOOT_INSET = 50;
-const FOOT_MAX_SPACING = 800;
 // anti-tip brackets : one central up to 500 wide, else 100 to 150 from each end (Furnica guide)
 // no more than 800 apart and 20 from the back edge of the top (convention)
 const ANTI_TIP_SINGLE_MAX_WIDTH = 500;
@@ -286,24 +285,18 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
     if (c.base.type === "plinth" || c.base.type === "feet")
     {
         const h = c.base.height;
-        let foot: Foot | undefined;
-        for (const f of AXILO_FEET)
-        {
-            if (foot === undefined && h >= f.min && h <= f.max)
-            {
-                foot = f;
-            }
-        }
+        const foot = footFor(h);
         if (foot === undefined)
         {
             b.errors.push(`${c.name} : hauteur de socle ${h} mm hors de la gamme AXILO 78 (53 à 200).`);
             return;
         }
-        const perRow = Math.max(2, Math.ceil((c.width - 2 * FOOT_INSET) / FOOT_MAX_SPACING) + 1);
+        const perRow = feetPerRow(c);
         const count = 2 * perRow;
         b.hardware.push({ ref: "637.76.333", qty: count, item: c.id, itemName: c.name, target: null, note: null });
         b.hardware.push({ ref: foot.ref, qty: count, item: c.id, itemName: c.name, target: null,
                          note: `réglage ${foot.min}-${foot.max} mm` });
+        b.fitted.push(...feetFitted(c, foot.ref));
         if (c.base.type === "plinth")
         {
             b.hardware.push({ ref: "637.38.054", qty: perRow, item: c.id, itemName: c.name, target: null, note: null });
@@ -321,17 +314,13 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
                 bottom.notes.push(`Meuble de ${totalKg.toFixed(0)} kg chargé : régler les pieds AXILO `
                     + "avant chargement (réglage sous charge limité à 80 kg)");
             }
-            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (entraxe de rive ${FOOT_INSET} mm, convention)`;
-            let i = 0;
-            while (i < perRow)
+            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (axe à ${FOOT_INSET} mm des joues et du fond, `
+                + `${frontFootInset(c)} mm de l'avant, convention)`;
+            for (const f of footPlaces(c))
             {
-                const x = FOOT_INSET + (c.width - 2 * FOOT_INSET) * i / (perRow - 1) - c.thickness;
-                for (const v of [FOOT_INSET, bottom.width - FOOT_INSET])
-                {
-                    bottom.holes.push({ u: Math.min(Math.max(x, 20), bottom.length - 20), v, diameter: 0, depth: 0,
-                                        face: "B", label });
-                }
-                i++;
+                const u = f.x - c.x - c.thickness;
+                bottom.holes.push({ u: Math.min(Math.max(u, 20), bottom.length - 20), v: c.z + c.depth - f.z,
+                                    diameter: 0, depth: 0, face: "B", label });
             }
         }
     }
@@ -359,7 +348,7 @@ export function antiTipPositions(width: number): number[]
 }
 
 
-// Brackets on the top of a standing carcass, screwed to the wall with the plug its material needs
+// Brackets on the top of a standing carcass, screwed to the wall with the plug the wall material need
 export function fitWallFixing(c: Carcass, s: Settings, b: Build): void
 {
     const top = byId(b.parts, `${c.id}/top`);

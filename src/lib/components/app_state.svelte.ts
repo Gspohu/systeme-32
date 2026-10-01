@@ -25,12 +25,14 @@ class AppState
     history = $state.raw<History>(historyOf(tvWall()));
     textures = $state.raw<Map<string, Uint8Array>>(new Map());
     selection = $state<Selection | null>(null);
-    // the wall the front view shows, where dropped items land
+    // the wall the façade shows, where dropped items land
     wall = $state<Wall>("back");
     toasts = $state<Toast[]>([]);
     storageOk = $state(true);
-    // bumped on every refused command : the forms keyed on it drop the value the user typed
+    // bumped on every refused command : the inspector puts the stored value back in the field
     refusals = $state(0);
+    // the 3D view shows the hardware hidden inside the carcasses, the boards seen through
+    showHardware = $state(false);
     private nextToast = 0;
 
     project: Project = $derived(this.history.present);
