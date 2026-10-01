@@ -49,7 +49,6 @@ class AppState
         catch (e)
         {
             this.refusals++;
-            console.log(`diag app refus ${this.refusals}`);
             this.notify(e instanceof CommandError ? e.message : `Opération impossible : ${(e as Error).message}`,
                         e instanceof CommandError ? "warning" : "danger");
             return false;

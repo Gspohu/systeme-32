@@ -304,14 +304,11 @@
         {
             entered = { field: t, value: t.value, checked: t instanceof HTMLInputElement && t.checked,
                         refusals: app.refusals };
-            console.log(`diag app remember ${t.tagName} valeur=${t.value} refus=${app.refusals}`);
         }
     }
 
     function restoreRefused(e: Event): void
     {
-        console.log(`diag app restore entered=${entered !== null} meme=${e.target === entered?.field} `
-            + `vu=${entered?.refusals} refus=${app.refusals} valeur=${(e.target as HTMLInputElement).value}`);
         if (entered === null || e.target !== entered.field)
         {
             return;
@@ -319,8 +316,13 @@
         const f = entered.field;
         if (app.refusals !== entered.refusals)
         {
-            f.value = entered.value;
-            if (f instanceof HTMLInputElement)
+            // reading value first makes a number field commit what its editor holds, a blind write
+            // was overwritten by the pending "-5" on GitHub runners
+            if (f.value !== entered.value)
+            {
+                f.value = entered.value;
+            }
+            if (f instanceof HTMLInputElement && (f.type === "checkbox" || f.type === "radio"))
             {
                 f.checked = entered.checked;
             }
