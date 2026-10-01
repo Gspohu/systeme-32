@@ -179,10 +179,11 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         const m = MATERIALS[id];
         if (m !== undefined)
         {
-            sources.add(`${m.label} : ${m.density} kg/m${CUBED} en moyenne, module ${m.modulus} N/mm² (${m.source})`);
+            sources.add(`${m.label} : ${m.density} kg/m${CUBED} en moyenne, module ${m.modulus} N/mm², `
+                + `kdef ${String(m.kdef).replace(".", ",")} (${m.source})`);
         }
     }
-    sources.add("EN 1995-1-1:2004 tableau 3.2 (via COFORD, Handbook for Eurocode 5) : kdef 2,25");
+    sources.add("EN 1995-1-1:2004 tableau 3.2 (via COFORD, tableaux D.6 et D.7) : kdef en classe de service 1");
     if (p.items.some((it) =>
     {
         return it.kind === "carcass" && it.seat !== null;
