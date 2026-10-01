@@ -29,6 +29,8 @@ class AppState
     wall = $state<Wall>("back");
     toasts = $state<Toast[]>([]);
     storageOk = $state(true);
+    // bumped on every refused command : the forms keyed on it drop the value the user typed
+    refusals = $state(0);
     private nextToast = 0;
 
     project: Project = $derived(this.history.present);
@@ -46,6 +48,8 @@ class AppState
         }
         catch (e)
         {
+            this.refusals++;
+            console.log(`diag app refus ${this.refusals}`);
             this.notify(e instanceof CommandError ? e.message : `Opération impossible : ${(e as Error).message}`,
                         e instanceof CommandError ? "warning" : "danger");
             return false;

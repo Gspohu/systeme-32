@@ -304,11 +304,14 @@
         {
             entered = { field: t, value: t.value, checked: t instanceof HTMLInputElement && t.checked,
                         refusals: app.refusals };
+            console.log(`diag app remember ${t.tagName} valeur=${t.value} refus=${app.refusals}`);
         }
     }
 
     function restoreRefused(e: Event): void
     {
+        console.log(`diag app restore entered=${entered !== null} meme=${e.target === entered?.field} `
+            + `vu=${entered?.refusals} refus=${app.refusals} valeur=${(e.target as HTMLInputElement).value}`);
         if (entered === null || e.target !== entered.field)
         {
             return;
