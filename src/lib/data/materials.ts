@@ -17,6 +17,9 @@ export interface BoardMaterial
     strength: number;
     // EN 1995-1-1:2004 deformation factor, service class 1
     kdef: number;
+    // EN 1995-1-1:2004 strength factor, service class 1, medium-term load : a seat used every day is read like
+    // an imposed floor load (COFORD tables D.2, D.4, D.5)
+    kmod: number;
     thicknesses: number[];
     source: string;
 }
@@ -26,7 +29,7 @@ export interface BoardMaterial
 // building physics based on 600 kg/m3, 13-20 mm MOE 1600 and MOR 11
 // https://panelco.com/wp-content/uploads/2025/10/Technical_Datasheet_Eurospan_E1_P2.pdf
 // Hettich SlideLine M brochure (2017) plans door weights with 700 kg/m3 for particleboard
-// kdef : COFORD Handbook for Eurocode 5 table D.7 gives 2.25 for P4/P5, P2 is not listed
+// kdef and kmod : COFORD Handbook for Eurocode 5 tables D.7 and D.5 give 2.25 and 0.65 for P4/P5, P2 is not listed
 export const PARTICLEBOARD: BoardMaterial = {
     id: "p2",
     label: "Panneau de particules mélaminé P2",
@@ -36,6 +39,7 @@ export const PARTICLEBOARD: BoardMaterial = {
     modulus: 1600,
     strength: 11,
     kdef: 2.25,
+    kmod: 0.65,
     thicknesses: [8, 19],
     source: "Egger Eurospan E1 P2 rec. 107, Hettich SlideLine M 2017, EN 1995-1-1:2004 tab. 3.2 via COFORD",
 };
@@ -52,6 +56,7 @@ export const MDF: BoardMaterial = {
     modulus: 2800,
     strength: 30,
     kdef: 2.25,
+    kmod: 0.6,
     thicknesses: [8, 10, 16, 19, 22],
     source: "Isoroy MEDIUM fiche technique 2014, Hettich SlideLine M 2017, EN 1995-1-1:2004 tab. 3.2 via COFORD",
 };
@@ -68,6 +73,7 @@ export const MDF_FLEX: BoardMaterial = {
     modulus: 2800,
     strength: 30,
     kdef: 2.25,
+    kmod: 0.6,
     thicknesses: [6, 9],
     source: "Rayons : données revendeur (MDF Direct), à confirmer par un essai sur chute",
 };
@@ -87,6 +93,7 @@ export const SOLID_WOOD: BoardMaterial = {
     modulus: 10000,
     strength: 40,
     kdef: 0.6,
+    kmod: 0.8,
     thicknesses: [18, 20, 27],
     source: "Densité : table Hettich SlideLine M 2017. "
         + "Module et résistance : valeur prudente non sourcée, non utilisée par les contrôles",
@@ -105,6 +112,7 @@ export const MDF_VENEER: BoardMaterial = {
     modulus: 1500,
     strength: 15,
     kdef: 2.25,
+    kmod: 0.6,
     thicknesses: [4, 9, 13, 16, 17, 19, 23, 26, 29, 31, 39],
     source: "Decospan Decopanel MDF-BOARD fiche technique 2021, Hettich SlideLine M 2017, EN 1995-1-1:2004 tab. 3.2 via COFORD",
 };
@@ -123,6 +131,8 @@ export const GLASS: BoardMaterial = {
     modulus: 70000,
     strength: 45,
     kdef: 0,
+    // a timber load-duration factor, it has no meaning for glass
+    kmod: 1,
     thicknesses: [5, 6],
     source: "AGC Planibel TDS 01/2023 (EN 572-1, épaisseurs EN 572-2)",
 };

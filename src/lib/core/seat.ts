@@ -30,6 +30,7 @@ export interface SeatCheck
     // bending stress under the load at mid span, and what the board may take, N/mm2
     stress: number;
     allowed: number;
+    kmod: number;
     // deflection under the load, mm
     deflection: number;
 }
@@ -73,7 +74,7 @@ export function checkSeat(c: Carcass, lay: ResolvedLayout, top: Part): SeatCheck
     const moment = SEAT_LOAD_N * span / 4;
     const stress = moment / (b * t * t / 6);
     const deflection = SEAT_LOAD_N * span ** 3 / (48 * m.modulus * (b * t ** 3 / 12));
-    return { span, stress, allowed: m.strength / GAMMA_M, deflection };
+    return { span, stress, allowed: m.kmod * m.strength / GAMMA_M, kmod: m.kmod, deflection };
 }
 
 
@@ -102,8 +103,9 @@ export function seatChecks(p: Project, b: Build): Check[]
         {
             checks.push({ level: "info", item: it.id, target: top.id,
                           message: `${it.name} : assise vérifiée sous ${SEAT_LOAD_N} N (EN 16139:2013 niveau 1), ${figures}. `
-                              + "Marge : résistance moyenne du fabricant divisée par 1,3, le gamma M d'EN 1995-1-1:2004 qui "
-                              + "vise normalement une valeur caractéristique, non publiée." });
+                              + `Admissible : résistance moyenne du fabricant x kmod ${r.kmod} (moyen terme, classe de `
+                              + "service 1) / gamma M 1,3 d'EN 1995-1-1:2004, qui visent normalement une valeur "
+                              + "caractéristique, non publiée." });
         }
         top.notes.push(`Assise : ${SEAT_LOAD_N} N au milieu de la portée de ${Math.round(r.span)} mm, rien ne se pose dessus`);
         const edge = tipping(it, b, frontFootInset(it), 0);

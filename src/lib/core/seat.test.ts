@@ -53,15 +53,21 @@ describe("seats", () =>
         const c = p.items[0] as Carcass;
         const top = a.build.parts.find((q) => { return q.id === `${c.id}/top`; })!;
         const r = checkSeat(c, a.build.layouts.get(c.id)!, top);
-        // top 392 deep : W = 392 x 19 x 19 / 6, allowed 11 / 1.3
+        // top 392 deep : W = 392 x 19 x 19 / 6, allowed kmod 0.65 x 11 / 1.3
         expect(r.stress).toBeCloseTo(1600 * 571.5 / 4 / (392 * 19 * 19 / 6), 9);
-        expect(r.allowed).toBeCloseTo(11 / 1.3, 9);
+        expect(r.allowed).toBeCloseTo(0.65 * 11 / 1.3, 9);
         expect(a.checks).toContainEqual(flagged("error", "ne porte pas une personne"));
     });
 
-    it("accepts it with two uprights, and counts the person on the feet", () =>
+    it("refuses it with two uprights under a medium-term load, the 405 span takes 6.9 N/mm2 for 5.5", () =>
     {
-        const p = projectOf(bench([376, 757]));
+        expect(analyse(projectOf(bench([376, 757]))).checks).toContainEqual(flagged("error",
+            "ne porte pas une personne"));
+    });
+
+    it("accepts it with three uprights, and counts the person on the feet", () =>
+    {
+        const p = projectOf(bench([300, 600, 900]));
         const a = analyse(p);
         expect(a.checks).toContainEqual(flagged("info", "assise vérifiée"));
         expect(a.checks).not.toContainEqual(flagged("error", ""));

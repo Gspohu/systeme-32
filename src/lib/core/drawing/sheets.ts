@@ -183,6 +183,13 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         }
     }
     sources.add("EN 1995-1-1:2004 tableau 3.2 (via COFORD, Handbook for Eurocode 5) : kdef 2,25");
+    if (p.items.some((it) =>
+    {
+        return it.kind === "carcass" && it.seat !== null;
+    }))
+    {
+        sources.add("EN 1995-1-1:2004 tableau 3.1 (via COFORD, tableaux D.4 et D.5) : kmod des assises en moyen terme");
+    }
     sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée");
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
     for (const line of sources)
