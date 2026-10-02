@@ -27,6 +27,7 @@ import { screenSize } from "./extent";
 import { boxesMeet, roomBox, type Box3 } from "./room";
 import { buildSlats } from "./slats";
 import { SEAT_LOAD_N, seatChecks } from "./seat";
+import { swingChecks } from "./swing";
 import { slopeErrors } from "./slope";
 import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
 import { buildLights, lightChecks } from "./lights";
@@ -203,7 +204,8 @@ export function analyse(p: Project): Analysis
                           + "de la plaque. Vérifier la charge admise par la cheville choisie." });
     }
     checks.push(...seatChecks(p, b), ...screenChecks(p), ...wardrobeChecks(p, b), ...lightChecks(p), ...liftChecks(p, b),
-                ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p), ...solidChecks(p, b));
+                ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p), ...solidChecks(p, b),
+                ...swingChecks(p, b));
     return { build: b, checks, masses, deflections: partReport.deflections, tippings };
 }
 
