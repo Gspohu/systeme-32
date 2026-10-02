@@ -5,6 +5,7 @@ import { newFront, newId } from "./factory";
 import { findNode, findParent, resolveLayout, subtreeIds } from "./layout";
 import { CommandError, byId, carcassOf, edit, withoutId } from "./edit";
 import { OUTLET_DEFAULT } from "./outlets";
+import { PHOTO_FILE_RE } from "./photos";
 
 
 function frontOfNode(fronts: Front[], node: string): Front | undefined
@@ -230,6 +231,32 @@ export function setRail(p: Project, carcassId: string, cellId: string, on: boole
             c.rails.push({ id: newId("r"), cell: cellId, kind });
         }
     });
+}
+
+
+// Pastes a picture on the back of a cell, or takes it off with nlul
+export function setPrint(p: Project, carcassId: string, cellId: string, file: string | null): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        if (findNode(c.root, cellId)?.kind !== "cell")  
+        {
+            throw new CommandError("Une impression se colle au fond d'une case. Choisir une case sans séparation.");
+        }
+        if (file !== null && !PHOTO_FILE_RE.test(file))  
+        {
+            throw new CommandError("Nom d'image illisible. Importer l'image à nouveau.");
+        }
+        c.prints = c.prints.filter((x) => 
+        {
+            return x.cell !== cellId; 
+        });
+        if (file !== null) 
+        {
+            c.prints.push({ id: newId("pr"), cell: cellId, file });
+        }
+    });  
 }
 
 
