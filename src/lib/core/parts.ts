@@ -459,12 +459,27 @@ function buildBase(c: Carcass, b: Build): void
     }
     const [ox, oy, oz] = boxOrigin(c);
     const t = c.thickness;
+    const returns = c.base.returns ?? [];
+    const y0 = oy - c.base.height + PLINTH_FOOT_GAP;
+    const zFront = oz + c.depth - c.base.setback - t;
+    // the front plinth runs the whole width, the returns come from the wall in the plane of the sides to its back
     const part = newPart({
         item: c.id, itemName: c.name, thickness: t, decor: c.decor,
         id: `${c.id}/plinth`, label: "Plinthe", role: "plinth", length: c.width, width: c.base.height - PLINTH_FOOT_GAP,
-        edges: ["v1"],
-        frame: { o: [ox, oy - c.base.height + PLINTH_FOOT_GAP, oz + c.depth - c.base.setback - t], u: X, v: Y, n: Z },
+        edges: ["v1"], frame: { o: [ox, y0, zFront], u: X, v: Y, n: Z },
     });
     part.notes.push("Clipsée sur les pieds AXILO (clips 637.38.054)");
     b.parts.push(part);
+    for (const side of returns)
+    {
+        const right = side === "right";
+        const ret = newPart({
+            item: c.id, itemName: c.name, thickness: t, decor: c.decor,
+            id: `${c.id}/plinth/${side}`, label: `Plinthe, retour ${right ? "droit" : "gauche"}`, role: "plinth",
+            length: zFront - oz, width: c.base.height - PLINTH_FOOT_GAP, edges: ["v1"],
+            frame: { o: [right ? ox + c.width - t : ox + t, y0, zFront], u: neg(Z), v: Y, n: right ? X : neg(X) },
+        });
+        ret.notes.push(`Clipsée sur les deux pieds ${right ? "de droite" : "de gauche"}, contre le dos de la plinthe`);
+        b.parts.push(ret);
+    }
 }

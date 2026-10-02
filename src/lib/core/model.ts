@@ -195,7 +195,8 @@ export interface Lining
 }
 
 export type Base =
-    | { type: "plinth"; height: number; setback: number; grills?: number }
+    // a return closes a side under the carcass, in the plane of its side panel
+    | { type: "plinth"; height: number; setback: number; grills?: number; returns?: ("left" | "right")[] }
     | { type: "feet"; height: number }
     // hung on a pair of Blum 48N0510 by default, or on Camar 807 base cabinet hangers for a heavier one
     | { type: "wall"; hanger?: "blum" | "camar" }

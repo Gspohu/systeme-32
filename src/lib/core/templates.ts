@@ -44,6 +44,8 @@ export function tvWall(): Project
         name: "Meuble bas",
         width: 2600, height: 500, depth: 400, x: 0, y: 100, z: 0,
         decor: OAK, backDecor: OAK,
+        // a return on the right hides the feet from the open quarter round
+        base: { type: "plinth", height: 100, setback: 50, returns: ["right"] },
         root: split("v", [627, 1272, 1917], [leftDoor, drawersA, drawersB, rightDoor]),
         ends: {
             left: { type: "square" },
@@ -59,7 +61,8 @@ export function tvWall(): Project
         newFront(leftDoor.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(drawersA.id, { type: "drawers", count: 2, loadKg: 15 }, { decor: GREEN }),
         newFront(drawersB.id, { type: "drawers", count: 2, loadKg: 15 }, { decor: GREEN }),
-        newFront(rightDoor.id, { type: "door", hinge: "left" }, PUSH_DOOR),
+        // hinged on the right, it swings towards the quarter round and clears the drawers pulled out beside it
+        newFront(rightDoor.id, { type: "door", hinge: "right" }, PUSH_DOOR),
     );
 
 

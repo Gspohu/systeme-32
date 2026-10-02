@@ -39,6 +39,18 @@ export function frontFootInset(c: Carcass): number
 }
 
 
+// Distance of a foot axis from a side : behind a plinth return both the plate on the floor and the wider mounting
+// plate under the bottom clear its back face
+export function sideFootInset(c: Carcass, side: "left" | "right"): number
+{
+    if (c.base.type === "plinth" && (c.base.returns ?? []).includes(side))
+    {
+        return c.thickness + Math.max(AXILO_PLATE_D, AXILO_TOP.w) / 2;
+    }
+    return FOOT_INSET;
+}
+
+
 export function feetPerRow(c: Carcass): number
 {
     return Math.max(2, Math.ceil((c.width - 2 * FOOT_INSET) / FOOT_MAX_SPACING) + 1);
@@ -89,7 +101,8 @@ export function footPlaces(c: Carcass): FootPlace[]
     let i = 0;
     while (i < n)
     {
-        const x = c.x + FOOT_INSET + (c.width - 2 * FOOT_INSET) * i / (n - 1);
+        const left = sideFootInset(c, "left");
+        const x = c.x + left + (c.width - left - sideFootInset(c, "right")) * i / (n - 1);
         // the back row stands under the bottom panel, which stops at an applied back
         for (const z of [c.z + c.depth - frontFootInset(c), c.z + c.depth - usableDepth(c) + FOOT_INSET])
         {

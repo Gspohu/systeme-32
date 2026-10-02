@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { analyse } from "./analysis";
 import { dresser, tvWall } from "./templates";
 import { resolveLayout } from "./layout";
+import { footPlaces } from "./feet";
 import type { Part } from "./parts";
 import type { Carcass, SplitNode } from "./model";
 
@@ -212,6 +213,28 @@ describe("the sketch templates", () =>
         {
             return it.kind === "wallShelf";
         }).length).toBe(2);
+    });
+
+
+    it("hides the feet of the TV base from its quarter round behind a plinth return", () =>
+    {
+        const p = tvWall();
+        const base = p.items[0] as Carcass;
+        const a = analyse(p);
+        const ret = a.build.parts.find((q) =>
+        {
+            return q.id === `${base.id}/plinth/right`;
+        })!;
+        // in the plane of the right side, from the wall to the back of the front plinth set 50 back : 400 - 50 - 19
+        expect(ret.frame!.o[0]).toBe(2600 - 19);
+        expect(ret.length).toBe(331);
+        // five feet a row, the front plinth clipped on the front five, the return on the two right ones
+        expect(hardwareCount(tvWall).get("637.38.054")).toBe(5 + 2);
+        const right = Math.max(...footPlaces(base).map((f) =>
+        {
+            return f.x;
+        }));
+        expect(2600 - right).toBe(19 + 92 / 2);
     });
 
 

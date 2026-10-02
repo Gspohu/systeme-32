@@ -871,6 +871,15 @@
                         onchange={(e) => patch({ base: { ...b, grills: Math.max(0,
                             Math.round(num(e))) } } as Partial<Carcass>)} />
                 </label>
+                {#each (["left", "right"] as const) as side}
+                    <label class="form-check" title="Ferme le dessous du caisson sur ce côté, dans le plan de la joue">
+                        <input type="checkbox" checked={(b.returns ?? []).includes(side)}
+                            onchange={(e) => patch({ base: { ...b, returns: (["left", "right"] as const).filter((s) =>
+                            {
+                                return s === side ? checked(e) : (b.returns ?? []).includes(s);
+                            }) } } as Partial<Carcass>)} />
+                        Retour {side === "left" ? "gauche" : "droit"}</label>
+                {/each}
             {/if}
             <label class="field"><span class="label">Fond</span>
                 <select class="select" value={carcass.back.type}

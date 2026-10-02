@@ -11,7 +11,7 @@ import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
 import {
     AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
-import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset } from "./feet";
+import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset, sideFootInset } from "./feet";
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
 
@@ -380,7 +380,10 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
         b.fitted.push(...feetFitted(c, foot.ref));
         if (c.base.type === "plinth")
         {
-            b.hardware.push({ ref: "637.38.054", qty: perRow, item: c.id, itemName: c.name, target: null, note: null });
+            // the front row carries the front plinth, the front and back feet of a side its return
+            const returns = (c.base.returns ?? []).length;
+            b.hardware.push({ ref: "637.38.054", qty: perRow + 2 * returns, item: c.id, itemName: c.name, target: null,
+                             note: returns > 0 ? `${perRow} en façade, 2 par retour` : null });
         }
         if (totalKg / count > AXILO_LOAD_PER_FOOT)
         {
@@ -395,7 +398,8 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
                 bottom.notes.push(`Meuble de ${totalKg.toFixed(0)} kg chargé : régler les pieds AXILO `
                     + "avant chargement (réglage sous charge limité à 80 kg)");
             }
-            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (axe à ${FOOT_INSET} mm des joues et du fond, `
+            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (axe à ${sideFootInset(c, "left")} mm de la joue `
+                + `gauche, ${sideFootInset(c, "right")} de la droite, ${FOOT_INSET} du fond, `
                 + `${frontFootInset(c)} mm de l'avant, convention)`;
             for (const f of footPlaces(c))
             {
