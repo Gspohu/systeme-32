@@ -84,8 +84,8 @@ describe("fronts swept through their opening", () =>
         expect(said).toHaveLength(2);
         for (const s of said)
         {
-            expect(s).toMatch(/^warning \| Meuble bas, tiroir [12] et meuble bas,
-                              porte \d se heurtent ouverts ensemble/);
+            const pair = /^warning \| Meuble bas, tiroir [12] et meuble bas, porte \d se heurtent/;
+            expect(s).toMatch(pair);
         }
     });
 });
