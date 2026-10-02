@@ -174,7 +174,6 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
             }
         }
     }
-    // TODO no socket hole is drawn here nor on the façade view, only the workpiece sheet of a drilled bak show it
     // inner panels show where no front covers them
     const W = k.width;
     if (k.slope === null)
@@ -272,6 +271,23 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
         else
         {
             canvas.line((x0 + x1) / 2 - 3, midY, (x0 + x1) / 2 + 3, midY, "normal");
+        }
+    }
+    // socket holes, as hidden lines behind a façade drawn on this sheet or inside a shelf
+    for (const o of a.build.outlets)
+    {
+        if (o.item !== k.id)
+        {
+            continue;
+        }
+        const s = o.edgeOn || (o.hidden && withFronts) ? "hidden" : "normal";
+        if (o.shape === "round")
+        {
+            canvas.circle(pageX(k.x + o.x + o.w / 2), pageY(k.y + o.y + o.h / 2), o.w / 2 / scale, s);
+        }
+        else
+        {
+            canvas.rect(pageX(k.x + o.x), pageY(k.y + o.y + o.h), o.w / scale, o.h / scale, s);
         }
     }
 }

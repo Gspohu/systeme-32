@@ -333,6 +333,11 @@
                         <rect x={it.width - 60} y="0" width="30" height={bh} class="foot" />
                     {/if}
                     <polygon points={svgPoints(frontOutline(it))} fill={fill(it.decor)} class="edge" />
+                    {#if it.back.type !== "none" && it.slope === null}
+                        <!-- the back shows through every open cell, in its own decor -->
+                        <rect x={it.thickness} y={-(it.height - it.thickness)} width={it.width - 2 * it.thickness}
+                            height={it.height - 2 * it.thickness} fill={shade(it.backDecor, 0.9)} />
+                    {/if}
                     {#if it.seat !== null}
                         {#if it.seat.cushion > 0}
                             <rect x="0" y={-(it.height + it.seat.cushion)} width={it.width} height={it.seat.cushion}
@@ -501,6 +506,18 @@
                             {/each}
                         </g>
                     {/each}
+                    {#each analysis.build.outlets.filter((o) =>
+                    {
+                        return o.item === it.id;
+                    }) as o (o.id)}
+                        {#if o.shape === "round"}
+                            <circle cx={o.x + o.w / 2} cy={-(o.y + o.h / 2)} r={o.w / 2} class="outlet"
+                                class:behind={o.hidden} />
+                        {:else}
+                            <rect x={o.x} y={-(o.y + o.h)} width={o.w} height={o.h} class="outlet"
+                                class:behind={o.hidden || o.edgeOn} />
+                        {/if}
+                    {/each}
                     {#if it.slope !== null}
                         {@const t = it.thickness}
                         {@const roof = frontOutline(it).slice(2)}
@@ -641,6 +658,20 @@
         stroke: var(--colour-text-inverse);
         stroke-width: 1.5;
         opacity: 0.6;
+    }
+
+    /* a socket hole, dashed behind a front or inside a shelf seen edge on */
+    .outlet
+    {
+        fill: none;
+        stroke: var(--colour-text-inverse);
+        stroke-width: 3;
+        pointer-events: none;
+    }
+
+    .outlet.behind
+    {
+        stroke-dasharray: 12 8;
     }
 
     .handle

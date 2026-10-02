@@ -164,7 +164,10 @@ export interface Build
     // bar handles as the front view draws them : the bar from end to end, in the plane of the fronts of its carcass
     handles: { item: string; front: string; ref: string; x0: number; y0: number; x1: number; y1: number }[];
     // pictures pasted on cell backs, in the frame of their wall : lower left corner, the face it lies on, its size
-    prints: { item: string; cell: string; file: string; x: number; y: number; z: number; w: number; h: number }[];   
+    prints: { item: string; cell: string; file: string; x: number; y: number; z: number; w: number; h: number }[];
+    // socket holes as the front views draw them, in the frame of their carcass : a hole in a shelf seen edge on
+    outlets: { item: string; id: string; shape: "round" | "rect"; x: number; y: number; w: number; h: number;
+               edgeOn: boolean; hidden: boolean }[];
 }
 
 
@@ -272,7 +275,7 @@ export function boxOrigin(c: Carcass): Vec3
 export function emptyBuild(): Build
 {
     return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], infos: [],
-             midLoads: new Map(), railCuts: [], fitted: [], motions: [], handles: [], prints: [] };  
+             midLoads: new Map(), railCuts: [], fitted: [], motions: [], handles: [], prints: [], outlets: [] };
 }
 
 

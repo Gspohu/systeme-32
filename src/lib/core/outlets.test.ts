@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CommandError, addItem, addOutlet, splitCell, updateOutlet, updateItem } from "./commands";
+import { CommandError, addItem, addOutlet, setFront, splitCell, updateOutlet, updateItem } from "./commands";
 import { newCarcass, newProject } from "./factory";
 import { analyse } from "./analysis";
 import { validateProject } from "./io/project_file";
@@ -100,5 +100,27 @@ describe("socket holes", () =>
         const old = JSON.parse(JSON.stringify({ ...p, schema: 5 }));
         delete old.items[0].outlets;
         expect((validateProject(old).items[0] as Carcass).outlets).toEqual([]);
+    });
+
+
+    it("shows the back hole to the front views as cut, hidden once a door covers its cell", () =>
+    {
+        const { p, c, lower } = tvUnit();
+        const q = addOutlet(p, c.id, lower);
+        expect(analyse(q).build.outlets).toEqual([{ item: c.id, id: (q.items[0] as Carcass).outlets[0]!.id,
+                                                     shape: "rect", x: 260, y: 171, w: 80, h: 80, edgeOn: false,
+                                                     hidden: false }]);
+        const shut = setFront(q, c.id, lower, { type: "door", hinge: "left" });
+        expect(analyse(shut).build.outlets[0]!.hidden).toBe(true);
+    });
+
+
+    it("shows a shelf hole edge on, over the thickness of the shelf, and none of a refused one", () =>
+    {
+        const { p, c, lower } = tvUnit();
+        // the 60 hole in the shelf above the lower cell : 19 thick, its underside at 403
+        const shelf = analyse(holed(p, c, lower, { panel: "above", shape: "round", w: 60 })).build.outlets;
+        expect(shelf).toMatchObject([{ shape: "rect", x: 270, y: 403, w: 60, h: 19, edgeOn: true }]);
+        expect(analyse(holed(p, c, lower, { dx: 300 })).build.outlets).toEqual([]);
     });
 });

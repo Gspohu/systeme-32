@@ -97,6 +97,19 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             continue;
         }
         part.cutouts.push(holeOutline(hole.shape, onPart(part, near), onPart(part, far)));
+        // seen from the front : the back hole as cut, a shelf one edge on over the thickness of its board
+        const f = part.frame;
+        const edgeOn = hole.panel !== "back";
+        const x = cx - hole.w / 2;
+        const y = edgeOn ? Math.min(f.o[1], f.o[1] + f.n[1] * part.thickness) - c.y : near[1] - c.y;
+        const tall = edgeOn ? part.thickness : h;
+        const hidden = (b.fronts.get(c.id) ?? []).some((fp) =>
+        {
+            return cx > fp.rect.x && cx < fp.rect.x + fp.rect.w && y + tall / 2 > fp.rect.y
+                && y + tall / 2 < fp.rect.y + fp.rect.h;
+        });
+        b.outlets.push({ item: c.id, id: hole.id, shape: edgeOn ? "rect" : hole.shape, x, y, w: hole.w, h: tall,
+                         edgeOn, hidden });
         part.notes.push(hole.shape === "round" ? `Trou ${DIAM}${hole.w} pour prise ou câble, d'après le DXF`
             : `Découpe ${hole.w} x ${hole.h} pour prise, d'après le DXF`);
     }
