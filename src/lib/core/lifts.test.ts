@@ -5,6 +5,7 @@ import { analyse, type Analysis, type Level } from "./analysis";
 import { pickMechanism } from "./lifts";
 import type { Carcass, LiftFront, Project } from "./model";
 import type { Hole, Part } from "./parts";
+import { X, neg } from "./geometry";
 
 // a wall cabinet over a desk in Colmar : 800 x 400 x 350, W1000 particleboard (700 kg/m3 for the checks)
 function cabinet(o: Partial<Carcass> = {}): Carcass
@@ -160,6 +161,20 @@ describe("AVENTOS HK top flaps", () =>
         expect(refs).toContain("956.1004 x1");
         expect(refs).toContain("956.1201 x1");
         expect(refs).not.toContain("22K2500 x1");
+    });
+
+
+    it("opens the flap about its top edge by the angle of its mechanism", () =>
+    {
+        const p = withFlap(cabinet());
+        const c = p.items[0] as Carcass;
+        const a = analyse(p);
+        const fp = a.build.fronts.get(c.id)![0]!;
+        expect(a.build.motions).toHaveLength(1);
+        // 22K2500 turns 107 deg, about the front top edge of the flap, upwards and out
+        expect(a.build.motions[0]).toMatchObject({ kind: "turn", axis: neg(X), amount: 107,
+                                                   pivot: [c.x + fp.rect.x, c.y + fp.rect.y + fp.rect.h,
+                                                           c.z + fp.z + fp.thickness] });
     });
 
     it("refuses a flap too tall, too heavy, inset or crossed by a shelf or a rail", () =>

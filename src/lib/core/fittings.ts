@@ -5,7 +5,7 @@ import type { ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
 import { sideFace } from "./locate";
 import { byId } from "./edit";
-import { polygonArea, tessellate } from "./geometry";
+import { X, polygonArea, tessellate } from "./geometry";
 import type { Build, Joint, Part } from "./parts";
 import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
 import {
@@ -98,6 +98,16 @@ export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Buil
         {
             b.errors.push(`${c.name} : les vantaux couvrent toute la voie de ${Math.round(track)} mm `
                 + "et ne peuvent plus coulisser (une seule voie en applique).");
+        }
+        // laid from the left on their single track : opening pushes them all right into the free length
+        for (const lp of leaves)
+        {
+            b.motions.push({
+                item: c.id, front: front.id, label: `${c.name}, vantail ${lp.index + 1}`, kind: "slide",
+                pivot: [0, 0, 0], axis: X, amount: Math.max(0, track - total), parts: [`${c.id}/front/${lp.id}`],
+                fitted: [], rides: [], source: `SlideLine M, ${Math.round(track - total)} mm de voie libre`,
+                remedy: "Réduire la largeur des vantaux.",
+            });
         }
         b.hardware.push({ ref: track <= 2500 ? "9209167" : "9209218", qty: 1, item: c.id, itemName: c.name,
                          target: front.id, note: `profilés haut et bas recoupés à ${Math.round(track)} mm` });

@@ -8,10 +8,11 @@ import { byId } from "./edit";
 import { panelMass } from "./fittings";
 import type { Build, Hole, Part } from "./parts";
 import {
-    CUP_DEPTH, CUP_DIAMETER, HINGE_CHART, HINGE_CHART_WIDTH, MIN_GAP, MIN_GAP_FD, PLATE_LINE, TB_MAX, TB_MIN,
-    TIPON_DOOR_SHORT_MAX_HEIGHT,
+    CUP_DEPTH, CUP_DIAMETER, HINGE_CHART, HINGE_CHART_WIDTH, HINGE_OPENING_DEG, MIN_GAP, MIN_GAP_FD, PLATE_LINE,
+    TB_MAX, TB_MIN, TIPON_DOOR_SHORT_MAX_HEIGHT,
 } from "../data/rules";
 import { DIAM } from "./text";
+import { neg, Y } from "./geometry";
 
 
 // Workshop conventions, stated in the drawings as such
@@ -202,6 +203,21 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                          note: null });
         b.hardware.push({ ref: "609.1500", qty: 4 * hingeTotal, item: c.id, itemName: c.name, target: fp.id,
                          note: "cuvettes et embases" });
+        // Blum gives the gap F a CLIP top door needs from its neighbour, not the path of its four bar arm :
+        // turned about its front edge on the hinge side, the door stays clear of that gap and of its own side
+        const deg = HINGE_OPENING_DEG[hingeRef];
+        if (deg !== undefined)
+        {
+            const edge = hingeSide === "left" ? fp.rect.x : fp.rect.x + fp.rect.w;
+            b.motions.push({
+                item: c.id, front: fp.id, label: name, kind: "turn",
+                pivot: [c.x + edge, c.y, c.z + fp.z + fp.thickness],
+                axis: hingeSide === "left" ? neg(Y) : Y, amount: deg,
+                parts: [part.id], fitted: [], rides: [],
+                source: `charnières ${hingeRef} ${deg}°`,
+                remedy: "Déplacer l'un des deux ou poser les charnières de l'autre côté.",
+            });
+        }
         // TODO : the cup screw positions are not dimensioned in the Blum catalogue, drill them from the template
         part.notes.push("Cuvettes à visser : position des vis selon la charnière (non cotée au catalogue)");
         if (push)

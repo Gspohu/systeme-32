@@ -12,6 +12,7 @@ import { boxesMeet, boxToRoom, roomBox, type Box3 } from "./room";
 import type { Build } from "./parts";
 import { SPOT_RIM, spotCentres } from "./lights";
 import { HK_TOP } from "../data/rules";
+import { X, neg } from "./geometry";
 
 
 export interface FlapLoad
@@ -195,6 +196,15 @@ export function fitLifts(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         const lift = flapClearance(fp, nb.walls.top);  
         part.notes.push(`Ouvert, l'abattant monte à ${Math.round(lift)} mm au-dessus du panneau du haut (Blum p. 46)`);
+        // turned about its top edge, it ends in front of the carcass with its free edge raised FH x sin 17 deg
+        const deg = push ? mech.pushDeg : mech.deg;
+        b.motions.push({
+            item: c.id, front: fp.id, label: name, kind: "turn",
+            pivot: [c.x + fp.rect.x, c.y + fp.rect.y + fp.rect.h, c.z + fp.z + fp.thickness], axis: neg(X),
+            amount: deg, parts: [part.id], fitted: [], rides: [],
+            source: `AVENTOS HK top ${push ? mech.push : mech.handle} ${deg}°`,
+            remedy: "Déplacer ce qui gêne au-dessus ou devant l'abattant.",
+        });
     }
 }
 

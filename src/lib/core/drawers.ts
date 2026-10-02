@@ -210,6 +210,15 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
                 bottomP.notes.push("Range-couverts : insert à façonner (ORGA-LINE n'existe que pour TANDEMBOX)");
             }
             b.parts.push(sideL, sideR, endF, endB, bottomP);
+            // MOVENTO pulls out over its whole nominal length, the front and its box together
+            b.motions.push({
+                item: c.id, front: fp.id, label: `${c.name}, ${name.toLowerCase()}`, kind: "slide", pivot: [0, 0, 0],
+                axis: Z, amount: runner.nl,
+                parts: [`${c.id}/front/${fp.id}`, sideL.id, sideR.id, endF.id, endB.id,
+                        bottomP.id], fitted: [], rides: [],
+                source: `coulisses ${runner.ref} sorties de ${runner.nl} mm`,
+                remedy: "Déplacer ce qui gêne ou réduire la profondeur du tiroir.",
+            });
             // the space Blum reserves for each runner (p. 419) : 21 against the cell side, under the drawer side
             // over NL from the front of the box
             // TODO the runner profile itself is not dimensionned on p. 419, only the space it takes

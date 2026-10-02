@@ -120,6 +120,10 @@ describe("layout and commands", () =>
         {
             expect(spec.leaves).toBe(1);
             expect(spec.leafWidth).toBeLessThan(600);
+            // opened, the leaf runs right over the free length of its track, the width of the box less its own
+            const runs = analyse(r).build.motions;
+            expect(runs).toHaveLength(1);
+            expect(runs[0]).toMatchObject({ kind: "slide", axis: [1, 0, 0], amount: c.width - spec.leafWidth });
         }
     });
 

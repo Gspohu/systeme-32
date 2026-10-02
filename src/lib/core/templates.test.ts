@@ -52,6 +52,35 @@ describe("the sketch templates", () =>
 
 
     // the TV wall keeps oak backs, cut from the oak 8 mm sheet its niche lining opens anyway
+    // TV : four doors, four drawers. Dresser : ten doors, three drawers
+    for (const [make, doors, drawers] of [[tvWall, 4, 4], [dresser, 10, 3]] as const)
+    {
+        it(`${make.name} turns every door 110 deg and pulls every drawer out with its box`, () =>
+        {
+            const motions = analyse(make()).build.motions;
+            const turns = motions.filter((m) =>
+            {
+                return m.kind === "turn";
+            });
+            const slides = motions.filter((m) =>
+            {
+                return m.kind === "slide";
+            });
+            expect([turns.length, slides.length]).toEqual([doors, drawers]);
+            for (const m of turns)
+            {
+                expect(m.amount).toBe(110);
+            }
+            for (const m of slides)
+            {
+                // the front, two sides, two ends and the bottom of the box, out by the length of the runner
+                expect(m.parts).toHaveLength(6);
+                expect(m.source).toContain(`sorties de ${m.amount} mm`);
+            }
+        });
+    }
+
+
     for (const [make, decor] of [[tvWall, "H1180_ST37"], [dresser, "SNOW_WHITE_8685"]] as const)
     {
         it(`${make.name} puts every back in ${decor}, the rounded end's one included`, () =>
