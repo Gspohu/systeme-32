@@ -35,6 +35,8 @@ class AppState
     showHardware = $state(false);
     // the back wall, the ceiling and the side walls an item stands against
     showRoom = $state(true);
+    // the room dimmed and every LED strip or spot lighting what is under it
+    ledsOn = $state(false);
     private nextToast = 0;
 
     project: Project = $derived(this.history.present);

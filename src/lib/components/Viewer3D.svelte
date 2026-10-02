@@ -13,6 +13,8 @@
             <input type="checkbox" bind:checked={app.showHardware} /> Voir la quincaillerie</label>
         <label class="form-check">
             <input type="checkbox" bind:checked={app.showRoom} /> Mur et plafond</label>
+        <label class="form-check" title="Pièce assombrie, éclairages LED allumés">
+            <input type="checkbox" bind:checked={app.ledsOn} /> LED allumées</label>
     </div>
 </div>
 

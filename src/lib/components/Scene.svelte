@@ -5,8 +5,10 @@
     import { untrack } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
     import { app } from "./app_state.svelte";
+    import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
     import { cushionMesh, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
-            type MeshSpec } from "../view3d/meshes";
+            type FittingMesh, type MeshSpec } from "../view3d/meshes";
+    import { kelvinColour } from "../view3d/kelvin";
     import { roomBox, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
     import { decorTexture } from "../view3d/textures";
@@ -242,7 +244,7 @@
     // rails and LED profiles follow the layouts of the analysis
     const fittings = $derived.by(() =>
     {
-        const list: { key: string; wall: Wall; light: boolean; geometry: THREE.BufferGeometry }[] = [];
+        const list: (FittingMesh & { wall: Wall })[] = [];
         for (const it of app.project.items)
         {
             const lay = it.kind === "carcass" ? build.layouts.get(it.id) : undefined;
@@ -257,7 +259,7 @@
             {
                 ladderMeshes(it).forEach((geometry, k) =>
                 {
-                    list.push({ key: `${it.id}/${k}`, wall: it.wall, light: false, geometry });
+                    list.push({ key: `${it.id}/${k}`, wall: it.wall, light: false, kelvin: null, geometry });
                 });
             }
         }
@@ -277,6 +279,34 @@
             }
         };
     });
+
+    // with the LEDs on, each strip or spot casts its light down from its own face, at its colour temperature
+    RectAreaLightUniformsLib.init();
+    const ledLights = $derived.by(() =>
+    {
+        const list: { key: string; wall: Wall; centre: [number, number, number]; w: number; d: number;
+                      colour: THREE.Color }[] = [];
+        for (const f of fittings)
+        {
+            if (!f.light || f.kelvin === null)
+            {
+                continue;
+            }
+            f.geometry.computeBoundingBox();
+            const box = f.geometry.boundingBox!;
+            const c = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const [r, g, bl] = kelvinColour(f.kelvin);
+            list.push({ key: f.key, wall: f.wall, centre: [c.x, box.min.y - 0.001, c.z], w: size.x, d: size.z,
+                        colour: new THREE.Color(r, g, bl) });
+        }
+        return list;
+    });
+    // the room dimmed to a fifth, the way a lit niche is looked at in the evening
+    const dim = $derived(app.ledsOn ? 0.2 : 1);
+    // a rendering exposure set by eye against the lights of this scene, which are not photometric either : a real
+    // strip of 1400 lm/m behind 18 mm of diffuser is near 25 000 cd/m2 and would only burn the picture white
+    const LED_NITS = 14;
     $effect(() =>
     {
         const current = cushions;
@@ -345,9 +375,19 @@
     <OrbitControls target={frame.target} enableDamping maxPolarAngle={Math.PI * 0.49} />
 </T.PerspectiveCamera>
 
-<T.HemisphereLight args={[0xffffff, 0x444444, 0.9]} />
-<T.DirectionalLight position={[3, 5, 4]} intensity={1.6} />
-<T.DirectionalLight position={[-4, 3, 2]} intensity={0.5} />
+<T.HemisphereLight args={[0xffffff, 0x444444, 0.9]} intensity={0.9 * dim} />
+<T.DirectionalLight position={[3, 5, 4]} intensity={1.6 * dim} />
+<T.DirectionalLight position={[-4, 3, 2]} intensity={0.5 * dim} />
+{#if app.ledsOn}
+    {#each ledLights as l (l.key)}
+        {@const pl = placement(l.wall)}
+        <T.Group rotation={pl.rotation} position={pl.position}>
+            <!-- a rect area light faces its local -z : turned a quarter about x it shines down -->
+            <T.RectAreaLight position={l.centre} rotation={[-Math.PI / 2, 0, 0]} width={l.w} height={l.d}
+                color={l.colour} intensity={LED_NITS} />
+        </T.Group>
+    {/each}
+{/if}
 
 <Grid plane="xz" cellSize={100 * MM} sectionSize={1000 * MM} gridSize={[12, 12]} fadeDistance={14}
     cellColor={grid.cell} sectionColor={grid.section} />
