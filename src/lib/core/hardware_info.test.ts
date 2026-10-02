@@ -150,15 +150,62 @@ describe("hardware the user is told about", () =>
     });
 
 
-    it("leaves the deflection of a wall shelf to the fixing it will get, never two end supports it has not", () =>
+    it("hangs a wall shelf on concealed supports 700 apart at most, its load and its deflection checked", () =>
     {
-        const p = addItem(newProject("Riquewihr"), newWallShelf({ width: 1600, depth: 250, thickness: 38,
+        const p = addItem(newProject("Riquewihr"), newWallShelf({ width: 1600, depth: 250, thickness: 39,
                                                                   decor: "CHENE_PLAQUE" }));
+        const a = analyse(p);
         expect(messages(p, "error")).toEqual([]);
-        expect(messages(p, "warning").some((m) =>
+        const shelf = a.build.parts.find((q) =>
         {
-            return m.includes("Sa flèche dépend de l'écartement de cette fixation");
+            return q.role === "wallShelf";
+        })!;
+        // 100 in from each end, the 1400 left parted in two gaps of 700
+        expect(shelf.holes.map((h) =>
+        {
+            return h.u;
+        })).toEqual([100, 800, 1500]);
+        expect(shelf.holes[0]).toMatchObject({ diameter: 12, depth: 104, face: "v1", w: 19.5 });
+        const qty = (ref: string): number =>
+        {
+            return a.build.hardware.filter((h) =>
+            {
+                return h.ref === ref;
+            }).reduce((n, h) =>
+            {
+                return n + h.qty;
+            }, 0);
+        };
+        expect(qty("283.33.910")).toBe(3);
+        expect(qty("WALL_SCREW_5x50")).toBe(6);
+        expect(qty("PLUG_NYLON_8x40")).toBe(6);
+        expect(messages(p, "info").some((m) =>
+        {
+            return m.includes("pour 140 admis à 250 mm de profondeur");
         })).toBe(true);
+        // checked on the widest gap between pins, never on the 1600 of the board
+        expect(a.deflections.find((d) =>
+        {
+            return d.part === shelf.id;
+        })!.span).toBe(700);
+    });
+
+
+    it("refuses a concealed shelf too thin, too deep, too loaded or on plasterboard", () =>
+    {
+        const errs = (o: Partial<Parameters<typeof newWallShelf>[0]>, wallType: Project["settings"]["wallType"] =
+            "solid"): string =>
+        {
+            const p = addItem(newProject("Kaysersberg"), newWallShelf({ width: 800, depth: 250, thickness: 39,
+                                                                        decor: "CHENE_PLAQUE", ...o }));
+            return messages({ ...p, settings: { ...p.settings, wallType } }, "error").join();
+        };
+        expect(errs({ thickness: 19 })).toContain("24 mini");
+        expect(errs({ depth: 350 })).toContain("que jusqu'à 300 mm");
+        // 300 deep carries 80 kg/m2 : the 100 of books are already more
+        expect(errs({ depth: 300 })).toContain("en porte 80 à 300 mm");
+        expect(errs({}, "plasterboard")).toContain("pas dans une plaque de plâtre");
+        expect(errs({})).toBe("");
     });
 
 

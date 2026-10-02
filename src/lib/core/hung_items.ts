@@ -1,8 +1,110 @@
 // Items hung on the wall : the single shelf and the open box
 
-import type { HangingBox, WallShelf } from "./model";
-import { type Build, newPart } from "./parts";
+import type { HangingBox, Settings, WallShelf } from "./model";
+import { type Build, type Part, newPart } from "./parts";
 import { X, Y, Z, neg, type Outline, type Segment } from "./geometry";
+import { box } from "./fitted";
+import { partMass, spread } from "./fittings";
+import { CONCEALED_SHELF_SUPPORT } from "../data/rules";
+import { DIAM } from "./text";
+
+// Workshop convention, stated in the drawings as such : the end supports stand 100 in from the ends of the shelf
+// TODO Häfele gives no end distance for its 283.33.910, a figure from the cabinet maker should replace this one
+const SUPPORT_END_INSET = 100;
+
+
+// Where the concealed supports of a shelf go, from its left end
+export function shelfSupportPositions(width: number): number[]
+{
+    return spread(width, Math.min(SUPPORT_END_INSET, width / 4), CONCEALED_SHELF_SUPPORT.maxSpacing);
+}
+
+
+// the widest gap between two supports : the span its deflection is checked on
+export function shelfSupportSpan(width: number): number
+{
+    const xs = shelfSupportPositions(width);
+    let span = 0;
+    for (let i = 1; i < xs.length; i++)
+    {
+        span = Math.max(span, xs[i]! - xs[i - 1]!);
+    }
+    return span;
+}
+
+
+// Häfele 283.33.910 pins drilled into the back edge, their plates screwed to the wall, the load read against
+// the table of p. 7.142
+function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): void
+{
+    const H = CONCEALED_SHELF_SUPPORT;
+    if (w.thickness < H.minThickness)
+    {
+        b.errors.push(`${w.name} : ${w.thickness} mm d'épaisseur, ${H.minThickness} mini pour la fixation invisible `
+            + `Häfele ${H.ref} (p. 7.142). Épaissir l'étagère.`);
+        return;
+    }
+    if (s.wallType === "plasterboard")
+    {
+        b.errors.push(`${w.name} : la fixation invisible Häfele ${H.ref} se pose dans le bois ou la maçonnerie, pas `
+            + "dans une plaque de plâtre (p. 7.142). Renforcer la cloison d'une fourrure bois ou changer le type "
+            + "de mur.");
+        return;
+    }
+    const xs = shelfSupportPositions(w.width);
+    const mid = w.thickness / 2;
+    xs.forEach((x, k) =>
+    {
+        part.holes.push({ u: x, v: 0, diameter: H.pinDiameter, depth: H.pinDepth, face: "v1", w: mid,
+                          label: `Fixation ${H.ref} : broche ${DIAM}${H.pinDiameter} x ${H.pinDepth}` });
+        // one fitting : the pin runs on from the bottom of the plate pocket to the end of its hole
+        const pin = box(`${w.id}/support${k}/broche`, w.id, H.ref, `${w.name}, broche ${k + 1}`,
+                        [w.x + x - H.pinDiameter / 2, w.y + mid - H.pinDiameter / 2, w.z + H.pocket.depth],
+                        [w.x + x + H.pinDiameter / 2, w.y + mid + H.pinDiameter / 2, w.z + H.pinDepth], true);
+        const plate = box(`${w.id}/support${k}/platine`, w.id, H.ref, `${w.name}, platine ${k + 1}`,
+                          [w.x + x - H.plate.width / 2, w.y + mid - H.plate.height / 2, w.z],
+                          [w.x + x + H.plate.width / 2, w.y + mid + H.plate.height / 2, w.z + H.pocket.depth], true);
+        pin.shape = "cylinder";
+        pin.axes = [X, Y, Z];
+        pin.half = [H.pinDiameter / 2, H.pinDiameter / 2, (H.pinDepth - H.pocket.depth) / 2];
+        pin.host = part.id;
+        plate.host = part.id;
+        b.fitted.push(pin, plate);
+    });
+    part.notes.push(`Au dos, une entaille de ${H.pocket.width} x ${H.pocket.height}, ${H.pocket.depth} de profondeur, `
+        + `centrée sur chaque broche pour la platine (Häfele p. 7.142)`);
+    part.notes.push(`Fixations à ${SUPPORT_END_INSET} mm des bouts : convention d'atelier, Häfele ne la donne pas`);
+    const n = xs.length;
+    const line = (ref: string, qty: number, note: string | null): void =>
+    {
+        b.hardware.push({ ref, qty, item: w.id, itemName: w.name, target: part.id, note });
+    };
+    line(H.ref, n, `vendue par ${H.orderMultiple} chez Häfele`);
+    line("WALL_SCREW_5x50", n * H.wallScrews, `${H.wallScrews} par platine`);
+    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", n * H.wallScrews, null);
+    // the load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
+    const row = H.loads.find((r) =>
+    {
+        return w.depth <= r.depth + 0.01;
+    });
+    const own = partMass(part, true) / (w.width * w.depth * 1e-6);
+    const load = s.shelfLoad * 100 + own;
+    if (row === undefined)
+    {
+        b.errors.push(`${w.name} : ${w.depth} mm de profondeur, Häfele ne donne la charge de la ${H.ref} que jusqu'à `
+            + `${H.loads[H.loads.length - 1]!.depth} mm (p. 7.142). Réduire la profondeur.`);
+    }
+    else if (load > row.kgPerM2)
+    {
+        b.errors.push(`${w.name} : ${load.toFixed(0)} kg/m² avec son poids, la fixation ${H.ref} en porte `
+            + `${row.kgPerM2} à ${row.depth} mm de profondeur (Häfele p. 7.142). Réduire la profondeur ou la charge.`);
+    }
+    else
+    {
+        b.infos.push(`${w.name} : ${n} fixations invisibles Häfele ${H.ref}, ${load.toFixed(0)} kg/m² avec son poids `
+            + `pour ${row.kgPerM2} admis à ${row.depth} mm de profondeur (p. 7.142).`);
+    }
+}
 
 
 // Board seen from above, u along the wall, v from the front edge back : front corners rounded at will
@@ -22,7 +124,7 @@ export function shelfOutline(L: number, W: number, left: number, right: number):
 }
 
 
-export function buildWallShelf(w: WallShelf, b: Build): void
+export function buildWallShelf(w: WallShelf, s: Settings, b: Build): void
 {
     const desk = w.purpose === "desk";
     const part = newPart({
@@ -42,9 +144,14 @@ export function buildWallShelf(w: WallShelf, b: Build): void
         part.outline = shelfOutline(w.width, w.depth, left, right);
         part.notes.push("Coins arrondis : découpe d'après le DXF, chant cintré posé à la main");
     }
-    // TODO : no concealed shelf bracket sourced yet, the analsis warns about it until one is chosen
-    part.notes.push(desk ? "Appuis du plan : sur les caissons voisins ou fixation à choisir"
-        : "Fixation invisible : quincaillerie non encore sourcée");
+    if (desk)
+    {
+        part.notes.push("Appuis du plan : sur les caissons voisins ou fixation à choisir");
+    }
+    else
+    {
+        fitConcealedSupports(w, part, s, b);
+    }
     b.parts.push(part);
 }
 

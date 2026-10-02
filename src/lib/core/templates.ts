@@ -32,7 +32,7 @@ export function tvWall(): Project
     const drawersA = cell();
     const drawersB = cell();
     const rightDoor = split("h", [224], [cell(), cell()], ["adjustable"]);
-    // the quarter round end left open, one shaped shelf parting its 500 of height in two
+    // the quarter round end left open, one shaped shelf parting its 500 of height in two, closed at the back
     const baseUnit = newCarcass({
         name: "Meuble bas",
         width: 2600, height: 500, depth: 400, x: 0, y: 100, z: 0,
@@ -41,7 +41,7 @@ export function tvWall(): Project
         ends: {
             left: { type: "square" },
             right: { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
-                     battens: DEFAULT_BATTENS, decor: OAK, open: true, shelves: 1 },
+                     battens: DEFAULT_BATTENS, decor: OAK, open: true, shelves: 1, back: true },
         },
     });
     // a 60 mm hole through the back of the lower left cell for the cables, to set from the grommet bought

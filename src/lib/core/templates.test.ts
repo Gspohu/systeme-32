@@ -70,12 +70,12 @@ describe("the sketch templates", () =>
                 end.push(q);
             }
         }
-        // no skin left : the two end panels and one shaped shelf, all 300 out to the radius
+        // no skin left : the two end panels, one shaped shelf and the back closing the arc
         expect(end.map((q) =>
         {
             return q.label;
         }).sort()).toEqual(["Bout arrondi droit, flasque basse", "Bout arrondi droit, flasque haute",
-                            "Bout arrondi droit, tablette 1"]);
+                            "Bout arrondi droit, fond", "Bout arrondi droit, tablette 1"]);
         // the 60 hole in the middle of the lower left cell : 19 + 627 / 2 across, 19 + 224 / 2 up
         const back = a.build.parts.find((q) =>
         {

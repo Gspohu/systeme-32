@@ -158,7 +158,7 @@ add({ id: "ANTI_TIP_BRACKET", family: "D60", label: "Équerre anti-basculement a
      brand: "", ref: "Générique", source: ANTI_TIP });
 add({ id: "SCREW_4x16", family: "D60", label: "Vis aggloméré 4 x 16, équerre dans le dessus du caisson", brand: "",
      ref: "Générique", source: ANTI_TIP });
-add({ id: "WALL_SCREW_5x50", family: "D60", label: "Vis 5 x 50, équerre dans le mur", brand: "", ref: "Générique",
+add({ id: "WALL_SCREW_5x50", family: "D60", label: "Vis 5 x 50 dans le mur", brand: "", ref: "Générique",
      source: ANTI_TIP });
 // Slat walls : a 20 mm cleat before the 40 mm plug asks for a 70 mm screw, the slats are glued and pinned
 const SLATS = ("Convention d'atelier, pas une donnée fabricant, référence au choix du distributeur");
@@ -306,6 +306,9 @@ for (const s of SHELF_SUPPORTS)
          ref: s.ref, source: `${HAFELE_UK} p. 7.158-7.159`,
          url: "https://assets.daro.com/HafeleLiterature/18T7-158.pdf" });
 }
+add({ id: "283.33.910", family: "D70", label: `Fixation invisible d'étagère à platine vissée, broche ${DIAM}12 x 112`,
+     brand: "Häfele", ref: "283.33.910", source: `${HAFELE_UK} p. 7.142`,
+     url: "https://assets.daro.com/HafeleLiterature/18T7-142.pdf" });
 
 
 // Glass shelf supports for 5 mm holes, p. 7.166 : chosen by the glass thickness, no load is published for them

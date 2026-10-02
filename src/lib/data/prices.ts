@@ -71,6 +71,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:48N0510.03": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:609.1500": entry(fromGbp(2.66 / 100), "u", "Interfit (UK), 2,66 GBP HT le sachet de 100"),
     "hw:637.76.352": entry(fromGbp(0.99), "u", "Interfit (UK), pied AXILO 80 mm à 0,99 GBP HT"),
+    "hw:283.33.910": entry(fromGbp(2.68 / 1.2), "u", "Swansea Timber (UK), 2,68 GBP TTC la fixation, en stock",
+                           READ_ON_2),
     // sold one by one in Spain : the 21 % of the Spanish VAT comes off, not the French 20
     "hw:637.76.333": entry(Math.round(0.67 / 1.21 * 1000) / 1000, "u",
                            "Monastil (Espagne), 0,67 EUR TTC l'embase avec 21 % de TVA, en stock", READ_ON_2),

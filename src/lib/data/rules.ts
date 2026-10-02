@@ -22,6 +22,11 @@ export const INSET_PLATE_SHIFT = 1.5;
 // Plates on the system 32 line
 export const PLATE_LINE = 37;
 export const MAX_DOOR_THICKNESS = 26;
+// Blum KA-150 p. 74 : how far each hinge hung on the doors opens, BLUMOTION and TIP-ON alike
+export const HINGE_OPENING_DEG: Record<string, number> = {
+    "71B3550": 110, "71B3650": 110, "71B3750": 110,
+    "70T3550.TL": 110, "70T3650.TL": 110, "70T3750.TL": 110,
+};
 
 
 // Blum KA-150 p. 75 : minimum gap F for fronts with R = 1 mm edges, rows TB 3..7, columns FD
@@ -73,6 +78,9 @@ export const MOVENTO = {
         return series === "766H" || nl >= 550;
     },
     backHole: { diameter: 6, depth: 10, fromSide: 7, fromBottom: 11 },
+    // "concealed full extension" (Blum MOVENTO product information 2022, p. 18) : the stroke is not dimensioned
+    // the box is taken out over its whole nominal lenght NL : the share of NL it travels
+    extension: 1,
     maxLoad760: 40,
     maxLoad766: 70,
 };
@@ -120,6 +128,23 @@ export const SLIDELINE_M = {
     minThickness: 16,
     maxThickness: 25,
     shelfThicknesses: [15, 16, 18, 19, 22, 25],
+};
+
+
+// Häfele U.K. 2018 p. 7.142, concealed shelf support 283.33.910 : a pin Ø 12 x 104 into the back edge of the shelf
+// its plate 68 x 20 let into a pocket 70 x 22 x 12, two Ø 5 screws in the wall, 700 apart at most under an even load
+export const CONCEALED_SHELF_SUPPORT = {
+    ref: "283.33.910",
+    minThickness: 24,
+    pinDiameter: 12,
+    pinDepth: 104,
+    pocket: { width: 70, height: 22, depth: 12 },
+    plate: { width: 68, height: 20 },
+    wallScrews: 2,
+    orderMultiple: 4,
+    maxSpacing: 700,
+    // most load spread over the shelf for its depth, kg/m2, nothing given past 300 deep
+    loads: [{ depth: 200, kgPerM2: 200 }, { depth: 250, kgPerM2: 140 }, { depth: 300, kgPerM2: 80 }],
 };
 
 

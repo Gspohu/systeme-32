@@ -2,7 +2,7 @@
 
 import type { Carcass, Item, Project } from "./model";
 import { type Build, buildCarcass, emptyBuild } from "./parts";
-import { buildBox, buildWallShelf } from "./hung_items";
+import { buildBox, buildWallShelf, shelfSupportSpan } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
 import { buildDrawers } from "./drawers";
 import { fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, partMass } from "./fittings";
@@ -106,7 +106,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
     }
     else if (it.kind === "wallShelf")
     {
-        buildWallShelf(it, b);
+        buildWallShelf(it, s, b);
     }
     else if (it.kind === "slats")
     {
@@ -225,6 +225,10 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
     const maxW = SHEET_WIDTH - 2 * s.trim;
     // one warning per item and unverified thickness, not one per part
     const unverified = new Map<string, { item: string; itemName: string; label: string; thickness: number; count: number }>();
+    const items = new Map(p.items.map((it) =>
+    {
+        return [it.id, it];
+    }));
     for (const part of b.parts)
     {
         if (part.role === "batten" || part.role === "skin")
@@ -266,14 +270,17 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
                               + `(limite ${s.handlingKg} kg, R4541-9).` });
         }
         const hung = b.midLoads.get(part.id) ?? 0;
-        // a top is only checked for what a rail hangs from it, never for the shelf load. A wall shelf is not
-        // a board on two end supports : its own fixing sets its spans, it is checked once that fixing is chosen
+        // a top is only checked for what a rail hangs from it, never for the shelf load. A wall shelf spans
+        // between its concealed supports, the widest gap taken as a span on two supports
         const top = part.role === "top";
-        if (part.role !== "shelf" && part.role !== "hdivider" && !(top && hung > 0))
+        const hungShelf = part.role === "wallShelf" ? items.get(part.item) : undefined;
+        const onSupports = hungShelf?.kind === "wallShelf" && hungShelf.purpose === "shelf";
+        if (part.role !== "shelf" && part.role !== "hdivider" && !(top && hung > 0) && !onSupports)
         {
             continue;
-        }  
-        const d = shelfDeflection(part, top ? 0 : s.shelfLoad, hung);
+        }
+        const span = onSupports ? shelfSupportSpan(part.length) : part.length;
+        const d = shelfDeflection({ ...part, length: span }, top ? 0 : s.shelfLoad, hung);
         if (d === null)
         {
             continue;
@@ -389,14 +396,11 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
         const loaded = load > 0 ? `, ${(m + load).toFixed(0)} kg chargé (charges d'essai)` : "";
         checks.push({ level: "info", item: it.id, target: null,
                      message: `${it.name} : ${m.toFixed(1)} kg à vide${loaded}.` });
-        if (it.kind === "wallShelf")
+        if (it.kind === "wallShelf" && it.purpose === "desk")
         {
-            const text = it.purpose === "desk"
-                ? "appuis non vérifiés, le poser sur des caissons ou choisir une fixation avec l'ébéniste. Sa flèche "
-                    + "se vérifiera avec ces appuis."
-                : "fixation invisible non encore sourcée, à choisir avec l'ébéniste selon le support mural. Sa flèche "
-                    + "dépend de l'écartement de cette fixation et se vérifiera avec elle.";
-            checks.push({ level: "warning", item: it.id, target: null, message: `${it.name} : ${text}` });
+            checks.push({ level: "warning", item: it.id, target: null,
+                          message: `${it.name} : appuis non vérifiés, le poser sur des caissons ou choisir une fixation `
+                              + "avec l'ébéniste. Sa flèche se vérifiera avec ces appuis." });
         }
     }
     return checks;

@@ -188,11 +188,19 @@ describe("AVENTOS HK top flaps", () =>
     {
         const p = withFlap(cabinet());
         // the top face is at 1900, the open flap rises 115 above it and reaches 369 + 397 frmo the wall
+        // the shelves stand as obstacles only : what is told of their own fixing is left out
+        const flapErrors = (q: Project): string[] =>
+        {
+            return errorsOf(q).filter((m) =>
+            {
+                return m.includes("abattant");
+            });
+        };
         const hit = addItem(p, newWallShelf({ x: 0, y: 1950, depth: 400 }));
-        expect(errorsOf(hit).join()).toContain("l'abattant ouvert heurte");
+        expect(flapErrors(hit).join()).toContain("l'abattant ouvert heurte");
         const clear = addItem(p, newWallShelf({ x: 0, y: 2100, depth: 400 }));
-        expect(errorsOf(clear)).toEqual([]);
+        expect(flapErrors(clear)).toEqual([]);
         const shallow = addItem(p, newWallShelf({ x: 0, y: 1950, depth: 300 }));
-        expect(errorsOf(shallow)).toEqual([]);
+        expect(flapErrors(shallow)).toEqual([]);
     });
 });
