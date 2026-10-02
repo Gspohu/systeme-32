@@ -97,19 +97,19 @@ export function dresser(): Project
                             base: standing ? { type: "floor" } : { type: "plinth", height: 100, setback: 50 } });
     };
 
-    // the end columns are cut at different heights, the doors do not line up across the niche
+    // the left column cut at two heights, the right one behind a single full height door over its two shelves
     const left = [cell(), cell(), cell()];
     const kl = box("Colonne gauche", 0, 100, 600, 2256, split("h", [636, 1500], left), false);
-    const right = [cell(), cell(), cell()];
-    const kr = box("Colonne droite", 2200, 100, 680, 2256, split("h", [776, 1666], right), false);
+    const rightRoot = split("h", [776, 1666], [cell(), cell(), cell()]);
+    const kr = box("Colonne droite", 2200, 100, 680, 2256, rightRoot, false);
     for (const c of left)
     {
         kl.fronts.push(newFront(c.id, { type: "door", hinge: "left" }, { decor: GREEN }));
     }
-    for (const c of right)
-    {
-        kr.fronts.push(newFront(c.id, { type: "door", hinge: "right" }, { decor: GREEN }));
-    }
+    kr.fronts.push(newFront(rightRoot.id, { type: "door", hinge: "right" }, { decor: GREEN }));
+    // an 80 mm hole for the mains in the back of the middle cell, its centre 100 in from the left and the bottom
+    kl.outlets.push({ id: newId("o"), cell: left[1]!.id, panel: "back", shape: "round", w: 80, h: 80,
+                      dx: -((600 - 2 * 19) / 2 - 100), dy: -((1500 - 636 - 19) / 2 - 100) });
 
 
     // three full height bays, each a cupboard under a 171 high drawer : the uprights carry the shelves
@@ -138,9 +138,9 @@ export function dresser(): Project
     const niche = box("Niche", 600, 960, 1600, 680, split("v", [220, 1323], [sideShelves(), cell(),
         sideShelves()]), true);
 
-    // doors of three widths on the top row, against the grid look
+    // the top row parted like the bays under it : its doors line up with theirs acros the niche
     const top = [cell(), cell(), cell()];
-    const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [603, 1111], top), true);
+    const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [512, 1040], top), true);
     high.fronts.push(
         newFront(top[0]!.id, { type: "door", hinge: "left" }, { decor: GREEN }),
         newFront(top[1]!.id, { type: "door", hinge: "left" }, { decor: GREEN }),

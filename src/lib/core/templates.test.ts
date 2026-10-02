@@ -48,13 +48,43 @@ describe("the sketch templates", () =>
     });
 
 
-    it("fits the dresser with 27 hinges and three 480 runner pairs for its row of drawers", () =>
+    it("fits the dresser with 24 hinges and three 480 runner pairs for its row of drawers", () =>
     {
-        // twelve doors, two hinges up to 750 mm and 6 kg on the Blum chart : the three past 750 take a third
+        // nine short doors of two hinges, the 861 one of the left column three, the full height right one five
         const hw = hardwareCount(dresser);
-        expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(9 * 2 + 3 * 3);
-        expect(hw.get("173H7100")).toBe(27);
+        expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(8 * 2 + 3 + 5);
+        expect(hw.get("173H7100")).toBe(24);
         expect(hw.get("760H4800S")).toBe(3);
+    });
+
+
+    it("gives the dresser one tall right door, top doors over the bottom ones and a mains hole", () =>
+    {
+        const p = dresser();
+        const a = analyse(p);
+        const doorsOf = (name: string): { x: number; w: number }[] =>
+        {
+            const it = p.items.find((k) =>
+            {
+                return k.name === name;
+            })!;
+            return (a.build.fronts.get(it.id) ?? []).filter((fp) =>
+            {
+                return fp.role === "door";
+            }).map((fp) =>
+            {
+                return { x: fp.rect.x, w: fp.rect.w };
+            });
+        };
+        expect(doorsOf("Colonne droite")).toHaveLength(1);
+        expect(doorsOf("Placards hauts")).toEqual(doorsOf("Placards et tiroirs"));
+        const back = a.build.parts.find((q) =>
+        {
+            return q.itemName === "Colonne gauche" && q.role === "back";
+        })!;
+        // 80 round, 100 above the floor of the middle cell (674 + 100) and 100 in from its left side (19 + 100)
+        expect(back.cutouts).toHaveLength(1);
+        expect(back.cutouts[0]!.segments[0]).toMatchObject({ kind: "arc", cx: 774, cy: 119, y: 79 });
     });
 
     it("gives the TV wall an open quarter round, a cable hole, one door per zone and its two oak shelves", () =>
