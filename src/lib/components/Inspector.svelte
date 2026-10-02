@@ -6,7 +6,8 @@
     import {
         removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, mergeFronts, splitFront, splitCell,
         removeDivider,
-        moveDivider, setDividerKind, setDividerFinish, setDividerThickness, setLining, setRail, setLight, setEnd,
+        moveDivider, setDividerKind, setDividerFinish, setDividerThickness, distributeEvenly, setCellSize, setLining,
+        setRail, setLight, setEnd,
         setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet, toSliding, toDoor,
     } from "../core/commands";
     import { byId } from "../core/edit";
@@ -359,7 +360,7 @@
                             if (nb !== undefined)
                             {
                                 const from = sp.axis === "h" ? nb.y : nb.x;
-                                app.apply(moveDivider, carcass.id, sp.id, sel.index, from + num(e));
+                                app.apply(moveDivider, carcass.id, sp.id, sel.index, from + num(e), true);
                             }
                         }} />
                 </label>
@@ -424,7 +425,20 @@
                     {#each FRONT_KINDS as [k, label]}<option value={k}>{label}</option>{/each}
                 </select>
             </label>
+            {@const parentNode = parentId === null ? null : findNode(carcass.root, parentId)}
+            {#if parentNode !== null && parentNode.kind === "split"}
+                <label class="field" title="La séparation voisine se déplace pour donner exactement cette taille">
+                    <span class="label">{parentNode.axis === "h" ? "Hauteur (mm)" : "Largeur (mm)"}</span>
+                    <input class="input" type="number" min={MIN_CELL} step="1"
+                        value={Math.round(parentNode.axis === "h" ? nodeBox.h : nodeBox.w)}
+                        onchange={(e) => app.apply(setCellSize, carcass.id, nodeBox.id, num(e))} />
+                </label>
+            {/if}
             <div class="row">
+                {#if nodeBox.kind === "split"}
+                    <button class="btn btn-secondary" title="Toutes les cases de la zone à la même taille"
+                        onclick={() => app.apply(distributeEvenly, carcass.id, nodeBox.id)}>Répartir également</button>
+                {/if}
                 {#if parentId !== null}
                     <button class="btn btn-secondary"
                         title="Sélectionne la zone qui englobe celle-ci, pour y poser une seule façade"

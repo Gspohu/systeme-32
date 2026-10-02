@@ -162,7 +162,9 @@ export function removeDivider(p: Project, carcassId: string, splitId: string, in
 }
 
 
-export function moveDivider(p: Project, carcassId: string, splitId: string, index: number, pos: number): Project
+// A dragged divider snaps on the grid, a position typed in mm is kept as it is
+export function moveDivider(p: Project, carcassId: string, splitId: string, index: number, pos: number,
+    exact = false): Project
 {
     return edit(p, (q) =>
     {
@@ -181,7 +183,7 @@ export function moveDivider(p: Project, carcassId: string, splitId: string, inde
         const start = sp.axis === "h" ? nb.y : nb.x;
         const length = sp.axis === "h" ? nb.h : nb.w;
         const origin = sp.axis === "h" ? lay.inner.y : lay.inner.x;
-        const local = Math.round(origin + snap(pos - origin, q.settings.grid) - start);
+        const local = Math.round(exact ? pos - start : origin + snap(pos - origin, q.settings.grid) - start);
         const previous = index === 0 ? 0 : sp.cuts[index - 1]! + thick(index - 1);
         const next = index === sp.cuts.length - 1 ? length : sp.cuts[index + 1]!;
         if (local - previous < MIN_CELL || next - (local + thick(index)) < MIN_CELL)
@@ -194,6 +196,89 @@ export function moveDivider(p: Project, carcassId: string, splitId: string, inde
         if (errors.length > 0)
         {
             throw new CommandError(`Déplacement impossible : ${errors[0]}`);
+        }
+    });
+}
+
+
+// Every cell of a split gets the same height or width, the dividers taken off : to the mm, the last cell
+// keeping what rounding leaves
+export function distributeEvenly(p: Project, carcassId: string, splitId: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const sp = findNode(c.root, splitId);
+        const nb = resolveLayout(c).nodes.get(splitId);
+        if (sp === null || sp.kind !== "split" || nb === undefined)
+        {
+            throw new CommandError("Choisir une zone recoupée par des tablettes ou des montants.");
+        }
+        const thick = sp.cuts.map((_, k) =>
+        {
+            return dividerThickness(c, sp.axis, sp.thicknesses[k] ?? null);
+        });
+        const length = sp.axis === "h" ? nb.h : nb.w;
+        let used = 0;
+        for (const t of thick)
+        {
+            used += t;
+        }
+        const each = (length - used) / sp.children.length;
+        let before = 0;
+        let k = 0;
+        while (k < sp.cuts.length)
+        {
+            sp.cuts[k] = Math.round((k + 1) * each + before);
+            before += thick[k]!;
+            k++;
+        }
+        const errors = resolveLayout(c).errors;
+        if (errors.length > 0)
+        {
+            throw new CommandError(`Répartition impossible : ${errors[0]}`);
+        }
+    });
+}
+
+
+// The height of a cell in a horizontal split, its width in a vertical one : the divider after it moves, or the
+// one before it for the last cell
+export function setCellSize(p: Project, carcassId: string, cellId: string, size: number): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const sp = findParent(c.root, cellId);
+        if (sp === null)
+        {
+            throw new CommandError("Cette case remplit tout le caisson : régler la taille du caisson.");
+        }
+        if (!Number.isFinite(size) || size < MIN_CELL)
+        {
+            throw new CommandError(`Taille illisible ou trop petite : ${MIN_CELL} mm au moins.`);
+        }
+        const thick = (k: number): number =>
+        {
+            return dividerThickness(c, sp.axis, sp.thicknesses[k] ?? null);
+        };
+        const nb = resolveLayout(c).nodes.get(sp.id)!;
+        const i = sp.children.findIndex((n) =>
+        {
+            return n.id === cellId;
+        });
+        if (i < sp.cuts.length)
+        {
+            sp.cuts[i] = Math.round((i === 0 ? 0 : sp.cuts[i - 1]! + thick(i - 1)) + size);
+        }
+        else
+        {
+            sp.cuts[i - 1] = Math.round((sp.axis === "h" ? nb.h : nb.w) - size - thick(i - 1));
+        }
+        const errors = resolveLayout(c).errors;
+        if (errors.length > 0)
+        {
+            throw new CommandError(`Taille impossible : ${errors[0]}`);
         }
     });
 }

@@ -7,7 +7,8 @@ import { CommandError, byId, edit, withoutId } from "./edit";
 
 
 export { CommandError } from "./edit";
-export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish, setDividerThickness }
+export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish, setDividerThickness, distributeEvenly,
+         setCellSize }
     from "./layout_commands";
 export { setFront, removeFront, updateFront, moveFront, mergeFronts, splitFront, toSliding, toDoor, setLining, setRail,
          setLight, setEnd, setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet }

@@ -156,7 +156,78 @@ export function dresser(): Project
 }
 
 
+// Sketch C, drawn with the parents : a wide niche no row of columns can give, their sides would cut it
+// A full height column at each end, three carcasses stacked between them
+// TODO every size is read off the sketch proportions, to set from the parents' own measures
+export function dresserNiche(): Project
+{
+    const project = newProject("Vaisselier à niche");
+    const white = "W1000_ST9";
+    const green = "U604_ST9";
+    const box = (name: string, x: number, y: number, width: number, height: number,
+        root: ReturnType<typeof split>, standing: boolean): Carcass =>
+    {
+        return newCarcass({ name, width, height, depth: 500, x, y, z: 0, decor: white, backDecor: white, root,
+                            base: standing ? { type: "floor" } : { type: "plinth", height: 100, setback: 50 } });
+    };
+
+    // the end columns are cut at different heights, the doors do not line up across the niche
+    const left = [cell(), cell(), cell()];
+    const kl = box("Colonne gauche", 0, 100, 600, 2340, split("h", [636, 1500], left), false);
+    const right = [cell(), cell(), cell()];
+    const kr = box("Colonne droite", 2200, 100, 680, 2340, split("h", [776, 1666], right), false);
+    for (const c of left)
+    {
+        kl.fronts.push(newFront(c.id, { type: "door", hinge: "left" }, { decor: green }));
+    }
+    for (const c of right)
+    {
+        kr.fronts.push(newFront(c.id, { type: "door", hinge: "right" }, { decor: green }));
+    }
+
+
+    // three full height bays, each a cupboard under a 171 high drawer : the uprights carry the shelves
+    const doors = [cell(), cell(), cell()];
+    const drawers = [cell(), cell(), cell()];
+    const bays = [0, 1, 2].map((k) =>
+    {
+        return split("h", [632], [doors[k]!, drawers[k]!]);
+    });
+    const low = box("Placards et tiroirs", 600, 100, 1600, 860, split("v", [512, 1040], bays), false);
+    low.fronts.push(
+        newFront(doors[0]!.id, { type: "door", hinge: "left" }, { decor: green }),
+        newFront(doors[1]!.id, { type: "door", hinge: "left" }, { decor: green }),
+        newFront(doors[2]!.id, { type: "door", hinge: "right" }, { decor: green }),
+    );
+    for (const c of drawers)
+    {
+        low.fronts.push(newFront(c.id, { type: "drawers", count: 1, loadKg: 10 }, { decor: green }));
+    }
+
+    // the niche : two narrow columns of small shelves around a 1084 wide opening
+    const sideShelves = (): ReturnType<typeof split> =>
+    {
+        return split("h", [201, 421], [cell(), cell(), cell()]);
+    };
+    const niche = box("Niche", 600, 960, 1600, 680, split("v", [220, 1323], [sideShelves(), cell(),
+        sideShelves()]), true);
+
+    // doors of three widths on the top row, against the grid look
+    const top = [cell(), cell(), cell()];
+    const high = box("Placards hauts", 600, 1640, 1600, 800, split("v", [603, 1111], top), true);
+    high.fronts.push(
+        newFront(top[0]!.id, { type: "door", hinge: "left" }, { decor: green }),
+        newFront(top[1]!.id, { type: "door", hinge: "left" }, { decor: green }),
+        newFront(top[2]!.id, { type: "door", hinge: "right" }, { decor: green }),
+    );
+
+    project.items.push(kl, low, niche, high, kr);
+    return project;
+}
+
+
 export const TEMPLATES = [
     { id: "tv", label: "Composition TV et bibliothèque", make: tvWall },
     { id: "dresser", label: "Vaisselier bibliothèque", make: dresser },
+    { id: "dresserNiche", label: "Vaisselier à niche", make: dresserNiche },
 ];

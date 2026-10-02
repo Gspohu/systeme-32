@@ -133,8 +133,8 @@ test.describe("dividers", () =>
     {
         const shelf = page.locator(".facade .split-panel").first();
         await setField(page, "Position (mm)", "300");
-        // snapped on the 32 mm grid counted from the inner bottom
-        await expect(field(page, "Position (mm)")).toHaveValue("288");
+        // a typed position is kept to the mm, only a dragged shelf snaps on the grid
+        await expect(field(page, "Position (mm)")).toHaveValue("300");
         const y0 = Number(await shelf.getAttribute("y"));
         const from = await centreOf(shelf);
         await dragBetween(page, from, { x: from.x, y: from.y - 60 });
@@ -152,6 +152,28 @@ test.describe("dividers", () =>
         await expect(shelf).not.toHaveAttribute("fill", before!);
         await page.locator(".inspector-body .segmented-item", { hasText: "Réglable" }).click();
         await expect(page.locator(".facade .split-panel.adjustable")).toHaveCount(1);
+    });
+
+
+    test("sets the exact height of a cell, then spreads the cells evenly", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await setField(page, "Hauteur (mm)", "250");
+        await expect(field(page, "Hauteur (mm)")).toHaveValue("250");
+        await expect(cells(page).first()).toHaveAttribute("height", "250");
+        await page.getByRole("button", { name: "Zone parente" }).click();
+        await page.getByRole("button", { name: "Répartir également" }).click();
+        await expect.poll(async () =>
+        {
+            return cells(page).evaluateAll((rs) =>
+            {
+                return rs.map((r) =>
+                {
+                    return Math.round(Number(r.getAttribute("height")));
+                });
+            });
+        // 762 inside less a 19 mm shelf leaves 743 : 371.5 each, the last cell keeps what the rounding leave
+        }).toEqual([372, 371]);
     });
 
 
