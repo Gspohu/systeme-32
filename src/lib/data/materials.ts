@@ -219,6 +219,20 @@ export const DECORS: Decor[] = [
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/W1000_9?country=FR",
     },
     {
+        // the cheap white of the backs : 8 mm in stock where the W1000 is not, its maker not named by the merchant
+        id: "SNOW_WHITE_8685",
+        label: "Blanc basique",
+        brand: "Jean Hue & Socoda",
+        ref: "Les Essentiels Snow White 8685 BS",
+        material: "p2",
+        grain: false,
+        rgb: [255, 255, 255],
+        colourSource: "Image décor Jean Hue & Socoda, aplat blanc",
+        references: "Décor 8685 Snow White, attribué à Kronospan par des revendeurs (non vérifié)",
+        url: "https://www.jeanhue-socoda.fr/melamine/melamines-decoratifs/melamine-decoratif-les-basiques/"
+            + "agglomere-melamine-les-essentiels-snow-white-8685-bs-2800x2070mm-08mm",
+    },
+    {
         id: "CHENE_MASSIF",
         label: "Chêne massif (tasseaux)",
         brand: "",

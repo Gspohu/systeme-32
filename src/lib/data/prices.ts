@@ -61,6 +61,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:CHENE_PLAQUE:39": entry(ht(79.57), "m2", "Barillet, Decospan replaqué chêne fil A/B 2800 x 2070 x 39 à "
                                    + "79,57 EUR TTC/m2, âme aggloméré : le MDF ne se fait pas en 39", READ_ON_2),
     "board:W1000_ST9:19": entry(ht(22.82), "m2", `${JHS}, 22,82 EUR TTC/m2 (132,26 le panneau), en stock`),
+    "board:SNOW_WHITE_8685:8": entry(ht(22.98), "m2", `${JHS}, réf. 1001137234, 22,98 EUR TTC/m2 (133,22 le panneau `
+                                     + "2800 x 2070), en stock", READ_ON_2),
     "board:U604_ST9:19": entry(perSheet(101.3), "m2", "Houdard, 101,30 EUR HT le panneau 2800 x 2070, en stock"),
     // battens on their net area : a 2000 x 140 x 20 board is 0.28 m2
     "board:CHENE_MASSIF:20": entry(ht(29.9 / 0.28), "m2",
@@ -78,6 +80,13 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:760H4800S": entry(fromGbp(25.92), "u", "Interfit (UK), 25,92 GBP HT la paire"),
     "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière, lu le 2 octobre"),
     "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
+    "hw:70T3550.TL": entry(fromGbp(1.33), "u", "Interfit (UK), 1,33 GBP HT la charnière sans ressort", READ_ON_2),
+    "hw:70T3650.TL": entry(fromGbp(1.61), "u", "Interfit (UK), 1,61 GBP HT la charnière sans ressort", READ_ON_2),
+    // sold as a set with its strike plaet, black or white at the same price
+    "hw:956.1004": entry(fromGbp(3.60), "u", "Interfit (UK), 3,60 GBP HT le jeu 956.1004 B.SET avec contreplaque",   
+                         READ_ON_2),
+    "hw:956A1004": entry(fromGbp(4.51), "u", "Interfit (UK), 4,51 GBP HT le jeu 956A1004 W.SET avec contreplaque",  
+                         READ_ON_2),
     "hw:T51.7601": entry(fromGbp(3.28), "u", "Interfit (UK), 3,28 GBP HT la paire gauche et droite"),
     "hw:48N0510.02": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:48N0510.03": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
@@ -120,6 +129,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     // TODO a merchant's own scale, or a quote from the cabinet maker, should replace this one
     "service:cut": entry(4, "u", "Indicatif, source non vérifiée : usinage.services, 4 EUR le trait de scie compté "
                          + "une fois par pièce, HT ou TTC non précisé", READ_ON_2),
+    "service:print": entry(ht(29.9), "m2", "DimensionShop, papier peint intissé 225 g/m² pré-encollé imprimé sur "
+                           + "mesure à 29,90 EUR TTC le m², 1 m² facturé au moins, port offert dès 100 EUR", READ_ON_2),
     "service:edging": entry(5, "m", "Indicatif, source non vérifiée : usinage.services, collage de chant à 5 EUR le "
                             + "mètre, HT ou TTC non précisé", READ_ON_2),
 };

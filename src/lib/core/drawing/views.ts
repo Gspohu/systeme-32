@@ -13,6 +13,8 @@ import { SPOT_RIM, spotCentres } from "../lights";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
+import { endDrop, endPost, openEndLevels } from "../curves";
+
 
 type ToPage = (value: number) => number;
 
@@ -146,8 +148,22 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
         }
         const reach = endReach(k, side);
         const x = side === "right" ? k.x + k.width : k.x - reach;
-        canvas.rect(pageX(x), pageY(k.y + k.height), reach / scale, k.height / scale, "normal");
-        if (end.technique === "battens")
+        const drop = endDrop(k, end);
+        canvas.rect(pageX(x), pageY(k.y + k.height), reach / scale, (k.height + drop) / scale, "normal");
+        if (end.open === true)
+        {
+            for (const lv of openEndLevels(k, end)) 
+            {
+                canvas.rect(pageX(x), pageY(k.y + lv + t), reach / scale, t / scale, "thin");
+            }
+            const post = endPost(k, side);  
+            if (post !== null) 
+            {
+                const px = side === "right" ? x + post.u - post.w / 2 : x + reach - post.u - post.w / 2; 
+                canvas.rect(pageX(px), pageY(k.y + k.height), post.w / scale, (k.height + drop) / scale, "thin");
+            }
+        }
+        else if (end.technique === "battens")
         {
             const pitch = end.battens.width + end.battens.gap;
             let along = pitch;
@@ -158,6 +174,7 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
             }
         }
     }
+    // TODO no socket hole is drawn here nor on the façade view, only the workpiece sheet of a drilled bak show it
     // inner panels show where no front covers them
     const W = k.width;
     if (k.slope === null)

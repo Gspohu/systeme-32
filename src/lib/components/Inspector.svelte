@@ -2,6 +2,7 @@
     import { app } from "./app_state.svelte";
     import { checked, num, str } from "./events";
     import PhotoPicker from "./PhotoPicker.svelte";
+    import PrintPicker from "./PrintPicker.svelte";  
     import { slatLayout } from "../core/slats";
     import {
         removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, mergeFronts, splitFront, splitCell,
@@ -553,6 +554,7 @@
                         Pilotage Wi-Fi
                     </label>
                 {/if}
+                <PrintPicker {carcass} cell={nodeBox.id} />  
                 <div class="section-title">Trous de prise</div>
                 {#each carcass.outlets.filter((o) => { return o.cell === nodeBox.id; }) as o (o.id)}
                     <div class="segmented">
@@ -960,6 +962,17 @@
                             <input class="input" type="number" min="0" step="1" value={e.shelves ?? 2}
                                 onchange={(ev) => endPatch(side, { shelves: Math.max(0, Math.round(num(ev))) })} />
                         </label>
+                        {#if carcass.base.type === "plinth" || carcass.base.type === "feet"}  
+                            <label class="form-check" title="La planche du bas descend au sol, à côté du socle">  
+                                <input type="checkbox" checked={e.floor === true} 
+                                    onchange={(ev) => endPatch(side, { floor: checked(ev) })} /> Jusqu'au sol</label> 
+                        {/if}   
+                        <label class="form-check" title="Montant vertical au milieu de l'arc, du haut jusqu'en bas"> 
+                            <input type="checkbox" checked={e.post === true} 
+                                onchange={(ev) => endPatch(side, { post: checked(ev) })} /> Montant</label> 
+                        <label class="form-check" title="On s'assoit dessus : le haut est vérifié sous une personne"> 
+                            <input type="checkbox" checked={e.seat === true}  
+                                onchange={(ev) => endPatch(side, { seat: checked(ev) })} /> Assise</label>  
                     {:else}
                         <label class="field"><span class="label">Technique</span>
                             <select class="select" value={e.technique}

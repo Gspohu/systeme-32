@@ -9,6 +9,7 @@ import { itemExtent } from "./extent";
 import { boxToRoom, roomBox } from "./room";
 import { tipping } from "./mechanics";
 import { frontFootInset } from "./feet";
+import { endGrounded, endPost } from "./curves";
 import { MATERIALS } from "../data/materials";
 import { GRAVITY } from "../data/rules";
 
@@ -78,10 +79,78 @@ export function checkSeat(c: Carcass, lay: ResolvedLayout, top: Part): SeatCheck
 }
 
 
+// Top board of an open end sat on : hung off the side alone, the load at half its reach, or carried between
+// the side and the upright, the load halfway between them. The whole depth works as one beam, as for a top
+// TODO the upright is a point under a pate, not a line across it : a plate model would tell how much of the
+// depth really carry the sitter
+export function checkEndSeat(c: Carcass, side: "left" | "right", top: Part): SeatCheck & { onPost: boolean }
+{
+    const m = MATERIALS[top.material]!;
+    const post = endPost(c, side); 
+    const b = top.width;
+    const t = top.thickness; 
+    const inertia = b * t ** 3 / 12;
+    const span = post === null ? top.length / 2 : post.u;
+    const moment = post === null ? SEAT_LOAD_N * span : SEAT_LOAD_N * span / 4;
+    const deflection = post === null
+        ? SEAT_LOAD_N * span ** 3 / (3 * m.modulus * inertia)
+        : SEAT_LOAD_N * span ** 3 / (48 * m.modulus * inertia);
+    return { span, stress: moment / (b * t * t / 6), allowed: m.kmod * m.strength / GAMMA_M, kmod: m.kmod, deflection,
+             onPost: post !== null };
+}
+
+
+function endSeatChecks(c: Carcass, b: Build): Check[]
+{
+    const out: Check[] = [];
+    for (const side of ["left", "right"] as const)
+    {
+        const end = c.ends[side]; 
+        const top = byId(b.parts, `${c.id}/end/${side}/Flasque haute`);
+        if (end.type !== "rounded" || end.seat !== true || end.open !== true || top === undefined)
+        {
+            continue;  
+        }
+        const where = `${c.name}, bout arrondi ${side === "right" ? "droit" : "gauche"}`;
+        const r = checkEndSeat(c, side, top);
+        const figures = `${r.onPost ? "portée" : "porte-à-faux"} ${Math.round(r.span)} mm, ${r.stress.toFixed(1)} N/mm² ` 
+            + `pour ${r.allowed.toFixed(1)} admissibles, flèche ${r.deflection.toFixed(1)} mm`;
+        if (r.stress > r.allowed)
+        {
+            out.push({ level: "error", item: c.id, target: top.id,
+                       message: `${where} : l'assise ne porte pas une personne (${SEAT_LOAD_N} N, essai EN 16139:2013), `
+                           + `${figures}. ${r.onPost ? "Réduire le rayon." : "Ajouter le montant sous l'arc."}` });
+        }
+        else
+        {
+            out.push({ level: "info", item: c.id, target: top.id,
+                       message: `${where} : assise vérifiée sous ${SEAT_LOAD_N} N (EN 16139:2013 niveau 1), ${figures}. `
+                           + "Le montant compte comme un appui sur toute la profondeur, l'assemblage sur la joue "
+                           + "n'est pas vérifié (aucune capacité Minifix sourcée)." });
+        }
+        if (r.onPost && !endGrounded(c, end))
+        {
+            out.push({ level: "error", item: c.id, target: top.id,
+                       message: `${where} : le montant descend sur une flasque basse qui pend de la joue, la charge ` 
+                           + "n'atteint pas le sol. Cocher Jusqu'au sol ." });
+        }
+        top.notes.push(`Assise : ${SEAT_LOAD_N} N, rien ne se pose dessus`);
+    }
+    return out;
+}
+
+
 // A seat holds a person, and nothing may stand on it
 export function seatChecks(p: Project, b: Build): Check[]
 {
     const checks: Check[] = [];
+    for (const it of p.items)
+    {
+        if (it.kind === "carcass")
+        {
+            checks.push(...endSeatChecks(it, b));
+        }
+    }
     for (const it of p.items)
     {
         const lay = it.kind === "carcass" && it.seat !== null ? b.layouts.get(it.id) : undefined;

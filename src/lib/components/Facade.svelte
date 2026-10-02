@@ -12,7 +12,8 @@
     import { FIT_PLAY, RAIL_D, RAIL_DROP, railPlan } from "../core/wardrobe";
     import { SPOT_RIM, spotCentres } from "../core/lights";
     import { openingPoints } from "../core/cutouts";
-    import { openEndLevels } from "../core/curves";
+    import { endDrop, endPost, openEndLevels } from "../core/curves";
+    import { photoMime } from "../core/photos";
     import { SHOE_RACKS, shoeLevels } from "../core/shoes";
     import { VENT_GRILL } from "../core/vents";
     import type { NodeBox, ResolvedLayout } from "../core/layout";
@@ -30,6 +31,32 @@
     const project = $derived(app.project);
     const analysis = $derived(app.outputs.analysis);
     const sel = $derived(app.selection);
+
+    // the printed pictures as object urls, given back when the set chagnes
+    const printUrls = $derived.by(() => 
+    {
+        const urls = new Map<string, string>();   
+        for (const x of analysis.build.prints)
+        {
+            const bytes = app.textures.get(x.file);
+            if (bytes !== undefined && !urls.has(x.file))
+            {
+                urls.set(x.file, URL.createObjectURL(new Blob([bytes as BlobPart], { type: photoMime(x.file) })));
+            } 
+        }
+        return urls;  
+    });
+    $effect(() =>
+    {
+        const current = printUrls;
+        return () =>
+        {
+            for (const u of current.values())
+            {
+                URL.revokeObjectURL(u);
+            }
+        }; 
+    });
 
 
     const shown = $derived.by(() =>
@@ -321,12 +348,19 @@
                             {@const ex = side === "right" ? it.width : -r}
                             {@const pitch = e.battens.width + e.battens.gap}
                             {#if e.open === true}
-                                <rect x={ex} y={-it.height} width={r} height={it.height} class="edge"
+                                {@const drop = endDrop(it, e)}
+                                {@const post = endPost(it, side)}
+                                <rect x={ex} y={-it.height} width={r} height={it.height + drop} class="edge"
                                     fill={shade(it.decor, 0.6)} />
                                 {#each openEndLevels(it, e) as lv}
                                     <rect x={ex} y={-(lv + it.thickness)} width={r} height={it.thickness}
                                         class="edge end-board" fill={fill(it.decor)} />
                                 {/each}
+                                {#if post !== null} 
+                                    <rect x={side === "right" ? ex + post.u - post.w / 2 : ex + r - post.u - post.w / 2}
+                                        y={-it.height} width={post.w} height={it.height + drop} class="edge end-board"
+                                        fill={fill(it.decor)} />
+                                {/if}
                             {:else}
                                 <rect x={ex} y={-it.height} width={r} height={it.height} class="edge"
                                     fill={fill(e.technique === "battens" ? e.battens.decor : e.decor)} />
@@ -345,6 +379,13 @@
                             {#if nb !== undefined}
                                 <rect x={nb.x} y={-(nb.y + nb.h)} width={nb.w} height={nb.h} fill={fill(l.decor,
                                     l.colour)} />
+                            {/if}
+                        {/each}
+                        {#each analysis.build.prints.filter((x) => { return x.item === it.id; }) as x (x.cell)}
+                            {@const href = printUrls.get(x.file)}
+                            {#if href !== undefined}
+                                <image {href} x={x.x - it.x} y={-(x.y - it.y + x.h)} width={x.w} height={x.h}
+                                    preserveAspectRatio="none" class="print" />
                             {/if}
                         {/each}
                         {#each cellsOf(lay) as nb (nb.id)}

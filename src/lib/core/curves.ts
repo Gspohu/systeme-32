@@ -2,7 +2,7 @@
 
 import type { Battens, Carcass, CurveTechnique, End, RoundCorner } from "./model";
 import type { ResolvedLayout } from "./layout";
-import { type Build, type Part, newPart } from "./parts";
+import { type Build, type Part, baseHeight, newPart } from "./parts";
 import { type Outline, type Vec3, X, Y, Z, neg } from "./geometry";
 import { endReach, usableDepth } from "./extent";
 import { FLEX_MIN_RADIUS } from "../data/materials";
@@ -11,6 +11,9 @@ import { FLEX_MIN_RADIUS } from "../data/materials";
 // Workshop conventions : one former every 400 mm of height, solid profiles only for small radii
 const FORMER_SPACING = 400;
 const SOLID_MAX_RADIUS = 100;
+// an open end's upright, narrow enough for a single connector at each end (two would clash under 2 x 37)
+const POST_WIDTH = 60;
+const POST_SETBACK = 15;
 
 
 function skinThickness(tech: CurveTechnique, flex: 6 | 9, battens: Battens): number
@@ -80,19 +83,54 @@ function skinParts(
 }
 
 
+// How far below the carcass bottom the low end panel goes : down to the floor past a plinth or feet
+export function endDrop(c: Carcass, end: Extract<End, { type: "rounded" }>): number
+{
+    return end.floor === true ? baseHeight(c) : 0;
+}
+
+
+// The low end panel rests on the floor, the only way a load on the end reaches it
+export function endGrounded(c: Carcass, end: Extract<End, { type: "rounded" }>): boolean
+{
+    return c.base.type === "floor" || (end.floor === true && c.base.type !== "wall");
+} 
+
+
 // Undersides of the shaped boards of an open end above the carcass bottom : both end panels, then the shelves
 // evenly spread between them
 export function openEndLevels(c: Carcass, end: Extract<End, { type: "rounded" }>): number[]
 {
     const board = c.thickness;
+    const drop = endDrop(c, end);
     const shelves = Math.max(0, Math.round(end.shelves ?? 2));
-    const gap = (c.height - 2 * board - shelves * board) / (shelves + 1);
-    const levels = [0, c.height - board];
+    const gap = (c.height + drop - 2 * board - shelves * board) / (shelves + 1);
+    const levels = [-drop, c.height - board];
     for (let k = 1; k <= shelves; k++)
     {
-        levels.push(board + k * gap + (k - 1) * board);
+        levels.push(-drop + board + k * gap + (k - 1) * board);
     }
     return levels;
+}
+
+
+// Upright of an open end, in the frame of its shaped boards (u out from the side, v back from the front) :
+// halfway round the arc, its outer corners kept POST_SETBACK inside it
+export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: number; w: number; t: number } | null
+{
+    const end = c.ends[side];
+    if (end.type !== "rounded" || end.open !== true || end.post !== true)
+    {
+        return null;
+    }
+    const outer = endReach(c, side);
+    const phi = end.sweep === 180 ? 0 : Math.PI / 4;
+    const a = POST_WIDTH / 2;
+    const h = c.thickness / 2;
+    const lead = a * Math.cos(phi) + h * Math.sin(phi);
+    const reach = outer - POST_SETBACK;
+    const rho = -lead + Math.sqrt((lead * lead) - (a * a + h * h - reach * reach));
+    return { u: rho * Math.cos(phi), v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
 }
 
 
@@ -138,9 +176,17 @@ export function buildEnds(c: Carcass, b: Build): void
         const uDir: Vec3 = side === "right" ? X : neg(X);
         const base = { item: c.id, itemName: c.name };
         const title = `Bout arrondi ${side === "right" ? "droit" : "gauche"}`;
-        const formers = Math.max(0, Math.ceil(c.height / FORMER_SPACING) - 1);
+        if (end.floor === true && c.base.type === "wall")
+        {
+            b.errors.push(`${c.name}, ${title.toLowerCase()} : un meuble suspendu ne descend pas au sol. `
+                + "Décocher Jusqu'au sol ou poser le meuble au sol.");
+        }
+        const drop = endDrop(c, end);
+        const y0 = c.y - drop;
+        const tall = c.height + drop;
+        const formers = Math.max(0, Math.ceil(tall / FORMER_SPACING) - 1);
         const levels: { y: number; label: string; role: Part["role"] }[] = [
-            { y: c.y, label: "Flasque basse", role: "endPanel" },
+            { y: y0, label: "Flasque basse", role: "endPanel" },
             { y: c.y + c.height - board, label: "Flasque haute", role: "endPanel" },
         ];
         // TODO an open end's shelves hang off the side, the deflection check knows shelves on two supports only
@@ -150,8 +196,14 @@ export function buildEnds(c: Carcass, b: Build): void
         {
             levels.push(open
                 ? { y: c.y + shelfLevels[k - 1]!, label: `Tablette ${k}`, role: "endPanel" }
-                : { y: c.y + (c.height - board) * k / (formers + 1), label: `Gabarit ${k}`, role: "former" });
+                : { y: y0 + (tall - board) * k / (formers + 1), label: `Gabarit ${k}`, role: "former" });
             k++;
+        }
+        const post = endPost(c, side);
+        if (drop > 0 && post === null && end.back !== true)
+        {
+            b.errors.push(`${c.name}, ${title.toLowerCase()} : la flasque basse posée au sol n'est tenue par rien, `
+                + "la joue s'arrête au-dessus du socle. Ajouter le montant ou le fond de l'arrondi.");
         }
         for (const lv of levels)
         {
@@ -168,10 +220,45 @@ export function buildEnds(c: Carcass, b: Build): void
                 p.notes.push("Ouvert : chant cintré sur l'arc, posé à la main");
             }
             b.parts.push(p);
+            if (lv.y < c.y) 
+            {
+                p.notes.push("Posée au sol, sous le niveau de la joue");
+                continue;
+            }
             // shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
                            face: "B", lineAxis: "u", line: lv.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
                            reversed: false });
+        }
+        if (post !== null)
+        {
+            // one lenght of upright between each pair of boards, standing on the one below and under the next :
+            // the low panel, the shelves bottom up, the top panel
+            const boards = [levels[0]!, ...levels.slice(2), levels[1]!].map((lv) =>
+            {
+                return { y: lv.y, id: `${c.id}/end/${side}/${lv.label}` };
+            });
+            const xMin = side === "right" ? xFace + post.u - post.w / 2 : xFace - post.u - post.w / 2;
+            let n = 1;
+            while (n < boards.length)
+            {
+                const low = boards[n - 1]!;
+                const high = boards[n]!;
+                const label = boards.length > 2 ? `montant ${n}` : "montant";
+                const piece = newPart({
+                    ...base, id: `${c.id}/end/${side}/post${n}`, label: `${title}, ${label}`, role: "vdivider",
+                    length: high.y - low.y - board, width: post.w, thickness: post.t, decor: c.decor, edges: ["v0",
+                        "v1"],
+                    frame: { o: [xMin, low.y + board, c.z + depth - post.v + post.t / 2], u: Y, v: X, n: neg(Z) },
+                });
+                piece.notes.push("Montant porteur sous l'assise : la charge descend jusqu'à la flasque au sol");
+                b.parts.push(piece);
+                const span = { lineAxis: "v" as const, line: post.v, from: post.u - post.w / 2, to: post.u + post.w / 2,
+                               edgeFrom: 0, reversed: side === "left" };
+                b.joints.push({ edgePart: piece.id, edge: "u0", facePart: low.id, face: "A", ...span },
+                              { edgePart: piece.id, edge: "u1", facePart: high.id, face: "B", ...span });
+                n++;
+            }
         }
         if (end.back === true && end.sweep === 90)
         {
@@ -184,9 +271,9 @@ export function buildEnds(c: Carcass, b: Build): void
             {
                 // behind the shaped panels, in the plane of the carcass back, from the side out to the skin
                 const back = newPart({
-                    ...base, id: `${c.id}/end/${side}/back`, label: `${title}, fond`, role: "back", length: c.height,
+                    ...base, id: `${c.id}/end/${side}/back`, label: `${title}, fond`, role: "back", length: tall,
                     width: outer, thickness: c.back.thickness, decor: c.backDecor, edges: [],
-                    frame: { o: [side === "right" ? xFace : xFace - outer, c.y, c.z + c.back.thickness], u: Y, v: X,
+                    frame: { o: [side === "right" ? xFace : xFace - outer, y0, c.z + c.back.thickness], u: Y, v: X,
                              n: neg(Z) },
                 });
                 back.notes.push("Vissé en applique sur les chants arrière des flasques et des gabarits");
@@ -201,7 +288,7 @@ export function buildEnds(c: Carcass, b: Build): void
         const developed = end.sweep === 180
             ? Math.PI * (outer - skin / 2)
             : Math.PI / 2 * (outer - skin / 2) + straight;
-        const centre: Vec3 = [xFace, c.y, c.z + depth - outer];
+        const centre: Vec3 = [xFace, y0, c.z + depth - outer];
         // right end sweeps from +x to +z (quarter) or -z to +z (half), the left end mirrors it
         const q = Math.PI / 2;
         let a0 = q;
@@ -217,8 +304,8 @@ export function buildEnds(c: Carcass, b: Build): void
         }
         const straightAt = side === "right" ? 0 : Math.PI;
         skinParts(base, `${c.id}/end/${side}/skin`, title, end.technique, end.flexThickness, end.battens,
-                  developed, c.height, outer, { centre, axis: "y", rOuter: outer, thickness: skin, a0, a1, from: 0,
-                                                to: c.height, straight, straightAt }, b);
+                  developed, tall, outer, { centre, axis: "y", rOuter: outer, thickness: skin, a0, a1, from: 0,
+                                            to: tall, straight, straightAt }, b);
     }
 }
 
