@@ -88,12 +88,27 @@ export function photoMime(file: string): string
 export function usedPhotos(p: Project, all: Map<string, Uint8Array>): Map<string, Uint8Array>
 {
     const kept = new Map<string, Uint8Array>();
-    for (const t of Object.values(p.textures))
+    const files = Object.values(p.textures).map((t) =>
     {
-        const bytes = all.get(t.file);
+        return t.file;
+    });
+    // ech picture printed on a back (papier peint collé) travel in the same folder
+    for (const it of p.items)
+    {
+        if (it.kind === "carcass")
+        {
+            files.push(...it.prints.map((x) =>
+            {
+                return x.file;
+            }));
+        }  
+    }
+    for (const file of files)
+    {
+        const bytes = all.get(file);
         if (bytes !== undefined)
         {
-            kept.set(t.file, bytes);
+            kept.set(file, bytes);   
         }
     }
     return kept;

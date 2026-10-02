@@ -9,6 +9,7 @@ import { fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, partMass 
 import { antiTipKept, fitWallFixing } from "./wall_fixing";
 import { fitDoors } from "./doors";
 import { fitHandles } from "./handles";
+import { fitPrints } from "./prints"; 
 import { fitLifts, liftChecks } from "./lifts";
 import { cornerChecks } from "./corner";
 import { fitPanels } from "./cutouts";
@@ -73,6 +74,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         fitPanels(it, b);
         fitSliding(it, lay, s, b);
         fitHandles(it, b);
+        fitPrints(it, lay, b); 
         fitShelfPins(it, lay, s, b);
         fitModularRows(it, lay, s, b);
         fitOutlets(it, lay, b);

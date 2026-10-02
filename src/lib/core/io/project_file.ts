@@ -158,6 +158,17 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
             }
         }
     }
+    if (version < 7 && Array.isArray(raw.items)) 
+    {
+        // pictures printed on the back of a cell acme with version 7
+        for (const it of raw.items as { kind?: unknown; prints?: unknown }[])
+        {
+            if (it.kind === "carcass") 
+            {
+                it.prints = it.prints ?? [];  
+            } 
+        }
+    }
     raw.schema = SCHEMA_VERSION;
     return raw;
 }
@@ -167,25 +178,25 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
 export function validateProject(raw: unknown): Project
 {
     need(typeof raw === "object" && raw !== null, "contenu JSON attendu");
-    const r = migrate(raw as Record<string, unknown>);
-    need(typeof r.id === "string" && typeof r.name === "string", "identifiant ou nom manquant");
-    need(typeof r.settings === "object" && r.settings !== null, "réglages manquants");
-    need(Array.isArray(r.items), "liste des meubles manquante");
-    need(typeof r.textures === "object" && r.textures !== null, "liste des photos manquante");
-    const room = r.room as Record<string, unknown> | null;
+    const migrated = migrate(raw as Record<string, unknown>);
+    need(typeof migrated.id === "string" && typeof migrated.name === "string", "identifiant ou nom manquant");
+    need(typeof migrated.settings === "object" && migrated.settings !== null, "réglages manquants");
+    need(Array.isArray(migrated.items), "liste des meubles manquante");
+    need(typeof migrated.textures === "object" && migrated.textures !== null, "liste des photos manquante");
+    const room = migrated.room as Record<string, unknown> | null;
     for (const k of ["width", "depth", "height"])
     {
         need(typeof room === "object" && room !== null && typeof room[k] === "number" && Number.isFinite(room[k])
              && (room[k] as number) > 0, `pièce avec ${k} absent ou non positif`);
     }
-    for (const t of Object.values(r.textures as Record<string, unknown>))
+    for (const t of Object.values(migrated.textures as Record<string, unknown>))
     {
         const photo = t as { file?: unknown; tileMm?: unknown };
         need(typeof photo === "object" && photo !== null && typeof photo.file === "string"
              && PHOTO_FILE_RE.test(photo.file) && typeof photo.tileMm === "number"
              && Number.isFinite(photo.tileMm) && photo.tileMm > 0, "photo de décor mal décrite");
     }
-    for (const it of r.items as unknown[])
+    for (const it of migrated.items as unknown[])
     {
         need(typeof it === "object" && it !== null && typeof (it as { kind?: unknown }).kind === "string",
              "meuble sans type");
@@ -201,13 +212,17 @@ export function validateProject(raw: unknown): Project
             need(Array.isArray(c.fronts) && Array.isArray(c.linings), "caisson sans liste de façades ou d'habillages");
             need(Array.isArray(c.rails) && Array.isArray(c.lights), "caisson sans liste de penderies ou d'éclairages");
             need(Array.isArray(c.shoeRacks), "caisson sans liste de range-chaussures");
+            need(Array.isArray(c.prints) && (c.prints as { file?: unknown }[]).every((x) =>  
+            {
+                return typeof x?.file === "string" && PHOTO_FILE_RE.test(x.file);
+            }), "impression de fond mal décrite"); 
             for (const k of ["width", "height", "depth", "thickness", "x", "y", "z"])
             {
                 need(typeof c[k] === "number" && Number.isFinite(c[k] as number), `caisson avec ${k} non numérique`);
             }
         }
     }
-    return r as unknown as Project;
+    return migrated as unknown as Project;
 }
 
 

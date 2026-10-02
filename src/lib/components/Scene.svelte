@@ -101,13 +101,16 @@
     $effect(() =>
     {
         const wanted = new Set<string>();
-        for (const t of Object.values(app.project.textures))
+        // the decor photos and the pictures printed on cell backs, decoded the same way
+        const files = [...Object.values(app.project.textures).map((t) => { return t.file; }),
+                       ...build.prints.map((x) => { return x.file; })];
+        for (const file of files)
         {
-            wanted.add(t.file);
-            const bytes = app.textures.get(t.file);
-            if (bytes !== undefined && untrack(() => { return photos.get(t.file)?.bytes; }) !== bytes)
+            wanted.add(file);
+            const bytes = app.textures.get(file);
+            if (bytes !== undefined && untrack(() => { return photos.get(file)?.bytes; }) !== bytes)
             {
-                void decode(t.file, bytes);
+                void decode(file, bytes);
             }
         }
         const current = untrack(() => { return photos; });
@@ -302,6 +305,55 @@
         }
         return list;
     });
+    // a printed picture : a sheet stretched once over the back of its cell, a hair in front of it, lit like a board
+    const prints = $derived.by(() =>
+    {
+        const walls = new Map(app.project.items.map((it) =>
+        {
+            return [it.id, it.wall];
+        }));
+        return build.prints.map((x) =>
+        {
+            const geometry = new THREE.PlaneGeometry(x.w * MM, x.h * MM);
+            geometry.translate((x.x + x.w / 2) * MM, (x.y + x.h / 2) * MM, (x.z + 0.3) * MM);
+            return { key: `${x.item}/${x.cell}`, wall: walls.get(x.item) ?? "back", file: x.file, geometry };
+        });
+    });
+    $effect(() =>
+    {
+        const current = prints;
+        return () =>
+        {
+            for (const x of current)   
+            {
+                x.geometry.dispose();
+            }
+        };
+    });
+    const printMats = new Map<string, THREE.MeshStandardMaterial>();
+
+
+    function printMaterial(file: string): THREE.MeshStandardMaterial | null
+    {
+        const photo = photos.get(file);   
+        if (photo === undefined)
+        {
+            return null;
+        }
+        const key = `${file}@${photo.version}`;
+        let m = printMats.get(key); 
+        if (m === undefined)
+        {
+            // its own copy of the texture : a decor photo repeats per millimetre, a print shows oce
+            const map = photo.tex.clone();
+            map.repeat.set(1, 1);
+            map.needsUpdate = true;
+            m = new THREE.MeshStandardMaterial({ map, roughness: 0.6 });
+            printMats.set(key, m);
+        }
+        return m;  
+    }
+
     // the room dimmed to a fifth, the way a lit niche is looked at in the evening
     const dim = $derived(app.ledsOn ? 0.2 : 1);
     // a rendering exposure set by eye against the lights of this scene, which are not photometric either : a real
@@ -425,6 +477,15 @@
         {/each}
     </T.Group>
 {/each}
+
+{#each prints as x (x.key)}
+    {@const m = printMaterial(x.file)}
+    {#if m !== null}
+        {@const pl = placement(x.wall)}
+        <T.Mesh geometry={x.geometry} material={m} rotation={pl.rotation} position={pl.position} />
+    {/if}   
+{/each}
+
 
 {#each cushions as c (c.key)}
     {@const pl = placement(c.wall)}

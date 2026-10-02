@@ -163,6 +163,8 @@ export interface Build
     motions: Motion[];
     // bar handles as the front view draws them : the bar from end to end, in the plane of the fronts of its carcass
     handles: { item: string; front: string; ref: string; x0: number; y0: number; x1: number; y1: number }[];
+    // pictures pasted on cell backs, in the frame of their wall : lower left corner, the face it lies on, its size
+    prints: { item: string; cell: string; file: string; x: number; y: number; z: number; w: number; h: number }[];   
 }
 
 
@@ -270,10 +272,12 @@ export function boxOrigin(c: Carcass): Vec3
 export function emptyBuild(): Build
 {
     return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], infos: [],
-             midLoads: new Map(), railCuts: [], fitted: [], motions: [], handles: [] };
+             midLoads: new Map(), railCuts: [], fitted: [], motions: [], handles: [], prints: [] };  
 }
 
 
+// TODO a carcass standing on another one is not tied to it : the dresser stacks three, connecting screws or
+// dowels between them are neither drliled nor counted
 export function buildCarcass(c: Carcass, s: Settings, b: Build): void
 {
     const lay = resolveLayout(c);

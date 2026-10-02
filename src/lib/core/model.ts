@@ -1,6 +1,10 @@
 // Project data model, all lengths in millimetres, pure data with no behavour
 
-export const SCHEMA_VERSION = 6;
+import type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell_fittings";   
+export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell_fittings"; 
+
+export const SCHEMA_VERSION = 7;  
+
 
 export type Id = string;
 
@@ -20,7 +24,7 @@ export interface Settings
     trim: number;
     // weight one person may carry (Code du travail R4541-9)
     handlingKg: number;
-    // shelf test load kg/dm2 (UNI 11663 via EN 16122:2012)
+    // shelf test load kg/dm2 (UNI 11663 via EN 16122:2012) : 1.0 for other use, 1.5 in a kitchen or bathroom
     shelfLoad: number;
     joinery: Joinery;
     // workshop conventions, not taken from a manufacturer document
@@ -222,7 +226,10 @@ export type End =
     | { type: "rounded"; radius: number; sweep: 90 | 180; technique: CurveTechnique; flexThickness: 6 |
        9; battens: Battens; decor: string; back?: boolean;
        // an open end has no skin : shaped shelves in the reach of the arc, evenly spread between the end panels
-       open?: boolean; shelves?: number };
+       open?: boolean; shelves?: number; 
+       // the low end panel laid on the floor past the base, an upright halfway roudn the arc, sat on
+       floor?: boolean; post?: boolean; seat?: boolean };  
+
 
 export interface Carcass
 {
@@ -263,30 +270,9 @@ export interface Carcass
     outlets: Outlet[];
     // Häfele reference of the shelf supports the user chose, the first one carrying each shelf when absent
     pins?: string;
+    prints: CellPrint[];  
 }
 
-// A hole for a wall socket or a cable : through the back behind a cell, or the panel above or below it
-export interface Outlet
-{
-    id: Id;
-    cell: Id;
-    panel: "back" | "above" | "below";
-    shape: "round" | "rect";
-    // diameter of a round hole in `w`, width and height of a rectangle, mm
-    w: number;
-    h: number;
-    // centre offset from the middle of the cell : across, then up on the back or towards the front elsewhere
-    dx: number;
-    dy: number;
-}
-
-// Shoe racks screwed to the back of a cell, levels spread evenly from its floor
-export interface ShoeRack
-{
-    id: Id;
-    cell: Id;
-    levels: number;
-}
 
 export interface Slope
 {
@@ -299,31 +285,6 @@ export interface Seat
     // 0 for a bare top, else the cushion laid on it, made by an upholsterer
     cushion: number;
 }
-
-// Clothes rail across a cell, hung under the panel above it, or pulled down on a wardrobe lift
-export interface HangingRail
-{
-    id: Id;
-    cell: Id;
-    kind: "fixed" | "lift";
-}
-
-
-// LED profile or round spots recessed in the underside of the panel above a cell
-export interface CellLight
-{
-    id: Id;
-    cell: Id;
-    kind: "strip" | "spots";
-    // spots spread evenly across the cell, unused by a strip
-    spots: number;
-    // from the front edge of that panel to the groove or to the spot holes
-    setback: number;
-    kelvin: 2700 | 3000 | 4000;
-    // dimmed and switched from a phone through a Wi-Fi controller on the driver output
-    wifi?: boolean;
-}
-
 
 // Quarter round joining two boxes in the front view, like the top right corner of the TV wall
 export interface RoundCorner

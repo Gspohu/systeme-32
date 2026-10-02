@@ -21,6 +21,6 @@ export function computeOutputs(p: Project): Outputs
     const analysis = analyse(p);
     const bom = computeBom(p, analysis);
     const nesting = nest(bom.cut, p.settings);
-    const cost = computeCost(p, bom, nesting);
+    const cost = computeCost(p, bom, nesting, analysis.build.prints); 
     return { analysis, bom, nesting, cost };
 }

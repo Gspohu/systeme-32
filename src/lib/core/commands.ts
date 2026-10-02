@@ -11,7 +11,7 @@ export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish
          setCellSize }
     from "./layout_commands";
 export { setFront, removeFront, updateFront, moveFront, mergeFronts, splitFront, toSliding, toDoor, setLining, setRail,
-         setLight, setEnd, setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet }
+         setLight, setPrint, setEnd, setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet } 
     from "./front_commands";
 export { historyOf, push, undo, redo, type History } from "./history";
 

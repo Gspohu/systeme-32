@@ -3,6 +3,8 @@
 import type { PriceEntry, Project } from "./model";
 import type { Bom } from "./bom";
 import type { NestResult } from "./nesting";
+import type { Build } from "./parts";
+import { PRINT_MIN_M2 } from "./prints";
 import { SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
 import { DEFAULT_PRICES } from "../data/prices";
 
@@ -45,9 +47,10 @@ export function hardwareKey(ref: string): string
 
 export const SERVICE_CUT = "service:cut";
 export const SERVICE_EDGING = "service:edging";
+export const SERVICE_PRINT = "service:print";
 
 
-export function computeCost(p: Project, bom: Bom, nesting: NestResult): Cost
+export function computeCost(p: Project, bom: Bom, nesting: NestResult, prints: Build["prints"] = []): Cost  
 {
     const lines: CostLine[] = [];
     const sheetArea = SHEET_LENGTH * SHEET_WIDTH * 1e-6;
@@ -107,6 +110,16 @@ export function computeCost(p: Project, bom: Bom, nesting: NestResult): Cost
     {
         lines.push({ key: SERVICE_EDGING, label: "Placage des chants à façon", qty: banded, unit: "m",
                     price: null, total: null });
+    }
+    // each print (papeir peint intissé) is ordered on its own, billed its area or the printer's minimum
+    const printed = prints.reduce((m, x) =>
+    {
+        return m + Math.max(x.w * x.h * 1e-6, PRINT_MIN_M2);
+    }, 0);
+    if (prints.length > 0)
+    {
+        lines.push({ key: SERVICE_PRINT, label: `Impression sur mesure collée au fond, ${prints.length} image(s), `
+            + `${PRINT_MIN_M2} m² facturé au moins chacune`, qty: printed, unit: "m2", price: null, total: null });  
     }
     let total = 0;
     const missing: CostLine[] = [];
