@@ -71,9 +71,10 @@ export function tvWall(): Project
     );
     column.linings.push(lining(niche.id, OAK, true));
 
+    // their 38 mm oak shelves in the Decospan 39, the nearest board sold
     const shelves = [[1860, 1600], [2230, 800]].map(([y, width]) =>
     {
-        return newWallShelf({ x: 450, y, width, depth: 250, thickness: 38, decor: "CHENE_PLAQUE",
+        return newWallShelf({ x: 450, y, width, depth: 250, thickness: 39, decor: "CHENE_PLAQUE",
                               corners: { left: 0, right: 50 } });
     });
 

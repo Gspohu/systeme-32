@@ -5,26 +5,39 @@ import { SERVICE_CUT, SERVICE_EDGING } from "./costing";
 
 describe("costing with the dated public prices", () =>
 {
-    it("prices the dresser but for what no listing showed", () =>
+    for (const make of [dresser, tvWall])
     {
-        const missing = computeOutputs(dresser()).cost.missing.map((l) =>
+        it(`prices every line of ${make.name}, the sawing and banding included`, () =>
         {
-            return l.key;
-        }).sort();
-        // drawer boxes in H1180 16 found nowhere in stock, the AXILO plate sold in kits only
-        expect(missing).toEqual(["board:H1180_ST37:16", "hw:637.76.333", SERVICE_CUT, SERVICE_EDGING].sort());
-    });
+            const cost = computeOutputs(make()).cost;
+            expect(cost.missing.map((l) =>
+            {
+                return l.key;
+            })).toEqual([]);
+            const keys = cost.lines.map((l) =>
+            {
+                return l.key;
+            });
+            expect(keys).toContain(SERVICE_CUT);
+            expect(keys).toContain(SERVICE_EDGING);
+            expect(cost.total).toBeGreaterThan(0);
+        });
+    }
 
 
-    it("prices the TV wall but for what no listing showed", () =>
+    it("tells an estimate and an indicative scale from a listed price", () =>
     {
-        const missing = computeOutputs(tvWall()).cost.missing.map((l) =>
+        const lines = computeOutputs(dresser()).cost.lines;
+        const source = (key: string): string =>
         {
-            return l.key;
-        }).sort();
-        // the 38 mm oak veneered board and its edge of the shelves : the maker lists 39, not 38
-        expect(missing).toEqual(["board:CHENE_PLAQUE:38", "board:H1180_ST37:16", "edge:CHENE_PLAQUE",
-                                 "hw:637.76.333", SERVICE_CUT, SERVICE_EDGING].sort());
+            return lines.find((l) =>
+            {
+                return l.key === key;
+            })?.price?.source ?? "";
+        };
+        expect(source("board:H1180_ST37:16")).toMatch(/^Estimation/);
+        expect(source(SERVICE_CUT)).toMatch(/^Indicatif, source non vérifiée/);
+        expect(source(SERVICE_EDGING)).toMatch(/^Indicatif, source non vérifiée/);
     });
 
 

@@ -87,14 +87,15 @@ export function computeCost(p: Project, bom: Bom, nesting: NestResult): Cost
         lines.push({ key: hardwareKey(h.id), label: `${h.brand} ${h.ref} ${h.label}`.trim(), qty: h.qty,
                     unit: "u", price: null, total: null });
     }
-    // what a panel merchant charges to saw and band the parts, quoted on request only
+    // what a workshop charges to saw and band the parts : merchants quote it on request, the default prices are an
+    // indicative scale and their source say so
     const pieces = nesting.sheets.reduce((n, s) =>
     {
         return n + s.placements.length;
     }, 0);
     if (pieces > 0)
     {
-        lines.push({ key: SERVICE_CUT, label: `Débit à façon, ${pieces} pièces (tarif sur devis)`, qty: pieces,
+        lines.push({ key: SERVICE_CUT, label: `Débit à façon, ${pieces} pièces`, qty: pieces,
                     unit: "u",
                     price: null, total: null });
     }
@@ -104,7 +105,7 @@ export function computeCost(p: Project, bom: Bom, nesting: NestResult): Cost
     }, 0);
     if (banded > 0)
     {
-        lines.push({ key: SERVICE_EDGING, label: "Placage des chants à façon (tarif sur devis)", qty: banded, unit: "m",
+        lines.push({ key: SERVICE_EDGING, label: "Placage des chants à façon", qty: banded, unit: "m",
                     price: null, total: null });
     }
     let total = 0;
