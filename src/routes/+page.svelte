@@ -7,6 +7,8 @@
     import Facade from "$lib/components/Facade.svelte";
     import Inspector from "$lib/components/Inspector.svelte";
     import ChecksPanel from "$lib/components/ChecksPanel.svelte";
+    import Splitter from "$lib/components/Splitter.svelte";
+    import { panes, savePanes } from "$lib/components/panes.svelte";
     import { TEMPLATES } from "$lib/core/templates";
     import { newProject } from "$lib/core/factory";
     import { rename } from "$lib/core/commands";
@@ -22,6 +24,13 @@
     let narrowTab = $state(0);
     const NARROW_TABS = ["Conception", "3D", "Détails", "Contrôles"];
     let projectsOpen = $state(false);
+    // the workspace and the panes the handles measure before their first drag
+    let panesHost = $state<HTMLElement>();
+    let paletteEl = $state<HTMLElement>();
+    let sideEl = $state<HTMLElement>();
+    let checksEl = $state<HTMLElement>();
+    let viewerEl = $state<HTMLElement>();
+    const px = (v: number | null): string | undefined => { return v === null ? undefined : `${v}px`; };
     let localProjects = $state<{ id: string; name: string; saved: string }[]>([]);
     let ready = $state(false);
 
@@ -239,15 +248,28 @@
             </div>
         </main>
     {:else}
-        <main class="workspace">
-            <aside class="pane pane-palette"><Palette /></aside>
+        <main class="workspace" bind:this={panesHost} style:--palette-w={px(panes.palette)} style:--side-w={px(panes.side)}
+            style:--checks-h={px(panes.checks)} style:--viewer-h={px(panes.viewer)}>
+            <aside class="pane pane-palette" bind:this={paletteEl}><Palette /></aside>
             <section class="pane pane-facade"><Facade /></section>
-            <section class="pane pane-checks"><ChecksPanel /></section>
-            <aside class="pane pane-side">
-                <div class="viewer">{#await loadViewer() then { default: Viewer3D }}<Viewer3D />{:catch}
+            <section class="pane pane-checks" bind:this={checksEl}><ChecksPanel /></section>
+            <aside class="pane pane-side" bind:this={sideEl}>
+                <div class="viewer" bind:this={viewerEl}>{#await loadViewer() then { default: Viewer3D }}<Viewer3D />{:catch}
                     <p class="alert alert-danger">Vue 3D non chargée. Recharger la page une fois connecté.</p>{/await}</div>
                 <div class="inspector"><Inspector /></div>
+                <Splitter axis="y" bind:size={panes.viewer} target={viewerEl} label="Hauteur de la vue 3D"
+                    place="grid-row: 2; top: 0; transform: translateY(-50%)" onrelease={savePanes}
+                    bounds={() => { return [120, (sideEl?.clientHeight ?? 0) - 120]; }} />
             </aside>
+            <Splitter axis="x" bind:size={panes.palette} target={paletteEl} label="Largeur de la palette"
+                place="grid-area: palette; left: 100%; transform: translateX(-50%)" onrelease={savePanes}
+                bounds={() => { return [96, (panesHost?.clientWidth ?? 0) * 0.3]; }} />
+            <Splitter axis="x" bind:size={panes.side} target={sideEl} grows={-1} label="Largeur de la 3D et des propriétés"
+                place="grid-area: side; left: 0; transform: translateX(-50%)" onrelease={savePanes}
+                bounds={() => { return [240, (panesHost?.clientWidth ?? 0) * 0.6]; }} />
+            <Splitter axis="y" bind:size={panes.checks} target={checksEl} grows={-1} label="Hauteur des contrôles"
+                place="grid-area: checks; top: 0; transform: translateY(-50%)" onrelease={savePanes}
+                bounds={() => { return [48, (panesHost?.clientHeight ?? 0) * 0.7]; }} />
         </main>
     {/if}
 </div>

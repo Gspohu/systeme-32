@@ -55,16 +55,34 @@ body:has(.app) .boot
 
 .toolbar .name
 {
-    min-width: 12rem;
+    flex: 1 1 12rem;
+    min-width: 0;
     max-width: 22rem;
 }
 
+/* on a phone the project name is the title, the brand leaves it the room */
+@media (max-width: 600px)
+{
+    .toolbar > strong
+    {
+        display: none;
+    }
+}
+
+/* a select is as wide as its longest option, the template names pushed undo and redo to a second line */
+.toolbar .select
+{
+    max-width: 12rem;
+}
+
+/* the sizes dragged by the user come in as variables, the stylesheet ones are their fallbacks */
 .workspace
 {
     display: grid;
+    position: relative;
     min-height: 0;
-    grid-template-columns: 11rem minmax(0, 1fr) minmax(22rem, 30rem);
-    grid-template-rows: minmax(0, 1fr) minmax(8rem, 14rem);
+    grid-template-columns: var(--palette-w, 11rem) minmax(0, 1fr) var(--side-w, minmax(22rem, 30rem));
+    grid-template-rows: minmax(0, 1fr) var(--checks-h, minmax(8rem, 14rem));
     grid-template-areas:
         "palette facade side"
         "palette checks side";
@@ -101,7 +119,8 @@ body:has(.app) .boot
 {
     grid-area: side;
     display: grid;
-    grid-template-rows: minmax(14rem, 42%) minmax(0, 1fr);
+    position: relative;
+    grid-template-rows: var(--viewer-h, minmax(14rem, 42%)) minmax(0, 1fr);
 }
 
 .pane-side .viewer
@@ -201,6 +220,14 @@ body:has(.app) .boot
 .narrow .tabs
 {
     overflow-x: auto;
+}
+
+/* the four tabs share the width : at their design system size the last one left a phone screen */
+.narrow .tabs .tab
+{
+    flex: 1 1 0;
+    padding-inline: var(--spacing-xs);
+    font-size: var(--font-size-sm);
 }
 
 .narrow-body
