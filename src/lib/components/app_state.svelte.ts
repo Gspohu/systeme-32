@@ -33,6 +33,8 @@ class AppState
     refusals = $state(0);
     // the 3D view shows the hardware hidden inside the carcasses, the boards seen through
     showHardware = $state(false);
+    // the back wall, the ceiling and the side walls an item stands against
+    showRoom = $state(true);
     private nextToast = 0;
 
     project: Project = $derived(this.history.present);

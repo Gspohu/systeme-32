@@ -120,7 +120,16 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 + "l'abaque Blum (2500 mm, 22 kg). Diviser la porte.");
             continue;
         }
-        if (fp.rect.w > HINGE_CHART_WIDTH) 
+        // on a short door the cups of two hinges run into each other, the plates are not dimensioned yet
+        const pitch = (fp.rect.h - 2 * s.hingeEdgeDistance) / Math.max(1, hingeTotal - 1);
+        if (hingeTotal > 1 && pitch < CUP_DIAMETER)
+        {
+            b.errors.push(`${name} : ${Math.round(fp.rect.h)} mm de haut, trop bas pour ${hingeTotal} charnières à `
+                + `${s.hingeEdgeDistance} mm des chants (Réglages). Réduire cet écart, réunir avec la porte voisine `
+                + "(Porte unique) ou poser un tiroir ou un abattant.");
+            continue;
+        }
+        if (fp.rect.w > HINGE_CHART_WIDTH)
         {
             part.notes.push(`Largeur ${Math.round(fp.rect.w)} mm : l'abaque Blum est établi pour 600 mm, `
                 + "essai de montage conseillé");

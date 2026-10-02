@@ -1,11 +1,13 @@
 // Masses, sliding leaves, shelf pins, carcass ojinery and base : hardware lines and drilling
 
-import type { Carcass, Settings } from "./model";
+import type { Carcass, Item, Settings } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
-import { sideFace } from "./locate"; 
+import { sideFace } from "./locate";
 import { byId } from "./edit";
-import { topAngle } from "./slope";
+import { topAngle, topAt } from "./slope";
+import { box } from "./fitted";
+import { boxesMeet, wallBox, type Box3 } from "./room";
 import { polygonArea, tessellate } from "./geometry";
 import type { Build, Joint, Part } from "./parts";
 import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
@@ -27,6 +29,9 @@ const ANTI_TIP_SINGLE_MAX_WIDTH = 500;
 const ANTI_TIP_INSET = 120;
 const ANTI_TIP_MAX_SPACING = 800;
 const ANTI_TIP_FROM_BACK = 20;
+// the generic 40 x 40 x 40 steel bracket of 2 mm priced in data/prices.ts
+const ANTI_TIP_BRACKET_SIZE = 40;
+const ANTI_TIP_BRACKET_THICKNESS = 2;
 
 
 export function partMass(p: Part, check: boolean): number
@@ -358,9 +363,12 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
         }
         const perRow = feetPerRow(c);
         const count = 2 * perRow;
+        const perFoot = `${(totalKg / count).toFixed(0)} kg par pied chargé, ${AXILO_LOAD_PER_FOOT} kg admis`;
         b.hardware.push({ ref: "637.76.333", qty: count, item: c.id, itemName: c.name, target: null, note: null });
         b.hardware.push({ ref: foot.ref, qty: count, item: c.id, itemName: c.name, target: null,
-                         note: `réglage ${foot.min}-${foot.max} mm` });
+                         note: `réglage ${foot.min}-${foot.max} mm, ${perFoot}` });
+        b.infos.push(`${c.name} : ${count} pieds AXILO 78 H${foot.height}, ${perFoot} (Häfele p. 11.43A), réglage `
+            + `sous charge jusqu'à ${AXILO_ADJUST_MAX_CABINET} kg de meuble.`);
         b.fitted.push(...feetFitted(c, foot.ref));
         if (c.base.type === "plinth")
         {
@@ -393,6 +401,8 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
     {
         b.hardware.push({ ref: "48N0510.02", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
         b.hardware.push({ ref: "48N0510.03", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
+        b.infos.push(`${c.name} : suspendu par une paire de ferrures Blum 48N0510, ${totalKg.toFixed(0)} kg `
+            + "chargé pour 130 kg admis (Blum p. 586).");
         if (totalKg > 130)
         {
             b.errors.push(`${c.name} : ${totalKg.toFixed(0)} kg suspendus, une paire de ferrures 48N0510 `
@@ -413,23 +423,86 @@ export function antiTipPositions(width: number): number[]
 }
 
 
+// where a bracket lies, in the frame of the wall : on the highest point of the top under it, a sloped top
+// gets a bracket bent to its angle
+function bracketBox(c: Carcass, x: number): Box3
+{
+    const half = ANTI_TIP_BRACKET_SIZE / 2;
+    const y = c.y + (c.slope === null ? c.height : Math.max(topAt(c, x - half), topAt(c, x + half)));
+    return { min: [c.x + x - half, y, c.z], max: [c.x + x + half, y + ANTI_TIP_BRACKET_SIZE, c.z +
+                                                  ANTI_TIP_BRACKET_SIZE] };
+}
+
+
+// Each bracket position, with the name of what stands over it when something does : no bracket fits under
+// another item, a carcass above holds the lower one once the two are joined
+export function antiTipKept(c: Carcass, items: Item[]): { x: number; under: string | null }[]
+{
+    return antiTipPositions(c.width).map((x) =>
+    {
+        const space = bracketBox(c, x);
+        const over = items.find((k) =>
+        {
+            return k.id !== c.id && k.wall === c.wall && boxesMeet(space, wallBox(k));
+        });
+        return { x, under: over === undefined ? null : over.name };
+    });
+}
+
+
 // Brackets on the top of a standing carcass, screwed to the wall with the plug the wall material need
-export function fitWallFixing(c: Carcass, s: Settings, b: Build): void
+export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]): void
 {
     const top = byId(b.parts, `${c.id}/top`);
     if (!c.fixToWall || c.base.type === "wall" || top === undefined)
     {
         return;
     }
-    const at = antiTipPositions(c.width);
+    const kept = antiTipKept(c, items);
+    for (const name of new Set(kept.map((k) =>
+    {
+        return k.under;
+    })))
+    {
+        if (name !== null)
+        {
+            b.infos.push(`${c.name} : pas d'équerre anti-basculement sous ${name}, posé dessus. Relier les deux `
+                + "caissons, le plus haut retient alors l'autre.");
+        }
+    }
+    const at = kept.filter((k) =>
+    {
+        return k.under === null;
+    }).map((k) =>
+    {
+        return k.x;
+    });
+    const t = ANTI_TIP_BRACKET_THICKNESS;
+    const S = ANTI_TIP_BRACKET_SIZE;
     for (const x of at)
     {
         // measured along a sloped top
         const u = (x - c.thickness) / Math.cos(topAngle(c));
         top.holes.push({ u, v: top.width - ANTI_TIP_FROM_BACK, diameter: 0, depth: 0, face: "B",
                          label: `Équerre anti-basculement : vis 4 x 16, à ${ANTI_TIP_FROM_BACK} mm du chant arrière (convention)` });
+        // one leg lying on the top from the wall, the other standing against the wall on it
+        const y = bracketBox(c, x).min[1];
+        const key = `${c.id}/equerre-${Math.round(x)}`;
+        const label = `${c.name} : équerre anti-basculement`;
+        b.fitted.push(
+            box(`${key}/a`, c.id, "ANTI_TIP_BRACKET", label, [c.x + x - S / 2, y, c.z], [c.x + x + S / 2, y + t, c.z +
+                S],
+                true),
+            box(`${key}/b`, c.id, "ANTI_TIP_BRACKET", label, [c.x + x - S / 2, y + t, c.z], [c.x + x +
+                S / 2, y + S, c.z + t],
+                true),
+        );
     }
     const n = at.length;
+    if (n === 0)
+    {
+        return;
+    }
     const line = (ref: string, note: string | null): void =>
     {
         b.hardware.push({ ref, qty: n, item: c.id, itemName: c.name, target: top.id, note });

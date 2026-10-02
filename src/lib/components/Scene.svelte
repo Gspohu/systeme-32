@@ -308,6 +308,19 @@
                  section: css.getPropertyValue("--colour-text-secondary").trim() || "#a5988a" };
     });
 
+    // the walls and the ceiling only show the room : one face each, towards the inside, gone once the camera is out
+    const sideWalls = $derived(new Set(app.project.items.map((it) =>
+    {
+        return it.wall;
+    })));
+    const roomTint = $derived.by(() =>
+    {
+        void dark.current;
+        const css = getComputedStyle(document.documentElement);
+        return { wall: css.getPropertyValue("--colour-bg-surface-raised").trim() || "#372b24",
+                 ceiling: css.getPropertyValue("--colour-bg-surface-hover").trim() || "#2d231d" };
+    });
+
     function computeFrame(): { target: [number, number, number]; camera: [number, number, number] }  
     {
         const box = new THREE.Box3();
@@ -338,6 +351,31 @@
 
 <Grid plane="xz" cellSize={100 * MM} sectionSize={1000 * MM} gridSize={[12, 12]} fadeDistance={14}
     cellColor={grid.cell} sectionColor={grid.section} />
+
+{#if app.showRoom}
+    {@const r = app.project.room}
+    <T.Mesh position={[r.width / 2 * MM, r.height / 2 * MM, 0]}>
+        <T.PlaneGeometry args={[r.width * MM, r.height * MM]} />
+        <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
+    </T.Mesh>
+    <T.Mesh position={[r.width / 2 * MM, r.height * MM, r.depth / 2 * MM]} rotation={[Math.PI / 2, 0, 0]}>
+        <T.PlaneGeometry args={[r.width * MM, r.depth * MM]} />
+        <!-- facing down it gets none of the light from above : a flat colour, it only marks the room -->
+        <T.MeshBasicMaterial color={roomTint.ceiling} side={THREE.FrontSide} />
+    </T.Mesh>
+    {#if sideWalls.has("left")}
+        <T.Mesh position={[0, r.height / 2 * MM, r.depth / 2 * MM]} rotation={[0, Math.PI / 2, 0]}>
+            <T.PlaneGeometry args={[r.depth * MM, r.height * MM]} />
+            <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
+        </T.Mesh>
+    {/if}
+    {#if sideWalls.has("right")}
+        <T.Mesh position={[r.width * MM, r.height / 2 * MM, r.depth / 2 * MM]} rotation={[0, -Math.PI / 2, 0]}>
+            <T.PlaneGeometry args={[r.depth * MM, r.height * MM]} />
+            <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
+        </T.Mesh>
+    {/if}
+{/if}
 
 {#each app.project.items as it (it.id)}
     {@const pl = placement(it.wall)}

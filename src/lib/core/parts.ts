@@ -151,6 +151,8 @@ export interface Build
     fronts: Map<string, FrontPanel[]>;
     layouts: Map<string, ResolvedLayout>;
     errors: string[];
+    // what the hardware chosen admits, told the user without being a fault
+    infos: string[];
     // point loads at mid span in N, a rail centre support hanging from a shelf
     midLoads: Map<string, number>;
     // tube lengths to cut, packed into bars over the whole project once every item is built
@@ -243,8 +245,8 @@ export function boxOrigin(c: Carcass): Vec3
 
 export function emptyBuild(): Build
 {
-    return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], midLoads: new Map(),
-             railCuts: [], fitted: [] };
+    return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], infos: [],
+             midLoads: new Map(), railCuts: [], fitted: [] };
 }
 
 

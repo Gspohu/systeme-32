@@ -5,7 +5,7 @@ import { type Build, buildCarcass, emptyBuild } from "./parts";
 import { buildBox, buildWallShelf } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
 import { buildDrawers } from "./drawers";
-import { antiTipPositions, fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, fitWallFixing,
+import { antiTipKept, fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, fitWallFixing,
     partMass } from "./fittings";
 import { fitDoors } from "./doors";
 import { fitLifts, liftChecks } from "./lifts";
@@ -97,7 +97,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         const person = it.seat === null ? 0 : SEAT_LOAD_N / GRAVITY;
         loads.set(it.id, content + shelves + person + clothes);
         fitBase(it, itemMass(b, it.id) + content + shelves + person + clothes, b);
-        fitWallFixing(it, s, b);
+        fitWallFixing(it, s, b, p.items);
         buildCeilingFiller(it, p.room, b);
     }
     else if (it.kind === "corner")
@@ -135,6 +135,7 @@ export function analyse(p: Project): Analysis
     for (const it of p.items)
     {
         let k = b.errors.length;
+        let told = b.infos.length;
         try
         {
             buildItem(it, p, b, loads);
@@ -147,6 +148,11 @@ export function analyse(p: Project): Analysis
         {
             checks.push({ level: "error", item: it.id, target: null, message: b.errors[k]! });
             k++;
+        }
+        while (told < b.infos.length)
+        {
+            checks.push({ level: "info", item: it.id, target: null, message: b.infos[told]! });
+            told++;
         }
     }
     packRailBars(b);
@@ -170,9 +176,13 @@ export function analyse(p: Project): Analysis
         {
             tippings.push(tp);
             const fixed = it.fixToWall && it.base.type !== "wall";
-            const verdict = fixed
-                ? `Retenu par ${antiTipPositions(it.width).length} équerre(s) anti-basculement fixées au mur.`
-                : "Aucune fixation murale : cocher Fixation murale anti-basculement sur le caisson.";
+            const brackets = antiTipKept(it, p.items).filter((k) =>
+            {
+                return k.under === null;
+            }).length;
+            const verdict = !fixed ? "Aucune fixation murale : cocher Fixation murale anti-basculement sur le caisson."
+                : brackets > 0 ? `Retenu par ${brackets} équerre(s) anti-basculement fixées au mur.`
+                    : "Retenu par le caisson posé dessus, une fois les deux reliés.";
             checks.push({
                 level: "info", item: it.id, target: null,
                 message: `${it.name} : basculement sous ${tp.pullKg.toFixed(1)} kg tirés horizontalement en haut, `
