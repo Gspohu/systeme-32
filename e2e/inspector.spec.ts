@@ -99,6 +99,19 @@ test.describe("inspector", () =>
         expect(await errorCount(page)).toBe(0);
     });
 
+    test("opens a quarter round into three shaped shelves", async ({ page }) =>
+    {
+        const left = page.locator(".inspector-body .section-title", { hasText: "Côté gauche" });
+        await left.locator("xpath=following-sibling::div[1]").getByRole("button", { name: "Arrondi" }).click();
+        await page.locator(".inspector-body").getByRole("checkbox", { name: "Ouvert", exact: true }).check();
+        await setField(page, "Tablettes", "3");
+        expect(await errorCount(page)).toBe(0);
+        await outputsTab(page, "Débit");
+        // the shelves and the end panels share their outline : one line of the cut list, five pieces
+        const row = page.locator(".tab-content tbody tr", { hasText: "Bout arrondi gauche, flasque basse" });
+        await expect(row.locator("td").nth(2)).toHaveText("5");
+    });
+
     test("closes the back of a quarter round", async ({ page }) =>
     {
         const left = page.locator(".inspector-body .section-title", { hasText: "Côté gauche" });
@@ -186,7 +199,7 @@ test.describe("dividers", () =>
         await field(page, "Épaisseur").selectOption("");
         await expect(shelf).toHaveAttribute("height", "19");
         await selectItem(page);
-        await field(page, "Tablettes").selectOption("16");
+        await field(page, "Ép. tablettes").selectOption("16");
         await expect(shelf).toHaveAttribute("height", "16");
     });
 

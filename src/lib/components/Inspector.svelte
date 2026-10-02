@@ -790,7 +790,7 @@
                     {#each BOARD_THICKNESSES as t}<option value={String(t)}>{t} mm</option>{/each}
                 </select>
             </label>
-            <label class="field"><span class="label">Tablettes</span>
+            <label class="field"><span class="label">Ép. tablettes</span>
                 <select class="select" value={carcass.shelfThickness === null ? "" : String(carcass.shelfThickness)}
                     onchange={(e) => patch({ shelfThickness: str(e) === "" ? null
                         : Number(str(e)) } as Partial<Carcass>)}>
@@ -908,14 +908,24 @@
                             <input type="checkbox" checked={e.back === true}
                                 onchange={(ev) => endPatch(side, { back: checked(ev) })} /> Fond</label>
                     {/if}
-                    <label class="field"><span class="label">Technique</span>
-                        <select class="select" value={e.technique}
-                            onchange={(ev) => endPatch(side, { technique: str(ev) as CurveTechnique })}>
-                            <option value="battens">Tasseaux</option>
-                            <option value="flex">MDF cintrable</option>
-                            <option value="solid">Massif usiné</option>
-                        </select>
-                    </label>
+                    <label class="form-check" title="Sans habillage cintré : des tablettes découpées au rayon">
+                        <input type="checkbox" checked={e.open === true}
+                            onchange={(ev) => endPatch(side, { open: checked(ev) })} /> Ouvert</label>
+                    {#if e.open === true}
+                        <label class="field"><span class="label">Tablettes</span>
+                            <input class="input" type="number" min="0" step="1" value={e.shelves ?? 2}
+                                onchange={(ev) => endPatch(side, { shelves: Math.max(0, Math.round(num(ev))) })} />
+                        </label>
+                    {:else}
+                        <label class="field"><span class="label">Technique</span>
+                            <select class="select" value={e.technique}
+                                onchange={(ev) => endPatch(side, { technique: str(ev) as CurveTechnique })}>
+                                <option value="battens">Tasseaux</option>
+                                <option value="flex">MDF cintrable</option>
+                                <option value="solid">Massif usiné</option>
+                            </select>
+                        </label>
+                    {/if}
                 {/if}
             {/each}
         {/if}  

@@ -97,7 +97,8 @@ export function buildEnds(c: Carcass, b: Build): void
         {
             b.errors.push(`${c.name} : rayon de ${end.radius} mm supérieur à la profondeur ${usable} mm, ramené à ${usable}.`);
         }
-        const skin = skinThickness(end.technique, end.flexThickness, end.battens);
+        const open = end.open === true;
+        const skin = open ? 0 : skinThickness(end.technique, end.flexThickness, end.battens);
         const inner = outer - skin;
         const outline: Outline = end.sweep === 180
             ? {
@@ -126,21 +127,31 @@ export function buildEnds(c: Carcass, b: Build): void
             { y: c.y, label: "Flasque basse", role: "endPanel" },
             { y: c.y + c.height - board, label: "Flasque haute", role: "endPanel" },
         ];
+        // TODO an open end's shelves hang off the side, the deflection check knows shelves on two supports only
+        const shelves = open ? Math.max(0, Math.round(end.shelves ?? 2)) : 0;
+        const gap = (c.height - 2 * board - shelves * board) / (shelves + 1);
         let k = 1;
-        while (k <= formers)
+        while (k <= (open ? shelves : formers))
         {
-            levels.push({ y: c.y + (c.height - board) * k / (formers + 1), label: `Gabarit ${k}`, role: "former" });
+            levels.push(open
+                ? { y: c.y + board + k * gap + (k - 1) * board, label: `Tablette ${k}`, role: "endPanel" }
+                : { y: c.y + (c.height - board) * k / (formers + 1), label: `Gabarit ${k}`, role: "former" });
             k++;
         }
         for (const lv of levels)
         {
             const p = newPart({
                 ...base, id: `${c.id}/end/${side}/${lv.label}`, label: `${title}, ${lv.label.toLowerCase()}`,
-                role: lv.role, length: inner, width: usable, thickness: board, decor: c.decor, edges: [],
+                role: lv.role, length: inner, width: usable, thickness: board, decor: c.decor,
+                edges: !open ? [] : end.sweep === 90 ? ["v0", "u1"] : ["v0"],
                 frame: { o: [xFace, lv.y + board, c.z + depth], u: uDir, v: neg(Z), n: neg(Y) },
             });
             p.outline = outline;
             p.notes.push("Contour cintré : découpe CN d'après le DXF");
+            if (open)
+            {
+                p.notes.push("Ouvert : chant cintré sur l'arc, posé à la main");
+            }
             b.parts.push(p);
             // shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
@@ -166,6 +177,10 @@ export function buildEnds(c: Carcass, b: Build): void
                 back.notes.push("Vissé en applique sur les chants arrière des flasques et des gabarits");
                 b.parts.push(back);
             }
+        }
+        if (open)
+        {
+            continue;
         }
         const straight = end.sweep === 180 ? 0 : usable - outer;
         const developed = end.sweep === 180

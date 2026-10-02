@@ -226,6 +226,41 @@ describe("rounded ends", () =>
     });
 
 
+    it("opens a quarter round into shaped shelves evenly spread, with no skin left", () =>
+    {
+        const c = newCarcass({ name: "Bout de Kaysersberg", width: 600, height: 800, depth: 500,
+                               ends: { left: { type: "square" }, right: { type: "rounded", radius: 300, sweep: 90,
+                                   technique: "battens", flexThickness: 9, battens: DEFAULT_BATTENS, decor: "W1000_ST9",
+                                   open: true, shelves: 3 } } });
+        const a = analyse(addItem(newProject("Kaysersberg"), c));
+        const end = a.build.parts.filter((q) =>
+        {
+            return q.id.startsWith(`${c.id}/end/right/`);
+        });
+        expect(end.some((q) =>
+        {
+            return q.role === "batten" || q.role === "skin" || q.role === "former";
+        })).toBe(false);
+        // (800 - 2 x 19 - 3 x 19) / 4 = 176.25 between the end panels and the three shelves
+        const tops = end.map((q) =>
+        {
+            return q.frame!.o[1] - c.y;
+        }).sort((x, y) =>
+        {
+            return x - y;
+        });
+        expect(tops).toEqual([19, 19 + 176.25 + 19, 19 + 2 * (176.25 + 19), 19 + 3 * (176.25 + 19), 800]);
+        expect(end.every((q) =>
+        {
+            return q.length === 300;
+        })).toBe(true);
+        expect(a.checks.filter((k) =>
+        {
+            return k.level === "error";
+        })).toEqual([]);
+    });
+
+
     it("closes the back of a quarter round with a panel like the carcass back, from the side out to the skin", () =>
     {
         const quarter = (back: boolean): Extract<End, { type: "rounded" }> =>

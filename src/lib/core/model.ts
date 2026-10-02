@@ -217,7 +217,9 @@ export interface Battens
 export type End =
     | { type: "square" }
     | { type: "rounded"; radius: number; sweep: 90 | 180; technique: CurveTechnique; flexThickness: 6 |
-       9; battens: Battens; decor: string; back?: boolean };
+       9; battens: Battens; decor: string; back?: boolean;
+       // an open end has no skin : shaped shelves in the reach of the arc, evenly spread between the end panels
+       open?: boolean; shelves?: number };
 
 export interface Carcass
 {
