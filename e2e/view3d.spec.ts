@@ -16,4 +16,18 @@ test.describe("3D view", () =>
         await expect(hardware).toBeChecked();
         await expect(page.locator(".viewer canvas")).toBeVisible();
     });
+
+
+    test("opens every front of the TV wall and shuts them again", async ({ page }) =>
+    {
+        await page.goto("/");
+        await page.getByLabel("Nouveau projet").selectOption({ label: "Composition TV et bibliothèque" });
+        const open = page.getByRole("checkbox", { name: "Ouvrir les façades" });
+        await expect(open).not.toBeChecked();
+        await open.check();
+        await expect(open).toBeChecked();
+        await expect(page.locator(".viewer canvas")).toBeVisible();
+        await open.uncheck();
+        await expect(open).not.toBeChecked();
+    });
 });

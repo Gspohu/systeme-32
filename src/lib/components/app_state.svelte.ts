@@ -4,6 +4,7 @@ import type { Project, Wall } from "../core/model";
 import { historyOf, push, redo, undo, CommandError, type History } from "../core/commands";
 import { computeOutputs, type Outputs } from "../core/outputs";
 import { tvWall } from "../core/templates";
+import { SvelteSet } from "svelte/reactivity";
 
 
 export type Selection =
@@ -37,6 +38,9 @@ class AppState
     showRoom = $state(true);
     // the room dimmed and every LED strip or spot lighting what is under it
     ledsOn = $state(false);
+    // every front open in 3D, and the ones a click turned the other way from that
+    frontsOpen = $state(false);
+    flipped = new SvelteSet<string>();
     private nextToast = 0;
 
     project: Project = $derived(this.history.present);
@@ -90,6 +94,33 @@ class AppState
         {
             this.dismiss(id);
         }, variant === "danger" ? 8000 : 4000);
+    }
+
+
+    // the box opens or shuts them all, a click on one front then turns it the other way
+    openFronts(open: boolean): void
+    {
+        this.frontsOpen = open;
+        this.flipped.clear();
+    }
+
+
+    flipFront(front: string): void
+    {
+        if (this.flipped.has(front))
+        {
+            this.flipped.delete(front);
+        }
+        else
+        {
+            this.flipped.add(front);
+        }
+    }
+
+
+    isOpen(front: string): boolean
+    {
+        return this.frontsOpen !== this.flipped.has(front);
     }
 
 

@@ -15,6 +15,9 @@
             <input type="checkbox" bind:checked={app.showRoom} /> Mur et plafond</label>
         <label class="form-check" title="Pièce assombrie, éclairages LED allumés">
             <input type="checkbox" bind:checked={app.ledsOn} /> LED allumées</label>
+        <label class="form-check" title="Toucher une façade l'ouvre ou la ferme seule">
+            <input type="checkbox" checked={app.frontsOpen} onchange={(e) => app.openFronts(e.currentTarget.checked)} />
+            Ouvrir les façades</label>
     </div>
 </div>
 

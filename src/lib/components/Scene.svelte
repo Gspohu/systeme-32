@@ -1,6 +1,7 @@
 <script lang="ts">
     import { T } from "@threlte/core";
-    import { OrbitControls, Grid } from "@threlte/extras";
+    import { OrbitControls, Grid, interactivity, type IntersectionEvent } from "@threlte/extras";
+    import { REST, movers, openPose, type Pose } from "../view3d/motions";
     import * as THREE from "three";
     import { untrack } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
@@ -20,6 +21,23 @@
 
     // every part holds its own lacquer colour, fronts, dividers and linings alike
     const specs = $derived(partMeshes(build.parts));
+
+    // what each part and each fixed piece of hardware moves with : all the motions to know what a click opens
+    // the open ones to pose the meshes
+    const anyMotion = $derived(movers(build.motions, build.fitted, () =>
+    {
+        return true;
+    }));
+    const openMotion = $derived(movers(build.motions, build.fitted, (m) =>
+    {
+        return app.isOpen(m.front);
+    }));
+    function poseOf(key: string | null): Pose
+    {
+        const m = key === null ? undefined : openMotion.get(key);
+        return m === undefined ? REST : openPose(m);
+    }
+    interactivity();
 
     // meshes stay in the frame of their wall, a group per item turns them into the room
     const byItem = $derived.by(() =>
@@ -473,7 +491,19 @@
     {@const pl = placement(it.wall)}
     <T.Group rotation={pl.rotation} position={pl.position}>
         {#each byItem.get(it.id) ?? [] as s (s.key)}
-            <T.Mesh geometry={s.geometry} material={material(s.decor, s.colour)} />
+            {@const pose = poseOf(s.part)}
+            {@const mover = s.part === null ? undefined : anyMotion.get(s.part)}
+            <T.Group quaternion={pose.quaternion} position={pose.position}>
+                <T.Mesh geometry={s.geometry} material={material(s.decor, s.colour)}
+                    onclick={(e: IntersectionEvent<MouseEvent>) =>
+                    {
+                        if (mover !== undefined)
+                        {
+                            e.stopPropagation();
+                            app.flipFront(mover.front);
+                        }
+                    }} />
+            </T.Group>
         {/each}
     </T.Group>
 {/each}
@@ -494,7 +524,12 @@
 {#each hardware as f (f.key)}
     {#if !f.hidden || app.showHardware}
         {@const pl = placement(f.wall)}
-        <T.Mesh geometry={f.geometry} material={hardwareMat(f.ref)} rotation={pl.rotation} position={pl.position} />
+        {@const pose = poseOf(f.key)}
+        <T.Group rotation={pl.rotation} position={pl.position}>
+            <T.Group quaternion={pose.quaternion} position={pose.position}>
+                <T.Mesh geometry={f.geometry} material={hardwareMat(f.ref)} />
+            </T.Group>
+        </T.Group>
     {/if}
 {/each}
 {#each fittings as f (f.key)}
