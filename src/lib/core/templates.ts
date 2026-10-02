@@ -5,7 +5,6 @@ import { cell, newCarcass, newFront, newId, newProject, newWallShelf, split, DEF
 
 const OAK = "H1180_ST37";
 const GREEN = "U604_ST9";
-const WHITE = "W1000_ST9";
 
 function lining(cellId: string, decor: string, full: boolean): Lining
 {
@@ -93,7 +92,7 @@ export function dresser(): Project
     const box = (name: string, x: number, y: number, width: number, height: number,
         root: ReturnType<typeof split>, standing: boolean): Carcass =>
     {
-        return newCarcass({ name, width, height, depth: 500, x, y, z: 0, decor: OAK, backDecor: WHITE, root,
+        return newCarcass({ name, width, height, depth: 500, x, y, z: 0, decor: OAK, backDecor: OAK, root,
                             base: standing ? { type: "floor" } : { type: "plinth", height: 100, setback: 50 } });
     };
 

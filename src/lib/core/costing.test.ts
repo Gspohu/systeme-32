@@ -11,9 +11,8 @@ describe("costing with the dated public prices", () =>
         {
             return l.key;
         }).sort();
-        // drawer boxes in H1180 16 and white 8 mm backs found nowhere in stock, the AXILO plate sold in kits only
-        expect(missing).toEqual(["board:H1180_ST37:16", "board:W1000_ST9:8", "hw:637.76.333", SERVICE_CUT,
-                                 SERVICE_EDGING].sort());
+        // drawer boxes in H1180 16 found nowhere in stock, the AXILO plate sold in kits only
+        expect(missing).toEqual(["board:H1180_ST37:16", "hw:637.76.333", SERVICE_CUT, SERVICE_EDGING].sort());
     });
 
 

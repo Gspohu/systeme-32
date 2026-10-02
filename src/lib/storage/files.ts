@@ -40,26 +40,6 @@ export async function shareOrDownload(bytes: Uint8Array, name: string, mime: str
 }
 
 
-export function canShareFiles(): boolean
-{
-    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-    if (typeof nav.canShare !== "function")
-    {
-        console.log('colibri99');
-        return false;
-    }
-    try
-    {
-        return nav.canShare({ files: [new File([new Uint8Array(1)], "t.zip", { type: "application/zip" })] });
-    }
-    catch (e)
-    {
-        console.warn("systeme-32 : partage de fichiers refusé, téléchargement à la place", e);
-        return false;
-    }
-}
-
-
 // A throwaway input opens the pickre, no listener outlives the choice
 export function pickFile(accept: string): Promise<File | null>
 {

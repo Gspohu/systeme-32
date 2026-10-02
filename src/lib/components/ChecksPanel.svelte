@@ -42,7 +42,7 @@
         <p class="muted">Aucun problème de fabrication détecté.</p>
     {:else}
         <ul>
-            {#each shown as c, i (i)}
+            {#each shown as c}
                 <li class={c.level}>
                     <button class="line" onclick={() =>
                     {

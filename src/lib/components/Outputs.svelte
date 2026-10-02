@@ -102,6 +102,8 @@
     </div>
 
     <div class="tab-content active">
+        <!-- rebuilt from the store after a refused command, like the inspector -->
+        {#key app.refusals}
         {#if tab === 0}
             <div class="row">
                 <button class="btn btn-primary"
@@ -362,6 +364,7 @@
                     onchange={(e) => screen({ wallMounted: checked(e) })} /> Fixé au mur</label>
             {/if}
         {/if}
+        {/key}
     </div>
 </div>
 

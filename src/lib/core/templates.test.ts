@@ -37,6 +37,17 @@ describe("the sketch templates", () =>
     }
 
 
+    it("keeps the dresser to the two decors the parents picked, Halifax oak and the green", () =>
+    {
+        const decors = new Set<string>();
+        for (const q of analyse(dresser()).build.parts)
+        {
+            decors.add(q.decor);
+        }
+        expect([...decors].sort()).toEqual(["H1180_ST37", "U604_ST9"]);
+    });
+
+
     it("fits the dresser with 27 hinges and three 480 runner pairs for its row of drawers", () =>
     {
         // twelve doors, two hinges up to 750 mm and 6 kg on the Blum chart : the three past 750 take a third

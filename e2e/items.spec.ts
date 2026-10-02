@@ -36,7 +36,7 @@ test.describe("other items", () =>
     {
         await drop(page, "Étagère murale", await toClient(page, 500, 1200));
         await selectItem(page);
-        const board = page.locator(".facade > svg > rect.edge").first();
+        const board = page.locator(".facade svg > rect.edge").first();
         await expect(board).not.toHaveAttribute("width", "1200");
         await setField(page, "Largeur", "1200");
         await expect(board).toHaveAttribute("width", "1200");
