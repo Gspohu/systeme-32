@@ -33,6 +33,8 @@ test.describe("plans and lists", () =>
 
     test("packs the workshop folder : drawings, lists, PBS and one DXF per part", async ({ page }) =>
     {
+        // the whole folder is drawn in the page : about 30 s alone, twice that beside the rest of the suite
+        test.slow();
         await outputsTab(page, "Plans");
         const zip = await download(page, page.getByRole("button", { name: "Dossier atelier" }));
         expect(zip.name).toBe("vaisselier_bibliotheque_atelier.zip");
@@ -63,6 +65,7 @@ test.describe("plans and lists", () =>
 
     test("downloads the drawings alone as a PDF", async ({ page }) =>
     {
+        test.slow();
         await outputsTab(page, "Plans");
         const pdf = await download(page, page.getByRole("button", { name: "PDF", exact: true }));
         expect(pdf.name).toBe("vaisselier_bibliotheque_plans.pdf");

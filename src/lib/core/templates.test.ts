@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyse } from "./analysis";
-import { dresser, dresserNiche, tvWall } from "./templates";
+import { dresser, tvWall } from "./templates";
 import { resolveLayout } from "./layout";
 import type { Part } from "./parts";
 import type { Carcass, SplitNode } from "./model";
@@ -18,7 +18,7 @@ function hardwareCount(make: typeof tvWall): Map<string, number>
 
 describe("the sketch templates", () =>
 {
-    for (const make of [tvWall, dresser, dresserNiche])
+    for (const make of [tvWall, dresser])
     {
         it(`${make.name} builds without any manufacturing error`, () =>
         {
@@ -37,15 +37,16 @@ describe("the sketch templates", () =>
     }
 
 
-    it("fits the dresser with sixteen overlay hinges and 480 runners for the cutlery drawers", () =>
+    it("fits the dresser with 27 hinges and three 480 runner pairs for its row of drawers", () =>
     {
+        // twelve doors, two hinges up to 750 mm and 6 kg on the Blum chart : the three past 750 take a third
         const hw = hardwareCount(dresser);
-        expect(hw.get("71B3550")).toBe(16);
-        expect(hw.get("173H7100")).toBe(16);
+        expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(9 * 2 + 3 * 3);
+        expect(hw.get("173H7100")).toBe(27);
         expect(hw.get("760H4800S")).toBe(3);
     });
 
-    it("gives the TV wall a half round batten end and a wall hung bridge", () =>
+    it("gives the TV wall its quarter round batten end, one door per zone and its two oak shelves", () =>
     {
         const p = tvWall();
         const a = analyse(p);
@@ -58,17 +59,21 @@ describe("the sketch templates", () =>
             }
         }
         expect(battens).toHaveLength(1);
-        // 500 deep less the 8 mm back : radius 246, batens 20 thick liad on their mid line, 30 mm pitch
-        expect(battens[0]!.quantity).toBe(Math.floor((Math.PI * (246 - 20 / 2) + 10) / 30));
+        // radius 300 in 392 of usable depth : a quarter on the mid line of 20 mm battens, 92 of flat run, 30 pitch
+        expect(battens[0]!.quantity).toBe(Math.floor((Math.PI / 2 * (300 - 20 / 2) + 92 + 10) / 30));
+        // four doors of two hinges, none of the small ones of the save lfet
         const hw = hardwareCount(tvWall);
-        expect(hw.get("48N0510.02")).toBe(1);
-        expect(hw.get("48N0510.03")).toBe(1);
+        expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(4 * 2);
+        expect(p.items.filter((it) =>
+        {
+            return it.kind === "wallShelf";
+        }).length).toBe(2);
     });
 
 
     it("opens the niche of the parents' sketch over 1084 between its two shelf columns", () =>
     {
-        const niche = dresserNiche().items.find((it) =>
+        const niche = dresser().items.find((it) =>
         {
             return it.name === "Niche";
         }) as Carcass;
@@ -79,7 +84,7 @@ describe("the sketch templates", () =>
 
     it("lines the three drawers of the sketch up side by side, all at the same height", () =>
     {
-        const low = dresserNiche().items.find((it) =>
+        const low = dresser().items.find((it) =>
         {
             return it.name === "Placards et tiroirs";
         }) as Carcass;

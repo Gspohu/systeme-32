@@ -266,9 +266,10 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
                               + `(limite ${s.handlingKg} kg, R4541-9).` });
         }
         const hung = b.midLoads.get(part.id) ?? 0;
-        // a top is only checked for what a rail hangs from it, never for the shelf load
+        // a top is only checked for what a rail hangs from it, never for the shelf load. A wall shelf is not
+        // a board on two end supports : its own fixing sets its spans, it is checked once that fixing is chosen
         const top = part.role === "top";
-        if (part.role !== "shelf" && part.role !== "hdivider" && part.role !== "wallShelf" && !(top && hung > 0))
+        if (part.role !== "shelf" && part.role !== "hdivider" && !(top && hung > 0))
         {
             continue;
         }  
@@ -391,8 +392,10 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
         if (it.kind === "wallShelf")
         {
             const text = it.purpose === "desk"
-                ? "appuis non vérifiés, le poser sur des caissons ou choisir une fixation avec l'ébéniste."
-                : "fixation invisible non encore sourcée, à choisir avec l'ébéniste selon le support mural.";
+                ? "appuis non vérifiés, le poser sur des caissons ou choisir une fixation avec l'ébéniste. Sa flèche "
+                    + "se vérifiera avec ces appuis."
+                : "fixation invisible non encore sourcée, à choisir avec l'ébéniste selon le support mural. Sa flèche "
+                    + "dépend de l'écartement de cette fixation et se vérifiera avec elle.";
             checks.push({ level: "warning", item: it.id, target: null, message: `${it.name} : ${text}` });
         }
     }

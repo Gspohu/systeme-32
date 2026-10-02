@@ -11,7 +11,8 @@ describe("costing with the dated public prices", () =>
         {
             return l.key;
         }).sort();
-        expect(missing).toEqual(["board:W1000_ST9:16", "board:W1000_ST9:8", "hw:637.76.333", SERVICE_CUT,
+        // drawer boxes in H1180 16 and white 8 mm backs found nowhere in stock, the AXILO plate sold in kits only
+        expect(missing).toEqual(["board:H1180_ST37:16", "board:W1000_ST9:8", "hw:637.76.333", SERVICE_CUT,
                                  SERVICE_EDGING].sort());
     });
 
@@ -22,8 +23,9 @@ describe("costing with the dated public prices", () =>
         {
             return l.key;
         }).sort();
-        expect(missing).toEqual(["board:H1180_ST37:16", "board:MDF_FLEX:9", "hw:637.76.333", SERVICE_CUT,
-                                 SERVICE_EDGING].sort());
+        // the 38 mm oak veneered board and its edge of the shelves : the maker lists 39, not 38
+        expect(missing).toEqual(["board:CHENE_PLAQUE:38", "board:H1180_ST37:16", "edge:CHENE_PLAQUE",
+                                 "hw:637.76.333", SERVICE_CUT, SERVICE_EDGING].sort());
     });
 
 

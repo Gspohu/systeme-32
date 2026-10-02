@@ -44,7 +44,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:W1000_ST9:19": entry(ht(22.82), "m2", `${JHS}, 22,82 EUR TTC/m2 (132,26 le panneau), en stock`),
     "board:U604_ST9:19": entry(perSheet(101.3), "m2", "Houdard, 101,30 EUR HT le panneau 2800 x 2070, en stock"),
     // battens on their net area : a 2000 x 140 x 20 board is 0.28 m2
-    "board:CHENE_MASSIF:20": entry(ht(29.9 / 0.28), "m2", "Brico Dépôt, chêne massif raboté 2000 x 140 x 20 à 29,90 TTC"),
+    "board:CHENE_MASSIF:20": entry(ht(29.9 / 0.28), "m2",
+                                   "Brico Dépôt, chêne massif raboté 2000 x 140 x 20 à 29,90 TTC"),
 
     "edge:W1000_ST9": entry(ht(1.77), "m", `${JHS}, chant ABS Egger W1000 ST9 23 x 0,8 à 1,77 EUR TTC/m`),
     "edge:H1180_ST37": entry(ht(2.11), "m", `${JHS}, chant ABS Egger H1180 ST37 23 x 0,8 à 2,11 EUR TTC/m`),
@@ -53,6 +54,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:71B3550": entry(fromGbp(2.42), "u", "Interfit (UK), 2,42 GBP HT la charnière"),
     "hw:173H7100": entry(fromGbp(0.42), "u", "Interfit (UK), 0,42 GBP HT l'embase"),
     "hw:760H4800S": entry(fromGbp(25.92), "u", "Interfit (UK), 25,92 GBP HT la paire"),
+    "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière, lu le 2 octobre"),
+    "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
     "hw:T51.7601": entry(fromGbp(3.28), "u", "Interfit (UK), 3,28 GBP HT la paire gauche et droite"),
     "hw:48N0510.02": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:48N0510.03": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),

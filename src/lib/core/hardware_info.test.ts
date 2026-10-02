@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addItem, setCellSize, setFront, splitCell, updateFront, updateItem } from "./commands";
-import { newCarcass, newProject } from "./factory";
+import { newCarcass, newProject, newWallShelf } from "./factory";
 import { analyse } from "./analysis";
 import type { Carcass, Project, SplitNode } from "./model";
 
@@ -146,6 +146,18 @@ describe("hardware the user is told about", () =>
         expect(analyse(small).build.hardware.some((h) =>
         {
             return h.ref === "282.24.727";
+        })).toBe(true);
+    });
+
+
+    it("leaves the deflection of a wall shelf to the fixing it will get, never two end supports it has not", () =>
+    {
+        const p = addItem(newProject("Riquewihr"), newWallShelf({ width: 1600, depth: 250, thickness: 38,
+                                                                  decor: "CHENE_PLAQUE" }));
+        expect(messages(p, "error")).toEqual([]);
+        expect(messages(p, "warning").some((m) =>
+        {
+            return m.includes("Sa flèche dépend de l'écartement de cette fixation");
         })).toBe(true);
     });
 

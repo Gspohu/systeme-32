@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addItem, updateItem } from "./commands";
-import { newCarcass, newProject } from "./factory";
+import { cell, newCarcass, newFront, newProject, split } from "./factory";
 import { analyse } from "./analysis";
-import { dresser, TEMPLATES } from "./templates";
+import { TEMPLATES } from "./templates";
 import { solids } from "./solids";
 import { stability } from "./stability";
 import type { Carcass, Project } from "./model";
@@ -91,13 +91,17 @@ describe("gravity on what stands on the floor", () =>
     });
 
 
-    it("fails the carpet test with the bracket off the drawer column of the dresser", () =>
+    it("fails the carpet test with the bracket off a tall narrow column of drawers", () =>
     {
-        let p = dresser();
-        const drawers = p.items.find((it) =>
-        {
-            return it.name.startsWith("Colonne 3");
-        })!;
+        // 576 x 2340 x 500 : a door, three cutlery drawers, an open niche, alone against the wall
+        const door = cell();
+        const box = cell();
+        const column = newCarcass({ name: "Colonne 3, argenterie", width: 576, height: 2340, depth: 500,
+                                    root: split("h", [700, 1169], [door, box, cell()]) });
+        column.fronts.push(newFront(door.id, { type: "door", hinge: "left" }),
+                           newFront(box.id, { type: "drawers", count: 3, loadKg: 10 }));
+        let p = project(column);
+        const drawers = p.items[0]!;
         expect(errors(p).some((m) =>
         {
             return m.includes("ASTM");
