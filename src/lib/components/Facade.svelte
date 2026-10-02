@@ -11,6 +11,7 @@
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
     import { FIT_PLAY, RAIL_D, RAIL_DROP, SPOT_RIM, railPlan, spotCentres } from "../core/wardrobe";
     import { openingPoints } from "../core/cutouts";
+    import { openEndLevels } from "../core/curves";
     import { SHOE_RACKS, shoeLevels } from "../core/shoes";
     import { VENT_GRILL } from "../core/vents";
     import type { NodeBox, ResolvedLayout } from "../core/layout";
@@ -19,18 +20,11 @@
     import { boxToWall, roomBox } from "../core/room";
 
 
-    let svg: SVGSVGElement | undefined = $state();
     let hostWidth = $state(800);
     let hostHeight = $state(600);
     let zoom = $state(1);
     let panX = $state(0);
     let panY = $state(0);
-
-
-    $effect(() =>
-    {
-        facadeBridge.svg = svg ?? null;
-    });
 
     const project = $derived(app.project);
     const analysis = $derived(app.outputs.analysis);
@@ -186,6 +180,41 @@
         return `${outer} L ${X(0)} ${Y(r)} A ${r} ${r} 0 0 ${1 - sweep} ${X(r)} ${Y(0)} Z`;
     }
 
+    function gripLabel(name: string, roomPx: number): { text: string; px: number }
+    {
+        const px = Math.max(48, Math.min(Math.max(90, name.length * 8 + 20), roomPx));
+        const fits = Math.min(18, Math.floor((px - 20) / 8));
+        return { text: name.length > fits ? `${name.slice(0, Math.max(1, fits - 1))}...` : name, px };
+    }
+
+    // a grip keeps its whole name unless a neighbour at the same height would run over it :
+    // each one is narrowed to the gap between its centre and the nearest one of its row
+    const grips = $derived.by(() =>
+    {
+        const u = mmPerPx;
+        const rows: { id: string; name: string; mid: number; top: number }[] = [];
+        for (const it of shown)
+        {
+            const b = itemExtent(it);
+            rows.push({ id: it.id, name: it.name, mid: (b.x0 + b.x1) / 2, top: b.y1 });
+        }
+        const out = new Map<string, { text: string; px: number }>();
+        for (const g of rows)
+        {
+            let room = Infinity;
+            for (const o of rows)
+            {
+                // a grip is 28 px high : two tops further apart than that stack, they never touch
+                if (o.id !== g.id && Math.abs(o.top - g.top) < 28 * u)
+                {
+                    room = Math.min(room, Math.abs(o.mid - g.mid) / u - 6);
+                }
+            }
+            out.set(g.id, gripLabel(g.name, room));
+        }
+        return out;
+    });
+
     function hingeLines(x0: number, y0: number, x1: number, y1: number, hinge: "left" | "right" | null): string
     {
         const hx = hinge === "left" ? x0 : x1;
@@ -221,7 +250,7 @@
     }
 </script>
 
-<div class="facade" bind:clientWidth={hostWidth} bind:clientHeight={hostHeight}>
+<div class="facade">
     <div class="facade-tools">
         <button class="btn btn-ghost btn-icon" title="Zoom avant" onclick={() => (zoom = Math.min(8,
             zoom * 1.25))}>+</button>
@@ -239,7 +268,9 @@
             {/each}
         </div>
     </div>
-    <svg bind:this={svg} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" onwheel={onWheel}
+    <!-- the size of the drawing alone : the tools row above is not part of what the zoom frames -->
+    <div class="drawing" bind:clientWidth={hostWidth} bind:clientHeight={hostHeight}>
+    <svg bind:this={facadeBridge.svg} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" onwheel={onWheel}
         role="application" aria-label="Vue de face">
         <line x1={extent.x0} y1="0" x2={extent.x1} y2="0" class="floor" />
         <polyline points={`0,0 0,${-project.room.height} ${wallLength},${-project.room.height} ${wallLength},0`}
@@ -264,7 +295,7 @@
                         {@const grills = Math.max(0, Math.round(it.base.grills ?? 0))}
                         <rect x="0" y="0" width={it.width} height={bh - PLINTH_FOOT_GAP} fill={shade(it.decor, 0.75)}
                             class="edge" />
-                        {#each Array.from({ length: grills }) as _, i (i)}
+                        {#each { length: grills }, i}
                             <rect x={it.width * (i + 0.5) / grills - VENT_GRILL.rimW / 2}
                                 y={(bh - PLINTH_FOOT_GAP - VENT_GRILL.rimH) / 2} width={VENT_GRILL.rimW}
                                 height={VENT_GRILL.rimH} class="foot" />
@@ -288,10 +319,19 @@
                             {@const r = endReach(it, side)}
                             {@const ex = side === "right" ? it.width : -r}
                             {@const pitch = e.battens.width + e.battens.gap}
-                            <rect x={ex} y={-it.height} width={r} height={it.height} class="edge"
-                                fill={fill(e.technique === "battens" ? e.battens.decor : e.decor)} />
-                            {#if e.technique === "battens"}
-                                {#each Array.from({ length: Math.max(0, Math.floor(r / pitch)) }) as _, k}
+                            {#if e.open === true}
+                                <rect x={ex} y={-it.height} width={r} height={it.height} class="edge"
+                                    fill={shade(it.decor, 0.6)} />
+                                {#each openEndLevels(it, e) as lv}
+                                    <rect x={ex} y={-(lv + it.thickness)} width={r} height={it.thickness}
+                                        class="edge end-board" fill={fill(it.decor)} />
+                                {/each}
+                            {:else}
+                                <rect x={ex} y={-it.height} width={r} height={it.height} class="edge"
+                                    fill={fill(e.technique === "battens" ? e.battens.decor : e.decor)} />
+                            {/if}
+                            {#if e.technique === "battens" && e.open !== true}
+                                {#each { length: Math.max(0, Math.floor(r / pitch)) }, k}
                                     <line x1={ex + (k + 1) * pitch} y1={-it.height} x2={ex + (k + 1) * pitch} y2="0"
                                         class="thin" />
                                 {/each}
@@ -459,13 +499,22 @@
                 <rect x={it.x + it.thickness} y={-(it.y + it.height - it.thickness)} width={it.width - 2 * it.thickness}
                     height={it.height - 2 * it.thickness} fill={shade(it.decor, 0.8)} />
             {/if}
+        {/each}
+        {#if project.screen !== null && app.wall === "back"}
+            {@const sc = project.screen}
+            {@const size = screenSize(sc)}
+            <rect x={sc.cx - size.w / 2} y={-(sc.bottom + size.h)} width={size.w} height={size.h} class="screen" />
+        {/if}
+        <!-- grips last : an item drawn after another one covered its label -->
+        {#each shown as it (it.id)}
             {@const b = itemExtent(it)}
             {@const u = mmPerPx}
-            {@const label = it.name.length > 18 ? `${it.name.slice(0, 17)}...` : it.name}
-            {@const gw = Math.max(90, label.length * 8 + 20) * u}
+            {@const grip = grips.get(it.id) ?? gripLabel(it.name, Infinity)}
+            {@const label = grip.text}
+            {@const gw = grip.px * u}
             {@const mid = (b.x0 + b.x1) / 2}
             <g
-                class="grip" class:selected={selected}
+                class="grip" class:selected={sel !== null && sel.item === it.id}
                 role="button" tabindex="-1" aria-label={`Déplacer ${it.name}`}
                 onpointerdown={(e) => startItemDrag(e, it)}
             >
@@ -474,30 +523,34 @@
                 <text x={mid} y={-(b.y1 + 15 * u)} text-anchor="middle" font-size={13 * u}>{label}</text>
             </g>
         {/each}
-        {#if project.screen !== null && app.wall === "back"}
-            {@const sc = project.screen}
-            {@const size = screenSize(sc)}
-            <rect x={sc.cx - size.w / 2} y={-(sc.bottom + size.h)} width={size.w} height={size.h} class="screen" />
-        {/if}
     </svg>
+    </div>
 </div>
 
 <style>
     .facade
     {
-        position: relative;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
         width: 100%;
         height: 100%;
     }
 
+    /* a row of its own above the drawing : laid over it, it hid the labels of the top items */
     .facade-tools
     {
-        position: absolute;
-        top: var(--spacing-xs);
-        right: var(--spacing-xs);
         display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
         gap: var(--spacing-2xs);
-        z-index: var(--z-sticky);
+        padding: var(--spacing-2xs) var(--spacing-xs);
+    }
+
+    .drawing
+    {
+        min-height: 0;
+        min-width: 0;
     }
 
 

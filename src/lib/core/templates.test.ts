@@ -46,21 +46,32 @@ describe("the sketch templates", () =>
         expect(hw.get("760H4800S")).toBe(3);
     });
 
-    it("gives the TV wall its quarter round batten end, one door per zone and its two oak shelves", () =>
+    it("gives the TV wall an open quarter round, a cable hole, one door per zone and its two oak shelves", () =>
     {
         const p = tvWall();
         const a = analyse(p);
-        const battens: Part[] = [];
+        const base = p.items[0]!;
+        const end: Part[] = [];
         for (const q of a.build.parts)
         {
-            if (q.role === "batten")
+            if (q.role === "batten" || q.id.includes("/end/right/"))
             {
-                battens.push(q);
+                end.push(q);
             }
         }
-        expect(battens).toHaveLength(1);
-        // radius 300 in 392 of usable depth : a quarter on the mid line of 20 mm battens, 92 of flat run, 30 pitch
-        expect(battens[0]!.quantity).toBe(Math.floor((Math.PI / 2 * (300 - 20 / 2) + 92 + 10) / 30));
+        // no skin left : the two end panels and one shaped shelf, all 300 out to the radius
+        expect(end.map((q) =>
+        {
+            return q.label;
+        }).sort()).toEqual(["Bout arrondi droit, flasque basse", "Bout arrondi droit, flasque haute",
+                            "Bout arrondi droit, tablette 1"]);
+        // the 60 hole in the middle of the lower left cell : 19 + 627 / 2 across, 19 + 224 / 2 up
+        const back = a.build.parts.find((q) =>
+        {
+            return q.id === `${base.id}/back`;
+        })!;
+        expect(back.cutouts).toHaveLength(1);
+        expect(back.cutouts[0]!.segments[0]).toMatchObject({ kind: "arc", cx: 19 + 627 / 2, cy: 19 + 224 / 2 });
         // four doors of two hinges, none of the small ones of the save lfet
         const hw = hardwareCount(tvWall);
         expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(4 * 2);

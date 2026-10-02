@@ -28,10 +28,12 @@ export function tvWall(): Project
     const project = newProject("Composition TV et bibliothèque");
 
     // four columns of 627 : a door before an adjustable shelf, two pairs of drawers, a door again
-    const leftDoor = split("h", [224], [cell(), cell()], ["adjustable"]);
+    const cables = cell();
+    const leftDoor = split("h", [224], [cables, cell()], ["adjustable"]);
     const drawersA = cell();
     const drawersB = cell();
     const rightDoor = split("h", [224], [cell(), cell()], ["adjustable"]);
+    // the quarter round end left open, one shaped shelf parting its 500 of height in two
     const baseUnit = newCarcass({
         name: "Meuble bas",
         width: 2600, height: 500, depth: 400, x: 0, y: 100, z: 0,
@@ -40,9 +42,12 @@ export function tvWall(): Project
         ends: {
             left: { type: "square" },
             right: { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
-                     battens: DEFAULT_BATTENS, decor: OAK },
+                     battens: DEFAULT_BATTENS, decor: OAK, open: true, shelves: 1 },
         },
     });
+    // a 60 mm hole through the back of the lower left cell for the cables, to set from the grommet bought
+    baseUnit.outlets.push({ id: newId("o"), cell: cables.id, panel: "back", shape: "round", w: 60, h: 60, dx: 0,
+                            dy: 0 });
     baseUnit.fronts.push(
         newFront(leftDoor.id, { type: "door", hinge: "left" }, { decor: GREEN }),
         newFront(drawersA.id, { type: "drawers", count: 2, loadKg: 15 }, { decor: GREEN }),
@@ -80,8 +85,8 @@ export function tvWall(): Project
 
 
 // Their dresser, as their sketch wants it : a wide niche no row of columns can give, their sides would cut it
-// A full height column at each end, three carcasses stacked between them, 2256 high on a 100 plinth
-// TODO the niche and the end columns are read off the sketch proportions, to set from the parents' measures
+// A full height column at each end, three carcasses stacked between them
+// TODO the end column widths and every split are read off the sketch, their save only gives the envelope
 export function dresser(): Project
 {
     const project = newProject("Vaisselier bibliothèque");

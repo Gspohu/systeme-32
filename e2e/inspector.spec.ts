@@ -115,6 +115,8 @@ test.describe("inspector", () =>
         await page.locator(".inspector-body").getByRole("checkbox", { name: "Ouvert", exact: true }).check();
         await setField(page, "Tablettes", "3");
         expect(await errorCount(page)).toBe(0);
+        // the front view draws the open end board by board, no batten skin left over it
+        await expect(page.locator(".end-board")).toHaveCount(5);
         await outputsTab(page, "Débit");
         // the shelves and the end panels share their outline : one line of the cut list, five pieces
         const row = page.locator(".tab-content tbody tr", { hasText: "Bout arrondi gauche, flasque basse" });

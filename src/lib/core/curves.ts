@@ -80,6 +80,22 @@ function skinParts(
 }
 
 
+// Undersides of the shaped boards of an open end above the carcass bottom : both end panels, then the shelves
+// evenly spread between them
+export function openEndLevels(c: Carcass, end: Extract<End, { type: "rounded" }>): number[]
+{
+    const board = c.thickness;
+    const shelves = Math.max(0, Math.round(end.shelves ?? 2));
+    const gap = (c.height - 2 * board - shelves * board) / (shelves + 1);
+    const levels = [0, c.height - board];
+    for (let k = 1; k <= shelves; k++)
+    {
+        levels.push(board + k * gap + (k - 1) * board);
+    }
+    return levels;
+}
+
+
 export function buildEnds(c: Carcass, b: Build): void
 {
     for (const side of ["left", "right"] as const)
@@ -128,13 +144,12 @@ export function buildEnds(c: Carcass, b: Build): void
             { y: c.y + c.height - board, label: "Flasque haute", role: "endPanel" },
         ];
         // TODO an open end's shelves hang off the side, the deflection check knows shelves on two supports only
-        const shelves = open ? Math.max(0, Math.round(end.shelves ?? 2)) : 0;
-        const gap = (c.height - 2 * board - shelves * board) / (shelves + 1);
+        const shelfLevels = open ? openEndLevels(c, end).slice(2) : [];
         let k = 1;
-        while (k <= (open ? shelves : formers))
+        while (k <= (open ? shelfLevels.length : formers))
         {
             levels.push(open
-                ? { y: c.y + board + k * gap + (k - 1) * board, label: `Tablette ${k}`, role: "endPanel" }
+                ? { y: c.y + shelfLevels[k - 1]!, label: `Tablette ${k}`, role: "endPanel" }
                 : { y: c.y + (c.height - board) * k / (formers + 1), label: `Gabarit ${k}`, role: "former" });
             k++;
         }
