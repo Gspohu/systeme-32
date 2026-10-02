@@ -225,7 +225,7 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         face.part.holes.push(hole(face.part, y - face.uOrigin));
         return;
     }
-    // double doors meet in the middle : the unit goes into the front edge of the panel above
+    // double doors meet in the middle : the unit fit into the front edge of the panel above
     let above: Part | undefined;
     for (const p of b.parts)
     {
@@ -233,7 +233,7 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         {
             continue;
         }
-        const level = p.role === "top" ? nb.y + nb.h : nb.y + nb.h + c.thickness;
+        const level = p.role === "top" ? nb.y + nb.h : nb.y + nb.h + p.thickness;
         if ((p.role === "top" || p.role === "hdivider") && Math.abs(p.frame.o[1] - c.y - level) < 0.01)
         {
             above = p;

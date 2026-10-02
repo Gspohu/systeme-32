@@ -22,6 +22,7 @@ const PIN_BELOW_SHELF = 4;
 const PIN_SPARE_HOLES = 3;
 // anti-tip brackets : one central up to 500 wide, else 100 to 150 from each end (Furnica guide)
 // no more than 800 apart and 20 from the back edge of the top (convention)
+// TODO the 800 and the 20 are workshop habits, no maker figure read for them yet
 const ANTI_TIP_SINGLE_MAX_WIDTH = 500;
 const ANTI_TIP_INSET = 120;
 const ANTI_TIP_MAX_SPACING = 800;
@@ -146,7 +147,7 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
                              + "publiée pour ce support" : `charge d'essai ${loadKg.toFixed(1)} kg` });
         const node = { id: d.split, kind: "cell" as const, parent: null, x: d.x, y: d.y, w: d.w, h: d.h,
                       left: "outer" as const, right: "outer" as const, bottom: "outer" as const,
-                      top: "outer" as const };
+                      top: "outer" as const, walls: { left: c.thickness, right: c.thickness, bottom: d.h, top: d.h } };
         const yPin = d.y - PIN_BELOW_SHELF;
         const rows = [37, c.depth - lay.zBack - 37];
         for (const side of ["left", "right"] as const)
@@ -166,6 +167,70 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
                                           label: k === 0 ? `Taquet ${sup.ref}` : `Réglage étagère ${DIAM}5` });
                 }
                 k++;
+            }
+        }
+    }
+}
+
+
+// A modular cell has a pin hole at every height a shelf may rest on : under each grid position, as long as
+// a shelf still fits below the top of the cell
+export function fitModularRows(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
+{
+    const shelf = c.shelfThickness ?? c.thickness;
+    const rows = [37, c.depth - lay.zBack - 37];
+    for (const id of c.modularCells)
+    {
+        const nb = lay.nodes.get(id);
+        if (nb === undefined || nb.kind !== "cell")
+        {
+            continue;
+        }
+        if (s.grid <= 0)
+        {
+            b.errors.push(`${c.name} : une case modulable se perce au pas de la grille, réglée à 0. Rétablir la grille.`);
+            continue;
+        }
+        const ys: number[] = [];
+        let n = Math.ceil((nb.y - lay.inner.y) / s.grid);
+        while (lay.inner.y + n * s.grid + shelf <= nb.y + nb.h)
+        {
+            const pin = lay.inner.y + n * s.grid - PIN_BELOW_SHELF;
+            if (pin - 5 / 2 > nb.y)
+            {
+                ys.push(pin);
+            }
+            n++;
+        }
+        for (const side of ["left", "right"] as const)
+        {
+            const face = sideFace(c, lay, b, nb, side);
+            if (face === null)
+            {
+                b.errors.push(`${c.name} : case modulable sans paroi pleine hauteur à ${side === "left" ? "gauche"
+                    : "droite"}, la série n'y est pas percée. Prolonger le montant ou décocher la case.`);
+                continue;
+            }
+            for (const y of ys)
+            {
+                for (const v of rows)
+                {
+                    const u = y - face.uOrigin;
+                    const drilled = face.part.holes.some((h) =>
+                    {
+                        return h.face === face.face && Math.abs(h.u - u) < 0.01 && Math.abs(h.v - v) < 0.01;
+                    });
+                    if (!drilled)
+                    {
+                        face.part.holes.push({ u, v, diameter: 5, depth: s.pinDepth, face: face.face,
+                                               label: `Série ${DIAM}5, case modulable` });
+                    }
+                }
+            }
+            const note = `Série de trous ${DIAM}5 au pas de ${s.grid} (case modulable)`;
+            if (!face.part.notes.includes(note))
+            {
+                face.part.notes.push(note);
             }
         }
     }

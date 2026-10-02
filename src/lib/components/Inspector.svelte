@@ -4,13 +4,15 @@
     import PhotoPicker from "./PhotoPicker.svelte";
     import { slatLayout } from "../core/slats";
     import {
-        removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, moveFront, splitCell, removeDivider,
-        moveDivider, setDividerKind, setDividerFinish, setLining, setRail, setLight, setEnd, setShoeRack, toSliding, toDoor,
+        removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, mergeFronts, splitFront, splitCell,
+        removeDivider,
+        moveDivider, setDividerKind, setDividerFinish, setDividerThickness, setLining, setRail, setLight, setEnd,
+        setShoeRack, setModularCell, toSliding, toDoor,
     } from "../core/commands";
     import { byId } from "../core/edit";
     import { MIN_CELL, findNode, findParent } from "../core/layout";
     import { topAngle } from "../core/slope";
-    import { DECORS, MATERIALS, decorById } from "../data/materials";
+    import { BOARD_THICKNESSES, DECORS, MATERIALS, decorById } from "../data/materials";
     import { HARDWARE } from "../data/hardware";
     import { DEFAULT_BATTENS } from "../core/factory";
     import { PANEL_MARGIN } from "../core/cutouts";
@@ -389,6 +391,17 @@
                                                        { ...finish, colour: str(e) })} />
                     </label>
                 {/if}
+                {#if sp.axis === "h" && (finish === null || decorById(finish.decor).thickness === undefined)}
+                    {@const own = sp.thicknesses[sel.index] ?? null}
+                    <label class="field"><span class="label">Épaisseur</span>
+                        <select class="select" value={own === null ? "" : String(own)}
+                            onchange={(e) => app.apply(setDividerThickness, carcass.id, sp.id, sel.index,
+                                                       str(e) === "" ? null : Number(str(e)))}>
+                            <option value="">Comme le caisson ({carcass.shelfThickness ?? carcass.thickness} mm)</option>
+                            {#each BOARD_THICKNESSES as t}<option value={String(t)}>{t} mm</option>{/each}
+                        </select>
+                    </label>
+                {/if}
                 <div class="row">
                     <button class="btn btn-danger" onclick={() =>
                     {
@@ -470,6 +483,11 @@
                             onclick={() => app.apply(setRail, carcass.id, nodeBox.id, true, "lift")}>Ascenseur</button>
                     </div>
                 {/if}
+                <label class="form-check" title="Côtés percés sur toute la hauteur au pas de 32, pour poser des étagères plus tard">
+                    <input type="checkbox" checked={carcass.modularCells.includes(nodeBox.id)}
+                        onchange={(e) => app.apply(setModularCell, carcass.id, nodeBox.id, checked(e))} />
+                    Case modulable
+                </label>
                 {@const shoes = carcass.shoeRacks.find((s) => { return s.cell === nodeBox.id; }) ?? null}
                 <label class="field" title="Range-chaussures Häfele vissés au fond, répartis sur la hauteur, 0 pour aucun">
                     <span class="label">Chaussures</span>
@@ -636,9 +654,16 @@
                 </label>
             {/if}
             <div class="row">
-                {#if parentId !== null}
-                    <button class="btn btn-secondary" title="La façade couvre la zone qui englobe sa case"
-                        onclick={() => app.apply(moveFront, carcass.id, front.id, carcass.id, parentId)}>Étendre</button>
+                {#if parentId !== null && front.spec.type !== "drawers"}
+                    <button class="btn btn-secondary" title="Une seule façade pour la case et ses voisines"
+                        onclick={() => app.apply(mergeFronts, carcass.id, front.id)}>
+                        {front.spec.type === "door" || front.spec.type === "doubleDoor" ? "Porte unique" : "Réunir"}</button>
+                {/if}
+                {#if findNode(carcass.root, front.node)?.kind === "split"}
+                    <button class="btn btn-secondary" title="Une façade identique sur chaque case de la zone"
+                        onclick={() => app.apply(splitFront, carcass.id, front.id)}>
+                        {front.spec.type === "door" || front.spec.type === "doubleDoor" ? "Une porte par case"
+                            : "Une par case"}</button>
                 {/if}
                 <button class="btn btn-danger" onclick={() =>
                 {
@@ -697,7 +722,15 @@
             <label class="field"><span class="label">Épaisseur</span>
                 <select class="select" value={String(carcass.thickness)}
                     onchange={(e) => patch({ thickness: Number(str(e)) } as Partial<Carcass>)}>
-                    {#each [16, 19, 22] as t}<option value={String(t)}>{t} mm</option>{/each}
+                    {#each BOARD_THICKNESSES as t}<option value={String(t)}>{t} mm</option>{/each}
+                </select>
+            </label>
+            <label class="field"><span class="label">Tablettes</span>
+                <select class="select" value={carcass.shelfThickness === null ? "" : String(carcass.shelfThickness)}
+                    onchange={(e) => patch({ shelfThickness: str(e) === "" ? null
+                        : Number(str(e)) } as Partial<Carcass>)}>
+                    <option value="">Comme les côtés</option>
+                    {#each BOARD_THICKNESSES as t}<option value={String(t)}>{t} mm</option>{/each}
                 </select>
             </label>
             <label class="field"><span class="label">X / Y / Z</span>
@@ -906,6 +939,13 @@
                 <input class="input" type="number" value={w.depth}
                     onchange={(e) => patch({ depth: num(e) } as Partial<Item>)} />
             </label>
+            {#if w.kind === "wallShelf"}
+                <!-- the top stays where it was, the board grows downwards -->
+                <label class="field"><span class="label">Épaisseur</span>
+                    <input class="input" type="number" min="8" step="1" value={w.thickness}
+                        onchange={(e) => patch({ thickness: num(e), y: w.y + w.thickness - num(e) } as Partial<Item>)} />
+                </label>
+            {/if}
             <label class="field"><span class="label">Décor</span>
                 <select class="select" value={w.decor} onchange={(e) => patch({ decor: str(e) } as Partial<Item>)}>
                     {#each panelDecors as d}<option value={d.id}>{d.ref} {d.label}</option>{/each}

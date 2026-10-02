@@ -30,7 +30,7 @@ export function split(axis: "h" | "v", cuts: number[], children: LayoutNode[], d
 {
     const kinds = dividers ?? new Array<DividerKind>(cuts.length).fill("fixed");
     return { kind: "split", id: newId("s"), axis, cuts, dividers: kinds, finishes: new Array(cuts.length).fill(null),
-             children };
+             thicknesses: new Array(cuts.length).fill(null), children };
 }
 
 
@@ -48,6 +48,7 @@ export function newCarcass(o: Partial<Carcass> & { width: number; height: number
         y: 100,
         z: 0,
         thickness: 19,
+        shelfThickness: null,
         decor: "W1000_ST9",
         base: { type: "plinth", height: 100, setback: 50 },
         back: { type: "applied", thickness: 8 },
@@ -63,6 +64,7 @@ export function newCarcass(o: Partial<Carcass> & { width: number; height: number
         lights: [],
         ceilingFiller: false,
         shoeRacks: [],
+        modularCells: [],
         ...o,
     };
 }
@@ -120,7 +122,7 @@ export function newSlats(o: Partial<SlatWall>): SlatWall
 }
 
 
-// Every size here is a starting value to set from the chosen ladder's sheet
+// Every size here need setting from the chosen ladder's sheet, a starting value only
 export function newLadder(o: Partial<LadderRail>): LadderRail
 {
     return { kind: "ladder", id: newId("e"), name: "Échelle sur rail", wall: "back", x: 0, y: 2000, z: 400, width: 2400,

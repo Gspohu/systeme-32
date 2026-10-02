@@ -47,7 +47,7 @@ export function pickMechanism(lf: number): (typeof HK_TOP.mechanisms)[number] | 
 }
 
 
-// Height the open flap reaces above the top face of the panel it hangs under
+// Height the poen flap rise above the top face of the panel it hangs under
 export function flapClearance(fp: FrontPanel, panelAbove: number): number
 {
     return fp.rect.h * HK_TOP.clearanceFactor + fp.thickness - panelAbove;
@@ -62,7 +62,6 @@ function touchesTop(nb: NodeBox, cell: NodeBox): boolean
 
 export function fitLifts(c: Carcass, lay: ResolvedLayout, b: Build): void
 {
-    const t = c.thickness;
     for (const fp of b.fronts.get(c.id) ?? [])
     {
         if (fp.role !== "flap")
@@ -194,7 +193,7 @@ export function fitLifts(c: Carcass, lay: ResolvedLayout, b: Build): void
                 face.part.notes.push(text);
             }
         }
-        const lift = flapClearance(fp, t);
+        const lift = flapClearance(fp, nb.walls.top);  
         part.notes.push(`Ouvert, l'abattant monte à ${Math.round(lift)} mm au-dessus du panneau du haut (Blum p. 46)`);
     }
 }
@@ -204,11 +203,11 @@ export function fitLifts(c: Carcass, lay: ResolvedLayout, b: Build): void
 export function swingBox(c: Carcass, fp: FrontPanel, lay: ResolvedLayout): Box3
 {
     const nb = lay.nodes.get(fp.node)!;
-    const topFace = c.y + nb.y + nb.h + c.thickness;
+    const topFace = c.y + nb.y + nb.h + nb.walls.top;   
     const front = c.z + c.depth + fp.thickness;
     return {
         min: [c.x + fp.rect.x, c.y + fp.rect.y, front],
-        max: [c.x + fp.rect.x + fp.rect.w, topFace + flapClearance(fp, c.thickness), front + fp.rect.h],
+        max: [c.x + fp.rect.x + fp.rect.w, topFace + flapClearance(fp, nb.walls.top), front + fp.rect.h],  
     };
 }
 

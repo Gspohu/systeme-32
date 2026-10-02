@@ -14,6 +14,15 @@ export interface Rect
 // What stands on each side of a node : the carcass shell or a divider shared with a negihbour
 export type Boundary = "outer" | "divider";
 
+// thickness of the panel bounding a node on each side, shell or divider
+export interface Walls
+{
+    left: number;
+    right: number;
+    bottom: number;
+    top: number;
+}
+
 export interface NodeBox extends Rect
 {
     id: string;
@@ -23,6 +32,7 @@ export interface NodeBox extends Rect
     right: Boundary;
     bottom: Boundary;
     top: Boundary;
+    walls: Walls;
 }
 
 export interface DividerBox extends Rect
@@ -65,6 +75,19 @@ export function innerDepthStart(back: BackMount): number
 }
 
 
+// A shelf has its own thickness, else the one of the carcass shelves, else the one of the sides
+// an upright always stay as thick as the sides
+// TODO an upright of its own thickness is not offered yet
+export function dividerThickness(c: Carcass, axis: "h" | "v", own: number | null): number
+{
+    if (axis === "v")
+    {
+        return c.thickness;
+    }
+    return own ?? c.shelfThickness ?? c.thickness;
+}
+
+
 export function resolveLayout(c: Carcass): ResolvedLayout
 {
     const t = c.thickness;
@@ -82,7 +105,8 @@ export function resolveLayout(c: Carcass): ResolvedLayout
         out.errors.push(`Caisson "${c.name}" trop petit pour son épaisseur de panneau.`);
         return out;
     }
-    walk(c.root, inner, null, { left: "outer", right: "outer", bottom: "outer", top: "outer" }, t, out);
+    walk(c.root, inner, null, { left: "outer", right: "outer", bottom: "outer", top: "outer",
+                                walls: { left: t, right: t, bottom: t, top: t } }, c, out);
     return out;
 }
 
@@ -93,16 +117,21 @@ interface Sides
     right: Boundary;
     bottom: Boundary;
     top: Boundary;
+    walls: Walls;
 }
 
-function walk(node: LayoutNode, r: Rect, parent: string | null, sides: Sides, t: number, out: ResolvedLayout): void
+function walk(node: LayoutNode, r: Rect, parent: string | null, sides: Sides, c: Carcass, out: ResolvedLayout): void
 {
     out.nodes.set(node.id, { id: node.id, kind: node.kind, parent, ...r, ...sides });
     if (node.kind === "cell")
     {
         return;
     }
-    const spans = childSpans(node, r, t, out);
+    const thick = node.cuts.map((_, k) =>
+    {
+        return dividerThickness(c, node.axis, node.thicknesses[k] ?? null);
+    });
+    const spans = childSpans(node, r, thick, out);
     let i = 0;
     while (i < node.children.length)
     {
@@ -120,6 +149,8 @@ function walk(node: LayoutNode, r: Rect, parent: string | null, sides: Sides, t:
                 right: sides.right,
                 bottom: first ? sides.bottom : "divider",
                 top: last ? sides.top : "divider",
+                walls: { ...sides.walls, bottom: first ? sides.walls.bottom : thick[i - 1]!,
+                         top: last ? sides.walls.top : thick[i]! },
             };
         }
         else
@@ -130,15 +161,17 @@ function walk(node: LayoutNode, r: Rect, parent: string | null, sides: Sides, t:
                 right: last ? sides.right : "divider",
                 bottom: sides.bottom,
                 top: sides.top,
+                walls: { ...sides.walls, left: first ? sides.walls.left : thick[i - 1]!,
+                         right: last ? sides.walls.right : thick[i]! },
             };
         }
-        walk(child, cr, node.id, cs, t, out);
+        walk(child, cr, node.id, cs, c, out);
         i++;
     }
 }
 
 
-function childSpans(node: SplitNode, r: Rect, t: number, out: ResolvedLayout): { start: number; end: number }[]
+function childSpans(node: SplitNode, r: Rect, thick: number[], out: ResolvedLayout): { start: number; end: number }[]
 {
     const origin = node.axis === "h" ? r.y : r.x;
     const length = node.axis === "h" ? r.h : r.w;
@@ -160,6 +193,7 @@ function childSpans(node: SplitNode, r: Rect, t: number, out: ResolvedLayout): {
         }
         spans.push({ start: cursor, end: start });
         const finish = node.finishes[k] ?? null;
+        const t = thick[k]!;
         const d: DividerBox = node.axis === "h"
             ? { id: `${node.id}:${k}`, split: node.id, index: k, axis: "h", kind: node.dividers[k] ?? "fixed", 
                finish, x: r.x, y: start, w: r.w, h: t }

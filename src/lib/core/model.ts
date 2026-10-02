@@ -1,6 +1,6 @@
 // Project data model, all lengths in millimetres, pure data with no behavour
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export type Id = string;
 
@@ -84,6 +84,8 @@ export interface SplitNode
     dividers: DividerKind[];
     // own finish of each divider, null takes the carcass decor
     finishes: (Finish | null)[];
+    // own thickness of each shelf, null takes the shelf thickness of the carcass, an upright never has one
+    thicknesses: (number | null)[];
     children: LayoutNode[];
 }
 
@@ -230,6 +232,8 @@ export interface Carcass
     height: number;
     depth: number;
     thickness: number;
+    // thickness of the shelves, null for the one of the sides
+    shelfThickness: number | null;
     decor: string;
     base: Base;
     back: BackMount;
@@ -248,6 +252,8 @@ export interface Carcass
     // strip closing the gap from the top to the ceiling, in the plane of the fronts
     ceilingFiller: boolean;
     shoeRacks: ShoeRack[];
+    // cells drilled over their whole hieght on the 32 mm grid, for shelves moved later
+    modularCells: Id[];
 }
 
 // Shoe racks screwed to the back of a cell, levels spread evenly from its floor
@@ -327,6 +333,7 @@ export interface WallShelf
     z: number;
     width: number;
     depth: number;
+    // TODO no concealed bracket is sourced yet, the least thickness it needs is unknown
     thickness: number;
     decor: string;
     // a desk top is checked for its height and the room left for the legs

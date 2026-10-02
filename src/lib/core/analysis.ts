@@ -5,7 +5,8 @@ import { type Build, buildCarcass, emptyBuild } from "./parts";
 import { buildBox, buildWallShelf } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
 import { buildDrawers } from "./drawers";
-import { antiTipPositions, fitBase, fitJoints, fitShelfPins, fitSliding, fitWallFixing, partMass } from "./fittings";
+import { antiTipPositions, fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, fitWallFixing,
+    partMass } from "./fittings";
 import { fitDoors } from "./doors";
 import { fitLifts, liftChecks } from "./lifts";
 import { cornerChecks } from "./corner";
@@ -69,6 +70,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         fitPanels(it, b);
         fitSliding(it, lay, s, b);
         fitShelfPins(it, lay, s, b);
+        fitModularRows(it, lay, s, b);
         const clothes = buildRails(it, lay, b);
         buildLights(it, lay, s, b);
         buildShoeRacks(it, lay, b);

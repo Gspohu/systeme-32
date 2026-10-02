@@ -47,13 +47,13 @@ function edgeOffset(boundary: "outer" | "divider", t: number, s: Settings, mount
 }
 
 
-export function frontOuterRect(nb: NodeBox, c: Carcass, s: Settings, mount: Front["mount"]): Rect
+export function frontOuterRect(nb: NodeBox, s: Settings, mount: Front["mount"]): Rect
 {
-    const t = c.thickness;
-    const l = edgeOffset(nb.left, t, s, mount);
-    const r = edgeOffset(nb.right, t, s, mount);
-    const b = edgeOffset(nb.bottom, t, s, mount);
-    const tp = edgeOffset(nb.top, t, s, mount);
+    // a thicker shelf need half of its own thickness covered, not half of the sides
+    const l = edgeOffset(nb.left, nb.walls.left, s, mount);
+    const r = edgeOffset(nb.right, nb.walls.right, s, mount);
+    const b = edgeOffset(nb.bottom, nb.walls.bottom, s, mount);
+    const tp = edgeOffset(nb.top, nb.walls.top, s, mount);
     return { x: nb.x - l, y: nb.y - b, w: nb.w + l + r, h: nb.h + b + tp };
 }
 
@@ -80,7 +80,7 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings): Front
         {
             continue;
         }
-        const outer = frontOuterRect(nb, c, s, front.mount);
+        const outer = frontOuterRect(nb, s, front.mount);
         const z = front.mount === "inset" ? c.depth - ft : c.depth;
         const base = { front: front.id, node: front.node, z, thickness: ft, decor: front.decor ?? c.decor };
         const spec = front.spec;

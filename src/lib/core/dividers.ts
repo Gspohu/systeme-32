@@ -24,8 +24,9 @@ export function buildDividers(c: Carcass, lay: ResolvedLayout, s: Settings, b: B
     for (const div of lay.dividers)
     {
         rank++;
-        // a divider of its own finish, else the carcass decor
-        const look = { item: c.id, itemName: c.name, thickness: thick, decor: div.finish?.decor ?? c.decor,
+        // a divider of its own finish, else the carcass decor : a shelf is as thick as the layout made it's slot
+        const look = { item: c.id, itemName: c.name, thickness: div.axis === "h" ? div.h : thick,
+                       decor: div.finish?.decor ?? c.decor,
                        colour: div.finish?.colour ?? null };
         if (decorById(look.decor).thickness !== undefined && (div.axis === "v" || div.kind === "fixed"))
         {
@@ -58,7 +59,7 @@ export function buildDividers(c: Carcass, lay: ResolvedLayout, s: Settings, b: B
                 ...look,
                 id: `${c.id}/div/${div.id}`, label: `Tablette fixe ${rank}`, role: "hdivider",
                 length: div.w, width: depth - zs, edges: ["v0"],
-                frame: { o: [ox + div.x, oy + div.y + thick, oz + depth], u: X, v: neg(Z), n: neg(Y) },
+                frame: { o: [ox + div.x, oy + div.y + div.h, oz + depth], u: X, v: neg(Z), n: neg(Y) },
             });
             b.parts.push(part);
             attachEnds(c, lay, part, div, "h", b);
@@ -67,14 +68,14 @@ export function buildDividers(c: Carcass, lay: ResolvedLayout, s: Settings, b: B
         {
             const clear = s.shelfSideClearance;
             const front = oz + depth - s.shelfFrontSetback;
-            // a glass shelf keeps its own thickness and rests on the underside of the slot the layout gives it
+            // a glass shelf keeps its own thickness and rests on the underside of the slot the layout give it
             const glass = decorById(look.decor).thickness;
             const part = newPart({
-                ...look, thickness: glass ?? thick,
+                ...look, thickness: glass ?? div.h,
                 id: `${c.id}/div/${div.id}`, label: `Étagère ${glass === undefined ? "" : "en verre "}réglable ${rank}`,
                 role: "shelf", length: div.w - 2 * clear, width: depth - zs - s.shelfFrontSetback,
                 edges: glass === undefined ? ["v0"] : [],
-                frame: { o: [ox + div.x + clear, oy + div.y + (glass ?? thick), front], u: X, v: neg(Z), n: neg(Y) },
+                frame: { o: [ox + div.x + clear, oy + div.y + (glass ?? div.h), front], u: X, v: neg(Z), n: neg(Y) },
             });
             part.notes.push(glass === undefined ? `Posée sur 4 taquets ${DIAM}5, jeu latéral ${clear} mm par côté`
                 : `Verre trempé à commander au miroitier, chants polis, posé sur 4 supports pour verre, jeu latéral ${clear} mm`);
@@ -125,13 +126,13 @@ function attachEnds(c: Carcass, lay: ResolvedLayout, part: Part,
         : panelAtX(c, lay, d.x + d.w, d.y, b, "right");
     if (leftP !== undefined)
     {
-        const line = d.y + t / 2 - panelStartY(leftP, c);
+        const line = d.y + d.h / 2 - panelStartY(leftP, c);
         b.joints.push({ edgePart: part.id, edge: "u0", facePart: leftP.id, face: leftP.role === "side" ? "A" : "B",
                        lineAxis: "u", line, from: 0, to: depth, edgeFrom: 0, reversed: false });
     }
     if (rightP !== undefined)
     {
-        const line = d.y + t / 2 - panelStartY(rightP, c);
+        const line = d.y + d.h / 2 - panelStartY(rightP, c);
         b.joints.push({ edgePart: part.id, edge: "u1", facePart: rightP.id, face: "A", lineAxis: "u", line, from: 0,
                        to: depth, edgeFrom: 0, reversed: false });
     }
@@ -154,10 +155,9 @@ function panelStartY(p: Part, c: Carcass): number
 export function panelAtY(c: Carcass, lay: ResolvedLayout, y: number, x: number, b: Build,
     where: "below" | "above"): Part | undefined
 {
-    const t = c.thickness;
     for (const q of lay.dividers)
     {
-        const face = where === "below" ? q.y + t : q.y;
+        const face = where === "below" ? q.y + q.h : q.y;
         if (q.axis === "h" && q.kind === "fixed" && x >= q.x - TOUCH && x <= q.x + q.w + TOUCH
             && Math.abs(face - y) < TOUCH)
         {

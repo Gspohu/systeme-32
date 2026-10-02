@@ -147,6 +147,10 @@ export const MATERIALS: Record<string, BoardMaterial> = {
     [GLASS.id]: GLASS,
 };
 
+// Thicknesses offered for carcasses, shelves and wall shelves, the analysis tells when a material is not
+// verifed in one of them
+export const BOARD_THICKNESSES = [16, 19, 22];
+
 
 export interface Decor
 {

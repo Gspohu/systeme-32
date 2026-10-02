@@ -113,6 +113,53 @@ export function moveFront(p: Project, fromCarcass: string, frontId: string, toCa
 }
 
 
+// One front over the whole zone around its cell : the fronts of the neighbouring cells give way to it
+export function mergeFronts(p: Project, carcassId: string, frontId: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const f = byId(c.fronts, frontId);
+        const parent = f === undefined ? null : findParent(c.root, f.node);
+        if (f === undefined || parent === null)
+        {
+            throw new CommandError("Cette façade couvre déjà tout le caisson.");
+        }
+        if (f.spec.type === "drawers")
+        {
+            throw new CommandError("Des tiroirs se posent dans une case sans séparation intérieure.");
+        }
+        const zone = new Set(subtreeIds(parent));
+        c.fronts = c.fronts.filter((o) =>
+        {
+            return o.id === f.id || !zone.has(o.node);
+        });
+        f.node = parent.id;
+    });
+}
+
+
+// The front of a split zone becomes one front per part of the zone, alike
+export function splitFront(p: Project, carcassId: string, frontId: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const f = byId(c.fronts, frontId);
+        const node = f === undefined ? null : findNode(c.root, f.node);
+        if (f === undefined || node === null || node.kind !== "split")
+        {
+            throw new CommandError("Cette façade ne couvre qu'une case.");
+        }
+        c.fronts = withoutId(c.fronts, f.id);
+        for (const child of node.children)
+        {
+            c.fronts.push({ ...structuredClone(f), id: newId("f"), node: child.id });
+        }
+    });
+}
+
+
 // Door to one track sliding leaf covering half the opening : the SlideLine M overlay case
 export function toSliding(p: Project, carcassId: string, frontId: string): Project
 {
@@ -224,6 +271,25 @@ export function setShoeRack(p: Project, carcassId: string, cellId: string, level
         if (levels > 0)
         {
             c.shoeRacks.push({ id: newId("h"), cell: cellId, levels });
+        }
+    });
+}
+
+
+// A modular cell is drilled over its whole height, shelves are added or moved later without a drill
+export function setModularCell(p: Project, carcassId: string, cellId: string, on: boolean): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        if (findNode(c.root, cellId)?.kind !== "cell")
+        {
+            throw new CommandError("Seule une case se perce en série. Choisir une case sans séparation.");
+        }
+        c.modularCells = c.modularCells.filter((id) => { return id !== cellId; });
+        if (on)
+        {
+            c.modularCells.push(cellId);
         }
     });
 }

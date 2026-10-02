@@ -145,6 +145,31 @@ test.describe("dividers", () =>
     });
 
 
+    test("thickens one shelf, or every shelf of the carcass", async ({ page }) =>
+    {
+        const shelf = page.locator(".facade .split-panel").first();
+        await expect(shelf).toHaveAttribute("height", "19");
+        await field(page, "Épaisseur").selectOption("22");
+        await expect(shelf).toHaveAttribute("height", "22");
+        await field(page, "Épaisseur").selectOption("");
+        await expect(shelf).toHaveAttribute("height", "19");
+        await selectItem(page);
+        await field(page, "Tablettes").selectOption("16");
+        await expect(shelf).toHaveAttribute("height", "16");
+    });
+
+
+    test("drills one cell over its whole height for later shelves, not its neighbour", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await check(page, "Case modulable").check();
+        await cells(page).nth(1).click();
+        await expect(check(page, "Case modulable")).not.toBeChecked();
+        await cells(page).first().click();
+        await expect(check(page, "Case modulable")).toBeChecked();
+    });
+
+
     test("removes a shelf", async ({ page }) =>
     {
         await expect(cells(page)).toHaveCount(2);   

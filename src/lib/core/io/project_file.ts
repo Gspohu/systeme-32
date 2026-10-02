@@ -25,21 +25,21 @@ function need(cond: boolean, msg: string): void
 }
 
 
-// Version 2 gives every divider its own finish, none in a version 1 tree
-function giveFinishes(node: unknown): void
+// Version 2 gives every divider its own finish and version 5 its own thickness, an older tree has none
+function givePerDivider(node: unknown, key: "finishes" | "thicknesses"): void
 {
-    const n = node as { kind?: unknown; cuts?: unknown[]; finishes?: unknown[]; children?: unknown[] };
+    const n = node as { kind?: unknown; cuts?: unknown[]; children?: unknown[] } & Record<string, unknown>;
     if (typeof node !== "object" || node === null || n.kind !== "split")
     {
         return;
     }
-    if (!Array.isArray(n.finishes))
+    if (!Array.isArray(n[key]))
     {
-        n.finishes = new Array((n.cuts ?? []).length).fill(null);
+        n[key] = new Array((n.cuts ?? []).length).fill(null);
     }
     for (const child of n.children ?? [])
     {
-        giveFinishes(child);
+        givePerDivider(child, key);
     }
 }
 
@@ -89,7 +89,7 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
                 const k = it as { rails?: unknown; lights?: unknown };
                 k.rails = k.rails ?? [];
                 k.lights = k.lights ?? [];
-                giveFinishes((it as { root?: unknown }).root);
+                givePerDivider((it as { root?: unknown }).root, "finishes");
                 for (const l of ((it as { linings?: { colour?: unknown }[] }).linings ?? []))
                 {
                     l.colour = l.colour ?? null;
@@ -133,11 +133,26 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
             }
         }
     }
+    if (version < 5 && Array.isArray(raw.items))
+    {
+        // shelves took the thickness of the sides until version 5, and no cell was drilled for later shelves
+        for (const it of raw.items as { kind?: unknown; shelfThickness?: unknown; root?: unknown;
+            modularCells?: unknown }[])
+        {
+            if (it.kind === "carcass")
+            {
+                it.shelfThickness = it.shelfThickness ?? null;
+                it.modularCells = it.modularCells ?? [];
+                givePerDivider(it.root, "thicknesses");
+            }
+        }
+    }
     raw.schema = SCHEMA_VERSION;
     return raw;
 }
 
 
+// TODO only the top of each item is checked, a damaged layout tree inside a carcass passes until the analysis meets it
 export function validateProject(raw: unknown): Project
 {
     need(typeof raw === "object" && raw !== null, "contenu JSON attendu");

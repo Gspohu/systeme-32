@@ -7,9 +7,10 @@ import { CommandError, byId, edit, withoutId } from "./edit";
 
 
 export { CommandError } from "./edit";
-export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish } from "./layout_commands";
-export { setFront, removeFront, updateFront, moveFront, toSliding, toDoor, setLining, setRail, setLight, setEnd,
-         setShoeRack }
+export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish, setDividerThickness }
+    from "./layout_commands";
+export { setFront, removeFront, updateFront, moveFront, mergeFronts, splitFront, toSliding, toDoor, setLining, setRail,
+         setLight, setEnd, setShoeRack, setModularCell }
     from "./front_commands";
 export { historyOf, push, undo, redo, type History } from "./history";
 
@@ -174,7 +175,7 @@ export function setPrice(p: Project, key: string, price: PriceEntry | null): Pro
 }
 
 
-// A photo replces the look of a decor on every panel using it, null gives the decor its own look back
+// A photo replces the look of a decor on every panel using it, a null photo give the decor its own look back
 export function setTexture(p: Project, decor: string, texture: UserTexture | null): Project
 {
     return edit(p, (q) =>

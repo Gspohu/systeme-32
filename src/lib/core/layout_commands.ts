@@ -2,7 +2,7 @@
 
 import type { CellNode, DividerKind, Finish, Front, Project, SplitNode } from "./model";
 import { cell, newId } from "./factory";
-import { MIN_CELL, findNode, findParent, resolveLayout, snap } from "./layout";
+import { MIN_CELL, dividerThickness, findNode, findParent, resolveLayout, snap } from "./layout";
 import { CommandError, carcassOf, edit, prune, replaceNode } from "./edit";
 
 
@@ -42,7 +42,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
         const origin = axis === "h" ? lay.inner.y : lay.inner.x;
         // the lower face of the divider snaps on the grid counted rfom the carcass inner origin
         const local = Math.round(origin + snap(pos - origin, q.settings.grid) - start);
-        if (local < MIN_CELL || length - local - c.thickness < MIN_CELL)
+        if (local < MIN_CELL || length - local - dividerThickness(c, axis, null) < MIN_CELL)
         {
             throw new CommandError(`Case trop petite à cet endroit : ${MIN_CELL} mm mini de part et d'autre de la séparation.`);
         }
@@ -63,7 +63,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
                 c.linings.push({ ...structuredClone(l), id: newId("l"), cell: fresh.id });
             }
         }
-        // rails and lights hang under the panel above : an upright gives each half its own, a shelf hands
+        // rails and lights hang under the panel above : an upright give each half its own, a shelf hands
         // htem up to the upper half, which is always the fresh one
         for (const r of [...c.rails])
         {
@@ -95,6 +95,10 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
                 c.shoeRacks.push({ ...s, id: newId("h"), cell: fresh.id });
             }
         }
+        if (c.modularCells.includes(cellId))
+        {
+            c.modularCells.push(fresh.id);
+        }
         // a cut in the parent's own direction joins its list, unless a front must keep covering the whole cell
         if (parent !== null && parent.axis === axis && onCell.length === 0)
         {
@@ -103,13 +107,14 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
             parent.cuts.splice(k, 0, start + local - parentStart);
             parent.dividers.splice(k, 0, kind);
             parent.finishes.splice(k, 0, null);
+            parent.thicknesses.splice(k, 0, null);
             parent.children.splice(k + 1, 0, fresh);
         }
         else
         {
             const kept: CellNode = { kind: "cell", id: cellId };
             const sp: SplitNode = { kind: "split", id: newId("s"), axis, cuts: [local],
-                                   dividers: [kind], finishes: [null], children: [kept, fresh] };
+                                   dividers: [kind], finishes: [null], thicknesses: [null], children: [kept, fresh] };
             // the cell keeps its id and its lining, a front moves up to cover both halves
             c.root = replaceNode(c.root, cellId, sp);
             for (const f of onCell)
@@ -139,7 +144,8 @@ export function removeDivider(p: Project, carcassId: string, splitId: string, in
         }
         sp.cuts.splice(index, 1);
         sp.dividers.splice(index, 1);
-        sp.finishes.splice(index, 1); 
+        sp.finishes.splice(index, 1);
+        sp.thicknesses.splice(index, 1);
         sp.children.splice(index + 1, 1);
         if (sp.children.length === 1)
         {
@@ -168,14 +174,17 @@ export function moveDivider(p: Project, carcassId: string, splitId: string, inde
         {
             throw new CommandError("Séparation introuvable.");
         }
-        const t = c.thickness;
+        const thick = (k: number): number =>
+        {
+            return dividerThickness(c, sp.axis, sp.thicknesses[k] ?? null);
+        };
         const start = sp.axis === "h" ? nb.y : nb.x;
         const length = sp.axis === "h" ? nb.h : nb.w;
         const origin = sp.axis === "h" ? lay.inner.y : lay.inner.x;
         const local = Math.round(origin + snap(pos - origin, q.settings.grid) - start);
-        const previous = index === 0 ? 0 : sp.cuts[index - 1]! + t;
+        const previous = index === 0 ? 0 : sp.cuts[index - 1]! + thick(index - 1);
         const next = index === sp.cuts.length - 1 ? length : sp.cuts[index + 1]!;
-        if (local - previous < MIN_CELL || next - (local + t) < MIN_CELL)
+        if (local - previous < MIN_CELL || next - (local + thick(index)) < MIN_CELL)
         {
             throw new CommandError(`Déplacement impossible : ${MIN_CELL} mm mini par case.`);
         }
@@ -216,5 +225,33 @@ export function setDividerFinish(p: Project, carcassId: string, splitId: string,
             throw new CommandError("Séparation introuvable.");
         }
         sp.finishes[index] = finish === null ? null : { ...finish };
+    });
+}
+
+
+// Own thickness of one shelf, null gives it the shelf thickness of the carcass back
+export function setDividerThickness(p: Project, carcassId: string, splitId: string, index: number,
+    thickness: number | null): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const sp = findNode(c.root, splitId);
+        if (sp === null || sp.kind !== "split" || index < 0 || index >= sp.cuts.length)
+        {
+            throw new CommandError("Séparation introuvable.");
+        }
+        if (sp.axis !== "h")
+        {
+            throw new CommandError("Un montant garde l'épaisseur des côtés du caisson.");
+        }
+        sp.thicknesses[index] = thickness;
+        // a thicker shelf eats into the cell above it
+        // TODO it is refused when that cell gets too small, pushing the shelves above up could be the beter answer
+        const errors = resolveLayout(c).errors;
+        if (errors.length > 0)
+        {
+            throw new CommandError(`Épaisseur impossible : ${errors[0]}`);
+        }
     });
 }

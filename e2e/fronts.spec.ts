@@ -29,6 +29,21 @@ test.describe("fronts", () =>
         await expect(lines).not.toHaveAttribute("d", left!);
     });
 
+    test("makes one door of the doors of a shelved carcass, and one per cell again", async ({ page }) =>
+    {
+        expect(await drop(page, "Tablette fixe", await centreOf(cells(page).first()))).toBe("Ajouté : Tablette fixe");
+        // one drop after the other : the second cell is found once the first door is on
+        await drop(page, "Porte", await centreOf(cells(page).first()));
+        await drop(page, "Porte", await centreOf(cells(page).nth(1)));
+        await expect(page.locator(".facade .front")).toHaveCount(2);
+        await page.locator(".facade .front").first().click();
+        await page.getByRole("button", { name: "Porte unique" }).click();
+        await expect(page.locator(".facade .front")).toHaveCount(1);
+        await page.locator(".facade .front").click();
+        await page.getByRole("button", { name: "Une porte par case" }).click();
+        await expect(page.locator(".facade .front")).toHaveCount(2);
+    });
+
     test("opens a door by pressure with a TIP-ON and drops its hinge spring", async ({ page }) =>
     {
         await drop(page, "Porte", await centreOf(cells(page).first()));

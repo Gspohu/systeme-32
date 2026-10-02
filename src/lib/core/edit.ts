@@ -76,7 +76,7 @@ export function replaceNode(root: LayoutNode, id: string, by: LayoutNode): Layou
 }
 
 
-// Drops the fronts, linings, rails and lights whose node left the tree
+// Each list drop the fronts, linings, rails, lights, shoe racks and modular cells whose node left the tree
 export function prune(c: Carcass): void
 {
     const alive = new Set(subtreeIds(c.root));
@@ -101,4 +101,5 @@ export function prune(c: Carcass): void
     c.rails = c.rails.filter((r) => { return alive.has(r.cell); });
     c.lights = c.lights.filter((l) => { return alive.has(l.cell); });
     c.shoeRacks = c.shoeRacks.filter((s) => { return alive.has(s.cell); });
+    c.modularCells = c.modularCells.filter((id) => { return alive.has(id); });
 }
