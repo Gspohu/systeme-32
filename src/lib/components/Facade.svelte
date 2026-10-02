@@ -448,15 +448,15 @@
                                         fill={inside !== undefined ? fill(inside.decor, inside.colour) : shade(it.decor,
                                             0.6)} />
                                 {/if}
-                            {:else if fp.role === "drawer"}
-                                {#if f?.opening !== "push"}
-                                    <line x1={fp.rect.x + fp.rect.w / 2 - 60} y1={midY} x2={fp.rect.x +
-                                        fp.rect.w / 2 + 60}
-                                        y2={midY} class="handle" />
-                                {/if}
-                            {:else}
+                            {:else if fp.role !== "drawer"}
                                 <path d={`M ${fp.rect.x + 40} ${midY} h ${fp.rect.w - 80}`} class="thin" />
                             {/if}
+                            {#each analysis.build.handles.filter((h) =>
+                            {
+                                return h.item === it.id && h.front === fp.id;
+                            }) as h (h.front)}
+                                <line x1={h.x0} y1={-h.y0} x2={h.x1} y2={-h.y1} class="handle" />
+                            {/each}
                         </g>
                     {/each}
                     {#if it.slope !== null}

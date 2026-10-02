@@ -159,6 +159,30 @@ export interface Build
     railCuts: { item: string; itemName: string; length: number }[];
     // hardware as volumes, for the 3D view, the clash checks and the drawings
     fitted: Fitted[];
+    // how each front opens on the hardware it got
+    motions: Motion[];
+    // bar handles as the front view draws them : the bar from end to end, in the plane of the fronts of its carcass
+    handles: { item: string; front: string; ref: string; x0: number; y0: number; x1: number; y1: number }[];
+}
+
+
+// A front opening on its hardware, in the frame of its wall : turned `amount` degrees about `axis` through
+// `pivot`, or pushed `amount` mm along `axis`. It carries `parts` and `fitted`, and rides on `rides`
+export interface Motion
+{
+    item: string;
+    front: string;
+    label: string;
+    kind: "turn" | "slide";
+    pivot: Vec3;
+    axis: Vec3;
+    amount: number;
+    parts: string[];
+    fitted: string[];
+    rides: string[];
+    // the hardware that sets the movement, quoted in the message of a clash, and what to do then
+    source: string;
+    remedy: string;
 }
 
 
@@ -246,7 +270,7 @@ export function boxOrigin(c: Carcass): Vec3
 export function emptyBuild(): Build
 {
     return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], infos: [],
-             midLoads: new Map(), railCuts: [], fitted: [] };
+             midLoads: new Map(), railCuts: [], fitted: [], motions: [], handles: [] };
 }
 
 

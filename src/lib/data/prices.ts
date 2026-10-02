@@ -39,6 +39,18 @@ function entry(value: number, unit: PriceEntry["unit"], source: string, date = R
 
 const JHS = "Jean Hue & Socoda";
 
+
+function handlePrices(list: [string, number][]): Record<string, PriceEntry>
+{
+    const out: Record<string, PriceEntry> = {};
+    for (const [ref, usd] of list)
+    {
+        out[`hw:${ref}`] = entry(fromUsd(usd), "u", `Home Decor Hardware (US), ${String(usd).replace(".", ",")} USD HT `
+            + "la poignée, vis fournies, en stock", READ_ON_2);
+    }
+    return out;
+}
+
 export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:H1180_ST37:19": entry(perSheet(143.36), "m2", "Houdard, 143,36 EUR HT le panneau 2800 x 2070, en stock"),
     "board:H1180_ST37:8": entry(ht(38.84), "m2", `${JHS}, 38,84 EUR TTC/m2 (225,12 le panneau), en stock`),
@@ -82,6 +94,10 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                            + "même goujon B34 brut"),
     "hw:282.24.727": entry(fromUsd(0.22), "u", "Home Decor Hardware (US), 0,22 USD HT le taquet"),
     "hw:637.38.054": entry(fromUsd(0.77), "u", "Home Decor Hardware (US), 0,77 USD HT le clip"),
+    // the list price, the 20 % off shown on 2 October left out
+    ...handlePrices([["100.45.120", 1.5], ["100.45.121", 1.57], ["100.45.122", 1.73], ["100.45.123", 1.97],
+                     ["100.45.124", 2.25], ["100.45.125", 2.41], ["100.45.126", 2.76], ["100.45.127", 2.91],
+                     ["100.45.128", 3.15]]),
 
     "hw:ANTI_TIP_BRACKET": entry(ht(1.59), "u", "Brico Dépôt, équerre d'assemblage 40 x 40 x 40 à 1,59 EUR TTC"),
     "hw:DOWEL_8x35": entry(ht(4.99 / 100), "u", "Brico Dépôt, 100 tourillons hêtre 8 x 40 à 4,99 TTC, 8 x 35 non vendu"),

@@ -4,7 +4,8 @@ import { DIAM } from "../core/text";
 import { HK_TOP } from "./rules";
 
 // Standard part families of the PBS : D50 and D60 reuse the Free-pbs families, the others are new
-export type Family = "D20" | "D21" | "D22" | "D30" | "D31" | "D41" | "D42" | "D50" | "D60" | "D70" | "D80" | "D81";
+export type Family = "D20" | "D21" | "D22" | "D30" | "D31" | "D41" | "D42" | "D50" | "D51" | "D60" | "D70" | "D80" |
+    "D81";
 
 
 export const FAMILY_LABELS: Record<Family, string> = {
@@ -16,6 +17,7 @@ export const FAMILY_LABELS: Record<Family, string> = {
     D41: "Connecteurs d'assemblage",
     D42: "Tourillons",
     D50: "Ouvertures par pression",
+    D51: "Poignées",
     D60: "Supports et fixations",
     D70: "Taquets d'étagère",
     D80: "Penderie",
@@ -306,6 +308,34 @@ for (const s of SHELF_SUPPORTS)
          ref: s.ref, source: `${HAFELE_UK} p. 7.158-7.159`,
          url: "https://assets.daro.com/HafeleLiterature/18T7-158.pdf" });
 }
+// Bar handles : Häfele 100.45.120 to 128, brushed stainless steel, hollow, Ø 12, standing 32 off the front, two
+// M4 x 25 screws in the box, as Häfele describes them on the item pages of Home Decor Hardware (US), read 2 Oct 2026
+export interface BarHandle
+{
+    ref: string;
+    centres: number;
+    length: number;
+}
+export const BAR_HANDLES: BarHandle[] = [
+    { ref: "100.45.120", centres: 96, length: 150 },
+    { ref: "100.45.121", centres: 128, length: 198 },
+    { ref: "100.45.122", centres: 160, length: 249 },
+    { ref: "100.45.123", centres: 192, length: 300 },
+    { ref: "100.45.124", centres: 224, length: 351 },
+    { ref: "100.45.125", centres: 256, length: 399 },
+    { ref: "100.45.126", centres: 288, length: 450 },
+    { ref: "100.45.127", centres: 320, length: 500 },
+    { ref: "100.45.128", centres: 352, length: 550 },
+];
+export const BAR_HANDLE = { diameter: 12, projection: 32, screwHole: 5 };
+for (const h of BAR_HANDLES)
+{
+    add({ id: h.ref, family: "D51", label: `Poignée barre inox brossé ${DIAM}12, entraxe ${h.centres}, longueur `
+         + `${h.length}, vis M4 x 25 fournies`, brand: "Häfele", ref: h.ref,
+         source: "Häfele, désignation reprise par Home Decor Hardware (US), fiche de la référence lue le 2 octobre 2026" });
+}
+
+
 add({ id: "283.33.910", family: "D70", label: `Fixation invisible d'étagère à platine vissée, broche ${DIAM}12 x 112`,
      brand: "Häfele", ref: "283.33.910", source: `${HAFELE_UK} p. 7.142`,
      url: "https://assets.daro.com/HafeleLiterature/18T7-142.pdf" });
