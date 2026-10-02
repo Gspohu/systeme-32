@@ -27,7 +27,8 @@ import { boxesMeet, roomBox, type Box3 } from "./room";
 import { buildSlats } from "./slats";
 import { SEAT_LOAD_N, seatChecks } from "./seat";
 import { slopeErrors } from "./slope";
-import { buildLights, buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
+import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
+import { buildLights, lightChecks } from "./lights";
 import { fitOutlets } from "./outlets";
 import { bounds, tessellate } from "./geometry";
 import { MATERIALS, SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
@@ -199,7 +200,7 @@ export function analyse(p: Project): Analysis
                       message: "Équerres anti-basculement sur plaque de plâtre : la tenue dépend de la cheville et "
                           + "de la plaque. Vérifier la charge admise par la cheville choisie." });
     }
-    checks.push(...seatChecks(p, b), ...screenChecks(p), ...wardrobeChecks(p, b), ...liftChecks(p, b),
+    checks.push(...seatChecks(p, b), ...screenChecks(p), ...wardrobeChecks(p, b), ...lightChecks(p), ...liftChecks(p, b),
                 ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p), ...solidChecks(p, b));
     return { build: b, checks, masses, deflections: partReport.deflections, tippings };
 }

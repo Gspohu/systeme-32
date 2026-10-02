@@ -320,6 +320,8 @@ export interface CellLight
     // from the front edge of that panel to the groove or to the spot holes
     setback: number;
     kelvin: 2700 | 3000 | 4000;
+    // dimmed and switched from a phone through a Wi-Fi controller on the driver output
+    wifi?: boolean;
 }
 
 

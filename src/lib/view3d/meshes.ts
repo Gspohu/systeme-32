@@ -6,7 +6,8 @@ import type { Carcass, LadderRail, Screen } from "../core/model";
 import { tessellate } from "../core/geometry";
 import { screenSize } from "../core/extent";
 import type { ResolvedLayout } from "../core/layout";
-import { FIT_PLAY, LED_GROOVE_W, RAIL_D, SPOT_RIM, railPlan, spotCentres } from "../core/wardrobe";
+import { FIT_PLAY, RAIL_D, railPlan } from "../core/wardrobe";
+import { LED_GROOVE_W, SPOT_RIM, spotCentres } from "../core/lights";
 
 // scene unit is the metre
 export const MM = 0.001;
@@ -231,10 +232,20 @@ export function cushionMesh(c: Carcass): THREE.BufferGeometry | null
 
 
 // Clothes rails as tubes and LED profiles as thin bars, under the panel above their cell
-export function fittingMeshes(c: Carcass,
-                              lay: ResolvedLayout): { key: string; light: boolean; geometry: THREE.BufferGeometry }[]
+// a rail, a LED strip or a spot : what lights up carries the colour temperature of its LEDs
+export interface FittingMesh
 {
-    const out: { key: string; light: boolean; geometry: THREE.BufferGeometry }[] = [];
+    key: string;
+    light: boolean;
+    kelvin: number | null;
+    geometry: THREE.BufferGeometry;
+}
+
+
+export function fittingMeshes(c: Carcass,
+                              lay: ResolvedLayout): FittingMesh[]
+{
+    const out: FittingMesh[] = [];
     const front = c.z + c.depth;
     for (const r of c.rails)
     {
@@ -247,7 +258,7 @@ export function fittingMeshes(c: Carcass,
         geo.rotateZ(Math.PI / 2);
         geo.translate(c.x + rp.cell.x + rp.cell.w / 2, c.y + rp.axisY, front - rp.axisV);
         geo.scale(MM, MM, MM);  
-        out.push({ key: r.id, light: false, geometry: geo });
+        out.push({ key: r.id, light: false, kelvin: null, geometry: geo });
     }
     for (const l of c.lights)
     {
@@ -263,14 +274,14 @@ export function fittingMeshes(c: Carcass,
                 const disc = new THREE.CylinderGeometry(SPOT_RIM / 2, SPOT_RIM / 2, 2, 24);
                 disc.translate(c.x + x, c.y + nb.y + nb.h - 1, front - l.setback - SPOT_RIM / 2);
                 disc.scale(MM, MM, MM);
-                out.push({ key: `${l.id}/${x}`, light: true, geometry: disc });
+                out.push({ key: `${l.id}/${x}`, light: true, kelvin: l.kelvin, geometry: disc });
             }
             continue;
         }
         const geo = new THREE.BoxGeometry(nb.w - 2 * FIT_PLAY, 2, LED_GROOVE_W);
         geo.translate(c.x + nb.x + nb.w / 2, c.y + nb.y + nb.h - 1, front - l.setback - LED_GROOVE_W / 2);
         geo.scale(MM, MM, MM);
-        out.push({ key: l.id, light: true, geometry: geo });
+        out.push({ key: l.id, light: true, kelvin: l.kelvin, geometry: geo });
     }
     return out;
 }

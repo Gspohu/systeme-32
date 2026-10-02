@@ -213,14 +213,17 @@ add({ id: "892.12.906", family: "D80", label: "Range-chaussures, largeur réglab
 const LED = "Générique, dimensionné d'après Häfele Loox (TCH Design 2017 p. 5.138, 5.149, 5.203), référence au choix du distributeur";
 add({ id: "LED_PROFILE_RECESS", family: "D81", label: "Profilé aluminium à encastrer, corps 18 x 8,5 mm, diffuseur opale",
      brand: "", ref: "Générique", source: LED, url: "https://assets.daro.com/HafeleLiterature/17D5-203.pdf" });
-add({ id: "LED_END_CAPS", family: "D81", label: "Paire d'embouts du profilé", brand: "", ref: "Générique",
-     source: LED });
 add({ id: "LED_STRIP_24V", family: "D81", label: "Ruban LED 24 V, 8 à 10 mm de large, en profilé aluminium", brand: "",
      ref: "Générique", source: LED, url: "https://www.homedecorhardware.com/hf-833-76-353.html" });
 add({ id: "LED_LEAD", family: "D81", label: "Cordon d'alimentation du ruban vers l'alimentation", brand: "",
      ref: "Générique", source: LED });
 add({ id: "LED_DRIVER_24V", family: "D81", label: "Alimentation 24 V à tension constante", brand: "", ref: "Générique",
      source: LED, url: "https://assets.daro.com/HafeleLiterature/17D5-149.pdf" });
+// Shelly product page : 12 or 24 V DC in, 4 A a channel and 10 A in all, 42 x 37 x 12, driven over the local
+// network without any account
+export const WIFI_LED_CONTROLLER = { ref: "SHELLY_PLUS_RGBW_PM", ampsPerChannel: 4, volts: 24 };
+add({ id: WIFI_LED_CONTROLLER.ref, family: "D81", label: "Contrôleur Wi-Fi Shelly Plus RGBW PM, 12/24 V, 4 A par voie",
+     brand: "Shelly", ref: "Plus RGBW PM", source: "Shelly, fiche produit Shelly Plus RGBW PM" });
 add({ id: "LED_SPOT_ROUND", family: "D81",
      label: `Spot LED rond 24 V à encastrer, collerette ${DIAM}65, perçage ${DIAM}55 x 11, câble 2,5 m`, brand: "",
      ref: "Générique", source: "Générique, dimensionné d'après Häfele Loox 24V LED 3001 (TCH Design 2017 p. 5.119)",

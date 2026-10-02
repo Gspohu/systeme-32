@@ -10,7 +10,7 @@ import { byId } from "./edit";
 import { panelMass } from "./fittings";
 import { boxesMeet, boxToRoom, roomBox, type Box3 } from "./room";
 import type { Build } from "./parts";
-import { SPOT_RIM, spotCentres } from "./wardrobe";
+import { SPOT_RIM, spotCentres } from "./lights";
 import { HK_TOP } from "../data/rules";
 
 

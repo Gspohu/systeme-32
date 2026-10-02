@@ -99,6 +99,16 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                      ["100.45.124", 2.25], ["100.45.125", 2.41], ["100.45.126", 2.76], ["100.45.127", 2.91],
                      ["100.45.128", 3.15]]),
 
+    // generic LED parts read at Ledkia, one of each per lit cell : a 2 m profile, a 5 m reel, one lead
+    "hw:LED_PROFILE_RECESS": entry(ht(6.99), "u", "Estimation : Ledkia, profilé encastré Lithos H12 2 m avec diffuseur "
+                                  + "à 6,99 EUR TTC, son corps à vérifier contre la rainure 18 x 8,5", READ_ON_2),
+    "hw:LED_STRIP_24V": entry(ht(6.49), "u", "Ledkia, ruban 24 V 8 mm coupe 5 cm, 12 W/m, bobine de 5 m à 6,49 EUR TTC",
+                              READ_ON_2),
+    "hw:LED_LEAD": entry(ht(1.11), "u", "Ledkia, connecteur câblé pour ruban 8 mm à 1,11 EUR TTC", READ_ON_2),
+    "hw:LED_DRIVER_24V": entry(ht(7.49), "u", "Ledkia, alimentation 24 V 60 W 2,5 A à 7,49 EUR TTC hors remise",
+                               READ_ON_2),
+    "hw:SHELLY_PLUS_RGBW_PM": entry(ht(28.49), "u", "Alternate, Shelly Plus RGBW PM à 28,49 EUR TTC, momentanément "
+                                    + "indisponible", READ_ON_2),
     "hw:ANTI_TIP_BRACKET": entry(ht(1.59), "u", "Brico Dépôt, équerre d'assemblage 40 x 40 x 40 à 1,59 EUR TTC"),
     "hw:DOWEL_8x35": entry(ht(4.99 / 100), "u", "Brico Dépôt, 100 tourillons hêtre 8 x 40 à 4,99 TTC, 8 x 35 non vendu"),
     "hw:PLUG_NYLON_8x40": entry(ht(1.89 / 20), "u", "Brico Dépôt, lot de 20 chevilles nylon 8 x 40 à 1,89 EUR TTC"),

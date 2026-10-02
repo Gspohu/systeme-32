@@ -9,7 +9,8 @@
     import { PLINTH_FOOT_GAP, baseHeight } from "../core/parts";
     import { RAIL_THICKNESS, slatLayout } from "../core/slats";
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
-    import { FIT_PLAY, RAIL_D, RAIL_DROP, SPOT_RIM, railPlan, spotCentres } from "../core/wardrobe";
+    import { FIT_PLAY, RAIL_D, RAIL_DROP, railPlan } from "../core/wardrobe";
+    import { SPOT_RIM, spotCentres } from "../core/lights";
     import { openingPoints } from "../core/cutouts";
     import { openEndLevels } from "../core/curves";
     import { SHOE_RACKS, shoeLevels } from "../core/shoes";
