@@ -65,6 +65,7 @@ export function newCarcass(o: Partial<Carcass> & { width: number; height: number
         ceilingFiller: false,
         shoeRacks: [],
         modularCells: [],
+        outlets: [],
         ...o,
     };
 }

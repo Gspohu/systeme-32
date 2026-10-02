@@ -10,7 +10,7 @@ export { CommandError } from "./edit";
 export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish, setDividerThickness }
     from "./layout_commands";
 export { setFront, removeFront, updateFront, moveFront, mergeFronts, splitFront, toSliding, toDoor, setLining, setRail,
-         setLight, setEnd, setShoeRack, setModularCell }
+         setLight, setEnd, setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet }
     from "./front_commands";
 export { historyOf, push, undo, redo, type History } from "./history";
 

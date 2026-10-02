@@ -147,6 +147,17 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
             }
         }
     }
+    if (version < 6 && Array.isArray(raw.items))
+    {
+        // socket and cable holes came with version 6
+        for (const it of raw.items as { kind?: unknown; outlets?: unknown }[])
+        {
+            if (it.kind === "carcass")
+            {
+                it.outlets = it.outlets ?? [];
+            }
+        }
+    }
     raw.schema = SCHEMA_VERSION;
     return raw;
 }

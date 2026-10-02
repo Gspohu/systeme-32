@@ -27,6 +27,7 @@ import { buildSlats } from "./slats";
 import { SEAT_LOAD_N, seatChecks } from "./seat";
 import { slopeErrors } from "./slope";
 import { buildLights, buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
+import { fitOutlets } from "./outlets";
 import { bounds, tessellate } from "./geometry";
 import { MATERIALS, SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
 import { GRAVITY, SHELF_DEFLECTION_LIMIT } from "../data/rules";
@@ -71,6 +72,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         fitSliding(it, lay, s, b);
         fitShelfPins(it, lay, s, b);
         fitModularRows(it, lay, s, b);
+        fitOutlets(it, lay, b);
         const clothes = buildRails(it, lay, b);
         buildLights(it, lay, s, b);
         buildShoeRacks(it, lay, b);

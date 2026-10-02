@@ -3,7 +3,7 @@
 // TODO the hinge arm and its 173H7100 plate are no volume yet : their sizes are not in the Blum pages read so far
 
 import { at, tessellate, type Vec3 } from "./geometry";
-import { bevelU, unbevelU, type Build, type CurveShape, type Fitted, type Part } from "./parts";
+import { battenAngle, bevelU, unbevelU, type Build, type CurveShape, type Fitted, type Part } from "./parts";
 import type { Item, Project } from "./model";
 import { toRoom, toWall } from "./room";
 
@@ -264,7 +264,7 @@ function battenShapes(p: Part, c: CurveShape): Shape[]
         let axes: [Vec3, Vec3, Vec3];
         if (s <= arc)
         {
-            const a = c.a0 + (c.a1 - c.a0) * s / arc;
+            const a = battenAngle(c, s, arc);
             const rd = ax.rad(a);
             const mid = (c.from + c.to) / 2;
             centre = [c.centre[0] + r * rd[0] + mid * ax.axis[0], c.centre[1] + r * rd[1] + mid * ax.axis[1],

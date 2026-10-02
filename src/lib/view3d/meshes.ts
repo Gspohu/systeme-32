@@ -1,7 +1,7 @@
 // Three.js geometry for every part : flat parts extruedd from their outline, skins and battens on their arcs
 
 import * as THREE from "three";
-import { bevelU, type Fitted, type Part, type CurveShape } from "../core/parts";
+import { battenAngle, bevelU, type Fitted, type Part, type CurveShape } from "../core/parts";
 import type { Carcass, LadderRail, Screen } from "../core/model";
 import { tessellate } from "../core/geometry";
 import { screenSize } from "../core/extent";
@@ -147,7 +147,7 @@ function battenGeometries(p: Part, c: CurveShape): THREE.BufferGeometry[]
         const box = new THREE.BoxGeometry(c.thickness, c.to - c.from, p.width);
         if (s <= arc)
         {
-            const a = c.a0 + (c.a1 - c.a0) * s / arc;
+            const a = battenAngle(c, s, arc);
             // battens stand radially : thickness along the radius, width along the tangent
             const rot = new THREE.Matrix4();
             if (c.axis === "y")

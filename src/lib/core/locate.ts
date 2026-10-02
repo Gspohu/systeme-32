@@ -4,6 +4,7 @@ import type { Carcass } from "./model";
 import type { NodeBox, ResolvedLayout } from "./layout";
 import type { Build, Part } from "./parts";
 import { byId } from "./edit";
+import { panelAtY } from "./dividers";
 
 
 export interface FaceRef
@@ -37,4 +38,29 @@ export function sideFace(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox,
         return p === undefined ? null : { part: p, face: side === "left" ? "B" : "A", uOrigin: q.y };
     }
     return null;
+}
+
+
+// The fixed panel a cell hangs things from, and the face of it that looks down
+export function panelAbove(c: Carcass, lay: ResolvedLayout, nb: NodeBox, b: Build): { part: Part; face: "A" |
+    "B" } | null
+{
+    if (nb.y + nb.h >= c.height - c.thickness - 0.01)
+    {
+        const top = byId(b.parts, `${c.id}/top`);
+        return top === undefined ? null : { part: top, face: "A" };
+    }
+    const shelf = panelAtY(c, lay, nb.y + nb.h, nb.x + nb.w / 2, b, "above");
+    return shelf === undefined ? null : { part: shelf, face: "B" };
+}
+
+
+// The fixed panel a cell need below it : the bottom of the carcass or a fixed shelf
+export function panelBelow(c: Carcass, lay: ResolvedLayout, nb: NodeBox, b: Build): Part | undefined
+{
+    if (nb.y <= c.thickness + 0.01)
+    {
+        return byId(b.parts, `${c.id}/bottom`);
+    }
+    return panelAtY(c, lay, nb.y, nb.x + nb.w / 2, b, "below");
 }

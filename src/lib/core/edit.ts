@@ -102,4 +102,5 @@ export function prune(c: Carcass): void
     c.lights = c.lights.filter((l) => { return alive.has(l.cell); });
     c.shoeRacks = c.shoeRacks.filter((s) => { return alive.has(s.cell); });
     c.modularCells = c.modularCells.filter((id) => { return alive.has(id); });
+    c.outlets = c.outlets.filter((o) => { return alive.has(o.cell); });
 }

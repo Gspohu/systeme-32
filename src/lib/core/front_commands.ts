@@ -1,9 +1,10 @@
-// Commands on fronts, cell linings, rails, lights and rounded ends
+// Commands on fronts, cell linings, rails, lights, socket holes and rounded ends
 
-import type { CellLight, End, Front, FrontSpec, HangingRail, Lining, Project } from "./model";
+import type { CellLight, End, Front, FrontSpec, HangingRail, Lining, Outlet, Project } from "./model";
 import { newFront, newId } from "./factory";
 import { findNode, findParent, resolveLayout, subtreeIds } from "./layout";
 import { CommandError, byId, carcassOf, edit, withoutId } from "./edit";
+import { OUTLET_DEFAULT } from "./outlets";
 
 
 function frontOfNode(fronts: Front[], node: string): Front | undefined
@@ -272,6 +273,51 @@ export function setShoeRack(p: Project, carcassId: string, cellId: string, level
         {
             c.shoeRacks.push({ id: newId("h"), cell: cellId, levels });
         }
+    });
+}
+
+
+// A socket or cable hole for a cell, at the starting size, on the back behind it
+export function addOutlet(p: Project, carcassId: string, cellId: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        if (findNode(c.root, cellId)?.kind !== "cell")
+        {
+            throw new CommandError("Un trou de prise se rattache à une case. Choisir une case sans séparation.");
+        }
+        c.outlets.push({ id: newId("o"), cell: cellId, ...OUTLET_DEFAULT });
+    });
+}
+
+
+export function updateOutlet(p: Project, carcassId: string, outletId: string,
+    patch: Partial<Omit<Outlet, "id" | "cell">>): Project
+{
+    return edit(p, (q) =>
+    {
+        const o = byId(carcassOf(q, carcassId).outlets, outletId);
+        if (o === undefined)
+        {
+            throw new CommandError("Trou de prise introuvable.");
+        }
+        const next = { ...o, ...patch };
+        if (!(next.w > 0) || !(next.h > 0) || !Number.isFinite(next.dx) || !Number.isFinite(next.dy))
+        {
+            throw new CommandError("Taille ou décalage illisible. Saisir des mm, une taille plus grande que 0.");
+        }
+        Object.assign(o, next);
+    });
+}
+
+
+export function removeOutlet(p: Project, carcassId: string, outletId: string): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        c.outlets = withoutId(c.outlets, outletId);
     });
 }
 

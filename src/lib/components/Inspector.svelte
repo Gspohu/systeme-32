@@ -7,11 +7,12 @@
         removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, mergeFronts, splitFront, splitCell,
         removeDivider,
         moveDivider, setDividerKind, setDividerFinish, setDividerThickness, setLining, setRail, setLight, setEnd,
-        setShoeRack, setModularCell, toSliding, toDoor,
+        setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet, toSliding, toDoor,
     } from "../core/commands";
     import { byId } from "../core/edit";
     import { MIN_CELL, findNode, findParent } from "../core/layout";
     import { topAngle } from "../core/slope";
+    import { DIAM } from "../core/text";
     import { BOARD_THICKNESSES, DECORS, MATERIALS, decorById } from "../data/materials";
     import { HARDWARE } from "../data/hardware";
     import { DEFAULT_BATTENS } from "../core/factory";
@@ -532,6 +533,55 @@
                         </select>
                     </label>
                 {/if}
+                <div class="section-title">Trous de prise</div>
+                {#each carcass.outlets.filter((o) => { return o.cell === nodeBox.id; }) as o (o.id)}
+                    <div class="segmented">
+                        {#each ([["back", "Fond"], ["above", "Au-dessus"], ["below",
+                            "Au-dessous"]] as const) as [panel, label]}
+                            <button class="segmented-item" class:active={o.panel === panel}
+                                onclick={() => app.apply(updateOutlet, carcass.id, o.id, { panel })}>{label}</button>
+                        {/each}
+                    </div>
+                    <div class="segmented">
+                        <button class="segmented-item" class:active={o.shape === "round"}
+                            onclick={() => app.apply(updateOutlet, carcass.id, o.id, { shape: "round" })}>Rond</button>
+                        <button class="segmented-item" class:active={o.shape === "rect"}
+                            onclick={() => app.apply(updateOutlet, carcass.id, o.id,
+                                                     { shape: "rect" })}>Rectangle</button>
+                    </div>
+                    {#if o.shape === "round"}
+                        <label class="field"><span class="label">{DIAM} (mm)</span>
+                            <input class="input" type="number" min="1" value={o.w}
+                                onchange={(e) => app.apply(updateOutlet, carcass.id, o.id, { w: num(e) })} />
+                        </label>
+                    {:else}
+                        <label class="field"><span class="label">L x H (mm)</span>
+                            <span class="row">
+                                <input class="input" type="number" min="1" aria-label="Largeur du trou" value={o.w}
+                                    onchange={(e) => app.apply(updateOutlet, carcass.id, o.id, { w: num(e) })} />
+                                <input class="input" type="number" min="1" aria-label="Hauteur du trou" value={o.h}
+                                    onchange={(e) => app.apply(updateOutlet, carcass.id, o.id, { h: num(e) })} />
+                            </span>
+                        </label>
+                    {/if}
+                    <label class="field" title="Depuis le milieu de la case : en largeur, puis en hauteur sur le fond ou vers l'avant ailleurs">
+                        <span class="label">Décalage</span>
+                        <span class="row">
+                            <input class="input" type="number" aria-label="Décalage en largeur" value={o.dx}
+                                onchange={(e) => app.apply(updateOutlet, carcass.id, o.id, { dx: num(e) })} />
+                            <input class="input" type="number" aria-label="Décalage en hauteur ou profondeur" value={o.dy}
+                                onchange={(e) => app.apply(updateOutlet, carcass.id, o.id, { dy: num(e) })} />
+                        </span>
+                    </label>
+                    <div class="row">
+                        <button class="btn btn-danger" onclick={() => app.apply(removeOutlet, carcass.id, o.id)}>
+                            Retirer le trou</button>
+                    </div>
+                {/each}
+                <div class="row">
+                    <button class="btn btn-secondary" onclick={() => app.apply(addOutlet, carcass.id, nodeBox.id)}>
+                        Ajouter un trou</button>
+                </div>
             {/if}
         {/if}
 
@@ -657,7 +707,8 @@
                 {#if parentId !== null && front.spec.type !== "drawers"}
                     <button class="btn btn-secondary" title="Une seule façade pour la case et ses voisines"
                         onclick={() => app.apply(mergeFronts, carcass.id, front.id)}>
-                        {front.spec.type === "door" || front.spec.type === "doubleDoor" ? "Porte unique" : "Réunir"}</button>
+                        {front.spec.type === "door" ||
+                         front.spec.type === "doubleDoor" ? "Porte unique" : "Réunir"}</button>
                 {/if}
                 {#if findNode(carcass.root, front.node)?.kind === "split"}
                     <button class="btn btn-secondary" title="Une façade identique sur chaque case de la zone"
@@ -839,6 +890,9 @@
                             <input class="input" type="number" value={e.radius}
                                 onchange={(ev) => endPatch(side, { radius: num(ev) })} />
                         </label>
+                        <label class="form-check" title="Ferme l'arrière de l'arrondi, comme le fond du caisson">
+                            <input type="checkbox" checked={e.back === true}
+                                onchange={(ev) => endPatch(side, { back: checked(ev) })} /> Fond</label>
                     {/if}
                     <label class="field"><span class="label">Technique</span>
                         <select class="select" value={e.technique}

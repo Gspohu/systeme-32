@@ -1,5 +1,5 @@
 import { addCarcass, cells, centreOf, check, checkLines, drop, errorCount, expect, expectToast, field, openBlank,
-    selectItem, setField, test, toClient, dragBetween } from "./helpers";
+    outputsTab, selectItem, setField, test, toClient, dragBetween } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // The front outline of the first carcass, world millimetres with y pointing down
@@ -99,6 +99,16 @@ test.describe("inspector", () =>
         expect(await errorCount(page)).toBe(0);
     });
 
+    test("closes the back of a quarter round", async ({ page }) =>
+    {
+        const left = page.locator(".inspector-body .section-title", { hasText: "Côté gauche" });
+        await left.locator("xpath=following-sibling::div[1]").getByRole("button", { name: "Arrondi" }).click();
+        await page.locator(".inspector-body").getByRole("checkbox", { name: "Fond", exact: true }).check();
+        expect(await errorCount(page)).toBe(0);
+        await outputsTab(page, "Débit");
+        await expect(page.locator(".tab-content tbody")).toContainText("Bout arrondi gauche, fond");
+    });
+
     test("duplicates and deletes", async ({ page }) =>
     {
         await page.getByRole("button", { name: "Dupliquer" }).click();
@@ -156,6 +166,21 @@ test.describe("dividers", () =>
         await selectItem(page);
         await field(page, "Tablettes").selectOption("16");
         await expect(shelf).toHaveAttribute("height", "16");
+    });
+
+
+    // TODO the front view draws no socket hole yet, the checks are all there is to read on screen
+    test("cuts a socket hole behind a cell and says when it leaves the cell", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await page.getByRole("button", { name: "Ajouter un trou" }).click();
+        expect(await errorCount(page)).toBe(0);
+        const across = page.getByLabel("Décalage en largeur");
+        await across.fill("400");
+        await across.press("Tab");
+        expect((await checkLines(page)).join("\n")).toContain("sort de sa case");
+        await page.getByRole("button", { name: "Retirer le trou" }).click();
+        expect(await errorCount(page)).toBe(0);
     });
 
 

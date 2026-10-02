@@ -5,10 +5,9 @@ import { DIAM } from "./text";
 import type { NodeBox, ResolvedLayout } from "./layout";
 import { findNode, subtreeIds } from "./layout";
 import type { Build, Part } from "./parts";
-import { panelAtY, panelStartX } from "./dividers";
+import { panelStartX } from "./dividers";
 import type { Check } from "./analysis";
-import { sideFace } from "./locate";
-import { byId } from "./edit";
+import { panelAbove, sideFace } from "./locate";
 import { ceilingAt } from "./slope";
 import { GRAVITY } from "../data/rules";
 
@@ -121,19 +120,6 @@ export function railCheck(length: number, centre: boolean): RailCheck
     // takes 10 w L / 8
     const stress = w * span ** 2 / 8 / (I / (RAIL_D / 2));
     return { span, stress, reaction: centre ? 1.25 * w * span : 0 };
-}
-
-
-// The fixed panel a cell hangs things from, and the face of it that looks down
-function panelAbove(c: Carcass, lay: ResolvedLayout, nb: NodeBox, b: Build): { part: Part; face: "A" | "B" } | null
-{
-    if (nb.y + nb.h >= c.height - c.thickness - 0.01)
-    {
-        const top = byId(b.parts, `${c.id}/top`);
-        return top === undefined ? null : { part: top, face: "A" };
-    }
-    const shelf = panelAtY(c, lay, nb.y + nb.h, nb.x + nb.w / 2, b, "above");
-    return shelf === undefined ? null : { part: shelf, face: "B" };
 }
 
 

@@ -224,6 +224,45 @@ describe("rounded ends", () =>
         expect(endReach({ ...c, back: { type: "none" } }, "left")).toBe(250);
         expect(endReach({ ...c, ends: { ...c.ends, right: { type: "square" } } }, "right")).toBe(0);
     });
+
+
+    it("closes the back of a quarter round with a panel like the carcass back, from the side out to the skin", () =>
+    {
+        const quarter = (back: boolean): Extract<End, { type: "rounded" }> =>
+        {
+            return { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
+                     battens: DEFAULT_BATTENS, decor: "W1000_ST9", back };
+        };
+        const c = newCarcass({ name: "Meuble d'Obernai", width: 600, height: 800, depth: 500,
+                               ends: { left: quarter(true), right: quarter(true) } });
+        const a = analyse(addItem(newProject("Obernai"), c));
+        for (const [side, x0] of [["left", c.x - 300], ["right", c.x + 600]] as const)
+        {
+            const back = a.build.parts.find((q) =>
+            {
+                return q.id === `${c.id}/end/${side}/back`;
+            })!;
+            expect([back.length, back.width, back.thickness, back.decor]).toEqual([800, 300, 8, c.backDecor]);
+            expect(back.frame!.o[0]).toBe(x0);
+        }
+        expect(a.checks.filter((k) =>
+        {
+            return k.level === "error";
+        })).toEqual([]);
+        // a half round need no back, its skin close it all round
+        const half = analyse(addItem(newProject("Obernai"), { ...c, ends: { left: { type: "square" },
+                                                                          right: { ...quarter(true), sweep: 180 } } }));
+        expect(half.build.parts.some((q) =>
+        {
+            return q.id.endsWith("/back") && q.id.includes("/end/");
+        })).toBe(false);
+        const grooved = analyse(addItem(newProject("Obernai"), { ...c, back: { type: "groove", thickness: 8, offset: 10,
+                                                                               depth: 8 } }));
+        expect(grooved.checks.some((k) =>
+        {
+            return k.message.includes("son fond se visse en applique");
+        })).toBe(true);
+    });
 });
 
 describe("anti-tip fixing", () =>

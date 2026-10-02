@@ -1,6 +1,6 @@
 // Project data model, all lengths in millimetres, pure data with no behavour
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export type Id = string;
 
@@ -213,10 +213,11 @@ export interface Battens
 }
 
 
+// a quarter round is open at the back between the side and its skin, `back` closes it like the carcass back
 export type End =
     | { type: "square" }
     | { type: "rounded"; radius: number; sweep: 90 | 180; technique: CurveTechnique; flexThickness: 6 |
-       9; battens: Battens; decor: string };
+       9; battens: Battens; decor: string; back?: boolean };
 
 export interface Carcass
 {
@@ -254,6 +255,22 @@ export interface Carcass
     shoeRacks: ShoeRack[];
     // cells drilled over their whole hieght on the 32 mm grid, for shelves moved later
     modularCells: Id[];
+    outlets: Outlet[];
+}
+
+// A hole for a wall socket or a cable : through the back behind a cell, or the panel above or below it
+export interface Outlet
+{
+    id: Id;
+    cell: Id;
+    panel: "back" | "above" | "below";
+    shape: "round" | "rect";
+    // diameter of a round hole in `w`, width and height of a rectangle, mm
+    w: number;
+    h: number;
+    // centre offset from the middle of the cell : across, then up on the back or towards the front elsewhere
+    dx: number;
+    dy: number;
 }
 
 // Shoe racks screwed to the back of a cell, levels spread evenly from its floor

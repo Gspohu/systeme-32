@@ -147,6 +147,26 @@ export function buildEnds(c: Carcass, b: Build): void
                            face: "B", lineAxis: "u", line: lv.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
                            reversed: false });
         }
+        if (end.back === true && end.sweep === 90)
+        {
+            if (c.back.type !== "applied")
+            {
+                b.errors.push(`${c.name}, ${title.toLowerCase()} : son fond se visse en applique comme celui du caisson, `
+                    + "qui n'est pas rapporté. Passer le fond du caisson en rapporté ou retirer le fond de l'arrondi.");
+            }
+            else
+            {
+                // behind the shaped panels, in the plane of the carcass back, from the side out to the skin
+                const back = newPart({
+                    ...base, id: `${c.id}/end/${side}/back`, label: `${title}, fond`, role: "back", length: c.height,
+                    width: outer, thickness: c.back.thickness, decor: c.backDecor, edges: [],
+                    frame: { o: [side === "right" ? xFace : xFace - outer, c.y, c.z + c.back.thickness], u: Y, v: X,
+                             n: neg(Z) },
+                });
+                back.notes.push("Vissé en applique sur les chants arrière des flasques et des gabarits");
+                b.parts.push(back);
+            }
+        }
         const straight = end.sweep === 180 ? 0 : usable - outer;
         const developed = end.sweep === 180
             ? Math.PI * (outer - skin / 2)

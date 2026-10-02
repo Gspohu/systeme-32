@@ -104,6 +104,15 @@ export interface CurveShape
     straightAt: number;
 }
 
+
+// Angle of the batten `s` mm along the arc : the arc is laid from the carcass side, the flat run goes on from
+// its other end. Laid from `straightAt` the last batten of a right quarter bit 1.9 mm into the side
+export function battenAngle(c: CurveShape, s: number, arc: number): number
+{
+    const fromFlatEnd = c.straight > 0 && Math.abs(c.a0 - c.straightAt) < 1e-9;
+    return fromFlatEnd ? c.a1 - (c.a1 - c.a0) * s / arc : c.a0 + (c.a1 - c.a0) * s / arc;
+}
+
 // Butt joint : the edge `edge` of part `edgePart` sits against face `face` of part `facePart`
 export interface Joint
 {
