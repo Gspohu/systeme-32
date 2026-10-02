@@ -130,6 +130,8 @@ export interface DrawerFront
     cutlery?: boolean[];
     // expectd load per drawer (kg), drives the runner and TIP-ON choice
     loadKg: number;
+    // MOVENTO series asked by the user, the lightest one carrying the load when absent
+    runner?: "760H" | "766H";
 }
 
 // SlideLine M overlay runs on one track : leaves sit side by side and never cover the whole opening
@@ -191,7 +193,8 @@ export interface Lining
 export type Base =
     | { type: "plinth"; height: number; setback: number; grills?: number }
     | { type: "feet"; height: number }
-    | { type: "wall" }
+    // hung on a pair of Blum 48N0510 by default, or on Camar 807 base cabinet hangers for a heavier one
+    | { type: "wall"; hanger?: "blum" | "camar" }
     | { type: "floor" };
 
 
@@ -258,6 +261,8 @@ export interface Carcass
     // cells drilled over their whole hieght on the 32 mm grid, for shelves moved later
     modularCells: Id[];
     outlets: Outlet[];
+    // Häfele reference of the shelf supports the user chose, the first one carrying each shelf when absent
+    pins?: string;
 }
 
 // A hole for a wall socket or a cable : through the back behind a cell, or the panel above or below it

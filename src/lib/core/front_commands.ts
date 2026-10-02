@@ -75,6 +75,12 @@ export function updateFront(p: Project, carcassId: string, frontId: string, patc
         {
             throw new CommandError("Façade introuvable.");
         }
+        const spec = patch.spec;
+        if (spec?.type === "drawers" && spec.ratios !== undefined && (spec.ratios.length !== spec.count
+            || spec.ratios.some((r) => { return !(r > 0); })))
+        {
+            throw new CommandError(`Proportions : ${spec.count} nombres positifs, un par tiroir, séparés par des virgules.`);
+        }
         Object.assign(f, patch);
     });
 }

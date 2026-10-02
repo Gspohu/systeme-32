@@ -4,7 +4,8 @@ import { addItem, moveFront, rename, setFront, setPrice, splitCell, toSliding, u
         moveDivider } from "./commands";
 import { resolveLayout, findNode } from "./layout";
 import { cupDistance, frontPanels } from "./fronts";
-import { antiTipPositions, spread } from "./fittings";
+import { spread } from "./fittings";
+import { antiTipPositions } from "./wall_fixing";
 import { analyse } from "./analysis";
 import { validateProject } from "./io/project_file";
 import { computeOutputs } from "./outputs";

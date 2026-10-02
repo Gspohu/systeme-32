@@ -15,7 +15,7 @@
     import { topAngle } from "../core/slope";
     import { DIAM } from "../core/text";
     import { BOARD_THICKNESSES, DECORS, MATERIALS, decorById } from "../data/materials";
-    import { HARDWARE } from "../data/hardware";
+    import { HARDWARE, SHELF_SUPPORTS } from "../data/hardware";
     import { DEFAULT_BATTENS } from "../core/factory";
     import { PANEL_MARGIN } from "../core/cutouts";
     import type { Base, BackMount, Carcass, CurveTechnique, End, Front, FrontSpec, Item, Wall } from "../core/model";
@@ -621,6 +621,23 @@
                     <input class="input" type="number" min="0" max="70" value={spec.loadKg}
                         onchange={(e) => frontPatch({ spec: { ...spec, loadKg: num(e) } })} />
                 </label>
+                <label class="field"><span class="label">Coulisses</span>
+                    <select class="select" value={spec.runner ?? ""}
+                        onchange={(e) => frontPatch({ spec: { ...spec, runner: str(e) === "" ? undefined
+                            : str(e) as "760H" | "766H" } })}>
+                        <option value="">Automatique</option>
+                        <option value="760H">MOVENTO 40 kg</option>
+                        <option value="766H">MOVENTO 60/70 kg</option>
+                    </select>
+                </label>
+                {#if spec.count > 1}
+                    <label class="field" title="Hauteurs relatives des façades, de bas en haut : 1, 1, 2 double celle du haut">
+                        <span class="label">Proportions</span>
+                        <input class="input" placeholder="égales" value={spec.ratios?.join(", ") ?? ""}
+                            onchange={(e) => frontPatch({ spec: { ...spec, ratios: str(e).trim() === "" ? undefined
+                                : str(e).split(",").map((v) => { return Number(v.trim()); }) } })} />
+                    </label>
+                {/if}
                 <div class="row">
                     {#each { length: spec.count }, i}
                         <label class="form-check"><input type="checkbox" checked={spec.cutlery?.[i] === true}
@@ -820,6 +837,17 @@
                     <option value="floor">Posé</option>
                 </select>
             </label>
+            {#if carcass.base.type === "wall"}
+                {@const b = carcass.base}
+                <label class="field"><span class="label">Suspension</span>
+                    <select class="select" value={b.hanger ?? "blum"}
+                        onchange={(e) => patch({ base: { ...b, hanger: str(e) as "blum" |
+                                                        "camar" } } as Partial<Carcass>)}>
+                        <option value="blum">Ferrures Blum 48N0510, 130 kg la paire</option>
+                        <option value="camar">Reggibases Camar 807, 240 kg la paire</option>
+                    </select>
+                </label>
+            {/if}
             {#if carcass.base.type === "plinth" || carcass.base.type === "feet"}
                 {@const b = carcass.base}
                 <label class="field"><span class="label">Hauteur socle</span>
@@ -844,8 +872,18 @@
                     <option value="none">Sans fond</option>
                 </select>
             </label>
-            <label class="form-check"><input type="checkbox" checked={carcass.fixToWall}
-                onchange={(e) => patch({ fixToWall: checked(e) } as Partial<Carcass>)} /> Fixation murale anti-basculement</label>
+            {#if carcass.base.type !== "wall"}
+                <label class="form-check"><input type="checkbox" checked={carcass.fixToWall}
+                    onchange={(e) => patch({ fixToWall: checked(e) } as Partial<Carcass>)} /> Fixation murale anti-basculement</label>
+            {/if}
+            <label class="field" title="Taquets des étagères réglables, charge admise pour 4 (Häfele)">
+                <span class="label">Taquets</span>
+                <select class="select" value={carcass.pins ?? ""}
+                    onchange={(e) => patch({ pins: str(e) === "" ? undefined : str(e) } as Partial<Carcass>)}>
+                    <option value="">Automatique</option>
+                    {#each SHELF_SUPPORTS as s (s.ref)}<option value={s.ref}>{s.label}, {s.kgFor4} kg pour 4</option>{/each}
+                </select>
+            </label>
             <label class="form-check" title="Bandeau au nu des façades, du dessus au plafond de la pièce">
                 <input type="checkbox" checked={carcass.ceilingFiller}
                     onchange={(e) => patch({ ceilingFiller: checked(e) } as Partial<Carcass>)} />

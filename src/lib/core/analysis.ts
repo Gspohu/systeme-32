@@ -5,8 +5,8 @@ import { type Build, buildCarcass, emptyBuild } from "./parts";
 import { buildBox, buildWallShelf } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
 import { buildDrawers } from "./drawers";
-import { antiTipKept, fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, fitWallFixing,
-    partMass } from "./fittings";
+import { fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, partMass } from "./fittings";
+import { antiTipKept, fitWallFixing } from "./wall_fixing";
 import { fitDoors } from "./doors";
 import { fitLifts, liftChecks } from "./lifts";
 import { cornerChecks } from "./corner";

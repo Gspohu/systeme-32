@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addItem, setCellSize, setFront, splitCell } from "./commands";
+import { addItem, setCellSize, setFront, splitCell, updateFront, updateItem } from "./commands";
 import { newCarcass, newProject } from "./factory";
 import { analyse } from "./analysis";
 import type { Carcass, Project, SplitNode } from "./model";
@@ -81,6 +81,72 @@ describe("hardware the user is told about", () =>
         expect(messages(p, "info")).toContain("Bahut d'Ammerschwihr : pas d'équerre anti-basculement sous Colonne, "
             + "posé dessus. Relier les deux caissons, le plus haut retient alors l'autre.");
         expect(messages(p, "error")).toEqual([]);
+    });
+
+
+    it("hangs a heavy cabinet on Camar 807 instead of the Blum pair, each with its own limit", () =>
+    {
+        // 2000 x 600 x 500 hung low : about 150 kg with its test loads, too much for the Blum pair
+        const make = (hanger: "blum" | "camar"): Project =>
+        {
+            return addItem(newProject("Turckheim"), newCarcass({ name: "Meuble suspendu de Turckheim", width: 2000,
+                                                                 height: 600, depth: 500, y: 300,
+                                                                 base: { type: "wall", hanger } }));
+        };
+        const camar = analyse(make("camar"));
+        expect(camar.build.hardware.find((h) =>
+        {
+            return h.ref === "CAMAR_807";
+        })!.qty).toBe(2);
+        expect(messages(make("camar"), "info").some((m) =>
+        {
+            return /\d+ kg chargé pour 240 kg admis la paire \(120 kg la pièce, Camar\)/.test(m);
+        })).toBe(true);
+        const kg = Number(/(\d+) kg chargé pour 240/.exec(messages(make("camar"), "info").join(" "))![1]);
+        expect(kg).toBeGreaterThan(130);
+        expect(messages(make("camar"), "error")).toEqual([]);
+        expect(messages(make("blum"), "error").some((m) =>
+        {
+            return m.includes("porte 130 kg");
+        })).toBe(true);
+    });
+
+
+    it("keeps the runners and shelf supports the user chose, and says when they cannot carry the load", () =>
+    {
+        let p = addItem(newProject("Eguisheim"), newCarcass({ name: "Commode d'Eguisheim", width: 600, height: 800,
+                                                              depth: 500 }));
+        const c = p.items[0] as Carcass;
+        p = setFront(p, c.id, c.root.id, { type: "drawers", count: 3, loadKg: 20, runner: "766H" });
+        expect(analyse(p).build.hardware.some((h) =>
+        {
+            return h.ref.startsWith("766H");
+        })).toBe(true);
+        const front = (p.items[0] as Carcass).fronts[0]!;
+        const heavy = updateFront(p, c.id, front.id, { spec: { type: "drawers", count: 3, loadKg: 55,
+                                                              runner: "760H" } });
+        expect(messages(heavy, "error").some((m) =>
+        {
+            return m.includes("Choisir les coulisses 60/70 kg");
+        })).toBe(true);
+        expect(() =>
+        {
+            return updateFront(p, c.id, front.id, { spec: { type: "drawers", count: 3, loadKg: 20, ratios: [1, 2] } });
+        }).toThrow(/Proportions/);
+        // an adjustable shelf 1200 x 500 : 60 kg of test load and its own weight, past the 62.4 kg of four zamak pins
+        let wide = addItem(newProject("Eguisheim"), newCarcass({ width: 1238, height: 800, depth: 508,
+                                                                pins: "282.24.727" }));
+        const k = wide.items[0] as Carcass;
+        wide = splitCell(wide, k.id, k.root.id, "h", 400, "adjustable");
+        expect(messages(wide, "error").some((m) =>
+        {
+            return m.includes("le taquet 282.24.727 porte 62.4 kg pour 4");
+        })).toBe(true);
+        const small = updateItem<Carcass>(wide, k.id, { width: 638 });
+        expect(analyse(small).build.hardware.some((h) =>
+        {
+            return h.ref === "282.24.727";
+        })).toBe(true);
     });
 
 

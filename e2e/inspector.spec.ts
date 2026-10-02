@@ -99,6 +99,15 @@ test.describe("inspector", () =>
         expect(await errorCount(page)).toBe(0);
     });
 
+    test("hangs the carcass on Camar 807 base cabinet hangers instead of the Blum pair", async ({ page }) =>
+    {
+        await field(page, "Socle").selectOption("wall");
+        await expect(check(page, "Fixation murale anti-basculement")).toHaveCount(0);
+        await field(page, "Suspension").selectOption("camar");
+        await outputsTab(page, "Quincaillerie");
+        await expect(page.locator(".tab-content tbody").first()).toContainText("Reggibase réglable 807");
+    });
+
     test("opens a quarter round into three shaped shelves", async ({ page }) =>
     {
         const left = page.locator(".inspector-body .section-title", { hasText: "Côté gauche" });

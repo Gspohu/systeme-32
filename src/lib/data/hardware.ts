@@ -144,6 +144,11 @@ add({ id: "48N0510.02", family: "D60", label: "Ferrure de suspension à visser, 
      brand: "Blum", ref: "48N0510.02", source: `${BLUM_KA150} p. 586`, url: BLUM_KA150_URL });
 add({ id: "48N0510.03", family: "D60", label: "Ferrure de suspension à visser, gauche (130 kg la paire)",
      brand: "Blum", ref: "48N0510.03", source: `${BLUM_KA150} p. 586`, url: BLUM_KA150_URL });
+// Camar states 120 kg stamped on each piece, a right and a left one per cabinet, tested at TÜV LGA
+// TODO the exact right and left references, only the 807 family is read on the Camar page
+add({ id: "CAMAR_807", family: "D60", label: "Reggibase réglable 807 pour meuble suspendu (120 kg la pièce)",
+     brand: "Camar", ref: "807", source: "Camar, système 807, fiche produit",
+     url: "https://www.camar.it/prodotti_sistemi_807.php" });
 
 // Anti-tip fixing of a standing carcass : no manufacturer datasheet could be read (Häfele and Würth refuse
 // bots, Camar and Emuca list no reference), sizes follow the Furnica guide, a retailer blog

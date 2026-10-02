@@ -26,9 +26,12 @@ export interface RunnerChoice
 }
 
 
-export function chooseRunner(depthAvailable: number, loadKg: number): RunnerChoice | null
+// The lighter series that carries the load, or the one the user asked for if it carries it
+export function chooseRunner(depthAvailable: number, loadKg: number, asked?: "760H" | "766H"): RunnerChoice | null
 {
-    const series = loadKg <= MOVENTO.maxLoad760 ? "760H" : loadKg <= MOVENTO.maxLoad766 ? "766H" : null;
+    const auto = loadKg <= MOVENTO.maxLoad760 ? "760H" : loadKg <= MOVENTO.maxLoad766 ? "766H" : null;
+    const max = asked === "760H" ? MOVENTO.maxLoad760 : MOVENTO.maxLoad766;
+    const series = asked === undefined ? auto : loadKg <= max ? asked : null;
     if (series === null)
     {
         return null;
@@ -113,7 +116,13 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         const ft = c.thickness;
         const depthAvail = c.depth - lay.zBack - (front.mount === "inset" ? ft : 0);
-        const runner = chooseRunner(depthAvail, spec.loadKg);
+        const runner = chooseRunner(depthAvail, spec.loadKg, spec.runner);
+        if (runner === null && spec.runner === "760H" && spec.loadKg > MOVENTO.maxLoad760)
+        {
+            b.errors.push(`${c.name} : ${spec.loadKg} kg par tiroir pour des coulisses MOVENTO de `
+                + `${MOVENTO.maxLoad760} kg (Blum p. 418). Choisir les coulisses 60/70 kg ou le choix automatique.`);
+            continue;
+        }
         if (runner === null)
         {
             b.errors.push(`${c.name} : aucune coulisse MOVENTO pour ${Math.round(depthAvail)} mm de profondeur utile et `

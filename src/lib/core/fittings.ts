@@ -1,13 +1,10 @@
 // Masses, sliding leaves, shelf pins, carcass ojinery and base : hardware lines and drilling
 
-import type { Carcass, Item, Settings } from "./model";
+import type { Carcass, Settings } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
 import { sideFace } from "./locate";
 import { byId } from "./edit";
-import { topAngle, topAt } from "./slope";
-import { box } from "./fitted";
-import { boxesMeet, wallBox, type Box3 } from "./room";
 import { polygonArea, tessellate } from "./geometry";
 import type { Build, Joint, Part } from "./parts";
 import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
@@ -22,16 +19,6 @@ import { DIAM } from "./text";
 // Workshop conventions, stated in the drawings as such
 const PIN_BELOW_SHELF = 4;
 const PIN_SPARE_HOLES = 3;
-// anti-tip brackets : one central up to 500 wide, else 100 to 150 from each end (Furnica guide)
-// no more than 800 apart and 20 from the back edge of the top (convention)
-// TODO the 800 and the 20 are workshop habits, no maker figure read for them yet
-const ANTI_TIP_SINGLE_MAX_WIDTH = 500;
-const ANTI_TIP_INSET = 120;
-const ANTI_TIP_MAX_SPACING = 800;
-const ANTI_TIP_FROM_BACK = 20;
-// the generic 40 x 40 x 40 steel bracket of 2 mm priced in data/prices.ts
-const ANTI_TIP_BRACKET_SIZE = 40;
-const ANTI_TIP_BRACKET_THICKNESS = 2;
 
 
 export function partMass(p: Part, check: boolean): number
@@ -134,7 +121,18 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             const ref = GLASS_SUPPORTS[shelf.thickness];
             sup = ref === undefined ? undefined : { ref, label: "", kgFor4: Infinity };
         }
-        for (const x of shelf.material === "glass" ? [] : SHELF_SUPPORTS)
+        // the support the user chose, or the first one carrying the shelf
+        const asked = SHELF_SUPPORTS.find((x) =>
+        {
+            return x.ref === c.pins;
+        });
+        if (asked !== undefined && shelf.material !== "glass" && asked.kgFor4 < loadKg)
+        {
+            b.errors.push(`${c.name}, ${shelf.label.toLowerCase()} : ${loadKg.toFixed(1)} kg, le taquet ${asked.ref} `
+                + `porte ${asked.kgFor4} kg pour 4 (Häfele p. 7.158). Choisir un taquet plus fort ou le choix automatique.`);
+            continue;
+        }
+        for (const x of shelf.material === "glass" ? [] : asked !== undefined ? [asked] : SHELF_SUPPORTS)
         {
             if (sup === undefined && x.kgFor4 >= loadKg)
             {
@@ -397,6 +395,19 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
             }
         }
     }
+    else if (c.base.type === "wall" && c.base.hanger === "camar")
+    {
+        b.hardware.push({ ref: "CAMAR_807", qty: 2, item: c.id, itemName: c.name, target: null,
+                         note: "un droit et un gauche, avec leurs plaques murales anti-décrochage, référence de chaque "
+                             + `côté chez le distributeur, douilles ${DIAM}10 percées d'après la notice Camar` });
+        b.infos.push(`${c.name} : suspendu par deux reggibases Camar 807, ${totalKg.toFixed(0)} kg chargé pour 240 kg `
+            + "admis la paire (120 kg la pièce, Camar).");
+        if (totalKg > 240)
+        {
+            b.errors.push(`${c.name} : ${totalKg.toFixed(0)} kg suspendus, une paire de reggibases Camar 807 porte `
+                + "240 kg. Alléger le meuble ou le poser au sol.");
+        }
+    }
     else if (c.base.type === "wall")
     {
         b.hardware.push({ ref: "48N0510.02", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
@@ -411,109 +422,3 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
     }
 }
 
-
-// Centres of the anti-tip brackets along the carcass width, from its left outer face
-export function antiTipPositions(width: number): number[]
-{
-    if (width <= ANTI_TIP_SINGLE_MAX_WIDTH)
-    {
-        return [width / 2];
-    }
-    return spread(width, ANTI_TIP_INSET, ANTI_TIP_MAX_SPACING);
-}
-
-
-// where a bracket lies, in the frame of the wall : on the highest point of the top under it, a sloped top
-// gets a bracket bent to its angle
-function bracketBox(c: Carcass, x: number): Box3
-{
-    const half = ANTI_TIP_BRACKET_SIZE / 2;
-    const y = c.y + (c.slope === null ? c.height : Math.max(topAt(c, x - half), topAt(c, x + half)));
-    return { min: [c.x + x - half, y, c.z], max: [c.x + x + half, y + ANTI_TIP_BRACKET_SIZE, c.z +
-                                                  ANTI_TIP_BRACKET_SIZE] };
-}
-
-
-// Each bracket position, with the name of what stands over it when something does : no bracket fits under
-// another item, a carcass above holds the lower one once the two are joined
-export function antiTipKept(c: Carcass, items: Item[]): { x: number; under: string | null }[]
-{
-    return antiTipPositions(c.width).map((x) =>
-    {
-        const space = bracketBox(c, x);
-        const over = items.find((k) =>
-        {
-            return k.id !== c.id && k.wall === c.wall && boxesMeet(space, wallBox(k));
-        });
-        return { x, under: over === undefined ? null : over.name };
-    });
-}
-
-
-// Brackets on the top of a standing carcass, screwed to the wall with the plug the wall material need
-export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]): void
-{
-    const top = byId(b.parts, `${c.id}/top`);
-    if (!c.fixToWall || c.base.type === "wall" || top === undefined)
-    {
-        return;
-    }
-    const kept = antiTipKept(c, items);
-    for (const name of new Set(kept.map((k) =>
-    {
-        return k.under;
-    })))
-    {
-        if (name !== null)
-        {
-            b.infos.push(`${c.name} : pas d'équerre anti-basculement sous ${name}, posé dessus. Relier les deux `
-                + "caissons, le plus haut retient alors l'autre.");
-        }
-    }
-    const at = kept.filter((k) =>
-    {
-        return k.under === null;
-    }).map((k) =>
-    {
-        return k.x;
-    });
-    const t = ANTI_TIP_BRACKET_THICKNESS;
-    const S = ANTI_TIP_BRACKET_SIZE;
-    for (const x of at)
-    {
-        // measured along a sloped top
-        const u = (x - c.thickness) / Math.cos(topAngle(c));
-        top.holes.push({ u, v: top.width - ANTI_TIP_FROM_BACK, diameter: 0, depth: 0, face: "B",
-                         label: `Équerre anti-basculement : vis 4 x 16, à ${ANTI_TIP_FROM_BACK} mm du chant arrière (convention)` });
-        // one leg lying on the top from the wall, the other standing against the wall on it
-        const y = bracketBox(c, x).min[1];
-        const key = `${c.id}/equerre-${Math.round(x)}`;
-        const label = `${c.name} : équerre anti-basculement`;
-        b.fitted.push(
-            box(`${key}/a`, c.id, "ANTI_TIP_BRACKET", label, [c.x + x - S / 2, y, c.z], [c.x + x + S / 2, y + t, c.z +
-                S],
-                true),
-            box(`${key}/b`, c.id, "ANTI_TIP_BRACKET", label, [c.x + x - S / 2, y + t, c.z], [c.x + x +
-                S / 2, y + S, c.z + t],
-                true),
-        );
-    }
-    const n = at.length;
-    if (n === 0)
-    {
-        return;
-    }
-    const line = (ref: string, note: string | null): void =>
-    {
-        b.hardware.push({ ref, qty: n, item: c.id, itemName: c.name, target: top.id, note });
-    };
-    line("ANTI_TIP_BRACKET", "sur le dessus, jamais dans le fond");
-    line("SCREW_4x16", null);
-    if (s.wallType === "plasterboard")
-    {
-        line("PLUG_HOLLOW_METAL", null);
-        return;
-    }
-    line("WALL_SCREW_5x50", null);
-    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", null);
-}
