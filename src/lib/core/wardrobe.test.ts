@@ -205,6 +205,31 @@ describe("cell lights", () =>
         expect(hardwareOf(a.build.hardware, "LED_STRIP_24V")?.note).toBe("900 mm, 3000 K, 14.4 W/m");
         expect(hardwareOf(a.build.hardware, "LED_DRIVER_24V")?.note)
             .toBe("17 W mini pour 13.0 W de LED (1 éclairage(s), charge à 80 %)");
+        // the profile ends butt the sides of the cell, hidden : no end cap, and no Wi-Fi controller unasked
+        expect(hardwareOf(a.build.hardware, "LED_END_CAPS")).toBeUndefined();
+        expect(hardwareOf(a.build.hardware, "SHELLY_PLUS_RGBW_PM")).toBeUndefined();
+    });
+
+
+    it("puts one Wi-Fi controller on the driver when a light asks for it, and holds it to 4 A a channel", () =>
+    {
+        let p = addItem(newProject("Sélestat"), wardrobe());
+        const c = p.items[0] as Carcass;
+        p = setLight(p, c.id, c.root.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000, wifi: true });
+        const a = analyse(p);
+        // 13.0 W of strip on 24 V
+        expect(hardwareOf(a.build.hardware, "SHELLY_PLUS_RGBW_PM")?.note)
+            .toBe("entre l'alimentation et les rubans, 0.54 A sur une voie, pilotage local");
+        // 2000 wide : 1800 of strip at 50 W/m make 90 W, 3.75 A, still under , at 60 W/m 4.5 A is not
+        let wide = addItem(newProject("Sélestat"), wardrobe({ width: 2000 }));
+        const w = wide.items[0] as Carcass;
+        wide = setLight(wide, w.id, w.root.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000, wifi: true });
+        const strong = (watts: number): string =>
+        {
+            return errorsOf({ ...wide, settings: { ...wide.settings, ledWattPerMetre: watts } }).join();
+        };
+        expect(strong(50)).not.toContain("par voie du contrôleur");
+        expect(strong(60)).toContain("par voie du contrôleur");
     });
 
     it("drills round spots evenly under the top, their leads going up, and sizes the driver", () =>

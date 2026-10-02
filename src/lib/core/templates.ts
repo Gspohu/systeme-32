@@ -135,8 +135,12 @@ export function dresser(): Project
     {
         return split("h", [201, 421], [cell(), cell(), cell()]);
     };
-    const niche = box("Niche", 600, 960, 1600, 680, split("v", [220, 1323], [sideShelves(), cell(),
+    const opening = cell();
+    const niche = box("Niche", 600, 960, 1600, 680, split("v", [220, 1323], [sideShelves(), opening,
         sideShelves()]), true);
+    // a LED strip let into the underside of its top, lighting the opening, switched and dimmed over Wi-Fi
+    niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
+                        wifi: true });
 
     // the top row parted like the bays under it : its doors line up with theirs acros the niche
     const top = [cell(), cell(), cell()];

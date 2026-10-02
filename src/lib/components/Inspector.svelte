@@ -546,6 +546,12 @@
                             <option value="4000">4000 K</option>
                         </select>
                     </label>
+                    <label class="form-check" title="Contrôleur Wi-Fi entre l'alimentation et le ruban, sans compte">
+                        <input type="checkbox" checked={light.wifi === true}
+                            onchange={(e) => app.apply(setLight, carcass.id, nodeBox.id, { ...light,
+                                wifi: checked(e) })} />
+                        Pilotage Wi-Fi
+                    </label>
                 {/if}
                 <div class="section-title">Trous de prise</div>
                 {#each carcass.outlets.filter((o) => { return o.cell === nodeBox.id; }) as o (o.id)}

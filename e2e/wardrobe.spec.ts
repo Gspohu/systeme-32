@@ -60,6 +60,15 @@ test.describe("wardrobe", () =>
     });
 
 
+    test("adds the Wi-Fi controller once the light is driven over Wi-Fi", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await check(page, "Éclairage LED").check();
+        await check(page, "Pilotage Wi-Fi").check();
+        expect(await hardwareRow(page, "Contrôleur Wi-Fi Shelly")).toContain("0.30 A sur une voie, pilotage local");
+    });
+
+
     test("swaps the profile for round spots and follows their power", async ({ page }) =>
     {
         await cells(page).first().click();
