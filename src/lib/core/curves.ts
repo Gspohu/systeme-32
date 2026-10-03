@@ -114,12 +114,12 @@ export function openEndLevels(c: Carcass, end: Extract<End, { type: "rounded" }>
 }
 
 
-// Upright of an open end, in the frame of its shaped boards (u out from the side, v back from the front) :
-// halfway round the arc, its outer corners kept POST_SETBACK inside it
+// Upright of an open end sat on, in the frame of its shaped boards (u out from the side, v back from the front) :
+// halfway round the arc, its outer corners kept POST_SETBACK inside it. No seat, no upright
 export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: number; w: number; t: number } | null
 {
     const end = c.ends[side];
-    if (end.type !== "rounded" || end.open !== true || end.post !== true)
+    if (end.type !== "rounded" || end.open !== true || end.seat !== true)
     {
         return null;
     }
@@ -179,7 +179,7 @@ export function buildEnds(c: Carcass, b: Build): void
         if (end.floor === true && c.base.type === "wall")
         {
             b.errors.push(`${c.name}, ${title.toLowerCase()} : un meuble suspendu ne descend pas au sol. `
-                + "Décocher Jusqu'au sol ou poser le meuble au sol.");
+                + "Décocher la case Jusqu'au sol, ou poser le meuble au sol.");
         }
         const drop = endDrop(c, end);
         const y0 = c.y - drop;
@@ -203,7 +203,7 @@ export function buildEnds(c: Carcass, b: Build): void
         if (drop > 0 && post === null && end.back !== true)
         {
             b.errors.push(`${c.name}, ${title.toLowerCase()} : la flasque basse posée au sol n'est tenue par rien, `
-                + "la joue s'arrête au-dessus du socle. Ajouter le montant ou le fond de l'arrondi.");
+                + "la joue s'arrête au-dessus du socle. Cocher la case Fond, ou Assise qui pose un montant.");
         }
         for (const lv of levels)
         {

@@ -228,8 +228,8 @@ export type End =
        9; battens: Battens; decor: string; back?: boolean;
        // an open end has no skin : shaped shelves in the reach of the arc, evenly spread between the end panels
        open?: boolean; shelves?: number; 
-       // the low end panel laid on the floor past the base, an upright halfway roudn the arc, sat on
-       floor?: boolean; post?: boolean; seat?: boolean };  
+       // the low end panel laid on the floor past the base. Sat on, an upright halfway roudn the arc carries it
+       floor?: boolean; seat?: boolean };  
 
 
 export interface Carcass

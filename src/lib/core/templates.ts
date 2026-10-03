@@ -51,7 +51,7 @@ export function tvWall(): Project
             left: { type: "square" },
             right: { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
                      battens: DEFAULT_BATTENS, decor: OAK, open: true, shelves: 1, back: true, floor: true,
-                     post: true, seat: true },
+                     seat: true },
         },
     });
     // a 60 mm hole through the back of the lower left cell for the cables, to set from the grommet bought

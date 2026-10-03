@@ -79,24 +79,24 @@ export function checkSeat(c: Carcass, lay: ResolvedLayout, top: Part): SeatCheck
 }
 
 
-// Top board of an open end sat on : hung off the side alone, the load at half its reach, or carried between
-// the side and the upright, the load halfway between them. The whole depth works as one beam, as for a top
+// Top board of an open end sat on, carried between the side and the upright a seat always gets, the load
+// halfway between them. The whole depth works as one beam, as for a top
 // TODO the upright is a point under a pate, not a line across it : a plate model would tell how much of the
 // depth really carry the sitter
-export function checkEndSeat(c: Carcass, side: "left" | "right", top: Part): SeatCheck & { onPost: boolean }
+export function checkEndSeat(c: Carcass, side: "left" | "right", top: Part): SeatCheck | null
 {
+    const post = endPost(c, side);
+    if (post === null)
+    {
+        return null;
+    }
     const m = MATERIALS[top.material]!;
-    const post = endPost(c, side); 
     const b = top.width;
-    const t = top.thickness; 
-    const inertia = b * t ** 3 / 12;
-    const span = post === null ? top.length / 2 : post.u;
-    const moment = post === null ? SEAT_LOAD_N * span : SEAT_LOAD_N * span / 4;
-    const deflection = post === null
-        ? SEAT_LOAD_N * span ** 3 / (3 * m.modulus * inertia)
-        : SEAT_LOAD_N * span ** 3 / (48 * m.modulus * inertia);
-    return { span, stress: moment / (b * t * t / 6), allowed: m.kmod * m.strength / GAMMA_M, kmod: m.kmod, deflection,
-             onPost: post !== null };
+    const t = top.thickness;
+    const span = post.u;
+    const deflection = SEAT_LOAD_N * span ** 3 / (48 * m.modulus * (b * t ** 3 / 12));
+    return { span, stress: SEAT_LOAD_N * span / 4 / (b * t * t / 6), allowed: m.kmod * m.strength / GAMMA_M,
+             kmod: m.kmod, deflection };
 }
 
 
@@ -113,13 +113,17 @@ function endSeatChecks(c: Carcass, b: Build): Check[]
         }
         const where = `${c.name}, bout arrondi ${side === "right" ? "droit" : "gauche"}`;
         const r = checkEndSeat(c, side, top);
-        const figures = `${r.onPost ? "portée" : "porte-à-faux"} ${Math.round(r.span)} mm, ${r.stress.toFixed(1)} N/mm² ` 
+        if (r === null)
+        {
+            continue;
+        }
+        const figures = `portée ${Math.round(r.span)} mm jusqu'au montant, ${r.stress.toFixed(1)} N/mm² `
             + `pour ${r.allowed.toFixed(1)} admissibles, flèche ${r.deflection.toFixed(1)} mm`;
         if (r.stress > r.allowed)
         {
             out.push({ level: "error", item: c.id, target: top.id,
                        message: `${where} : l'assise ne porte pas une personne (${SEAT_LOAD_N} N, essai EN 16139:2013), `
-                           + `${figures}. ${r.onPost ? "Réduire le rayon." : "Ajouter le montant sous l'arc."}` });
+                           + `${figures}. Réduire le rayon, ou décocher Assise.` });
         }
         else
         {
@@ -128,11 +132,11 @@ function endSeatChecks(c: Carcass, b: Build): Check[]
                            + "Le montant compte comme un appui sur toute la profondeur, l'assemblage sur la joue "
                            + "n'est pas vérifié (aucune capacité Minifix sourcée)." });
         }
-        if (r.onPost && !endGrounded(c, end))
+        if (!endGrounded(c, end))
         {
             out.push({ level: "error", item: c.id, target: top.id,
-                       message: `${where} : le montant descend sur une flasque basse qui pend de la joue, la charge ` 
-                           + "n'atteint pas le sol. Cocher Jusqu'au sol ." });
+                       message: `${where} : le montant descend sur une flasque basse qui pend de la joue, la charge `
+                           + "n'atteint pas le sol. Cocher la case Jusqu'au sol." });
         }
         top.notes.push(`Assise : ${SEAT_LOAD_N} N, rien ne se pose dessus`);
     }

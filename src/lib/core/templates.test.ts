@@ -238,7 +238,7 @@ describe("the sketch templates", () =>
     });
 
 
-    it("refuses a sitter on the quarter round once its upright is gone, then once it hangs above the floor", () =>
+    it("puts the upright under the quarter round with the seat, takes it away without", () =>
     {
         const p = tvWall();
         const base = p.items[0] as Carcass;
@@ -247,22 +247,33 @@ describe("the sketch templates", () =>
         {
             throw new Error("the TV wall lost its rounded end");
         }
-        const sat = (): string[] =>
+        const said = (): string[] =>
         {
             return analyse(p).checks.filter((k) =>
             {
-                return k.level === "error" && k.message.includes("bout arrondi droit");
+                return (k.level !== "info" && k.message.includes("bout arrondi droit")) || k.message.includes("assise");
             }).map((k) =>
             {
-                return k.message;
+                return `${k.level} | ${k.message}`;
             });
         };
-        end.post = false;
-        // 1600 N at half the 300 reach, hung off the side : the 10.2 N/mm2 found by hand against 5.5
-        expect(sat().join()).toContain("porte-à-faux 150 mm, 10.2 N/mm²");
-        end.post = true;
+        const posts = (): number =>
+        {
+            return analyse(p).build.parts.filter((q) =>
+            {
+                return q.id.startsWith(`${base.id}/end/right/post`);
+            }).length;
+        };
+        expect(posts()).toBe(2);
+        expect(said().join()).toContain("info | Meuble bas, bout arrondi droit : assise vérifiée");
+        // nobody sits on it : no upright, nothing to check, the low board held by the back of the arc
+        end.seat = false;
+        expect(posts()).toBe(0);
+        expect(said()).toEqual([]);
+        // sat on again but hanging above the floor : the upright stands on a board hung off the side
+        end.seat = true;
         end.floor = false;
-        expect(sat().join()).toContain("n'atteint pas le sol");
+        expect(said().join()).toContain("n'atteint pas le sol");
     });
 
 

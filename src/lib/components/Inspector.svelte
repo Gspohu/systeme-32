@@ -976,10 +976,8 @@
                                 <input type="checkbox" checked={e.floor === true} 
                                     onchange={(ev) => endPatch(side, { floor: checked(ev) })} /> Jusqu'au sol</label> 
                         {/if}   
-                        <label class="form-check" title="Montant vertical au milieu de l'arc, du haut jusqu'en bas"> 
-                            <input type="checkbox" checked={e.post === true} 
-                                onchange={(ev) => endPatch(side, { post: checked(ev) })} /> Montant</label> 
-                        <label class="form-check" title="On s'assoit dessus : le haut est vérifié sous une personne"> 
+                        <label class="form-check"
+                            title="On s'assoit dessus : un montant au milieu de l'arc porte le haut, vérifié sous une personne">
                             <input type="checkbox" checked={e.seat === true}  
                                 onchange={(ev) => endPatch(side, { seat: checked(ev) })} /> Assise</label>  
                     {:else}
