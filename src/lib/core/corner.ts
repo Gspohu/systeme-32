@@ -1,10 +1,10 @@
-// Fronts meeting other items across a corner : covered fronts, doors that cannot reach square, drawers blocked
+// Façades meeting other items across a corner : covered fronts, doors that cannot reach square, drawers blocked
 
 import type { Carcass, Project, Wall } from "./model";
 import type { FrontPanel } from "./fronts";
 import type { Check } from "./analysis";
 import type { Build } from "./parts";
-import { boxesMeet, boxToRoom, boxToWall, roomBox, WALL_LABELS, type Box3 } from "./room";
+import { boxesMeet, boxToRoom, boxToWall, roomBox, sideWallDepth, WALL_LABELS, type Box3 } from "./room";
 
 
 interface Obstacle
@@ -91,6 +91,13 @@ export function cornerChecks(p: Project, b: Build): Check[]
                           message: `${it.name} sort de la pièce (${r.width} x ${r.depth} x ${r.height} mm). Mesurer la `
                               + "pièce dans Réglages ou déplacer le meuble." });
         }
+        // on a side wall of an alcove, past its return there is no wall left to fix to
+        else if (it.wall !== "back" && box.max[2] > sideWallDepth(r, it.wall) + 0.5)
+        {
+            checks.push({ level: "warning", item: it.id, target: null,
+                          message: `${it.name} dépasse le retour du ${WALL_LABELS[it.wall].toLowerCase()} `
+                              + `(${sideWallDepth(r, it.wall)} mm depuis le fond) : rien pour le fixer au-delà.` });
+        }
     }
     for (const c of p.items)
     {
@@ -110,7 +117,7 @@ export function cornerChecks(p: Project, b: Build): Check[]
         for (const fp of b.fronts.get(c.id) ?? [])
         {
             const slab = frontSlab(c, fp);
-            const label = `${c.name}, ${fp.role === "door" ? "porte" : fp.role === "drawer" ? "tiroir" : "façade"} ${fp.index + 1}`;
+            const label = `${c.name}, ${fp.role === "door" ? "porte" : fp.role === "drawer" ? "tiroir" : "façade"} ${fp.number}`;
             let covered = false;
             for (const blocker of others)
             {

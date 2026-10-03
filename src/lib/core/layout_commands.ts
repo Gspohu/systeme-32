@@ -1,6 +1,7 @@
 // Commands on the split tree of a carcass : add, move, retype and remove shelves and uprights
 
-import type { CellNode, DividerKind, Finish, Front, Project, SplitNode } from "./model";
+import type { Carcass, CellNode, DividerKind, Finish, Front, Project, SplitNode } from "./model";
+import { shelfOnPins } from "./grid";
 import { cell, newId } from "./factory";
 import { MIN_CELL, dividerThickness, findNode, findParent, resolveLayout, snap } from "./layout";
 import { CommandError, carcassOf, edit, prune, replaceNode } from "./edit";
@@ -40,8 +41,10 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
         const start = axis === "h" ? nb.y : nb.x;
         const length = axis === "h" ? nb.h : nb.w;
         const origin = axis === "h" ? lay.inner.y : lay.inner.x;
-        // the lower face of the divider snaps on the grid counted rfom the carcass inner origin
-        const local = Math.round(origin + snap(pos - origin, q.settings.grid) - start);
+        // the lower face of the divider snaps on the grid counted rfom the carcass inner origin, an adjustable shelf
+        // on the pins of the line
+        const snapped = origin + snap(pos - origin, q.settings.grid);
+        const local = Math.round((axis === "h" && kind === "adjustable" ? onPins(q, c, snapped) : snapped) - start);
         if (local < MIN_CELL || length - local - dividerThickness(c, axis, null) < MIN_CELL)
         {
             throw new CommandError(`Case trop petite à cet endroit : ${MIN_CELL} mm mini de part et d'autre de la séparation.`);
@@ -183,7 +186,9 @@ export function moveDivider(p: Project, carcassId: string, splitId: string, inde
         const start = sp.axis === "h" ? nb.y : nb.x;
         const length = sp.axis === "h" ? nb.h : nb.w;
         const origin = sp.axis === "h" ? lay.inner.y : lay.inner.x;
-        const local = Math.round(exact ? pos - start : origin + snap(pos - origin, q.settings.grid) - start);
+        const wanted = exact ? pos : origin + snap(pos - origin, q.settings.grid);
+        const adjustable = sp.axis === "h" && sp.dividers[index] === "adjustable";
+        const local = Math.round((adjustable ? onPins(q, c, wanted) : wanted) - start);
         const previous = index === 0 ? 0 : sp.cuts[index - 1]! + thick(index - 1);
         const next = index === sp.cuts.length - 1 ? length : sp.cuts[index + 1]!;
         if (local - previous < MIN_CELL || next - (local + thick(index)) < MIN_CELL)
@@ -288,13 +293,32 @@ export function setDividerKind(p: Project, carcassId: string, splitId: string, i
 {
     return edit(p, (q) =>
     {
-        const sp = findNode(carcassOf(q, carcassId).root, splitId);
+        const c = carcassOf(q, carcassId);
+        const sp = findNode(c.root, splitId);
         if (sp === null || sp.kind !== "split" || sp.axis !== "h")
         {
             throw new CommandError("Seule une tablette horizontale peut être réglable.");
         }
         sp.dividers[index] = kind;
+        if (kind === "adjustable")
+        {
+            // made adjustable, the shelf moves onto the pins of the line nearest to it
+            const nb = resolveLayout(c).nodes.get(splitId)!;
+            sp.cuts[index] = Math.round(onPins(q, c, nb.y + sp.cuts[index]!) - nb.y);
+            const errors = resolveLayout(c).errors;
+            if (errors.length > 0)
+            {
+                throw new CommandError(`Tablette réglable impossible ici : ${errors[0]}`);
+            }
+        }
     });
+}
+
+
+// An adjustable shelf rests on the pins of the system 32 line, a typed height included : carcass y of its underside
+function onPins(q: Project, c: Carcass, underside: number): number
+{
+    return q.settings.grid > 0 ? shelfOnPins(c, q.settings, underside) : underside;
 }
 
 

@@ -38,15 +38,22 @@ export function endReach(c: Carcass, side: "left" | "right"): number
 }
 
 
+// Width of the filler strip on one side of a carcass, 0 without one
+export function sideFiller(c: Carcass, side: "left" | "right"): number
+{
+    return Math.max(0, c.sideFillers?.[side] ?? 0);
+}
+
+
 export function itemExtent(it: Item): Extent
 {
     if (it.kind === "carcass")
     {
         return {
-            x0: it.x - endReach(it, "left"),
+            x0: it.x - Math.max(endReach(it, "left"), sideFiller(it, "left")),
             y0: it.y - baseHeight(it),
-            x1: it.x + it.width + endReach(it, "right"),
-            // a cushin on a seat takes room above the top
+            x1: it.x + it.width + Math.max(endReach(it, "right"), sideFiller(it, "right")),
+            // a cushin on a seat need room above the top
             y1: it.y + it.height + (it.seat === null ? 0 : it.seat.cushion),
         };
     }

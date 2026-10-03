@@ -7,7 +7,7 @@ import { X, Y, Z, neg } from "./geometry";
 import { CLEAT_THICKNESS } from "./slats";
 
 // the slat cleats of the same project, 40 x 20
-const CLEAT_WIDTH = 40;
+export const CLEAT_WIDTH = 40;
 
 
 export function fillerGap(c: Carcass, room: Room): number
@@ -35,7 +35,7 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build): void
         return;
     }
     const t = c.thickness;
-    // in the plane of the overlay fronts, in their decor whne there are some
+    // in the plane of the overlay façades, in their decor whne there are some
     const front = c.fronts[0];
     const strip = newPart({
         item: c.id, itemName: c.name, thickness: t, decor: front?.decor ?? c.decor, colour: front?.colour ?? null,

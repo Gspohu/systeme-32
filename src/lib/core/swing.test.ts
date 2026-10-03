@@ -84,7 +84,8 @@ describe("fronts swept through their opening", () =>
         expect(said).toHaveLength(2);
         for (const s of said)
         {
-            const pair = /^warning \| Meuble bas, tiroir [12] et meuble bas, porte \d se heurtent/;
+            // drawers numbered top row first : the right hand column holds 2 and 4
+            const pair = /^warning \| Meuble bas, tiroir [24] et meuble bas, porte \d se heurtent/;
             expect(s).toMatch(pair);
         }
     });

@@ -22,7 +22,9 @@ export interface Page
 
 export const A3 = { w: 420, h: 297 };
 export const MARGIN = 10;
-export const TITLE_BLOCK_H = 18;
+export const TITLE_BLOCK_H = 28;
+// ISO 7200:2004 § 6 : 180 mm wide whatever the sheet, the width of an A4 between margins of 20 and 10
+export const TITLE_BLOCK_W = 180;
 
 // Helvetica averages about half an em per character : used to centre and truncate, not exatc metics
 const AVG_CHAR = 0.52;
@@ -42,6 +44,29 @@ export function fit(t: string, size: number, width: number): string
     }
     const n = Math.max(1, Math.floor(width / (size * AVG_CHAR)) - 3);
     return `${t.slice(0, n)}...`;
+}
+
+
+// Lines of at most `width`, broken between words : nothing cut off, a word too long for a line stands alone
+export function wrap(t: string, size: number, width: number): string[]
+{
+    const lines: string[] = [];
+    let line = "";
+    for (const word of t.split(" "))
+    {
+        const next = line === "" ? word : `${line} ${word}`;
+        if (line !== "" && textWidth(next, size) > width)
+        {
+            lines.push(line);
+            line = word;
+        }
+        else
+        {
+            line = next;
+        }
+    }
+    lines.push(line);
+    return lines;
 }
 
 
@@ -122,24 +147,62 @@ export interface TitleInfo
     scale: string;
     index: number;
     count: number;
+    // tells one state of the project from another, the drawings of two states never mix
+    revision: string;
+    // the document number, unique to the project and kept from one revision to the next
+    identification: string;
 }
 
 
+// ISO 5456-2:1996 first angle : the truncated cone on the left, its small end leftmost, its end view on the right
+// (drawn as the European symbol of the Çukurova EEE114 course, week 7)
+function firstAngleSymbol(c: Canvas, x: number, cy: number): void
+{
+    c.poly([[x, cy - 2], [x + 10, cy - 4], [x + 10, cy + 4], [x, cy + 2]], true, "thin");
+    c.circle(x + 18, cy, 4, "thin");
+    c.circle(x + 18, cy, 2, "thin");
+    c.line(x - 2, cy, x + 24, cy, "centre");
+}
+
+
+// ISO 7200:2004 title block, its eight mandatory fields (iTeh sample, tables 1 to 3) : title, legal owner, number
+// date of issue, sheet, creator, approval person, document type. Revision, scale, unit, tolerances and projection
+// beside them. The names the software cannot know are left to fill by hand
 export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): void
 {
     c.rect(MARGIN, MARGIN, w - 2 * MARGIN, h - 2 * MARGIN, "thick");
     const y = h - MARGIN - TITLE_BLOCK_H;
-    const x = w - MARGIN - 190;
-    c.rect(x, y, 190, TITLE_BLOCK_H, "normal");   
-    c.line(x + 110, y, x + 110, y + TITLE_BLOCK_H, "thin");
-    c.line(x + 150, y, x + 150, y + TITLE_BLOCK_H, "thin");
-    c.line(x, y + 9, x + 190, y + 9, "thin");
-    c.text(x + 2, y + 6, fit(info.project, 3.2, 106), 3.2, "start", true);
-    c.text(x + 2, y + 15, fit(info.title, 3, 106), 3);
-    c.text(x + 112, y + 6, `Échelle ${info.scale}`, 2.5);
-    c.text(x + 112, y + 15, info.date, 2.5);
-    c.text(x + 152, y + 6, `Planche ${info.index}/${info.count}`, 2.5);
-    c.text(x + 152, y + 15, "systeme-32", 2.5, "start", true);
+    const x = w - MARGIN - TITLE_BLOCK_W;
+    const row = TITLE_BLOCK_H / 4;
+    c.rect(x, y, TITLE_BLOCK_W, TITLE_BLOCK_H, "normal");
+    const [b, s, p] = [85, 117, 152];
+    for (const at of [b, s, p])
+    {
+        c.line(x + at, y, x + at, y + TITLE_BLOCK_H, "thin");
+    }
+    for (let k = 1; k < 4; k++)
+    {
+        c.line(x, y + k * row, x + (k === 2 ? TITLE_BLOCK_W : p), y + k * row, "thin");
+    }
+    const cell = (col: number, k: number, text: string, size = 2.4, bold = false): void =>
+    {
+        c.text(x + col + 2, y + k * row + row - 2, text, size, "start", bold);
+    };
+    cell(0, 0, fit(info.project, 3, b - 4), 3, true);
+    cell(0, 1, fit(info.title, 2.8, b - 4), 2.8);
+    cell(0, 2, "Dossier de fabrication");
+    // the class named in or near the title block (ISO 2768-1:1989 via the Zeiss quality forum chart)
+    cell(0, 3, "Cotes en mm, tolérances générales ISO 2768-1:1989 classe m", 2.2);
+    cell(b, 0, `Échelle ${info.scale}`);
+    cell(b, 1, info.date);
+    cell(b, 2, `Indice ${info.revision}`);
+    cell(b, 3, `N° ${info.identification}`);
+    cell(s, 0, `Planche ${info.index}/${info.count}`);
+    cell(s, 1, "Dessiné par :");
+    cell(s, 2, "Approuvé par :");
+    cell(s, 3, "Propriétaire :");
+    firstAngleSymbol(c, x + p + 3, y + row);
+    cell(p, 3, "systeme-32", 2.4, true);
 }
 
 

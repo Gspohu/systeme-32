@@ -1,7 +1,7 @@
 // Hardware catalogue, every reference checked against the manufacturer document named in `source`
 
 import { DIAM } from "../core/text";
-import { HK_TOP } from "./rules";
+import { CONNECTING_SCREWS, HK_TOP } from "./rules";
 
 // Standard part families of the PBS : D50 and D60 reuse the Free-pbs families, the others are new
 export type Family = "D20" | "D21" | "D22" | "D30" | "D31" | "D41" | "D42" | "D50" | "D51" | "D60" | "D70" | "D80" |
@@ -69,6 +69,8 @@ add({ id: "70T3750.TL", family: "D20", label: "Charnière CLIP top 110° sans re
      brand: "Blum", ref: "70T3750.TL", source: `${BLUM_KA150} p. 74`, url: BLUM_KA150_URL });
 add({ id: "173H7100", family: "D21", label: "Embase en croix 37/32, distance 0, réglage excentrique", brand: "Blum",
      ref: "173H7100", source: `${BLUM_KA150} p. 146`, url: BLUM_KA150_URL });
+add({ id: "174H7100E", family: "D21", label: "Embase en croix 37/32, distance 0, chevilles EXPANDO dans les trous système",
+     brand: "Blum", ref: "174H7100E", source: `${BLUM_KA150} p. 146`, url: BLUM_KA150_URL });
 add({ id: "609.1500", family: "D41", label: `Vis agglo ${DIAM}3,5 x 15`, brand: "Blum", ref: "609.1500",
      source: `${BLUM_KA150} p. 74 et 432`, url: BLUM_KA150_URL });
 add({ id: "956.1004", family: "D50", label: "TIP-ON pour portes, version courte avec aimant", brand: "Blum",
@@ -245,12 +247,22 @@ add({ id: "262.25.035", family: "D41", label: "Boîtier Minifix 15 avec bord, bo
      ref: "262.25.035", source: `${HAFELE_UK} p. 7.14`, url: "https://assets.daro.com/HafeleLiterature/18T7-14.pdf" });
 add({ id: "262.28.020", family: "D41", label: `Goujon Minifix S100 B34, filet 8, avant-trou ${DIAM}5`, brand: "Häfele",
      ref: "262.28.020", source: `${HAFELE_UK} p. 7.19`, url: "https://assets.daro.com/HafeleLiterature/18T7-19.pdf" });
+for (const s of CONNECTING_SCREWS)
+{
+    add({ id: s.ref, family: "D41", label: `Vis de liaison de caissons M6, serrage ${s.min}-${s.max}, ${DIAM}8 traversant`,
+         brand: "Häfele", ref: s.ref, source: "Häfele, catalogue 2017 (US), Connectors and Shelf Supports p. 11.138",
+         url: "https://p11.secure.hostingprod.com/@site.homedecorhardware.com/ssl/hafele-catalog-2017/"
+             + "11-Connectors-and-Shelf-Supports.pdf" });
+}
 add({ id: "145334", family: "D41", label: "Clamex P-14, boîte de 80 paires", brand: "Lamello", ref: "145334",
      source: LAMELLO_P14, url: "https://lamello.com/fileadmin/products/Operating_instructions_Clamex_P14.pdf" });
 add({ id: "145415", family: "D41", label: "Tenso P-14, boîte de 80 paires", brand: "Lamello", ref: "145415",
      source: LAMELLO_P14, url: "https://lamello.com/fileadmin/products/Operating_instructions_Clamex_P14.pdf" });
 add({ id: "DOWEL_8x35", family: "D42", label: `Tourillon hêtre ${DIAM}8 x 35 cannelé`, brand: "",
      ref: "Générique", source: "Article générique, sans référence fabricant" });
+// 16 mm of drawer box and 14 into a 19 mm front, 5 left before its face
+add({ id: "SCREW_4x30", family: "D41", label: "Vis aggloméré 4 x 30, façade de tiroir vissée depuis le caisson",
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
 
 
 // Plinth ventilation grill, p. 11.60 : black here, also 571.77.705 white, .500 grey, .900 matt silver, .200 chrome

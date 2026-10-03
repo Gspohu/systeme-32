@@ -62,7 +62,7 @@ function point(layer: string, x: number, y: number): Group[]
 
 function text(layer: string, x: number, y: number, h: number, t: string): Group[]
 {
-    // R12 text is single byte : accented letters are kept as Latin-1, the rest dropped to ASCII
+    // R12 text is single byte : accented letters (é, ç) are kept as Latin-1, the rest dropped to ASCII
     let safe = "";
     for (const ch of t)
     {
@@ -176,6 +176,19 @@ export function partToDxf(p: Part, code: string): string
         const half = g.width / 2;
         const [x0, y0, x1, y1] = g.along === "u" ? [g.from, g.at - half, g.to, g.at + half] : [g.at -
             half, g.from, g.at + half, g.to];
+        ents.push(line(l, x0, y0, x1, y0), line(l, x1, y0, x1, y1), line(l, x1, y1, x0, y1), line(l, x0, y1, x0, y0));
+    }
+    // an edge pocket seen from face A : its length along the edge, as deep as it goes, its layer naming the edge
+    // its width and where it sits across the thickness
+    for (const k of p.pockets ?? [])
+    {
+        const l = layerName(["ENTAILLE", k.edge, `L${k.across}`, `W${k.w}`, `P${k.depth}`]);
+        layers.add(l);
+        const half = k.length / 2;
+        const [x0, y0, x1, y1] = k.edge === "v0" ? [k.at - half, 0, k.at + half, k.depth]
+            : k.edge === "v1" ? [k.at - half, p.width - k.depth, k.at + half, p.width]
+                : k.edge === "u0" ? [0, k.at - half, k.depth, k.at + half] : [p.length - k.depth, k.at - half, p.length,
+                    k.at + half];
         ents.push(line(l, x0, y0, x1, y0), line(l, x1, y0, x1, y1), line(l, x1, y1, x0, y1), line(l, x0, y1, x0, y0));
     }
     ents.push(text("TEXTE", 0, -12, 6, `${code} ${p.label} ep. ${p.thickness} face A vers soi`));

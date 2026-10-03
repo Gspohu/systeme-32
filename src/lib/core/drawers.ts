@@ -1,9 +1,11 @@
 // Drawer boxes on Blum MOVENTO runners : sizing, runnr and TIP-ON choice, drilling (Blum KA-150 p. 418-437)
 
-import type { Carcass, DrawerFront } from "./model";
+import type { Carcass, DrawerFront, Settings } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
-import { type Build, newPart } from "./parts";
+import { type Build, type Joint, newPart } from "./parts";
+import { spread } from "./fittings";
+import { fitJoints } from "./joints";
 import { sideFace } from "./locate";
 import { box } from "./fitted";
 import { X, Y, Z, neg } from "./geometry";
@@ -17,6 +19,10 @@ import { DIAM } from "./text";
 export const BOX_THICKNESS = 16;
 const MIN_BOX_HEIGHT = 60;
 const BOTTOM_RECESS = 13;
+// Ø8 x 35 dowels in 16 mm boards : 10 into a face leaves 6 of it, the holes 3 longer than the dowel for the glue
+// (Dictum, 4 x 3 tips for dowelling), the split between face and edge is a workshop convention
+const BOX_DOWEL_FACE = 10;
+const BOX_DOWEL_EDGE = 28;
 
 export interface RunnerChoice
 {
@@ -80,7 +86,7 @@ export function rearOffsets(r: RunnerChoice): number[]
 }
 
 
-export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
+export function buildDrawers(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
 {
     const ordered: FrontPanel[] = [...(b.fronts.get(c.id) ?? [])];
     ordered.sort((a, q) =>
@@ -150,7 +156,7 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
             const fp = mine[slot]!;
             const below = mine[slot - 1];
             const above = mine[slot + 1];
-            const name = `Tiroir ${slot + 1}`;
+            const name = `Tiroir ${fp.number}`;
             // slot boundaries : the cell panels for the end drawers, the middle of the front gap otherwise
             const low = below === undefined ? nb.y : (below.rect.y + below.rect.h + fp.rect.y) / 2;
             const high = above === undefined ? nb.y + nb.h : (fp.rect.y + fp.rect.h + above.rect.y) / 2;
@@ -160,7 +166,7 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
             const tag = `${c.id}/drawer/${fp.id}`;
             if (hs < MIN_BOX_HEIGHT)
             {
-                b.errors.push(`${c.name}, tiroir ${slot + 1} : ${hs} mm de hauteur de côté disponible, ${MIN_BOX_HEIGHT} mini. `
+                b.errors.push(`${c.name}, tiroir ${fp.number} : ${hs} mm de hauteur de côté disponible, ${MIN_BOX_HEIGHT} mini. `
                     + "Réduire le nombre de tiroirs ou agrandir la case.");
                 slot++;
                 continue;
@@ -210,6 +216,40 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
                 bottomP.notes.push("Range-couverts : insert à façonner (ORGA-LINE n'existe que pour TANDEMBOX)");
             }
             b.parts.push(sideL, sideR, endF, endB, bottomP);
+            // the box glued on dowels into the inner faces of its sides : both ends, then the bottom on its line
+            // 13 up. Front and back edges of the bottom stay free, two sides hold it
+            const T = BOX_THICKNESS;
+            const joints: Joint[] = [];
+            for (const [end, line] of [[endF, T / 2], [endB, SKL - T / 2]] as const)
+            {
+                joints.push({ edgePart: end.id, edge: "u0", facePart: sideL.id, face: "A", lineAxis: "u", line,
+                              from: 0, to: hs, edgeFrom: 0, reversed: false },
+                            { edgePart: end.id, edge: "u1", facePart: sideR.id, face: "A", lineAxis: "u", line,
+                              from: 0, to: hs, edgeFrom: 0, reversed: false });
+            }
+            for (const [edge, side] of [["u0", sideL], ["u1", sideR]] as const)
+            {
+                joints.push({ edgePart: bottomP.id, edge, facePart: side.id, face: "A", lineAxis: "v",
+                              line: BOTTOM_RECESS + T / 2, from: T, to: SKL - T, edgeFrom: 0, reversed: false });
+            }
+            fitJoints(joints, { ...s, joinery: "dowel", dowelFaceDepth: BOX_DOWEL_FACE, dowelEdgeDepth: BOX_DOWEL_EDGE },
+                      b, c.id, c.name, false);
+            // the front set in place then screwed from inside the box, two rows clear of a handle at mid height
+            let screws = 0;
+            for (const u of spread(SKW, s.connectorInset, 256))
+            {
+                for (const v of [hs / 4, 3 * hs / 4])
+                {
+                    endF.holes.push({ u, v, diameter: 0, depth: 0, face: "A", label: "Vis 4 x 30 dans la façade" });
+                    screws++;
+                }
+            }
+            b.hardware.push({ ref: "SCREW_4x30", qty: screws, item: c.id, itemName: c.name, target: fp.id,
+                             note: "façade réglée puis vissée depuis le caisson" });
+            b.parts.find((q) =>
+            {
+                return q.id === `${c.id}/front/${fp.id}`;
+            })?.notes.push(`Vissée depuis l'avant du caisson, ${screws} vis 4 x 30 sans pré-perçage`);
             // MOVENTO pulls out over its whole nominal length, the front and its box together
             b.motions.push({
                 item: c.id, front: fp.id, label: `${c.name}, ${name.toLowerCase()}`, kind: "slide", pivot: [0, 0, 0],
@@ -240,7 +280,7 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
             {
                 if (fr === null)
                 {
-                    b.errors.push(`${c.name} : face de fixation des coulisses introuvable pour le tiroir ${slot + 1}.`);
+                    b.errors.push(`${c.name} : face de fixation des coulisses introuvable pour le tiroir ${fp.number}.`);
                     continue;
                 }
                 for (const o of offs)  
@@ -273,12 +313,12 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, b: Build): void
             {
                 if (runner.nl < 270)
                 {
-                    b.errors.push(`${c.name}, tiroir ${slot + 1} : TIP-ON BLUMOTION exige NL 270 mini (NL ${runner.nl}).`);
+                    b.errors.push(`${c.name}, tiroir ${fp.number} : TIP-ON BLUMOTION exige NL 270 mini (NL ${runner.nl}).`);
                 }
                 const set = chooseTipOnSet(runner.nl, drawerKg);
                 if (set === null)
                 {
-                    b.errors.push(`${c.name}, tiroir ${slot + 1} : pas de set TIP-ON BLUMOTION pour NL ${runner.nl} `
+                    b.errors.push(`${c.name}, tiroir ${fp.number} : pas de set TIP-ON BLUMOTION pour NL ${runner.nl} `
                         + `et ${drawerKg.toFixed(1)} kg.`);
                 }
                 else

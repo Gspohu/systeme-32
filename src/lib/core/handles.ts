@@ -13,6 +13,8 @@ import { DIAM } from "./text";
 const HANDLE_EDGE = 40;
 const GRIP_HEIGHT = 1000;
 const END_MARGIN = 40;
+// clears an M4 pan head, 8 across at most (ISO 7045:2011 via the Fuller Fasteners table), and the screwdriver
+const SCREW_HEAD_PASSAGE = 10;
 
 
 // The longest handle no longer than `room`, the shortest one when even that is too long
@@ -79,6 +81,19 @@ export function fitHandles(c: Carcass, b: Build): void
             part.holes.push({ u: vertical ? hy - r.y : hx - r.x, v: vertical ? hx - r.x : hy - r.y,
                               diameter: BAR_HANDLE.screwHole, depth: fp.thickness, face: "B",
                               label: `Poignée ${h.ref} : ${DIAM}${BAR_HANDLE.screwHole} traversant, vis M4 x 25` });
+            // behind a drawer front the box end takes the screw head : a clear hole lets it bear on the front
+            const end = fp.role === "drawer" ? byId(b.parts, `${c.id}/drawer/${fp.id}/endF`) : undefined;
+            if (end !== undefined && end.frame !== null)
+            {
+                const u = c.x + hx - end.frame.o[0];
+                const v = c.y + hy - end.frame.o[1];
+                if (u > SCREW_HEAD_PASSAGE / 2 && u < end.length - SCREW_HEAD_PASSAGE / 2 && v > SCREW_HEAD_PASSAGE / 2
+                    && v < end.width - SCREW_HEAD_PASSAGE / 2)
+                {
+                    end.holes.push({ u, v, diameter: SCREW_HEAD_PASSAGE, depth: end.thickness, face: "A",
+                                     label: `Passage de la vis M4 de poignée, ${DIAM}${SCREW_HEAD_PASSAGE} traversant` });
+                }
+            }
         }
         const z = c.z + fp.z + fp.thickness;
         const radius = BAR_HANDLE.diameter / 2;

@@ -13,7 +13,10 @@ export interface FrontPanel
     front: string;
     node: string;
     role: "door" | "drawer" | "leaf" | "flap" | "panel";
+    // rank inside its own front, a double door has leaves 0 and 1
     index: number;
+    // rank among the fronts of the same kind on the carcass, the name the drawings give it
+    number: number;
     rect: Rect;
     // z of the back face of the panel, from the back of the carcass box
     z: number;
@@ -82,7 +85,7 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings): Front
         }
         const outer = frontOuterRect(nb, s, front.mount);
         const z = front.mount === "inset" ? c.depth - ft : c.depth;
-        const base = { front: front.id, node: front.node, z, thickness: ft, decor: front.decor ?? c.decor };
+        const base = { front: front.id, node: front.node, z, thickness: ft, decor: front.decor ?? c.decor, number: 0 };
         const spec = front.spec;
         const hingeOverlayOf = (side: "left" | "right"): number =>
         {
@@ -168,6 +171,17 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings): Front
                 i++;
             }
         }
+    }
+    // numbered per kind in reading order, top row first then left to right : "porte 3" is the third one seen
+    const order = [...out].sort((p, q) =>
+    {
+        return Math.round(q.rect.y + q.rect.h) - Math.round(p.rect.y + p.rect.h) || p.rect.x - q.rect.x;
+    });
+    const seen = new Map<string, number>();
+    for (const fp of order)
+    {
+        fp.number = (seen.get(fp.role) ?? 0) + 1;
+        seen.set(fp.role, fp.number);
     }
     return out;
 }

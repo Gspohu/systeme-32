@@ -5,9 +5,9 @@ import { edgeNotation } from "../bom";
 import type { Fitted, Part } from "../parts";
 import { tessellate, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale, textWidth, type Stroke } from "./display";
 import type { Draft } from "./draft";
-import { DIAM } from "../text";
+import { ROW, TABLE_COL_W, drawTable, outlineArcs, round1, tableLines } from "./machining_table";
 
 
 const ROLE_ORIGIN: Record<string, string> = {
@@ -17,7 +17,6 @@ const ROLE_ORIGIN: Record<string, string> = {
     bottom: "u depuis la gauche, v depuis le chant avant, face A = intérieur (dessus)",
     hdivider: "u depuis la gauche, v depuis le chant avant, face A = dessus",
     shelf: "u depuis la gauche, v depuis le chant avant, face A = dessus",
-    door: "u depuis le bas, v depuis la gauche vue de face, face A = face intérieure",
     drawerFront: "u depuis la gauche vue de face, v depuis le bas, face A = face intérieure",
     boxSide: "u depuis l'avant du tiroir, v depuis le bas, face A = intérieur du tiroir",
 };
@@ -28,20 +27,51 @@ const BOX_H = 120;
 // a part alone on its sheet
 const WIDE_W = 390;
 const WIDE_H = 150;
-const ROW = 3.6;
-const TABLE_COL_W = 198;
 
 
-// A long or much drilled part reads better alone on its sheet than in half of it
+// Fronts read standing, the way they hang : their u, the height, runs up the sheet
+const UPRIGHT = new Set(["door", "leaf", "panel"]);
+
+
+// Width and height the part takes on the sheet before scaling
+function spans(part: Part): [number, number]
+{
+    return UPRIGHT.has(part.role) ? [part.width, part.length] : [part.length, part.width];
+}
+
+
+function originText(part: Part): string
+{
+    if (UPRIGHT.has(part.role))
+    {
+        // the quarter turn keeps the view from face A : v then runs from right to left
+        return "u depuis le bas, v depuis la gauche vue de face, dessin vu de l'intérieur (face A) : v de droite à gauche";
+    }
+    return ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN;
+}
+
+
+// Lines of the table a box of that size has room for, under a drawing at the scale it picks
+function tableRoom(part: Part, boxH: number, boxW: number, cols: number): number
+{
+    const [sx, sy] = spans(part);
+    const scale = pickScale(sx, sy, boxW - 20, boxH - 20);
+    const top = MARGIN + 5 + 24 + sy / scale + 18;
+    return cols * Math.max(4, Math.floor((A3.h - MARGIN - TITLE_BLOCK_H - 6 - top - 3.6) / ROW));
+}
+
+
+// A long or much drilled part reads better alone on its sheet than in half of it, and a table that would not fit
+// half a sheet takes the whole of it
 function wantsWholeSheet(row: CutRow): boolean
 {
     const part = row.parts[0]!;
-    if (part.holes.length > 36)
+    if (part.holes.length > 36 || tableLines(row, part).length > tableRoom(part, BOX_H, BOX_W, 1))
     {
         return true;
     }
-    return pickScale(part.length, part.width, WIDE_W - 20, WIDE_H - 20) < pickScale(part.length, part.width, BOX_W - 20,
-                                                                                    BOX_H - 20);
+    const [sx, sy] = spans(part);
+    return pickScale(sx, sy, WIDE_W - 20, WIDE_H - 20) < pickScale(sx, sy, BOX_W - 20, BOX_H - 20);
 }
 
 
@@ -55,28 +85,40 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         const canvas = new Canvas();
         const scales = new Set<number>();
         const codes: string[] = [];
+        const overflow: { row: CutRow; rest: string[][] }[] = [];
+        const wide = wantsWholeSheet(rows[i]!);
         let k = 0;
-        if (wantsWholeSheet(rows[i]!))
+        while (k < (wide ? 1 : 2) && i + k < rows.length && (wide || !wantsWholeSheet(rows[i + k]!)))
         {
-            scales.add(drawWorkpiece(canvas, rows[i]!, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 2));
-            codes.push(rows[i]!.code.split(",")[0]!);
-            k = 1;
-        }
-        else
-        {
-            while (k < 2 && i + k < rows.length && !wantsWholeSheet(rows[i + k]!))
+            const row = rows[i + k]!;
+            const drawn = wide ? drawWorkpiece(canvas, row, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 2)
+                : drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1);
+            scales.add(drawn.scale);
+            codes.push(row.code.split(",")[0]!);
+            if (drawn.rest.length > 0)
             {
-                const row = rows[i + k]!;
-                scales.add(drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1));
-                codes.push(row.code.split(",")[0]!);
-                k++;
+                overflow.push({ row, rest: drawn.rest });
             }
+            k++;
         }
         const scale = [...scales].map((s) =>
         {
             return `1:${s}`;
         }).join(", ");
         sheets.push({ title: `Pièces ${codes.join(" et ")}`, scale, canvas });
+        // what a table could not hold runs on over sheets of its own, never left to the DXF alone
+        for (const o of overflow)
+        {
+            let rest = o.rest;
+            while (rest.length > 0)
+            {
+                const more = new Canvas();
+                const code = o.row.code.split(",")[0]!;
+                more.text(MARGIN + 5, MARGIN + 10, `${code}  ${o.row.label} (suite)`, 3.5, "start", true);
+                rest = drawTable(more, rest, MARGIN + 5, MARGIN + 24, 2, "Usinages (suite)");
+                sheets.push({ title: `Pièces ${code} (suite)`, scale: "-", canvas: more });
+            }
+        }
         i += k;
     }
     return sheets;
@@ -85,51 +127,59 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
 
 // A workpiece in a 195 x 255 box : header, drawing at a drafting scale, then the table of holes
 function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW: number, boxH: number,
-                       fitted: Fitted[], tableCols: number): number
+                       fitted: Fitted[], tableCols: number): { scale: number; rest: string[][] }
 {
     const part = row.parts[0]!;
     const details = `${row.items.join(", ")} : quantité ${row.quantity}, ${row.decorLabel}, ép. ${row.thickness} mm`;
     canvas.text(x0, y0 + 5, fit(`${row.code}  ${row.label}`, 3.5, boxW + 5), 3.5, "start", true);
     canvas.text(x0, y0 + 10, fit(`${details}, chants ${edgeNotation(row.edges)}`, 2.5, boxW + 5), 2.5);
-    canvas.text(x0, y0 + 14, fit(`Origine : ${ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN}`, 2.5, boxW + 5), 2.5);
+    canvas.text(x0, y0 + 14, fit(`Origine : ${originText(part)}`, 2.5, boxW + 5), 2.5);
     const outline = tessellate(part.outline);
     let maxU = 0;
-    let maxV = 0;  
+    let maxV = 0;
     for (const [u, v] of outline)
     {
         maxU = Math.max(maxU, u);
         maxV = Math.max(maxV, v);
     }
-    const scale = pickScale(maxU, maxV, boxW - 20, boxH - 20);
+    const upright = UPRIGHT.has(part.role);
+    const [spanX, spanY] = upright ? [maxV, maxU] : [maxU, maxV];
+    const scale = pickScale(spanX, spanY, boxW - 20, boxH - 20);
     const ox = x0 + 12;
-    const oy = y0 + 24 + maxV / scale;
-    const pageU = (u: number): number =>
+    const oy = y0 + 24 + spanY / scale;
+    // lying, u to the right and v up. Standing, u up and v to the left. Both seen from face A
+    const P = (u: number, v: number): [number, number] =>
     {
-        return ox + u / scale;
+        return upright ? [ox + (maxV - v) / scale, oy - u / scale] : [ox + u / scale, oy - v / scale];
     };
-    const pageV = (v: number): number =>
+    const D = (du: number, dv: number): [number, number] =>
     {
-        return oy - v / scale;
+        return upright ? [-dv, -du] : [du, -dv];
     };
-
+    const seg = (u1: number, v1: number, u2: number, v2: number, s: Stroke): void =>
+    {
+        canvas.line(...P(u1, v1), ...P(u2, v2), s);
+    };
+    const box = (u1: number, v1: number, u2: number, v2: number, s: Stroke): void =>
+    {
+        const [a, b] = P(u1, v1);
+        const [c, d] = P(u2, v2);
+        canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), s);
+    };
 
     if (part.curve !== null && (part.role === "skin" || part.role === "batten"))
     {
-        canvas.rect(pageU(0), pageV(part.width), part.length / scale, part.width / scale, "normal");
+        box(0, 0, part.length, part.width, "normal");
         const what = part.role === "batten" ? `${row.quantity} tasseaux` : "Peau développée";
-        canvas.text(pageU(part.length / 2), pageV(part.width / 2), what, 2.5, "middle"); 
+        canvas.text(...P(part.length / 2, part.width / 2), what, 2.5, "middle");
     }
     else
     {
-        canvas.poly(outline.map(([u, v]) =>
+        for (const o of [part.outline, ...part.cutouts])
         {
-            return [pageU(u), pageV(v)];
-        }), true, "normal");
-        for (const c of part.cutouts)
-        {
-            canvas.poly(tessellate(c).map(([u, v]) =>
+            canvas.poly(tessellate(o).map(([u, v]) =>
             {
-                return [pageU(u), pageV(v)];
+                return P(u, v);
             }), true, "normal");
         }
     }
@@ -139,11 +189,11 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         const uAt = e === "u1" ? part.length : 0;
         if (e === "v0" || e === "v1")
         {
-            canvas.line(pageU(0), pageV(vAt), pageU(part.length), pageV(vAt), "thick");
+            seg(0, vAt, part.length, vAt, "thick");
         }
         else
         {
-            canvas.line(pageU(uAt), pageV(0), pageU(uAt), pageV(part.width), "thick");
+            seg(uAt, 0, uAt, part.width, "thick");
         }
     }
     for (const g of part.grooves)
@@ -153,19 +203,17 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         {
             if (g.along === "u")
             {
-                canvas.line(pageU(g.from), pageV(g.at + off), pageU(g.to), pageV(g.at + off), "dashed");
+                seg(g.from, g.at + off, g.to, g.at + off, "dashed");
             }
             else
             {
-                canvas.line(pageU(g.at + off), pageV(g.from), pageU(g.at + off), pageV(g.to), "dashed");
+                seg(g.at + off, g.from, g.at + off, g.to, "dashed");
             }
         }
     }
     for (const h of part.holes)
     {
-        const x = pageU(h.u);
-        const y = pageV(h.v);
-        const depth = h.depth / scale;
+        const [x, y] = P(h.u, h.v);
         if (h.face === "A" || h.face === "B")
         {
             if (h.diameter === 0)
@@ -180,38 +228,89 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         // an edge hole is a short stroke going into the part as deep as the hole
         else if (h.face === "u0" || h.face === "u1")
         {
-            canvas.line(x, y, x + (h.face === "u0" ? depth : -depth), y, "centre");
+            seg(h.u, h.v, h.u + (h.face === "u0" ? h.depth : -h.depth), h.v, "centre");
         }
         else
         {
-            canvas.line(x, y, x, y + (h.face === "v0" ? -depth : depth), "centre");
+            seg(h.u, h.v, h.u, h.v + (h.face === "v0" ? h.depth : -h.depth), "centre");
         }
     }
     if (part.grain)
     {
-        const gy = pageV(part.width / 2) - 4;
-        const gx0 = pageU(part.length * 0.35);
-        const gx1 = pageU(part.length * 0.65); 
-        canvas.line(gx0, gy, gx1, gy, "thin");
-        canvas.arrowHead(gx0, gy, 1, 0);
-        canvas.arrowHead(gx1, gy, -1, 0);
-        canvas.text((gx0 + gx1) / 2, gy - 1, "fil", 2, "middle");
+        // the arrow along u, set off 4 mm of paper towards v
+        const [nx, ny] = D(0, 1);
+        const [g0x, g0y] = P(part.length * 0.35, part.width / 2);
+        const [g1x, g1y] = P(part.length * 0.65, part.width / 2);
+        const [ax, ay] = D(1, 0);
+        canvas.line(g0x + 4 * nx, g0y + 4 * ny, g1x + 4 * nx, g1y + 4 * ny, "thin");
+        canvas.arrowHead(g0x + 4 * nx, g0y + 4 * ny, ax, ay);
+        canvas.arrowHead(g1x + 4 * nx, g1y + 4 * ny, -ax, -ay);
+        canvas.text((g0x + g1x) / 2 + 5 * nx + 1, (g0y + g1y) / 2 + 5 * ny, "fil", 2, "middle");
     }
-    canvas.circle(pageU(0), pageV(0), 1, "thin"); 
-    canvas.text(pageU(0) - 1.5, pageV(0) + 3, "0", 2, "end");
-    canvas.dimH(pageU(0), pageU(maxU), pageV(0) + 1, pageV(0) + 7, `${Math.round(maxU * 10) / 10}`);
-    canvas.dimV(pageV(maxV), pageV(0), pageU(0) - 1, pageU(0) - 7, `${Math.round(maxV * 10) / 10}`);
-    drawFootprints(canvas, part, fitted, pageU, pageV);
+    // a pocket in an edge is hidden from the face : its outline dashed, as deep as it goes in
+    for (const k of part.pockets ?? [])
+    {
+        const half = k.length / 2;
+        if (k.edge === "v0" || k.edge === "v1")
+        {
+            const v0 = k.edge === "v0" ? 0 : part.width - k.depth;
+            box(k.at - half, v0, k.at + half, v0 + k.depth, "dashed");
+        }
+        else
+        {
+            const u0 = k.edge === "u0" ? 0 : part.length - k.depth;
+            box(u0, k.at - half, u0 + k.depth, k.at + half, "dashed");
+        }
+    }
+    // every arc of the outline gets its radius, a leader from its centre to the middle of the arc
+    for (const a of outlineArcs(part))
+    {
+        const tipU = a.cu + a.r * Math.cos(a.mid);
+        const tipV = a.cv + a.r * Math.sin(a.mid);
+        seg(a.cu, a.cv, tipU, tipV, "thin");
+        canvas.arrowHead(...P(tipU, tipV), ...D(-Math.cos(a.mid), -Math.sin(a.mid)));
+        const [tx, ty] = P(a.cu + a.r * 0.55 * Math.cos(a.mid), a.cv + a.r * 0.55 * Math.sin(a.mid));
+        canvas.text(tx, ty - 1, `R${round1(a.r)}`, 2.5, "middle");
+    }
+    // the origin, then which way u and v run from it
+    const [zx, zy] = P(0, 0);
+    canvas.circle(zx, zy, 1, "thin");
+    canvas.text(zx + (upright ? 1.5 : -1.5), zy + 3, "0", 2, upright ? "start" : "end");
+    for (const [du, dv, name] of [[1, 0, "u"], [0, 1, "v"]] as const)
+    {
+        const [dx, dy] = D(du, dv);
+        canvas.line(zx, zy, zx + 8 * dx, zy + 8 * dy, "thin");
+        canvas.arrowHead(zx + 8 * dx, zy + 8 * dy, -dx, -dy);
+        canvas.text(zx + 10 * dx + (dx === 0 ? 1.5 : 0), zy + 10 * dy + (dy === 0 ? 1 : 0), name, 2.2, "middle", true);
+    }
+    const left = ox;
+    const right = ox + spanX / scale;
+    canvas.dimH(left, right, oy + 1, oy + 7, `${Math.round(spanX * 10) / 10}`);
+    // standing, the height is dimensioned on the right, clear of the u arrow at the origin
+    const dimAt = upright ? right : left;
+    const away = upright ? 1 : -1;
+    canvas.dimV(oy - spanY / scale, oy, dimAt + away, dimAt + (upright ? 12 : 6) * away,
+                `${Math.round(spanY * 10) / 10}`);
+    drawFootprints(canvas, part, fitted, P);
     canvas.text(x0 + boxW, y0 + 18, `1:${scale}`, 2.5, "end");
-    holeTable(canvas, row, part, x0, oy + 18, tableCols);
-    return scale;
+    const lines = tableLines(row, part);
+    const counts = [`Perçages (${part.holes.length})`];
+    for (const [n, what] of [[part.cutouts.length, "découpes"], [outlineArcs(part).length, "arcs"],
+                             [(part.pockets ?? []).length, "entailles"], [part.grooves.length, "rainures"]] as const)
+    {
+        if (n > 0)
+        {
+            counts.push(`${what} (${n})`);
+        }
+    }
+    const rest = drawTable(canvas, lines, x0, oy + 18, tableCols, counts.join(", "));
+    return { scale, rest };
 }
 
 
 // The outline of the hardware this part carries the screws of, dashed, with its reference
-// TODO on a narrow footprint the reference runs across the dashes, it wants a leader line
-function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[], pageU: (u: number) => number,
-                        pageV: (v: number) => number): void
+function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
+                        P: (u: number, v: number) => [number, number]): void
 {
     const fr = part.frame;
     if (fr === null)
@@ -266,96 +365,21 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[], pageU: (u:
         {
             continue;
         }
-        canvas.rect(pageU(u0), pageV(v1), pageU(u1) - pageU(u0), pageV(v0) - pageV(v1), "dashed");
-        canvas.text((pageU(u0) + pageU(u1)) / 2, (pageV(v0) + pageV(v1)) / 2 + 0.7, f.ref, 1.8, "middle");
-    }
-}
-
-
-function round1(v: number): string
-{
-    return (Math.round(v * 10) / 10).toString();
-}
-
-
-// Holes, then grooves and notes, run down as many columns as the sheet gives the part
-function holeTable(canvas: Canvas, row: CutRow, part: Part, x0: number, top: number, tableCols: number): void
-{
-    const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 6;
-    const cols = [16, 16, 10, 11, 24, 111];
-    const holes = [...part.holes].sort((a, b) =>
-    {
-        return a.face.localeCompare(b.face) || a.u - b.u || a.v - b.v;
-    });
-    const grooves = part.grooves.length > 0 ? `, rainures (${part.grooves.length})` : "";
-    canvas.text(x0, top - 5, `Perçages (${holes.length})${grooves}`, 2.8, "start", true);
-    const lines: string[][] = [];
-    for (const h of holes)
-    {
-        let face: string = h.face;
-        if (h.face !== "A" && h.face !== "B")
+        const [a, b] = P(u0, v0);
+        const [c, d] = P(u1, v1);
+        canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), "dashed");
+        // the reference reads along the long side of the footprint, or above it when even that is too short
+        const tall = Math.abs(d - b) > Math.abs(c - a);
+        if (textWidth(f.ref, 1.8) > Math.max(Math.abs(d - b), Math.abs(c - a)) - 1)
         {
-            face = h.w === undefined ? `chant ${h.face}` : `chant ${h.face} w${round1(h.w)}`;
-        }
-        lines.push([round1(h.u), round1(h.v), h.diameter === 0 ? "vis" : `${h.diameter}`,
-                    h.depth === 0 ? "-" : `${h.depth}`, face, h.label]);
-    }
-    for (const g of part.grooves)
-    {
-        const where = `le long de ${g.along} à ${round1(g.at)}, de ${Math.round(g.from)} à ${Math.round(g.to)}`;
-        lines.push([`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`]);
-    }
-    for (const note of row.notes.slice(0, 4))
-    {
-        lines.push([`Note : ${note}`]);
-    }
-    const perCol = Math.max(4, Math.floor((bottom - top - 3.6) / ROW));
-    let col = -1;
-    let ty = bottom + 1;
-    let n = 0;
-    for (const cells of lines)
-    {
-        if (ty > bottom)
-        {
-            col++;
-            if (col >= tableCols)
-            {
-                break;
-            }
-            ty = top;
-            let cx = x0 + col * TABLE_COL_W;
-            let c = 0;
-            for (const title of ["u", "v", DIAM, "prof.", "face", "usage"])
-            {
-                canvas.text(cx, ty, title, 2.4, "start", true);
-                cx += cols[c]!;
-                c++;
-            }
-            ty += 3.6;
-        }
-        const x = x0 + col * TABLE_COL_W;
-        // the last free line tells what did not fit, the DXF holds every hole
-        if (n === perCol * tableCols - 1 && lines.length > n + 1)
-        {
-            canvas.text(x, ty, `... ${lines.length - n} autres lignes : voir le DXF de la pièce`, 2.4);
-            break;
-        }
-        if (cells.length === 1)
-        {
-            canvas.text(x, ty, fit(cells[0]!, 2.4, TABLE_COL_W - 5), 2.4);
+            canvas.text((a + c) / 2, Math.min(b, d) - 0.8, f.ref, 1.8, "middle");
         }
         else
         {
-            let cx = x;
-            let c = 0;
-            for (const text of cells)
-            {
-                canvas.text(cx, ty, fit(text, 2.4, cols[c]! - 1), 2.4);
-                cx += cols[c]!;
-                c++;
-            }
+            canvas.text((a + c) / 2 + (tall ? 0.7 : 0), (b + d) / 2 + (tall ? 0 : 0.7), f.ref, 1.8, "middle", false,
+                        tall ? 90 : 0);
         }
-        ty += ROW;
-        n++;
     }
 }
+
+

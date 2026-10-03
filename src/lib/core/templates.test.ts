@@ -3,6 +3,8 @@ import { analyse } from "./analysis";
 import { dresser, tvWall } from "./templates";
 import { resolveLayout } from "./layout";
 import { footPlaces } from "./feet";
+import { computeBom } from "./bom";
+import { setSettings } from "./commands";
 import type { Part } from "./parts";
 import type { Carcass, SplitNode } from "./model";
 
@@ -43,7 +45,8 @@ describe("the sketch templates", () =>
         const decors = new Set<string>();
         for (const q of analyse(dresser()).build.parts)
         {
-            if (q.role !== "back")
+            // the solid oak cleats hidden behind the fillers are no decor
+            if (q.role !== "back" && q.role !== "cleat")
             {
                 decors.add(q.decor);
             }
@@ -108,7 +111,9 @@ describe("the sketch templates", () =>
         // the 2253 rigth door is past the 1300 of the short unit
         expect(hw.get("956.1004")).toBe(9);
         expect(hw.get("956A1004")).toBe(1);
-        expect(hw.get("173H7100")).toBe(24);
+        // every door overlays its side : all 24 plates take their dowels in the holes of the line
+        expect(hw.get("174H7100E")).toBe(24);
+        expect(hw.get("173H7100")).toBeUndefined();
         expect(hw.get("760H4800S")).toBe(3);
     });
 
@@ -198,13 +203,13 @@ describe("the sketch templates", () =>
             return k.message.startsWith("Meuble bas, bout arrondi droit : assise");
         })!;
         expect(seat.level).toBe("info");
-        // the 60 hole in the middle of the lower left cell : 19 + 627 / 2 across, 19 + 224 / 2 up
+        // the 60 hole in the middle of the lower left cell : 19 + 627 / 2 across, 19 + 219 / 2 up
         const back = a.build.parts.find((q) =>
         {
             return q.id === `${base.id}/back`;
         })!;
         expect(back.cutouts).toHaveLength(1);
-        expect(back.cutouts[0]!.segments[0]).toMatchObject({ kind: "arc", cx: 19 + 627 / 2, cy: 19 + 224 / 2 });
+        expect(back.cutouts[0]!.segments[0]).toMatchObject({ kind: "arc", cx: 19 + 627 / 2, cy: 19 + 219 / 2 });
         // four doors of two hinges, none of the small ones of the save lfet
         const hw = hardwareCount(tvWall);
         expect((hw.get("70T3550.TL") ?? 0) + (hw.get("70T3650.TL") ?? 0)).toBe(4 * 2);
@@ -213,6 +218,184 @@ describe("the sketch templates", () =>
         {
             return it.kind === "wallShelf";
         }).length).toBe(2);
+    });
+
+
+    for (const make of [tvWall, dresser])
+    {
+        it(`drills no hole of ${make.name} into another one of the same part`, () =>
+        {
+            const clashes: string[] = [];
+            for (const p of analyse(make()).build.parts)
+            {
+                const face = p.holes.filter((h) =>
+                {
+                    return h.face === "A" || h.face === "B";
+                });
+                face.forEach((x, i) =>
+                {
+                    for (const y of face.slice(i + 1))
+                    {
+                        const near = Math.hypot(x.u - y.u, x.v - y.v) < (x.diameter + y.diameter) / 2 + 1;
+                        if (near && (x.face === y.face || x.depth + y.depth > p.thickness))
+                        {
+                            clashes.push(`${p.itemName} ${p.label} : ${x.label} / ${y.label}`);
+                        }
+                    }
+                });
+            }
+            expect(clashes).toEqual([]);
+        });
+    }
+
+
+    it("closes the dresser's alcove with two fillers and keeps Blum's gap F between them and the doors", () =>
+    {
+        const filler = (p: ReturnType<typeof dresser>): string[] =>
+        {
+            return analyse(p).checks.filter((k) =>
+            {
+                return k.message.includes("jusqu'au fileur côté charnières");
+            }).map((k) =>
+            {
+                return k.message;
+            });
+        };
+        const labels = analyse(dresser()).build.parts.filter((q) =>
+        {
+            return q.role === "filler";
+        }).map((q) =>
+        {
+            return `${q.label} ${q.width}`;
+        });
+        expect(labels.sort()).toEqual(["Fileur droit 65", "Fileur gauche 65"]);
+        expect(filler(dresser())).toEqual([]);
+        // the outer reveal brought down to 0.5 mm leaves less than Blum's 0.9 to the fillers
+        const tight = filler(setSettings(dresser(), { edgeReveal: 0.5 }));
+        expect(tight).toHaveLength(4);
+        expect(tight[0]).toContain("0.5 mm jusqu'au fileur côté charnières, 0.9 mm mini");
+    });
+
+
+    it("joins the carcasses that stand on or beside one another with connecting screws for the boards they clamp", () =>
+    {
+        const links = (make: typeof tvWall): string[] =>
+        {
+            return analyse(make()).build.hardware.filter((h) =>
+            {
+                return h.ref.startsWith("267.07");
+            }).map((h) =>
+            {
+                return `${h.ref} x${h.qty} ${h.note}`;
+            });
+        };
+        // 19 + 19 sits in the middle of 36-42, at the very end of 32-38 (Häfele 2017 p. 11.138)
+        expect(links(tvWall)).toEqual(["267.07.903 x4 Meuble bas et Colonne gauche, 38 mm serrés"]);
+        expect(links(dresser)).toContain("267.07.903 x6 Niche et Placards hauts, 38 mm serrés");
+        expect(links(dresser)).toHaveLength(8);
+    });
+
+
+    it("assembles each drawer box on dowels and screws its front from inside, clear of the handle", () =>
+    {
+        const parts = analyse(tvWall()).build.parts;
+        const labels = (label: string): string[] =>
+        {
+            return parts.find((p) =>
+            {
+                return p.itemName === "Meuble bas" && p.label === label;
+            })!.holes.map((h) =>
+            {
+                return h.label;
+            });
+        };
+        // both ends and the bottom : 2 + 2 + 3 dowels in a 370 side
+        expect(labels("Tiroir 1, côté gauche").filter((l) =>
+        {
+            return l.startsWith("Tourillon");
+        })).toHaveLength(7);
+        const end = labels("Tiroir 1, avant de caisson");
+        expect(end.filter((l) =>
+        {
+            return l.startsWith("Vis 4 x 30");
+        })).toHaveLength(6);
+        expect(end.filter((l) =>
+        {
+            return l.startsWith("Passage de la vis M4");
+        })).toHaveLength(2);
+    });
+
+
+    it("keeps every TIP-ON catch plate on its door, drilled on an outer side, on an adapter plate on an upright", () =>
+    {
+        const a = analyse(dresser());
+        const holesOf = (item: string, label: string): Part["holes"] =>
+        {
+            return a.build.parts.filter((p) =>
+            {
+                return p.itemName === item && p.label === label;
+            }).flatMap((p) =>
+            {
+                return p.holes.filter((h) =>
+                {
+                    return h.label.includes("TIP-ON");
+                });
+            });
+        };
+        // Blum p. 172 : 7.5 from the face the door closes on
+        expect(holesOf("Colonne droite", "Joue gauche").map((h) =>
+        {
+            return [h.face, h.w, h.diameter];
+        })).toEqual([["v0", 7.5, 10]]);
+        // shared upright : the plate drilled 7.5 from the face would stand 0.5 from the door edge
+        expect(holesOf("Placards et tiroirs", "Montant 1").map((h) =>
+        {
+            return h.v;
+        }).sort()).toEqual([20, 37]);
+        const plates = a.build.parts.filter((p) =>
+        {
+            return p.role === "door";
+        }).flatMap((p) =>
+        {
+            return p.holes.filter((h) =>
+            {
+                return h.label.startsWith("Contreplaque");
+            }).map((h) =>
+            {
+                return Math.min(h.u, p.length - h.u, h.v, p.width - h.v);
+            });
+        });
+        expect(plates.length).toBeGreaterThan(8);
+        expect(Math.min(...plates)).toBeGreaterThanOrEqual(6.5);
+        expect(a.build.hardware.filter((h) =>
+        {
+            return h.ref === "956.1201";
+        }).length).toBe(6);
+    });
+
+
+    it("never merges a left and a right side no turn of the board makes alike", () =>
+    {
+        const p = dresser();
+        const rows = computeBom(p, analyse(p)).cut;
+        const count = (item: string, label: string): number[] =>
+        {
+            return rows.filter((r) =>
+            {
+                return r.items.includes(item) && r.label === label;
+            }).map((r) =>
+            {
+                return r.quantity;
+            });
+        };
+        // hinge plates 85.5 and 543 up and 37 from the front, runner screws : mirror images, one of each
+        expect([count("Placards et tiroirs", "Joue gauche"), count("Placards et tiroirs", "Joue droite")])
+            .toEqual([[1], [1]]);
+        // plates on the system 32 line, which runs unsymmetric in a 716 high carcass : turned upside down the left
+        // side is no longer the right one
+        expect([count("Placards hauts", "Joue gauche"), count("Placards hauts", "Joue droite")]).toEqual([[1], [1]]);
+        // shelves 1 mm off the middle and the front edge alone banded : two different boards
+        expect([count("Niche", "Joue gauche"), count("Niche", "Joue droite")]).toEqual([[1], [1]]);
     });
 
 

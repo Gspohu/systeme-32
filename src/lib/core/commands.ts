@@ -151,6 +151,25 @@ export function setRoom(p: Project, patch: Partial<Room>): Project
 }
 
 
+// The return of one side wall of an alcove, null for a wall running the whole depth : once neither is shorter than
+// the room, there is no alcove left
+export function setReturn(p: Project, side: "left" | "right", value: number | null): Project
+{
+    if (value !== null && (!Number.isFinite(value) || value <= 0))
+    {
+        throw new CommandError(`Retour ${side === "left" ? "gauche" : "droit"} invalide (${value}). Saisir une cote `
+            + "positive en mm, ou vider le champ pour un mur pleine profondeur.");
+    }
+    return edit(p, (q) =>
+    {
+        const { width, depth, height } = q.room;
+        const next = { ...q.room.returns ?? { left: depth, right: depth }, [side]: value ?? depth };
+        q.room = next.left < depth || next.right < depth ? { width, depth, height, returns: next }
+            : { width, depth, height };
+    });
+}
+
+
 export function setScreen(p: Project, screen: Screen | null): Project
 {
     return edit(p, (q) =>

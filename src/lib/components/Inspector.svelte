@@ -905,6 +905,18 @@
                 <input type="checkbox" checked={carcass.ceilingFiller}
                     onchange={(e) => patch({ ceilingFiller: checked(e) } as Partial<Carcass>)} />
                 Fileur jusqu'au plafond ({Math.round(app.project.room.height - carcass.y - carcass.height)} mm)</label>
+            <label class="field" title="Bande au nu des façades jusqu'au mur de chaque côté, 0 pour aucune">
+                <span class="label">Fileurs G / D (mm)</span>
+                <span class="row">
+                    {#each [["left", "gauche"], ["right", "droit"]] as const as [side, name] (side)}
+                        {@const fillers = carcass.sideFillers ?? { left: 0, right: 0 }}
+                        <input class="input" type="number" min="0" max="150" step="1" aria-label={`Fileur ${name}`}
+                            value={fillers[side]}
+                            onchange={(e) => patch({ sideFillers: { ...fillers, [side]: Math.max(0, num(e)) } } as
+                                Partial<Carcass>)} />
+                    {/each}
+                </span>
+            </label>
             <label class="form-check" title="Le dessus doit porter une personne, rien ne peut y être posé">
                 <input type="checkbox" checked={carcass.seat !== null}
                     onchange={(e) => patch({ seat: checked(e) ? { cushion: 0 } : null } as Partial<Carcass>)} /> Assise</label>

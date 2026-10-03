@@ -5,7 +5,8 @@ import { type Build, buildCarcass, emptyBuild } from "./parts";
 import { buildBox, buildWallShelf, shelfSupportSpan } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
 import { buildDrawers } from "./drawers";
-import { fitBase, fitJoints, fitModularRows, fitShelfPins, fitSliding, partMass } from "./fittings";
+import { fitBase, fitModularRows, fitShelfPins, fitSliding, lineSymmetry, partMass } from "./fittings";
+import { fitJoints } from "./joints";
 import { antiTipKept, fitWallFixing } from "./wall_fixing";
 import { fitDoors } from "./doors";
 import { fitHandles } from "./handles";
@@ -17,10 +18,12 @@ import { buildShoeRacks } from "./shoes";
 import { fitVentGrills } from "./vents";
 import { buildLadder, ladderChecks } from "./ladder";
 import { buildCeilingFiller, ceilingChecks } from "./ceiling";
+import { buildSideFillers } from "./fillers";
 import { deskChecks } from "./desk";
 import { itemMass, shelfDeflection, tipping, topDrawerExtension, type Deflection, type Tipping } from "./mechanics";
 import { frontFootInset } from "./feet";
 import { solidChecks } from "./solid_checks";
+import { fitCarcassLinks } from "./carcass_links";
 import { letInFittings } from "./fitted";
 import { findNode, subtreeIds } from "./layout";
 import { screenSize } from "./extent";
@@ -69,7 +72,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         b.errors.push(...slopeErrors(it, lay, b.fronts.get(it.id) ?? []));
         buildLinings(it, lay, b);
         buildEnds(it, b);
-        buildDrawers(it, lay, b);
+        buildDrawers(it, lay, s, b);
         fitDoors(it, lay, s, b);
         fitLifts(it, lay, b);
         fitPanels(it, b);
@@ -78,6 +81,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         fitPrints(it, lay, b); 
         fitShelfPins(it, lay, s, b);
         fitModularRows(it, lay, s, b);
+        lineSymmetry(it, lay, s, b);
         fitOutlets(it, lay, b);
         const clothes = buildRails(it, lay, b);
         buildLights(it, lay, s, b);
@@ -102,6 +106,8 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         // a person sat on it weighs on the feet like any load
         const person = it.seat === null ? 0 : SEAT_LOAD_N / GRAVITY;
         loads.set(it.id, content + shelves + person + clothes);
+        // the fillers weigh on the feet with the rest
+        buildSideFillers(it, b);
         fitBase(it, itemMass(b, it.id) + content + shelves + person + clothes, b);
         fitWallFixing(it, s, b, p.items);
         buildCeilingFiller(it, p.room, b);
@@ -141,6 +147,7 @@ export function analyse(p: Project): Analysis
     for (const it of p.items)
     {
         let k = b.errors.length;
+        let warned = b.warnings.length;
         let told = b.infos.length;
         try
         {
@@ -155,11 +162,20 @@ export function analyse(p: Project): Analysis
             checks.push({ level: "error", item: it.id, target: null, message: b.errors[k]! });
             k++;
         }
+        while (warned < b.warnings.length)
+        {
+            checks.push({ level: "warning", item: it.id, target: null, message: b.warnings[warned]! });
+            warned++;
+        }
         while (told < b.infos.length)
         {
             checks.push({ level: "info", item: it.id, target: null, message: b.infos[told]! });
             told++;
         }
+    }
+    for (const x of fitCarcassLinks(p, b))
+    {
+        checks.push({ level: "error", item: x.item, target: null, message: x.message });
     }
     packRailBars(b);
     b.fitted.push(...letInFittings(b.parts));

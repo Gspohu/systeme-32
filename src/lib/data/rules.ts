@@ -21,6 +21,8 @@ export const OVERLAY_X_TWIN = 1.5;
 export const INSET_PLATE_SHIFT = 1.5;
 // Plates on the system 32 line
 export const PLATE_LINE = 37;
+// Blum KA-150 p. 146 : 174H7100E, its EXPANDO dowels in two Ø5 holes 32 apart about the hinge axis, side 11.5 min
+export const EXPANDO_PLATE = { ref: "174H7100E", hole: 5, pitch: 32, minSide: 11.5 };
 export const MAX_DOOR_THICKNESS = 26;
 // Blum KA-150 p. 74 : how far each hinge hung on the doors opens, BLUMOTION and TIP-ON alike
 export const HINGE_OPENING_DEG: Record<string, number> = {
@@ -42,6 +44,24 @@ export const MIN_GAP: Record<number, number[]> = {
 
 // Blum KA-150 p. 172 : TIP-ON for doors, short up to about 1300 mm high, long above and for inset doors
 export const TIPON_DOOR_SHORT_MAX_HEIGHT = 1300;
+// Häfele 2017 catalogue p. 11.138 : steel M6 connecting screws through two panels, Ø8 through hole, Ø16 heads
+// chosen by the clamping range the two thicknesses fall in
+export const CONNECTING_SCREWS = [
+    { ref: "267.07.902", min: 32, max: 38 },
+    { ref: "267.07.903", min: 36, max: 42 },
+    { ref: "267.07.904", min: 39, max: 46 },
+];
+export const CONNECTING_SCREW_HOLE = 8;
+export const CONNECTING_SCREW_HEAD = 16;
+
+// Blum KA-150 p. 172 : drilled TIP-ON, Ø10 axis 7.5 mm from the panel face on the cell side, the glue-on catch
+// plate 13 x 18 on that axis, placed with template 65.5210.01 clipped on the unit (p. 687)
+export const TIPON_AXIS_FROM_FACE = 7.5;
+export const TIPON_HOLE_DIAMETER = 10;
+export const TIPON_CATCH_PLATE = { across: 13, high: 18 };
+// Blum KA-150 p. 173 : straight adapter plate 956.1201 screwed on that face, screws 20 and 37 from the front
+// edge, the unit axis 8 mm off the face inside the cell
+export const TIPON_ADAPTER = { ref: "956.1201", axisOffFace: 8, screws: [20, 37] };
 // Blum KA-150 p. 436 : TIP-ON BLUMOTION front gap FS
 export const TIPON_FRONT_GAP = 2.5;
 export const TIPON_SYNC_SMALL = { lwMin: 265, lwMax: 313, cut: 241 };

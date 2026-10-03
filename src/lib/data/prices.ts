@@ -77,6 +77,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
 
     "hw:71B3550": entry(fromGbp(2.42), "u", "Interfit (UK), 2,42 GBP HT la charnière"),
     "hw:173H7100": entry(fromGbp(0.42), "u", "Interfit (UK), 0,42 GBP HT l'embase"),
+    "hw:174H7100E": entry(fromGbp(0.57), "u", "Interfit (UK), 0,57 GBP HT l'embase nickelée", "2026-10-03"),
     "hw:760H4800S": entry(fromGbp(25.92), "u", "Interfit (UK), 25,92 GBP HT la paire"),
     "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière, lu le 2 octobre"),
     "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
@@ -85,8 +86,9 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     // sold as a set with its strike plaet, black or white at the same price
     "hw:956.1004": entry(fromGbp(3.60), "u", "Interfit (UK), 3,60 GBP HT le jeu 956.1004 B.SET avec contreplaque",   
                          READ_ON_2),
-    "hw:956A1004": entry(fromGbp(4.51), "u", "Interfit (UK), 4,51 GBP HT le jeu 956A1004 W.SET avec contreplaque",  
+    "hw:956A1004": entry(fromGbp(4.51), "u", "Interfit (UK), 4,51 GBP HT le jeu 956A1004 W.SET avec contreplaque",
                          READ_ON_2),
+    "hw:956.1201": entry(fromGbp(0.80), "u", "Interfit (UK), 0,80 GBP HT l'embase 956.1201 G grise", "2026-10-03"),
     "hw:T51.7601": entry(fromGbp(3.28), "u", "Interfit (UK), 3,28 GBP HT la paire gauche et droite"),
     "hw:48N0510.02": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:48N0510.03": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
@@ -99,6 +101,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                            "Monastil (Espagne), 0,67 EUR TTC l'embase avec 21 % de TVA, en stock", READ_ON_2),
 
     "hw:262.25.035": entry(fromUsd(0.35), "u", "Home Decor Hardware (US), 0,35 USD HT le boîtier"),
+    "hw:267.07.902": entry(fromUsd(0.76), "u", "Home Decor Hardware (US), 0,76 USD HT la vis de liaison", "2026-10-03"),
+    "hw:267.07.903": entry(fromUsd(0.87), "u", "Home Decor Hardware (US), 0,87 USD HT la vis de liaison", "2026-10-03"),
     "hw:262.28.020": entry(fromUsd(0.44), "u", "Home Decor Hardware (US), 0,44 USD HT le 262.28.026, "
                            + "même goujon B34 brut"),
     "hw:282.24.727": entry(fromUsd(0.22), "u", "Home Decor Hardware (US), 0,22 USD HT le taquet"),
@@ -122,6 +126,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:DOWEL_8x35": entry(ht(4.99 / 100), "u", "Brico Dépôt, 100 tourillons hêtre 8 x 40 à 4,99 TTC, 8 x 35 non vendu"),
     "hw:PLUG_NYLON_8x40": entry(ht(1.89 / 20), "u", "Brico Dépôt, lot de 20 chevilles nylon 8 x 40 à 1,89 EUR TTC"),
     "hw:SCREW_4x16": entry(ht(8.09 / 200), "u", "Brico Dépôt, boîte de 200 vis fischer 4 x 16 à 8,09 EUR TTC"),
+    "hw:SCREW_4x30": entry(ht(13.5 / 300), "u", "Brico Dépôt, boîte de 300 vis fischer PowerFast II 4 x 30 à 13,50 EUR TTC",
+                           "2026-10-03"),
     "hw:WALL_SCREW_5x50": entry(ht(34.9 / 500), "u", "Brico Dépôt, boîte de 500 vis fischer 5 x 50 à 34,90 EUR TTC"),
 
     // no workshop seen publishes its sawing and banding apart from the board : Houdard, SM Bois, Leroy Merlin

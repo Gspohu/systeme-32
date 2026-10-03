@@ -1,11 +1,11 @@
-// Front views of the items, the composition sheet of each wall and the room lpan
+// Front views of the items and the composition sheet of each wall
 
 import type { Carcass, Item, Project, Wall } from "../model";
-import { roomBox, WALL_LABELS } from "../room";
+import { WALL_LABELS } from "../room";
 import { openingPoints } from "../cutouts";
 import type { Analysis } from "../analysis";
 import { PLINTH_FOOT_GAP, baseHeight } from "../parts";
-import { endReach, itemExtent, projectExtent, screenSize } from "../extent";
+import { endReach, itemExtent, projectExtent, screenSize, sideFiller } from "../extent";
 import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, railPlan } from "../wardrobe";
@@ -14,6 +14,7 @@ import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
 import { endDrop, endPost, openEndLevels } from "../curves";
+import { chain } from "./plan";
 
 
 type ToPage = (value: number) => number;
@@ -114,6 +115,15 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
     if (filler !== undefined)
     {
         canvas.rect(pageX(k.x), pageY(k.y + k.height + filler.width), k.width / scale, filler.width / scale, "normal");
+    }
+    for (const side of ["left", "right"] as const)
+    {
+        const w = sideFiller(k, side);
+        if (w > 0)
+        {
+            const x = side === "left" ? k.x - w : k.x + k.width;
+            canvas.rect(pageX(x), pageY(k.y + k.height), w / scale, k.height / scale, "normal");
+        }
     }
     if (k.seat !== null)
     {
@@ -307,20 +317,41 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     const where = wall === "back" ? "vue de face" : WALL_LABELS[wall].toLowerCase();
     heading(canvas, `Composition, ${where}`);
     const all = projectExtent(items);
-    const boxW = A3.w - 2 * MARGIN - 40;
+    // in an alcove the back wall shows its returns and its ceiling raound the items
+    const r = p.room;
+    const niche = wall === "back" && r.returns !== undefined;
+    const frame = niche ? { x0: Math.min(all.x0, 0), x1: Math.max(all.x1, r.width), y0: Math.min(all.y0, 0),
+                            y1: Math.max(all.y1, r.height) } : all;
+    const boxW = A3.w - 2 * MARGIN - 60;
     const boxH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 40;
-    const scale = pickScale(all.x1 - all.x0, all.y1 - all.y0, boxW, boxH);
-    const ox = MARGIN + 25 - all.x0 / scale + (boxW - (all.x1 - all.x0) / scale) / 2;
-    const oy = MARGIN + 25 + boxH - (boxH - (all.y1 - all.y0) / scale) / 2 + all.y0 / scale;
+    const scale = pickScale(frame.x1 - frame.x0, frame.y1 - frame.y0, boxW, boxH);
+    const ox = MARGIN + 25 - frame.x0 / scale + (boxW - (frame.x1 - frame.x0) / scale) / 2;
+    const oy = MARGIN + 25 + boxH - (boxH - (frame.y1 - frame.y0) / scale) / 2 + frame.y0 / scale;
     for (const it of items)
     {
         drawFront(canvas, it, scale, ox, oy, a);
     }
+    if (niche)
+    {
+        const [x0, x1, top] = [ox, ox + r.width / scale, oy - r.height / scale];
+        canvas.poly([[x0, oy], [x0, top], [x1, top], [x1, oy]], false, "thick");
+        canvas.dimH(x0, x1, top - 2, top - 10, `${r.width}`);
+    }
     const floorY = oy - all.y0 / scale;
-    canvas.line(ox + all.x0 / scale - 5, floorY, ox + all.x1 / scale + 5, floorY, "thin");
+    canvas.line(ox + frame.x0 / scale - 5, floorY, ox + frame.x1 / scale + 5, floorY, "thin");
     canvas.dimH(ox + all.x0 / scale, ox + all.x1 / scale, floorY + 2, floorY + 10, `${Math.round(all.x1 - all.x0)}`);
-    canvas.dimV(oy - all.y1 / scale, floorY, ox + all.x0 / scale - 2, ox + all.x0 / scale - 10,
+    canvas.dimV(oy - all.y1 / scale, floorY, ox + frame.x0 / scale - 2, ox + frame.x0 / scale - 10,
                 `${Math.round(all.y1 - all.y0)}`);
+    // the levels on the right : floor, underside and top of each item, and the ceiling of an alcove
+    const right = ox + frame.x1 / scale;
+    chain(canvas, [0, ...items.flatMap((it) =>
+    {
+        const box = itemExtent(it);
+        return [box.y0, box.y1];
+    }), ...niche ? [r.height] : []], (v) =>
+    {
+        return oy - v / scale;
+    }, right + 2, right + 9, "v");
     if (p.screen !== null && wall === "back")
     {
         const sc = p.screen;
@@ -340,33 +371,6 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
 }
 
 
-// Top view of the room : its walls and the footprint of every item, fronts towards the room
-export function roomPlan(p: Project): Draft
-{
-    const canvas = new Canvas();
-    heading(canvas, "Plan de la pièce, vue de dessus");
-    const r = p.room;
-    const boxW = A3.w - 2 * MARGIN - 40;
-    const boxH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 40;
-    const scale = pickScale(r.width, r.depth, boxW, boxH);
-    const ox = MARGIN + 25 + (boxW - r.width / scale) / 2;
-    const oy = MARGIN + 25;
-    // room x to the right, depth downwards : the back wall at the top of the sheet
-    canvas.rect(ox, oy, r.width / scale, r.depth / scale, "thick");
-    canvas.dimH(ox, ox + r.width / scale, oy + r.depth / scale + 2, oy + r.depth / scale + 10, `${r.width}`);
-    canvas.dimV(oy, oy + r.depth / scale, ox - 2, ox - 10, `${r.depth}`);
-    for (const it of p.items)
-    {
-        const b = roomBox(it, r);
-        const x = ox + b.min[0] / scale;
-        const y = oy + b.min[2] / scale;
-        const w = (b.max[0] - b.min[0]) / scale;
-        const d = (b.max[2] - b.min[2]) / scale;
-        canvas.rect(x, y, w, d, "normal", "#ffffff");
-        canvas.text(x + w / 2, y + d / 2, fit(it.name, 2.2, w), 2.2, "middle", true);
-    }
-    return { title: "Plan", scale: `1:${scale}`, canvas };
-}
 
 
 

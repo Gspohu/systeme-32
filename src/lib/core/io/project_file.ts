@@ -189,6 +189,11 @@ export function validateProject(raw: unknown): Project
         need(typeof room === "object" && room !== null && typeof room[k] === "number" && Number.isFinite(room[k])
              && (room[k] as number) > 0, `pièce avec ${k} absent ou non positif`);
     }
+    const returns = room?.returns as Record<string, unknown> | undefined;
+    need(returns === undefined || (typeof returns === "object" && returns !== null && ["left", "right"].every((k) =>
+    {
+        return typeof returns[k] === "number" && Number.isFinite(returns[k]) && (returns[k] as number) > 0;
+    })), "retours de la niche mal décrits");
     for (const t of Object.values(migrated.textures as Record<string, unknown>))
     {
         const photo = t as { file?: unknown; tileMm?: unknown };
@@ -212,6 +217,12 @@ export function validateProject(raw: unknown): Project
             need(Array.isArray(c.fronts) && Array.isArray(c.linings), "caisson sans liste de façades ou d'habillages");
             need(Array.isArray(c.rails) && Array.isArray(c.lights), "caisson sans liste de penderies ou d'éclairages");
             need(Array.isArray(c.shoeRacks), "caisson sans liste de range-chaussures");
+            const fillers = c.sideFillers as Record<string, unknown> | undefined;
+            need(fillers === undefined || (typeof fillers === "object" && fillers !== null && ["left",
+                "right"].every((k) =>
+            {
+                return typeof fillers[k] === "number" && Number.isFinite(fillers[k]) && (fillers[k] as number) >= 0;
+            })), "fileurs latéraux mal décrits");
             need(Array.isArray(c.prints) && (c.prints as { file?: unknown }[]).every((x) =>  
             {
                 return typeof x?.file === "string" && PHOTO_FILE_RE.test(x.file);

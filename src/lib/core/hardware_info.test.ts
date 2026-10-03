@@ -79,7 +79,7 @@ describe("hardware the user is told about", () =>
             return h.item === base.id && h.ref === "ANTI_TIP_BRACKET";
         })!.qty).toBe(2);
         expect(messages(p, "info")).toContain("Bahut d'Ammerschwihr : pas d'équerre anti-basculement sous Colonne, "
-            + "posé dessus. Relier les deux caissons, le plus haut retient alors l'autre.");
+            + "posé dessus. Le plus haut le retient par les vis de liaison qui les serrent l'un à l'autre.");
         expect(messages(p, "error")).toEqual([]);
     });
 
@@ -202,7 +202,7 @@ describe("hardware the user is told about", () =>
         };
         expect(errs({ thickness: 19 })).toContain("24 mini");
         expect(errs({ depth: 350 })).toContain("que jusqu'à 300 mm");
-        // 300 deep carries 80 kg/m2 : the 100 of books are already more
+        // 300 deep, the shelf hold 80 kg/m2 : the 100 of books are already more
         expect(errs({ depth: 300 })).toContain("en porte 80 à 300 mm");
         expect(errs({}, "plasterboard")).toContain("pas dans une plaque de plâtre");
         expect(errs({})).toBe("");

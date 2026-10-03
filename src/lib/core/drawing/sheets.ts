@@ -7,18 +7,22 @@ import { EDGE_OVERLENGTH } from "../bom";
 import type { NestResult } from "../nesting";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, frameAndTitle, type Page } from "./display";
 import { BODY, heading, type Draft } from "./draft";
-import { composition, roomPlan } from "./views";
+import { composition } from "./views";
+import { roomPlan } from "./plan";
 import { itemViews } from "./item_views";
 import { partSheets } from "./workpiece";
 import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
+import { assemblySheets } from "./assembly_sheets";
+import { assemblySequences } from "../assembly";
 import { CUBED, DIAM } from "../text";
 import { MATERIALS } from "../../data/materials";
+import { SHELF_TEST_LOADS } from "../../data/rules";
 
 
 export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResult): Page[] 
 {
     const drafts: Draft[] = [cover(p, a, bom), composition(p, a)];
-    // a single back wall keeps the sheets it always had, side walls add theirs and a plan of the room
+    // side walls add their compositions, the setting out from above comes with every project
     const sides: Wall[] = [];
     for (const wall of ["left", "right"] as const)
     {
@@ -34,10 +38,7 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
     {
         drafts.push(composition(p, a, wall));
     }
-    if (sides.length > 0)
-    {
-        drafts.push(roomPlan(p));
-    }
+    drafts.push(roomPlan(p));
     for (const it of p.items)
     {
         if (it.kind === "carcass")
@@ -46,16 +47,33 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
         }
     }
     drafts.push(...partSheets(bom, a.build.fitted), ...cutListSheets(bom), ...hardwareSheets(bom));
+    drafts.push(...assemblySheets(assemblySequences(p, a, bom)));
     drafts.push(...nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
     const date = new Date(p.updated).toLocaleDateString("fr-FR");
+    const revision = revisionOf(p);
     const pages: Page[] = [];
     drafts.forEach((draft, i) =>
     {
         frameAndTitle(draft.canvas, { project: p.name, title: draft.title, date, scale: draft.scale, index: i + 1,
-                                     count: drafts.length });
+                                     count: drafts.length, revision,
+                                     identification: `S32-${p.id.replace(/^p-/, "").toUpperCase()}`.slice(0, 16) });
         pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims });
     });
     return pages;
+}
+
+
+// FNV-1a over the project as saved, its date left out : the same content always prints the same index
+export function revisionOf(p: Project): string
+{
+    const text = JSON.stringify({ ...p, updated: null });
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++)
+    {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).toUpperCase().padStart(8, "0").slice(0, 6);
 }
 
 
@@ -148,7 +166,8 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     const conventions = [
         `Connecteurs à ${s.connectorInset} mm des chants avant et arrière, intermédiaires tous les 256 mm maxi`,
         `Tourillons ${DIAM}8 x 35 : ${s.dowelFaceDepth} mm dans la face, ${s.dowelEdgeDepth} mm dans le chant`,
-        `Taquets : trous ${DIAM}5 de ${s.pinDepth} mm, rangées à 37 mm des chants, 3 trous de réglage de part et d'autre`,
+        `Taquets : trous ${DIAM}5 de ${s.pinDepth} mm, rangées à 37 mm des chants, `
+            + "3 trous de réglage de part et d'autre",
         `Étagères réglables : jeu latéral ${s.shelfSideClearance} mm par côté, retrait avant ${s.shelfFrontSetback} mm`,
         `Charnières à ${s.hingeEdgeDistance} mm des chants de porte, décalées hors des tablettes fixes`,
         `Chants : ${EDGE_OVERLENGTH} mm de surlongueur par bande. Trait de scie ${s.kerf} mm, délignage ${s.trim} mm`,
@@ -191,7 +210,13 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     {
         sources.add("EN 1995-1-1:2004 tableau 3.1 (via COFORD, tableaux D.4 et D.5) : kmod des assises en moyen terme");
     }
-    sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée");
+    const load = String(p.settings.shelfLoad).replace(".", ",");
+    const use = SHELF_TEST_LOADS.find((l) =>
+    {
+        return l.kgPerDm2 === p.settings.shelfLoad;
+    });
+    sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée "
+        + `sous ${load} kg/dm²${use === undefined ? ", charge choisie hors catégorie" : `, ${use.label}`}`);
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
     for (const line of sources)
     {

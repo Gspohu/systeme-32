@@ -220,7 +220,7 @@ describe("cell lights", () =>
         // 13.0 W of strip on 24 V
         expect(hardwareOf(a.build.hardware, "SHELLY_PLUS_RGBW_PM")?.note)
             .toBe("entre l'alimentation et les rubans, 0.54 A sur une voie, pilotage local");
-        // 2000 wide : 1800 of strip at 50 W/m make 90 W, 3.75 A, still under , at 60 W/m 4.5 A is not
+        // 2000 wide : 1800 of strip at 50 W/m make 90 W, 3.75 A, still under. At 60 W/m, 4.5 A is not
         let wide = addItem(newProject("Sélestat"), wardrobe({ width: 2000 }));
         const w = wide.items[0] as Carcass;
         wide = setLight(wide, w.id, w.root.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000, wifi: true });
@@ -273,7 +273,7 @@ describe("cell lights", () =>
     {
         let p = addItem(newProject("essai"), wardrobe());
         const c = p.items[0] as Carcass;
-        // 1000 mm hold 15 rims of 65
+        // the cell hold 15 rims of 65 in its 1000 mm
         expect(errorsOf(setLight(p, c.id, c.root.id, { kind: "spots", spots: 16, setback: 40, kelvin: 3000 })).join())
             .toContain("En poser 15 au plus");
         p = setLight(p, c.id, c.root.id, { kind: "spots", spots: 7, setback: 40, kelvin: 3000 });

@@ -7,8 +7,9 @@ import { PLINTH_FOOT_GAP, baseHeight } from "../parts";
 import { endReach, usableDepth } from "../extent";
 import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";
+import { endPost, openEndLevels } from "../curves";
 import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H } from "./display";
-import { heading, table, type Draft } from "./draft";
+import { heading, paginateTable, table, type Draft } from "./draft";
 import { drawFront } from "./views";
 import { decorById } from "../../data/materials";
 import { hardware } from "../../data/hardware";
@@ -73,6 +74,27 @@ export function itemViews(k: Carcass, a: Analysis): Draft
                     `${sides.left + bh}`);
         canvas.dimV(fy - (sides.right + bh) / scale, fy, xr + 1, xr + 8, `${sides.right + bh}`);
     }
+    // clear heights between the shaped boards of an open rounded end, down its middle
+    for (const side of ["left", "right"] as const)
+    {
+        const end = k.ends[side];
+        if (end.type !== "rounded" || end.open !== true)
+        {
+            continue;
+        }
+        const reach = side === "left" ? reachLeft : reachRight;
+        const xe = side === "right" ? fx + (k.width + reach / 2) / scale : fx - reach / 2 / scale;
+        const levels = openEndLevels(k, end).sort((p, q) =>
+        {
+            return p - q;
+        });
+        for (let i = 0; i + 1 < levels.length; i++)
+        {
+            const clear = levels[i + 1]! - levels[i]! - k.thickness;
+            canvas.dimV(fy - (bh + levels[i + 1]!) / scale, fy - (bh + levels[i]! + k.thickness) / scale, xe, xe,
+                        `${Math.round(clear)}`, 1.8);
+        }
+    }
     const lay = a.build.layouts.get(k.id);
     if (lay !== undefined && k.root.kind === "split" && k.root.axis === "v")
     {
@@ -115,7 +137,8 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     drawPlan(canvas, k, scale, fx, planTop, reachRight);
 
     const sideX = (stacked ? fx : cutX) + (k.width + reachRight) / scale + VIEW_GAP;
-    canvas.text(sideX + k.depth / scale / 2, topY - 12, "Vue de côté", 3, "middle", true);
+    // set on the right of the front view with the front of the item on its right : seen from the left, first angle
+    canvas.text(sideX + k.depth / scale / 2, topY - 12, "Vue de gauche", 3, "middle", true);
     canvas.rect(sideX, topY, k.depth / scale, k.height / scale, "normal");
     if (k.base.type === "plinth")
     {
@@ -135,6 +158,16 @@ export function itemViews(k: Carcass, a: Analysis): Draft
                     (e.max[2] - e.min[2]) / scale, (e.max[1] - e.min[1]) / scale, f.hidden ? "dashed" : "thin");
     }
     canvas.dimH(sideX, sideX + k.depth / scale, fy + 1, fy + 8, `${k.depth}`);
+    // the base : its height on the front edge, and how far a plinth stands back from the front
+    const sideFront = sideX + k.depth / scale;
+    if (bh > 0)
+    {
+        canvas.dimV(fy - bh / scale, fy, sideFront + 1, sideFront + 6, `${bh}`, 1.8);
+    }
+    if (k.base.type === "plinth" && k.base.setback > 0)
+    {
+        canvas.dimH(sideFront - k.base.setback / scale, sideFront, fy + 1, fy + 14, `${k.base.setback}`, 1.8);
+    }
 
     // the tables take the free column on the right, else the space under the cut
     const rightX = sideX + k.depth / scale + VIEW_GAP;
@@ -189,13 +222,14 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
         {
             kind = "façade fixe";
         }
+        if (listY + 4.5 > bottom)
+        {
+            canvas.text(listX + 3, listY, "... la suite des façades est dans la fiche de débit", 2.5);
+            return;
+        }
         const size = `${Math.round(fp.rect.w)} x ${Math.round(fp.rect.h)} x ${fp.thickness}`;
         canvas.text(listX + 3, listY, `${size}, ${kind}, ${decorById(fp.decor).label}`, 2.5);
         listY += 4.5;
-        if (listY > bottom)
-        {
-            return;
-        }
     }
     const qty = new Map<string, number>();
     for (const h of a.build.hardware)
@@ -211,14 +245,19 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
     }
     listY += 5;
     canvas.text(listX, listY, "Quincaillerie", 3, "start", true);
-    const room = Math.max(4, Math.floor((bottom - listY - 6) / 4.5));
-    const rows = [...qty].slice(0, room).map(([ref, count]) =>
+    const rows = [...qty].map(([ref, count]) =>
     {
         const h = hardware(ref);
         return [`${h.brand} ${h.ref}`.trim(), `${count}`, h.label];
     });
-    const labelW = Math.max(60, A3.w - MARGIN - 50 - listX);
-    table(canvas, listX + 3, listY + 6, [34, 10, labelW], ["Référence", "Qté", "Article"], rows, 2.5, 4.5);
+    const cols = [34, 10, Math.max(60, A3.w - MARGIN - 50 - listX)];
+    // what the room left does not hold is named, never dropped
+    const pages = paginateTable(rows, cols, 2.5, 4.5, bottom - listY - 12);
+    const end = table(canvas, listX + 3, listY + 6, cols, ["Référence", "Qté", "Article"], pages[0]!, 2.5, 4.5);
+    if (pages.length > 1)
+    {
+        canvas.text(listX + 3, end, `... ${rows.length - pages[0]!.length} autres articles dans la quincaillerie`, 2.5);
+    }
 }
 
 
@@ -261,6 +300,16 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
         }
         canvas.poly(arc, false, "normal");
         canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2), `R ${Math.round(r)}`, 2, "middle");
+        // the upright of a seat end, its centre from the side face and from the front
+        const post = endPost(k, side);
+        if (post !== null)
+        {
+            const px = planX(xFace + dir * post.u);
+            const py = planY(k.depth - post.v);
+            canvas.cross(px, py, 1.2);
+            canvas.dimH(planX(xFace), px, planY(k.depth) - 1, planY(k.depth) - 5, `${Math.round(post.u)}`, 1.8);
+            canvas.dimV(planY(k.depth), py, px + dir * 1.5, px + dir * 5, `${Math.round(post.v)}`, 1.8);
+        }
     }
     const dimX = planX(k.width) + reachRight / scale;
     canvas.dimV(planY(k.depth), planY(0), dimX + 1, dimX + 8, `${k.depth}`);

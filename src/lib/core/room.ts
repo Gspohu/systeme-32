@@ -129,4 +129,11 @@ export function boxesMeet(a: Box3, b: Box3): boolean
 }
 
 
+// How far a side wall runs from the back wall : its return in an alcove, else the depth of the room
+export function sideWallDepth(room: Room, side: "left" | "right"): number
+{
+    return Math.min(room.returns?.[side] ?? room.depth, room.depth);
+}
+
+
 export const WALL_LABELS: Record<Wall, string> = { back: "Mur du fond", left: "Mur gauche", right: "Mur droit" };

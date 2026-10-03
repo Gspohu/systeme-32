@@ -29,7 +29,8 @@ export interface BoardMaterial
 // building physics based on 600 kg/m3, 13-20 mm MOE 1600 and MOR 11
 // https://panelco.com/wp-content/uploads/2025/10/Technical_Datasheet_Eurospan_E1_P2.pdf
 // Hettich SlideLine M brochure (2017) plans door weights with 700 kg/m3 for particleboard
-// kdef and kmod : COFORD Handbook for Eurocode 5 tables D.7 and D.5 give 2.25 and 0.65 for P4/P5, P2 is not listed
+// TODO kdef and kmod : COFORD Handbook for Eurocode 5 tables D.7 and D.5 give 2.25 and 0.65 for P4/P5, P2 is not
+// listed and its own creep is unknown
 export const PARTICLEBOARD: BoardMaterial = {
     id: "p2",
     label: "Panneau de particules mélaminé P2",
@@ -41,7 +42,8 @@ export const PARTICLEBOARD: BoardMaterial = {
     kdef: 2.25,
     kmod: 0.65,
     thicknesses: [8, 19],
-    source: "Egger Eurospan E1 P2 rec. 107, Hettich SlideLine M 2017, EN 1995-1-1:2004 tab. 3.2 via COFORD",
+    source: "Egger Eurospan E1 P2 rec. 107, Hettich SlideLine M 2017, kdef et kmod repris de P4/P5 car P2 "
+        + "n'est pas listé par EN 1995-1-1:2004 (via COFORD)",
 };
 
 // Isoroy MEDIUM datasheet (April 2014, EN 622-5) : 16-19 mm density 730, MOR 30, MOE 2800
@@ -114,7 +116,8 @@ export const MDF_VENEER: BoardMaterial = {
     kdef: 2.25,
     kmod: 0.6,
     thicknesses: [4, 9, 13, 16, 17, 19, 23, 26, 29, 31, 39],
-    source: "Decospan Decopanel MDF-BOARD fiche technique 2021, Hettich SlideLine M 2017, EN 1995-1-1:2004 tab. 3.2 via COFORD",
+    source: "Decospan Decopanel MDF-BOARD fiche technique 2021, Hettich SlideLine M 2017, "
+        + "EN 1995-1-1:2004 tab. 3.2 via COFORD",
 };
 
 
@@ -287,7 +290,8 @@ export const DECORS: Decor[] = [
         rgb: [178, 154, 125],
         rgbDark: [158, 132, 101],
         rgbLight: [200, 178, 151],
-        colourSource: "Couleur d'affichage reprise du H1180, pas une mesure du placage : importer une photo de l'échantillon",
+        colourSource: "Couleur d'affichage reprise du H1180, pas une mesure du placage : "
+            + "importer une photo de l'échantillon",
         edge: "Chant placage chêne, référence au choix du distributeur",
     },
     {

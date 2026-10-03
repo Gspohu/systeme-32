@@ -1,6 +1,7 @@
 // Every volume the 3D view draws, in room millimetres, with its bounding box and its true shape : clashes.ts
 // and support.ts judge them
-// TODO the hinge arm and its 173H7100 plate are no volume yet : their sizes are not in the Blum pages read so far
+// TODO the hinge arm and its plate (174H7100E, 173H7100 on inset doors) are no volume yet : p. 146 gives the hole
+// pattern, not the plate outline
 
 import { at, tessellate, type Vec3 } from "./geometry";
 import { battenAngle, bevelU, unbevelU, type Build, type CurveShape, type Fitted, type Part } from "./parts";

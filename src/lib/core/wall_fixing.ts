@@ -74,8 +74,8 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
     {
         if (name !== null)
         {
-            b.infos.push(`${c.name} : pas d'équerre anti-basculement sous ${name}, posé dessus. Relier les deux `
-                + "caissons, le plus haut retient alors l'autre.");
+            b.infos.push(`${c.name} : pas d'équerre anti-basculement sous ${name}, posé dessus. Le plus haut le `
+                + "retient par les vis de liaison qui les serrent l'un à l'autre.");
         }
     }
     const at = kept.filter((k) =>

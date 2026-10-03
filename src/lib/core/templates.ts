@@ -34,10 +34,11 @@ export function tvWall(): Project
 
     // four columns of 627 : a door before an adjustable shelf, two pairs of drawers, a door again
     const cables = cell();
-    const leftDoor = split("h", [224], [cables, cell()], ["adjustable"]);
+    // adjustable shelves rest on the system 32 line, 9.5 + 32k from the bottom : 5 mm under the parents' save
+    const leftDoor = split("h", [219], [cables, cell()], ["adjustable"]);
     const drawersA = cell();
     const drawersB = cell();
-    const rightDoor = split("h", [224], [cell(), cell()], ["adjustable"]);
+    const rightDoor = split("h", [219], [cell(), cell()], ["adjustable"]);
     // the quarter round end left open and sat on : its low board on the floor, one shaped shelf between, an upright
     // halfway round the arc taking the sitter down to the floor
     const baseUnit = newCarcass({
@@ -67,9 +68,9 @@ export function tvWall(): Project
 
 
     // the column on the base : a door over three cells of adjustable shelves, an open lined niche, a door again
-    const lower = split("h", [160, 352], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
+    const lower = split("h", [155, 347], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
     const niche = cell();
-    const upper = split("h", [156, 348], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
+    const upper = split("h", [151, 343], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
     const column = newCarcass({
         name: "Colonne gauche",
         width: 450, height: 1830, depth: 300, x: 0, y: 600, z: 0,
@@ -163,6 +164,16 @@ export function dresser(): Project
     );
 
     project.items.push(kl, low, niche, high, kr);
+    // their alcove as measured : 3010 wide, 2440 under the ceiling, returns 660 on the left and 610 on the right
+    // the 2880 of the piece centred in it
+    project.room = { ...project.room, width: 3010, height: 2440, returns: { left: 660, right: 610 } };
+    for (const k of [kl, low, niche, high, kr])
+    {
+        k.x += (3010 - 2880) / 2;
+    }
+    // the two 65 mm gaps to the returns closed by fillers in the front decor, scribed on site
+    kl.sideFillers = { left: 65, right: 0 };
+    kr.sideFillers = { left: 0, right: 65 };
     return project;
 }
 

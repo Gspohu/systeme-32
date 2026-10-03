@@ -5,7 +5,7 @@
     import { handleDrop } from "./actions";
     import { hitTest } from "./hit";
     import { byId } from "../core/edit";
-    import { endReach, itemExtent, screenSize } from "../core/extent";
+    import { endReach, itemExtent, screenSize, sideFiller } from "../core/extent";
     import { PLINTH_FOOT_GAP, baseHeight } from "../core/parts";
     import { RAIL_THICKNESS, slatLayout } from "../core/slats";
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
@@ -19,7 +19,7 @@
     import type { NodeBox, ResolvedLayout } from "../core/layout";
     import { decorById } from "../data/materials";
     import type { Item, Wall } from "../core/model";
-    import { boxToWall, roomBox } from "../core/room";
+    import { boxToWall, roomBox, sideWallDepth } from "../core/room";
 
 
     let hostWidth = $state(800);
@@ -87,7 +87,17 @@
         }
         return list;
     });
-    const wallLength = $derived(app.wall === "back" ? project.room.width : project.room.depth);
+    // the stretch of wall that stands : a side wall meets the back wall on the right seen from the left wall, on the
+    // left seen from the right one, and runs only as far as its return in an alcove
+    const wallSpan = $derived.by((): [number, number] =>
+    {
+        if (app.wall === "back")
+        {
+            return [0, project.room.width];
+        }
+        const d = sideWallDepth(project.room, app.wall);
+        return app.wall === "left" ? [project.room.depth - d, project.room.depth] : [0, d];
+    });
     const WALLS: [Wall, string][] = [["left", "Gauche"], ["back", "Fond"], ["right", "Droit"]];
 
 
@@ -301,7 +311,8 @@
     <svg bind:this={facadeBridge.svg} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" onwheel={onWheel}
         role="application" aria-label="Vue de face">
         <line x1={extent.x0} y1="0" x2={extent.x1} y2="0" class="floor" />
-        <polyline points={`0,0 0,${-project.room.height} ${wallLength},${-project.room.height} ${wallLength},0`}
+        <polyline points={`${wallSpan[0]},0 ${wallSpan[0]},${-project.room.height} ${wallSpan[1]},${-project.room.height} `
+            + `${wallSpan[1]},0`}
             class="room" fill="none" />
         {#each ghosts as g (g.id)}
             <rect x={g.x0} y={-g.y1} width={g.x1 - g.x0} height={g.y1 -
@@ -319,6 +330,19 @@
                             height={project.room.height - it.y - it.height}
                             fill={fill(it.fronts[0]?.decor ?? it.decor, it.fronts[0]?.colour ?? null)} class="edge" />
                     {/if}
+                    {#each ["left", "right"] as const as side (side)}
+                        {@const w = sideFiller(it, side)}
+                        {#if w > 0}
+                            {@const fx = side === "left" ? -w : it.width}
+                            <rect x={fx} y={-it.height} width={w} height={it.height}
+                                fill={fill(it.fronts[0]?.decor ?? it.decor,
+                                           it.fronts[0]?.colour ?? null)} class="edge" />
+                            {#if it.base.type === "plinth"}
+                                <rect x={fx} y="0" width={w} height={bh - PLINTH_FOOT_GAP} fill={shade(it.decor, 0.75)}
+                                    class="edge" />
+                            {/if}
+                        {/if}
+                    {/each}
                     {#if it.base.type === "plinth"}
                         {@const grills = Math.max(0, Math.round(it.base.grills ?? 0))}
                         <rect x="0" y="0" width={it.width} height={bh - PLINTH_FOOT_GAP} fill={shade(it.decor, 0.75)}

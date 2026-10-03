@@ -55,7 +55,8 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     const mid = w.thickness / 2;
     xs.forEach((x, k) =>
     {
-        part.holes.push({ u: x, v: 0, diameter: H.pinDiameter, depth: H.pinDepth, face: "v1", w: mid,
+        // an edge hole sits on its edge : v1 is the back one, at the full width of the board
+        part.holes.push({ u: x, v: part.width, diameter: H.pinDiameter, depth: H.pinDepth, face: "v1", w: mid,
                           label: `Fixation ${H.ref} : broche ${DIAM}${H.pinDiameter} x ${H.pinDepth}` });
         // one fitting : the pin runs on from the bottom of the plate pocket to the end of its hole
         const pin = box(`${w.id}/support${k}/broche`, w.id, H.ref, `${w.name}, broche ${k + 1}`,
@@ -71,8 +72,11 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
         plate.host = part.id;
         b.fitted.push(pin, plate);
     });
-    part.notes.push(`Au dos, une entaille de ${H.pocket.width} x ${H.pocket.height}, ${H.pocket.depth} de profondeur, `
-        + `centrée sur chaque broche pour la platine (Häfele p. 7.142)`);
+    part.pockets = xs.map((x) =>
+    {
+        return { edge: "v1" as const, at: x, length: H.pocket.width, across: H.pocket.height, w: mid,
+                 depth: H.pocket.depth, label: `Entaille de la platine ${H.ref} (Häfele p. 7.142)` };
+    });
     part.notes.push(`Fixations à ${SUPPORT_END_INSET} mm des bouts : convention d'atelier, Häfele ne la donne pas`);
     const n = xs.length;
     const line = (ref: string, qty: number, note: string | null): void =>

@@ -17,6 +17,17 @@ test.describe("plans and lists", () =>
         await openTemplate(page, "Vaisselier bibliothèque");
     });
 
+    test("lists the assembly sequence of each carcass, floor first", async ({ page }) =>
+    {
+        await outputsTab(page, "Montage");
+        const titles = page.locator(".assembly .section-title");
+        await expect(titles).toHaveText(["Colonne gauche", "Placards et tiroirs", "Colonne droite", "Niche",
+                                         "Placards hauts"]);
+        await expect(page.locator(".assembly").first()).toContainText("7 embases 174H7100E enfoncées");
+        await expect(page.locator(".assembly").nth(3)).toContainText("vis de liaison 267.07.903");
+    });
+
+
     test("shows the A3 sheets and zooms on one", async ({ page }) =>
     {
         await outputsTab(page, "Plans");

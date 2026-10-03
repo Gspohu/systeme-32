@@ -5,6 +5,7 @@ import type { Analysis } from "./analysis";
 import type { Part, Edge } from "./parts";
 import { partMass } from "./fittings";
 import { bounds, polygonArea, tessellate } from "./geometry";
+import { groupBySignature } from "./signature";
 import { MATERIALS, decorById } from "../data/materials";
 import { FAMILY_LABELS, HARDWARE, type Family } from "../data/hardware";
 
@@ -82,51 +83,17 @@ export interface PbsNode
 }
 
 
-function r1(x: number): number
+// Two doors merged into one row keep both their names, in natural order
+function rowLabel(parts: Part[]): string
 {
-    return Math.round(x * 10) / 10;
-} 
-
-
-// Two parts are the same workpiece when board, size, edges and machining are identical
-function signature(p: Part): string
-{
-    const holes: string[] = [];
-    for (const h of p.holes)
+    const names = [...new Set(parts.map((q) =>
     {
-        holes.push(`${r1(h.u)},${r1(h.v)},${h.diameter},${h.depth},${h.face},${h.w ?? ""}`);
-    }  
-    const grooves: string[] = [];
-    for (const g of p.grooves)
+        return q.label;
+    }))];
+    return names.sort((p, q) =>
     {
-        grooves.push(`${g.face},${g.along},${r1(g.at)},${r1(g.from)},${r1(g.to)},${g.width},${g.depth}`);
-    }
-    let outline = "";
-    for (const o of [p.outline, ...p.cutouts])
-    {
-        outline += o === p.outline ? "" : "/";
-        for (const s of o.segments)
-        {
-            outline += s.kind === "arc" ? `a${r1(s.x)},${r1(s.y)},${r1(s.cx)},${r1(s.cy)},${s.ccw}` : `l${r1(s.x)},${r1(s.y)}`;
-        }
-    }
-    return [p.decor, p.material, p.thickness, r1(p.length), r1(p.width), [...p.edges].sort().join(""), p.role, outline,
-            holes.sort().join(";"), grooves.sort().join(";")].join("|");
-}
-
-
-// Parts grouped by signature, in the order their first member appears
-function groupBySignature(parts: Part[]): Part[][]
-{
-    const groups = new Map<string, Part[]>();
-    for (const part of parts)
-    {
-        const sig = signature(part);
-        const g = groups.get(sig) ?? [];
-        g.push(part);
-        groups.set(sig, g);
-    }
-    return [...groups.values()];
+        return p.localeCompare(q, "fr", { numeric: true });
+    }).join(", ");
 }
 
 
@@ -320,7 +287,7 @@ function cutRows(a: Analysis, codeOfPart: Map<string, string>): { cut: CutRow[];
         const row: CutRow = {
             code: [...codes].join(", "),
             items: [...items],
-            label: first.label,
+            label: rowLabel(parts),
             quantity: qty,
             length: bb.maxX - bb.minX,
             width: bb.maxY - bb.minY,
@@ -394,6 +361,21 @@ export function computeBom(p: Project, a: Analysis): Bom
 
 
 // L1 L2 along the length, l1 l2 across the ends, the usual French cut list notation
+// How a row is cut beyond its rectangle : curved, pierced, or a straight outline that is no rectangle
+export function shapeWord(r: CutRow): string
+{
+    if (r.curved)
+    {
+        return "cintrée";
+    }
+    if (r.parts[0]!.cutouts.length > 0)
+    {
+        return "découpée";
+    }
+    return r.shaped ? "biaise" : "";
+}
+
+
 export function edgeNotation(edges: Edge[]): string
 {
     const names: Record<Edge, string> = { v0: "L1", v1: "L2", u0: "l1", u1: "l2" };
@@ -426,7 +408,7 @@ export function cutListCsv(b: Bom): string
     {
         lines.push([
             r.code, r.items.join(" / "), r.label, r.quantity, r.length, r.width, r.thickness, r.decorLabel,
-            r.grain ? "oui" : "non", edgeNotation(r.edges), r.curved ? "cintrée (DXF)" : r.shaped ? "biaise (DXF)" : "rectangle",
+            r.grain ? "oui" : "non", edgeNotation(r.edges), shapeWord(r) === "" ? "rectangle" : `${shapeWord(r)} (DXF)`,
             r.areaM2, r.massKg, r.notes.join(" | "),
         ].map(csvCell).join(";"));
     }

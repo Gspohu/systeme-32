@@ -118,9 +118,12 @@ test.describe("inspector", () =>
         // the front view draws the open end board by board, no batten skin left over it
         await expect(page.locator(".end-board")).toHaveCount(5);
         await outputsTab(page, "Débit");
-        // the shelves and the end panels share their outline : one line of the cut list, five pieces
-        const row = page.locator(".tab-content tbody tr", { hasText: "Bout arrondi gauche, flasque basse" });
-        await expect(row.locator("td").nth(2)).toHaveText("5");
+        // one outline, two workpieces : the end panels meet the top and bottom joints from the other face of the
+        // side, their connectors stand 32 off, the three shelves keep theirs
+        const panels = page.locator(".tab-content tbody tr", { hasText: "Bout arrondi gauche, flasque basse" });
+        await expect(panels.locator("td").nth(2)).toHaveText("2");
+        const shelves = page.locator(".tab-content tbody tr", { hasText: "Bout arrondi gauche, tablette 1" });
+        await expect(shelves.locator("td").nth(2)).toHaveText("3");
     });
 
     test("closes the back of a quarter round", async ({ page }) =>

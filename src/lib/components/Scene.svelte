@@ -10,7 +10,7 @@
     import { cushionMesh, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
             type FittingMesh, type MeshSpec } from "../view3d/meshes";
     import { kelvinColour } from "../view3d/kelvin";
-    import { roomBox, wallPlacement } from "../core/room";
+    import { roomBox, sideWallDepth, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
     import { decorTexture } from "../view3d/textures";
     import { decorById } from "../data/materials";
@@ -473,15 +473,18 @@
         <!-- facing down it gets none of the light from above : a flat colour, it only marks the room -->
         <T.MeshBasicMaterial color={roomTint.ceiling} side={THREE.FrontSide} />
     </T.Mesh>
-    {#if sideWalls.has("left")}
-        <T.Mesh position={[0, r.height / 2 * MM, r.depth / 2 * MM]} rotation={[0, Math.PI / 2, 0]}>
-            <T.PlaneGeometry args={[r.depth * MM, r.height * MM]} />
+    <!-- the returns of an alcove frame it whatever stands against them -->
+    {#if sideWalls.has("left") || r.returns !== undefined}
+        {@const d = sideWallDepth(r, "left")}
+        <T.Mesh position={[0, r.height / 2 * MM, d / 2 * MM]} rotation={[0, Math.PI / 2, 0]}>
+            <T.PlaneGeometry args={[d * MM, r.height * MM]} />
             <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
         </T.Mesh>
     {/if}
-    {#if sideWalls.has("right")}
-        <T.Mesh position={[r.width * MM, r.height / 2 * MM, r.depth / 2 * MM]} rotation={[0, -Math.PI / 2, 0]}>
-            <T.PlaneGeometry args={[r.depth * MM, r.height * MM]} />
+    {#if sideWalls.has("right") || r.returns !== undefined}
+        {@const d = sideWallDepth(r, "right")}
+        <T.Mesh position={[r.width * MM, r.height / 2 * MM, d / 2 * MM]} rotation={[0, -Math.PI / 2, 0]}>
+            <T.PlaneGeometry args={[d * MM, r.height * MM]} />
             <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
         </T.Mesh>
     {/if}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addItem, setFront } from "./commands";
+import { addItem, setFront, setReturn } from "./commands";
 import { newCarcass, newProject } from "./factory";
 import { analyse } from "./analysis";
 import { sweepHits } from "./corner";
@@ -109,5 +109,27 @@ describe("walls and corners", () =>
         {
             validateProject(bad);
         }).toThrow("mur inconnu");
+    });
+
+
+    it("stops the side walls of an alcove at their returns", () =>
+    {
+        // the left carcass reaches 1000 from the back wall : a 660 return leaves 340 of it with nothing behind
+        const p = setReturn(corner(null, 3000), "left", 660);
+        expect(p.room.returns).toEqual({ left: 660, right: 4000 });
+        expect(messages(p, "warning")).toContain("Gauche dépasse le retour du mur gauche (660 mm depuis le fond)");
+        expect(messages(setReturn(p, "left", 1000), "warning")).not.toContain("dépasse le retour");
+        // once neither wall is shorter than the room there is no alcove left
+        expect(setReturn(p, "left", null).room).toEqual({ width: 4000, depth: 4000, height: 2500 });
+        expect(() =>
+        {
+            setReturn(p, "right", 0);
+        }).toThrow("Retour droit invalide");
+        const bad = JSON.parse(JSON.stringify(p));
+        bad.room.returns.right = -5;
+        expect(() =>
+        {
+            validateProject(bad);
+        }).toThrow("retours de la niche");
     });
 });

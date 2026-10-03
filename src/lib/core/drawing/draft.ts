@@ -1,6 +1,6 @@
 // Pieces shared by every sheet of the drawing set : the draft record, headings, tables, pagination
 
-import { Canvas, MARGIN, fit } from "./display";
+import { Canvas, MARGIN, fit, wrap } from "./display";
 
 
 export interface Draft
@@ -40,32 +40,53 @@ export function table(canvas: Canvas, x: number, y: number, cols: number[], head
     let rowY = y + rowH;
     for (const row of rows)
     {
+        // a cell too long for its column carries on below, the row grow as tall as its tallest cell
+        const cells = cellLines(row, cols, size);
         cx = x;
-        let k = 0;
-        while (k < row.length)
+        cells.forEach((lines, k) =>
         {
-            canvas.text(cx, rowY, fit(row[k]!, size, cols[k]! - 1), size);
+            lines.forEach((line, j) =>
+            {
+                canvas.text(cx, rowY + j * rowH, line, size);
+            });
             cx += cols[k]!;
-            k++;
-        }
-        rowY += rowH;
+        });
+        rowY += rowH * Math.max(1, ...cells.map((l) =>
+        {
+            return l.length;
+        }));
     }
     return rowY;
 }
 
 
-export function paginate<T>(rows: T[], perPage: number): T[][]
+function cellLines(row: string[], cols: number[], size: number): string[][]
 {
-    const pages: T[][] = [];
-    let i = 0;
-    while (i < rows.length)
+    return row.map((t, k) =>
     {
-        pages.push(rows.slice(i, i + perPage));
-        i += perPage;
-    }
-    if (pages.length === 0)
+        return wrap(t, size, (cols[k] ?? 40) - 1);
+    });
+}
+
+
+// Rows of a table grouped into pages by the height they take once wrapped, under a header row
+export function paginateTable(rows: string[][], cols: number[], size: number, rowH: number, room: number): string[][][]
+{
+    const pages: string[][][] = [[]];
+    let used = rowH;
+    for (const row of rows)
     {
-        pages.push([]);
+        const h = rowH * Math.max(1, ...cellLines(row, cols, size).map((l) =>
+        {
+            return l.length;
+        }));
+        if (used + h > room && pages[pages.length - 1]!.length > 0)
+        {
+            pages.push([]);
+            used = rowH;
+        }
+        pages[pages.length - 1]!.push(row);
+        used += h;
     }
     return pages;
 }

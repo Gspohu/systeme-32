@@ -1,4 +1,4 @@
-// Masses, sliding leaves, shelf pins, carcass ojinery and base : hardware lines and drilling
+// Masses, sliding leaves, shelf pins and base : hardware lines and drilling, the joints live in joints.ts
 
 import type { Carcass, Settings } from "./model";
 import type { ResolvedLayout } from "./layout";
@@ -6,18 +6,18 @@ import type { FrontPanel } from "./fronts";
 import { sideFace } from "./locate";
 import { byId } from "./edit";
 import { X, polygonArea, tessellate } from "./geometry";
-import type { Build, Joint, Part } from "./parts";
-import { MINIFIX, LAMELLO_P14, SLIDELINE_M } from "../data/rules";
+import type { Build, Part } from "./parts";
+import { SLIDELINE_M } from "../data/rules";
 import {
     AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
 import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset, sideFootInset } from "./feet";
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
+import { PIN_BELOW_SHELF, holeLine, nearestHole, symmetricHeights } from "./grid";
 
 
 // Workshop conventions, stated in the drawings as such
-const PIN_BELOW_SHELF = 4;
 const PIN_SPARE_HOLES = 3;
 
 
@@ -67,7 +67,7 @@ export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Buil
         for (const lp of leaves) 
         {
             const kg = panelMass(lp, true);
-            const name = `${c.name}, vantail ${lp.index + 1}`;
+            const name = `${c.name}, vantail ${lp.number}`;
             if (lp.rect.w < minW || lp.rect.w > L.maxWidth)
             {
                 b.errors.push(`${name} : largeur ${Math.round(lp.rect.w)} mm hors de ${minW} à ${L.maxWidth} `
@@ -103,7 +103,7 @@ export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Buil
         for (const lp of leaves)
         {
             b.motions.push({
-                item: c.id, front: front.id, label: `${c.name}, vantail ${lp.index + 1}`, kind: "slide",
+                item: c.id, front: front.id, label: `${c.name}, vantail ${lp.number}`, kind: "slide",
                 pivot: [0, 0, 0], axis: X, amount: Math.max(0, track - total), parts: [`${c.id}/front/${lp.id}`],
                 fitted: [], rides: [], source: `SlideLine M, ${Math.round(track - total)} mm de voie libre`,
                 remedy: "Réduire la largeur des vantaux.",
@@ -161,7 +161,16 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
         const node = { id: d.split, kind: "cell" as const, parent: null, x: d.x, y: d.y, w: d.w, h: d.h,
                       left: "outer" as const, right: "outer" as const, bottom: "outer" as const,
                       top: "outer" as const, walls: { left: c.thickness, right: c.thickness, bottom: d.h, top: d.h } };
-        const yPin = d.y - PIN_BELOW_SHELF;
+        // within a millimetre of the line (whole mm heights against a line on half mm) the pins go in its holes
+        // an older project may hold a shelf typed off it : its pins stay under it and the line is told
+        const line = holeLine(c, s, nearestHole(c, s, d.y - PIN_BELOW_SHELF));
+        const onLine = s.grid > 0 && Math.abs(line + PIN_BELOW_SHELF - d.y) <= 1;
+        const yPin = onLine ? line : d.y - PIN_BELOW_SHELF;
+        if (s.grid > 0 && !onLine)
+        {
+            b.warnings.push(`${c.name}, ${shelf.label.toLowerCase()} : à ${Math.round(d.y)} mm, hors des trous du `
+                + `système 32. La déplacer à ${Math.round(line + PIN_BELOW_SHELF)} mm pour qu'elle repose sur la série.`);
+        }
         const rows = [37, c.depth - lay.zBack - 37];
         for (const side of ["left", "right"] as const)
         {
@@ -175,13 +184,47 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             {
                 for (const v of rows)
                 {
-                    face.part.holes.push({ u: yPin + k * s.grid - face.uOrigin, v, diameter: 5,
-                                          depth: s.pinDepth, face: face.face,
-                                          label: k === 0 ? `Taquet ${sup.ref}` : `Réglage étagère ${DIAM}5` });
+                    // two shelves of a column share their spare holes, a hole carrying a pin keeps saying so
+                    const u = yPin + k * s.grid - face.uOrigin;
+                    const label = k === 0 ? `Taquet ${sup.ref}` : `Réglage étagère ${DIAM}5`;
+                    const there = face.part.holes.find((h) =>
+                    {
+                        return h.face === face.face && Math.abs(h.u - u) < 0.01 && Math.abs(h.v - v) < 0.01;
+                    });
+                    if (there === undefined)
+                    {
+                        face.part.holes.push({ u, v, diameter: 5, depth: s.pinDepth, face: face.face, label });
+                    }
+                    else if (k === 0 && there.label.startsWith("Embase"))
+                    {
+                        // the hole is a hinge plate's : the shelf cannot rest there
+                        b.warnings.push(`${c.name}, ${shelf.label.toLowerCase()} : son taquet tombe dans un trou `
+                            + "d'embase de charnière. La monter ou la descendre d'un cran de la série.");
+                    }
+                    else if (k === 0)
+                    {
+                        there.label = label;
+                    }
                 }
                 k++;
             }
         }
+    }
+}
+
+
+// A carcass drilled with the line : whether it ends on the axis of the top as it starts on that of the bottom
+export function lineSymmetry(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
+{
+    const drilled = c.modularCells.length > 0 || lay.dividers.some((d) =>
+    {
+        return d.axis === "h" && d.kind === "adjustable";
+    });
+    const heights = drilled ? symmetricHeights(c, s) : null;
+    if (heights !== null)
+    {
+        b.infos.push(`${c.name} : la série de trous ne finit pas à l'axe du dessus comme elle part de celui du `
+            + `dessous. Hauteur de caisson ${heights[0]} ou ${heights[1]} mm pour un motif symétrique (système 32).`);
     }
 }
 
@@ -205,10 +248,11 @@ export function fitModularRows(c: Carcass, lay: ResolvedLayout, s: Settings, b: 
             continue;
         }
         const ys: number[] = [];
-        let n = Math.ceil((nb.y - lay.inner.y) / s.grid);
-        while (lay.inner.y + n * s.grid + shelf <= nb.y + nb.h)
+        // every hole of the line inside the cell, while a shelf resting on it still fits under the cell top
+        let n = Math.ceil((nb.y + 5 / 2 - c.thickness / 2) / s.grid);
+        while (holeLine(c, s, n) + PIN_BELOW_SHELF + shelf <= nb.y + nb.h)
         {
-            const pin = lay.inner.y + n * s.grid - PIN_BELOW_SHELF;
+            const pin = holeLine(c, s, n);
             if (pin - 5 / 2 > nb.y)
             {
                 ys.push(pin);
@@ -268,93 +312,6 @@ export function spread(length: number, inset: number, max: number): number[]
         k++;
     }
     return out;
-}
-
-
-export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string, itemName: string): void
-{
-    let minifix = 0;
-    let dowels = 0;
-    let clamex = 0;
-    for (const joint of joints)
-    {
-        const ep = byId(b.parts, joint.edgePart);
-        const fpart = byId(b.parts, joint.facePart);
-        if (ep === undefined || fpart === undefined)
-        {
-            continue;
-        }
-        const len = joint.to - joint.from;
-        const edgeThickness = ep.thickness;
-        const edgeU = joint.edge === "u0" ? 0 : ep.length;
-        const inward = joint.edge === "u0" ? 1 : -1;
-        const alongU = joint.lineAxis === "u";
-        const onFace = (pos: number): { u: number; v: number } =>
-        {
-            return alongU ? { u: joint.line, v: joint.from + pos } : { u: joint.from + pos, v: joint.line };
-        };
-        if (s.joinery === "clamex")
-        {
-            for (const pos of spread(len, Math.max(60, s.connectorInset), 400))
-            {
-                const f = onFace(pos);
-                const mid = alongU ? f.v : f.u;
-                fpart.grooves.push({ face: joint.face, along: alongU ? "v" : "u", at: alongU ? f.u : f.v,
-                                     from: mid - 35, to: mid + 35, width: LAMELLO_P14.grooveWidth,
-                                     depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 (Zeta P2 ou CN)" });
-                ep.grooves.push({ face: "A", along: "v", at: edgeU, from: joint.edgeFrom + pos - 35,
-                                  to: joint.edgeFrom + pos + 35, width: LAMELLO_P14.grooveWidth,
-                                  depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 dans le chant" }); 
-                ep.holes.push({ u: edgeU + inward * 13.5, v: joint.edgeFrom + pos,
-                                diameter: LAMELLO_P14.accessDiameter, depth: 0, face: "A",
-                                label: `Accès levier Clamex ${DIAM}6, position selon notice Lamello` });
-                clamex++;
-            }
-            continue;
-        }
-        const positions = spread(len, s.connectorInset, 256);
-        let k = 0;
-        while (k < positions.length)
-        {
-            const pos = positions[k]!;
-            const f = onFace(pos);
-            const endConnector = s.joinery === "minifix" && (k === 0 || k === positions.length - 1);
-            if (endConnector)
-            {
-                fpart.holes.push({ ...f, diameter: MINIFIX.boltPilot, depth: MINIFIX.boltDepth, face: joint.face,
-                                   label: `Goujon Minifix 262.28.020, avant-trou ${DIAM}5` });
-                ep.holes.push({ u: edgeU + inward * MINIFIX.distanceB, v: joint.edgeFrom + pos,
-                                diameter: MINIFIX.housingDiameter, depth: MINIFIX.housingDepth, face: "A",
-                                label: `Boîtier Minifix 262.25.035 ${DIAM}15` });
-                ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: MINIFIX.distanceB,
-                                face: joint.edge, w: edgeThickness / 2, label: `Passage du goujon ${DIAM}8` });
-                minifix++;
-            }
-            else
-            {
-                fpart.holes.push({ ...f, diameter: 8, depth: s.dowelFaceDepth, face: joint.face,
-                                   label: `Tourillon ${DIAM}8 x 35` });
-                ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: s.dowelEdgeDepth,
-                                face: joint.edge, w: edgeThickness / 2, label: `Tourillon ${DIAM}8 x 35` });
-                dowels++;
-            }
-            k++;
-        }
-    }
-    if (minifix > 0)
-    {
-        b.hardware.push({ ref: "262.25.035", qty: minifix, item: itemId, itemName, target: null, note: null });
-        b.hardware.push({ ref: "262.28.020", qty: minifix, item: itemId, itemName, target: null, note: null });
-    }
-    if (dowels > 0)
-    {
-        b.hardware.push({ ref: "DOWEL_8x35", qty: dowels, item: itemId, itemName, target: null, note: "collés" });
-    }
-    if (clamex > 0)
-    {
-        b.hardware.push({ ref: "145334", qty: Math.ceil(clamex / 80), item: itemId, itemName, target: null,
-                         note: `${clamex} paires utilisées` });
-    }
 }
 
 

@@ -4,7 +4,8 @@ import { newCarcass, newProject } from "./factory";
 import { analyse } from "./analysis";
 import type { Carcass, Project, SplitNode } from "./model";
 
-// 800 high in 19 mm : a 19 mm shelf may rest at 51, 83 ... 755 on the grid, its pin 4 mm lower
+// 800 high in 19 mm : the line runs 9.5 + 32k from the axis of the bottom, its holes 41.5 to 745.5 inside the cell
+// a 19 mm shelf still fitting over the last one
 function modular(): { p: Project; c: Carcass }
 {
     let p = addItem(newProject("Sélestat"), newCarcass({ name: "Buffet de Sélestat", width: 600, height: 800,
@@ -41,8 +42,8 @@ describe("modular cells", () =>
             {
                 return Math.round(h.u);
             });
-            expect(Math.min(...us)).toBe(47);
-            expect(Math.max(...us)).toBe(751);
+            expect(Math.min(...us)).toBe(42);
+            expect(Math.max(...us)).toBe(746);
         }
     });
 

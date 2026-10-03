@@ -1,4 +1,4 @@
-import { addCarcass, checkLines, drop, expect, field, openBlank, outputsTab, selectItem, test,
+import { addCarcass, checkLines, drop, expect, field, openBlank, openTemplate, outputsTab, selectItem, test,
         toClient } from "./helpers";
 import type { Page } from "@playwright/test";
 
@@ -51,5 +51,36 @@ test.describe("walls", () =>
         await width.press("Tab");
         await page.getByRole("button", { name: "Conception", exact: true }).click();
         expect((await checkLines(page)).join("\n")).toContain("sort de la pièce (500 x 4000 x 2500 mm)");
+    });
+
+
+    test("shows the filler of the dresser's left column and refuses one too wide for a strip", async ({ page }) =>
+    {
+        await openTemplate(page, "Vaisselier bibliothèque");
+        await selectItem(page, 0);
+        const left = page.getByLabel("Fileur gauche");
+        await expect(left).toHaveValue("65");
+        await left.fill("200");
+        await left.press("Tab");
+        expect((await checkLines(page)).join("\n")).toContain("au-delà des 150 mm d'un fileur");
+    });
+
+
+    test("reads the returns of the dresser's alcove and lets them go one at a time", async ({ page }) =>
+    {
+        await openTemplate(page, "Vaisselier bibliothèque");
+        await outputsTab(page, "Réglages");
+        const left = page.getByLabel("Retour gauche de la niche");
+        const right = page.getByLabel("Retour droit de la niche");
+        await expect(left).toHaveValue("660");
+        await expect(right).toHaveValue("610");
+        await left.fill("");
+        await left.press("Tab");
+        // the left wall now runs the whole depth, the right one still stops at its return
+        await expect(left).toHaveValue("");
+        await expect(right).toHaveValue("610");
+        await right.fill("");
+        await right.press("Tab");
+        await expect(right).toHaveValue("");
     });
 });

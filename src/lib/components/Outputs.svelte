@@ -7,22 +7,27 @@
     import { pagesToPdf } from "../core/drawing/pdf";
     import { pageToDataUri } from "../core/drawing/svg";
     import { cutListCsv, edgeNotation, hardwareCsv, pbsJson, type PbsNode } from "../core/bom";
-    import { setPrice, setRoom, setScreen, setSettings, rename } from "../core/commands";
+    import { setPrice, setReturn, setRoom, setScreen, setSettings, rename } from "../core/commands";
+    import { sideWallDepth } from "../core/room";
+    import { assemblySequences } from "../core/assembly";
     import { shareOrDownload } from "../storage/files";
     import { FAMILY_LABELS } from "../data/hardware";
     import { HANDLING_LIMITS, SHELF_TEST_LOADS } from "../data/rules";
     import type { Joinery, Screen, Settings, WallType } from "../core/model";
 
 
-    const TABS = ["Plans", "Débit", "Quincaillerie", "Calepinage", "PBS", "Chiffrage", "Réglages"];
+    const TABS = ["Plans", "Montage", "Débit", "Quincaillerie", "Calepinage", "PBS", "Chiffrage", "Réglages"];
     let tab = $state(0);
+    // the open tab by its name : a tab added in the row moves no other one
+    const current = $derived(TABS[tab]);
     let zoomed = $state<number | null>(null);
 
 
     const project = $derived(app.project);
     const out = $derived(app.outputs);
     // the drawing set is only bilt while one of its tabs is open
-    const pages = $derived(tab === 0 || tab === 3 ? drawingSet(project, out) : []);
+    const pages = $derived(current === "Plans" || current === "Calepinage" ? drawingSet(project, out) : []);
+    const sequences = $derived(current === "Montage" ? assemblySequences(project, out.analysis, out.bom) : []);
     const nestPages = $derived.by(() =>
     {
         const found: typeof pages = [];
@@ -104,7 +109,7 @@
     <div class="tab-content active">
         <!-- rebuilt from the store after a refused command, like the inspector -->
         {#key app.refusals}
-        {#if tab === 0}
+        {#if current === "Plans"}
             <div class="row">
                 <button class="btn btn-primary"
                     onclick={() => send(workshopArchive(project, out), `${base}_atelier.zip`,
@@ -126,7 +131,22 @@
                     {/each}
                 </div>
             {/if}
-        {:else if tab === 1}
+        {:else if current === "Montage"}
+            <p class="muted">Ordre de pose : ce qui est au sol d'abord, de gauche à droite. Codes PBS des pièces, quantités de
+                quincaillerie.</p>
+            {#each sequences as s (s.item)}
+                <section class="assembly">
+                    <div class="section-title">{s.name}</div>
+                    <ol>
+                        {#each s.steps as st, i (st.title)}
+                            <li><strong>{i + 1}. {st.title}</strong>
+                                <ul>{#each st.lines as l}<li>{l}</li>{/each}</ul>
+                            </li>
+                        {/each}
+                    </ol>
+                </section>
+            {/each}
+        {:else if current === "Débit"}
             <div class="row">
                 <button class="btn btn-secondary"
                     onclick={() => send(strToU8(cutListCsv(out.bom)), `${base}_fiche_de_debit.csv`,
@@ -156,7 +176,7 @@
                     </tbody>
                 </table>
             </div>   
-        {:else if tab === 2}
+        {:else if current === "Quincaillerie"}
             <div class="row"><button class="btn btn-secondary" onclick={() => send(strToU8(hardwareCsv(out.bom)),
                 `${base}_quincaillerie.csv`, "text/csv")}>Exporter en CSV</button></div>
             <div class="table-container">
@@ -191,7 +211,7 @@
                     </tbody>
                 </table>
             </div>
-        {:else if tab === 3}
+        {:else if current === "Calepinage"}
             <p class="muted">{out.nesting.sheets.length} panneaux 2800 x 2070, trait de scie {project.settings.kerf} mm,
                 délignage {project.settings.trim} mm.</p>
             {#each out.nesting.unplaced as u}
@@ -200,7 +220,7 @@
             {#each nestPages as pg}
                 <div class="sheet big"><img src={pageToDataUri(pg)} alt={pg.title} /></div>
             {/each}  
-        {:else if tab === 4}
+        {:else if current === "PBS"}
             <div class="row">
                 <button class="btn btn-secondary" onclick={() => send(strToU8(pbsJson(project, out.bom)),
                     `${base}_pbs_free-pbs.json`, "application/json")}>Exporter pour Free-pbs</button>
@@ -215,7 +235,7 @@
                     </div>
                 {/each}
             </div>
-        {:else if tab === 5}
+        {:else if current === "Chiffrage"}
             <p class="muted">Prix hors taxes saisis par vous : les lignes sans prix restent listées, jamais comptées à zéro.</p>
             <div class="table-container">
                 <table class="table table-compact">
@@ -292,6 +312,17 @@
                         value={app.project.room.depth} onchange={(e) => app.apply(setRoom, { depth: num(e) })} />
                     <input class="input" type="number" min="1" aria-label="Hauteur de la pièce" value={app.project.room.height}
                         onchange={(e) => app.apply(setRoom, { height: num(e) })} />
+                </span>
+            </label>
+            <label class="field" title="Profondeur des murs de côté depuis le fond, vide pour un mur pleine profondeur">
+                <span class="label">Niche, retours G / D</span>
+                <span class="row">
+                    {#each [["left", "gauche"], ["right", "droit"]] as const as [side, name] (side)}
+                        <input class="input" type="number" min="1" aria-label={`Retour ${name} de la niche`}
+                            value={sideWallDepth(app.project.room, side) < app.project.room.depth
+                                ? sideWallDepth(app.project.room, side) : ""}
+                            onchange={(e) => app.apply(setReturn, side, str(e) === "" ? null : num(e))} />
+                    {/each}
                 </span>
             </label>
             <label class="field"><span class="label">Type de mur</span>
@@ -416,6 +447,21 @@
     .price
     {
         width: 7rem;
+    }
+
+
+    .assembly
+    {
+        display: grid;
+        gap: var(--spacing-2xs);
+        font-size: var(--font-size-xs);
+    }
+
+    .assembly ol,
+    .assembly ul
+    {
+        margin: 0;
+        padding-left: var(--spacing-sm);
     }
 
 

@@ -265,6 +265,8 @@ export interface Carcass
     lights: CellLight[];
     // strip closing the gap from the top to the ceiling, in the plane of the fronts
     ceilingFiller: boolean;
+    // strips closing the gap to a wall on either side, their width in mm, 0 for none
+    sideFillers?: { left: number; right: number };
     shoeRacks: ShoeRack[];
     // cells drilled over their whole hieght on the 32 mm grid, for shelves moved later
     modularCells: Id[];
@@ -399,6 +401,8 @@ export interface Room
     width: number;
     depth: number;
     height: number;
+    // an alcove : each side wall stops that far from the back wall, the room opens out beyond
+    returns?: { left: number; right: number };
 }
 
 export interface Screen
