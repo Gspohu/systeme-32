@@ -115,14 +115,56 @@ export function bounds(pts: [number, number][]): { minX: number; minY: number; m
     let maxY = -Infinity;
     for (const [x, y] of pts)
     {
-        console.log("chien04");
         minX = Math.min(minX, x);
         minY = Math.min(minY, y);
         maxX = Math.max(maxX, x);
         maxY = Math.max(maxY, y);
     }
     return { minX, minY, maxX, maxY };
-} 
+}
+
+
+// inside the polygon and futher than tol from each of its edges
+export function insidePolygon(poly: [number, number][], x: number, y: number, tol: number): boolean
+{
+    let inside = false;
+    let i = 0;
+    let j = poly.length - 1;
+    while (i < poly.length)
+    {
+        const [xi, yi] = poly[i]!;
+        const [xj, yj] = poly[j]!;
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
+        {
+            inside = !inside;
+        }
+        j = i;
+        i++;
+    }
+    // most points fall outside : the distances to the edges are only worth it for the others
+    if (!inside || tol <= 0)
+    {
+        return inside;
+    }
+    i = 0;
+    j = poly.length - 1;
+    while (i < poly.length)
+    {
+        const [xi, yi] = poly[i]!;
+        const [xj, yj] = poly[j]!;
+        const ex = xj - xi;
+        const ey = yj - yi;
+        const len2 = ex * ex + ey * ey;
+        const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - xi) * ex + (y - yi) * ey) / len2)) : 0;
+        if (Math.hypot(x - xi - t * ex, y - yi - t * ey) <= tol)
+        {
+            return false;
+        }
+        j = i;
+        i++;
+    }
+    return true;
+}
 
 
 // Shoelace area of a closed polyline, mm2

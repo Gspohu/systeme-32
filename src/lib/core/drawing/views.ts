@@ -13,7 +13,8 @@ import { SPOT_RIM, spotCentres } from "../lights";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
-import { endDrop, endPost, endToe, openEndLevels } from "../curves";
+import { endDrop, endPost, floorOutline, openEndLevels } from "../curves";
+import { bounds, tessellate } from "../geometry";
 import { chain } from "./plan";
 
 
@@ -212,11 +213,12 @@ function drawEnds(v: CarcassView): void
         canvas.rect(pageX(x), pageY(k.y + k.height), reach / scale, (k.height + drop) / scale, "normal");
         if (end.open === true)
         {
-            const toe = endToe(k, end);
+            const floor = floorOutline(k, side);
+            const floorReach = floor === null ? reach : bounds(tessellate(floor)).maxX;
             for (const lv of openEndLevels(k, end))
             {
-                // the floor board in line with the plinth, the side it butts never moving
-                const w = lv < 0 ? reach - toe : reach;
+                // the floor board as far out as its own outline goes, the side it butts never moving
+                const w = lv < 0 ? floorReach : reach;
                 const left = side === "right" ? x : k.x - w;
                 canvas.rect(pageX(left), pageY(k.y + lv + t), w / scale, t / scale, "thin");
             }

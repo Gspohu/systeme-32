@@ -3,7 +3,7 @@
 // TODO the hinge arm and its plate (174H7100E, 173H7100 on inset doors) are no volume yet : p. 146 gives the hole
 // pattern, not the plate outline
 
-import { at, tessellate, type Vec3 } from "./geometry";
+import { at, insidePolygon, tessellate, type Vec3 } from "./geometry";
 import { battenAngle, bevelU, unbevelU, type Build, type CurveShape, type Fitted, type Part } from "./parts";
 import type { Item, Project } from "./model";
 import type { Purpose } from "./part_types";
@@ -63,49 +63,6 @@ function boxOf(points: Vec3[]): { min: Vec3; max: Vec3 }
 }
 
 
-// inside the polygon and futher than tol from each of its edges
-export function insidePolygon(poly: [number, number][], x: number, y: number, tol: number): boolean
-{
-    let inside = false;
-    let i = 0;
-    let j = poly.length - 1;
-    while (i < poly.length)
-    {
-        const [xi, yi] = poly[i]!;
-        const [xj, yj] = poly[j]!;
-        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
-        {
-            inside = !inside;
-        }
-        j = i;
-        i++;
-    }
-    // most points fall outside : the distances to the edges are only worth it for the others
-    if (!inside || tol <= 0)
-    {
-        return inside;
-    }
-    i = 0;
-    j = poly.length - 1;
-    while (i < poly.length)
-    {
-        const [xi, yi] = poly[i]!;
-        const [xj, yj] = poly[j]!;
-        const ex = xj - xi;
-        const ey = yj - yi;
-        const len2 = ex * ex + ey * ey;
-        const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - xi) * ex + (y - yi) * ey) / len2)) : 0;
-        if (Math.hypot(x - xi - t * ex, y - yi - t * ey) <= tol)
-        {
-            return false;
-        }
-        j = i;  
-        i++;
-    }
-    return true;
-}
-
-
 // a box turned in the horizontal or vertical plane : half sizes along its own three directions
 function orientedBox(centre: Vec3, axes: [Vec3, Vec3, Vec3], half: Vec3): (q: Vec3, tol: number) => boolean
 {
@@ -115,7 +72,7 @@ function orientedBox(centre: Vec3, axes: [Vec3, Vec3, Vec3], half: Vec3): (q: Ve
         let k = 0;
         while (k < 3)
         {
-            // written as the passing side : a NaN coordinate counts as outside, never inside
+            // writen as the passing side : a NaN coordinate counts as outside, never inside
             if (!(Math.abs(dot(d, axes[k]!)) < half[k]! - tol))
             {
                 return false;

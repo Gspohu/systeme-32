@@ -7,7 +7,8 @@ import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
 import { endReach, usableDepth } from "../extent";
 import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";
-import { endPost, endToe, openEndLevels } from "../curves";
+import { endPost, endToe, floorOutline, openEndLevels } from "../curves";
+import { tessellate } from "../geometry";
 import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H } from "./display";
 import { heading, paginateTable, table, type Draft } from "./draft";
 import { drawFront } from "./views";
@@ -300,20 +301,26 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
         }
         canvas.poly(arc, false, "normal");
         canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2), `R ${Math.round(r)}`, 2, "middle");
-        // the floor board under the others, its arc in line with the plinth
-        const toe = endToe(k, end);
-        if (toe > 0)
+        // the floor board under the others, from the plinth line : only its curve, the rest runs on the lines drawn
+        const floor = floorOutline(k, side);
+        if (floor !== null)
         {
-            const rf = r - toe;
-            const under: [number, number][] = [];
-            for (let i = 0; i <= 24; i++)
+            const first = floor.segments.findIndex((s) =>
             {
-                const ang = start + (Math.PI / 2 - start) * i / 24;
-                under.push([planX(xFace + dir * rf * Math.cos(ang)), planY(k.depth - r + rf * Math.sin(ang))]);
-            }
-            canvas.poly(under, false, "hidden");
-            canvas.text(planX(xFace + dir * rf / 2), planY(k.depth / 2) + 3, `R ${Math.round(rf)} au sol`,
-                        1.8, "middle");
+                return s.kind === "arc";
+            });
+            const before = first === 0 ? floor.start : floor.segments[first - 1]!;
+            const from: [number, number] = Array.isArray(before) ? before : [before.x, before.y];
+            const curve = tessellate({ start: from, segments: floor.segments.filter((s) =>
+            {
+                return s.kind === "arc";
+            }) }, 3);
+            canvas.poly(curve.map(([u, v]): [number, number] =>
+            {
+                return [planX(xFace + dir * u), planY(k.depth - v)];
+            }), false, "hidden");
+            canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2) + 6, end.sweep === 180
+                ? `R ${Math.round(r - endToe(k, end))} au sol` : "au sol", 1.8, "middle");
         }
         // the upright of a seat end, its centre from the side face and from the front
         const post = endPost(k, side);

@@ -177,32 +177,22 @@ describe("the sketch templates", () =>
                 end.push(q);
             }
         }
-        // no skin left : the two end panels, one shaped shelf, the back closing the arc and the upright in two
+        // no skin left : the two end panels, one shaped shelf and the back closing the arc, no seat so no upright
         expect(end.map((q) =>
         {
             return q.label;
         }).sort()).toEqual(["Bout arrondi droit, flasque basse", "Bout arrondi droit, flasque haute",
-                            "Bout arrondi droit, fond", "Bout arrondi droit, montant 1", "Bout arrondi droit, montant 2",
-                            "Bout arrondi droit, tablette 1"]);
-        // the low board on the floor beside the 100 plinth, the uprigh filling the 600 between the three boards
+                            "Bout arrondi droit, fond", "Bout arrondi droit, tablette 1"]);
+        // the low board on the floor beside the 100 plinth
         const low = end.find((q) =>
         {
             return q.label.endsWith("flasque basse");
         })!;
         expect(low.frame!.o[1] - low.thickness).toBe(0);
-        const posts = end.filter((q) => 
-        {
-            return q.label.includes("montant");
-        });
-        expect(posts.reduce((s, q) =>
-        {
-            return s + q.length;
-        }, 0) + 3 * 19).toBeCloseTo(600, 6);
-        const seat = a.checks.find((k) =>
+        expect(a.checks.some((k) =>
         {
             return k.message.startsWith("Meuble bas, bout arrondi droit : assise");
-        })!;
-        expect(seat.level).toBe("info");
+        })).toBe(false);
         // the cables go through the column's technical cell now, the base back stays whole : two 60 holes 100 left
         // and 120 right of the middle of that 155 cell, 19 + 155 / 2 up then 19 + 412 / 2 across, u up on that back
         const backOf = (id: string): Part =>
@@ -452,12 +442,12 @@ describe("the sketch templates", () =>
                 return q.id.startsWith(`${base.id}/end/right/post`);
             }).length;
         };
-        expect(posts()).toBe(2);
-        expect(said().join()).toContain("info | Meuble bas, bout arrondi droit : assise vérifiée");
-        // nobody sits on it : no upright, nothing to check, the low board held by the back of the arc
-        end.seat = false;
+        // nobody sits on it as it comes : no upright, nothing to check, the low board held by the back of the arc
         expect(posts()).toBe(0);
         expect(said()).toEqual([]);
+        end.seat = true;
+        expect(posts()).toBe(2);
+        expect(said().join()).toContain("info | Meuble bas, bout arrondi droit : assise vérifiée");
         // sat on again but hanging above the floor : the upright stands on a board hung off the side
         end.seat = true;
         end.floor = false;

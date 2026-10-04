@@ -2,8 +2,7 @@
 
 import type { Build, Hole, Part } from "./part_types";
 import type { Check } from "./check";
-import { tessellate } from "./geometry";
-import { insidePolygon } from "./solids";
+import { insidePolygon, tessellate } from "./geometry";
 
 // the clearance metHole hold between two drillings
 const CLEAR = 2;

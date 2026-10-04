@@ -39,8 +39,8 @@ export function tvWall(): Project
     const drawersA = cell();
     const drawersB = cell();
     const rightDoor = split("h", [219], [cell(), cell()], ["adjustable"]);
-    // the quarter round end left open and sat on : its low board on the floor, one shaped shelf between, an upright
-    // halfway round the arc taking the sitter down to the floor
+    // the quarter round end left open, not sat on unless asked : its low board on the floor held by the back of the
+    // end, one shaped shelf between
     const baseUnit = newCarcass({
         name: "Meuble bas",
         width: 2600, height: 500, depth: 400, x: 0, y: 100, z: 0,
@@ -51,8 +51,7 @@ export function tvWall(): Project
         ends: {
             left: { type: "square" },
             right: { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
-                     battens: DEFAULT_BATTENS, decor: OAK, open: true, shelves: 1, back: true, floor: true,
-                     seat: true },
+                     battens: DEFAULT_BATTENS, decor: OAK, open: true, shelves: 1, back: true, floor: true },
         },
     });
     baseUnit.fronts.push(

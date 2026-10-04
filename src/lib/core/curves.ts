@@ -4,7 +4,7 @@ import type { Battens, Carcass, CurveTechnique, End, RoundCorner } from "./model
 import type { ResolvedLayout } from "./layout";
 import type { Build, Part } from "./part_types";
 import { baseHeight, newPart } from "./part_base";
-import { type Outline, type Vec3, X, Y, Z, neg } from "./geometry";
+import { type Outline, type Segment, type Vec3, X, Y, Z, bounds, insidePolygon, neg, tessellate } from "./geometry";
 import { endReach, usableDepth } from "./extent";
 import { FLEX_MIN_RADIUS } from "../data/materials";
 
@@ -91,6 +91,107 @@ export function endDrop(c: Carcass, end: Extract<End, { type: "rounded" }>): num
 }
 
 
+// A quarter of the ellipse of half axes `a` along u and `b` along v centred on (0, cy), as the workshop cuts it : a
+// basket-handle arch of two tangent arcs, from (a, cy) to (0, cy - b). The first radius is searched for the arch
+// closest to the ellipse, under a millimetre on a 300 x 342 quarter
+export function basketHandle(a: number, b: number, cy: number): Segment[]
+{
+    if (Math.abs(a - b) < 0.01)
+    {
+        return [{ kind: "arc", x: 0, y: cy - b, cx: 0, cy, ccw: false }];
+    }
+    const A = Math.max(a, b);
+    const B = Math.min(a, b);
+    // X along the major half axis, Y along the minor one
+    const onBoard = (X: number, Y: number): [number, number] =>
+    {
+        return b > a ? [Y, cy - X] : [X, cy - Y];
+    };
+    const arch = (r1: number): { r2: number; c1: [number, number]; c2: [number, number]; j: [number, number] } =>
+    {
+        const r2 = (2 * A * r1 - A * A - B * B) / (2 * (r1 - B));
+        const c1: [number, number] = [A - r1, 0];
+        const c2: [number, number] = [0, B - r2];
+        const d = Math.hypot(c1[0] - c2[0], c1[1] - c2[1]);
+        return { r2, c1, c2, j: [c2[0] + (c1[0] - c2[0]) / d * r2, c2[1] + (c1[1] - c2[1]) / d * r2] };
+    };
+    const worst = (r1: number): number =>
+    {
+        const { r2, c1, c2, j } = arch(r1);
+        const joint = Math.atan2(j[1] - c1[1], j[0] - c1[0]);
+        let w = 0;
+        for (let k = 0; k <= 48; k++)
+        {
+            const t = Math.PI / 2 * k / 48;
+            const [x, y] = [A * Math.cos(t), B * Math.sin(t)];
+            const near = Math.atan2(y - c1[1], x - c1[0]) <= joint;
+            w = Math.max(w, Math.abs(near ? Math.hypot(x - c1[0], y - c1[1]) - r1 : Math.hypot(x - c2[0], y -
+                c2[1]) - r2));
+        }
+        return w;
+    };
+    // r1 under B, and under (A² + B²) / 2A so the second centre stays past the minor axis
+    let lo = B * B / A / 2;
+    let hi = Math.min(B, (A * A + B * B) / (2 * A)) - 1e-6;
+    let best = (lo + hi) / 2;
+    for (let pass = 0; pass < 3; pass++)
+    {
+        const step = (hi - lo) / 40;
+        for (let r = lo; r <= hi; r += step)
+        {
+            if (worst(r) < worst(best))
+            {
+                best = r;
+            }
+        }
+        [lo, hi] = [Math.max(lo, best - step), Math.min(hi, best + step)];
+    }
+    const { c1, c2, j } = arch(best);
+    const [jx, jy] = onBoard(...j);
+    const [c1x, c1y] = onBoard(...c1);
+    const [c2x, c2y] = onBoard(...c2);
+    // from (a, cy) : the minor end first when the major axis runs along v
+    return b > a
+        ? [{ kind: "arc", x: jx, y: jy, cx: c2x, cy: c2y, ccw: false },
+           { kind: "arc", x: 0, y: cy - b, cx: c1x, cy: c1y, ccw: false }]
+        : [{ kind: "arc", x: jx, y: jy, cx: c1x, cy: c1y, ccw: false },
+           { kind: "arc", x: 0, y: cy - b, cx: c2x, cy: c2y, ccw: false }];
+}
+
+
+// The floor board of an open end on a plinth, kept off the toes : from the side in line with the plinth face, a
+// quarter round set back as much, or a basket handle out to the back on a quarter round. Null when it is cut like the
+// boards above
+export function floorOutline(c: Carcass, side: "left" | "right"): Outline | null
+{
+    const end = c.ends[side];
+    if (end.type !== "rounded")
+    {
+        return null;
+    }
+    const toe = endToe(c, end);
+    if (toe === 0)
+    {
+        return null;
+    }
+    const outer = endReach(c, side);
+    if (end.sweep === 180)
+    {
+        const low = outer - toe;
+        return { start: [0, outer - low], segments: [
+            { kind: "arc", x: 0, y: outer + low, cx: 0, cy: outer, ccw: true },
+            { kind: "line", x: 0, y: outer - low },
+        ] };
+    }
+    const usable = usableDepth(c);
+    return { start: [0, toe], segments: [
+        { kind: "line", x: 0, y: usable },
+        { kind: "line", x: outer, y: usable },
+        ...basketHandle(outer, usable - toe, usable),
+    ] };
+}
+
+
 // How far the floor board of an open end stays inside the arc of the boards above : in line with the plinth face
 // its edge kept off the toes like the plinth is
 export function endToe(c: Carcass, end: Extract<End, { type: "rounded" }>): number
@@ -141,9 +242,37 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
     const a = POST_WIDTH / 2;
     const h = c.thickness / 2;
     const lead = a * Math.cos(phi) + h * Math.sin(phi);
-    // it stands on the floor board, the smallest of the arcs
-    const reach = outer - endToe(c, end) - POST_SETBACK;
-    const rho = -lead + Math.sqrt((lead * lead) - (a * a + h * h - reach * reach));
+    const reach = outer - POST_SETBACK;
+    let rho = -lead + Math.sqrt((lead * lead) - (a * a + h * h - reach * reach));
+    // it stands on the floor board too : drawn in when that one is cut smaller, its corners as far inside it
+    const floor = floorOutline(c, side);
+    if (floor !== null)
+    {
+        const poly = tessellate(floor, 2);
+        const fits = (r: number): boolean =>
+        {
+            const [u, v] = [r * Math.cos(phi), outer - r * Math.sin(phi)];
+            return [[u - a, v - h], [u + a, v - h], [u - a, v + h], [u + a, v + h]].every(([x, y]) =>
+            {
+                return insidePolygon(poly, x!, y!, POST_SETBACK);
+            });
+        };
+        let inside = rho;
+        while (inside > 0 && !fits(inside))
+        {
+            inside -= 1;
+        }
+        let out = Math.min(rho, inside + 1);
+        if (inside > 0 && out > inside)
+        {
+            for (let k = 0; k < 40; k++)
+            {
+                const mid = (inside + out) / 2;
+                [inside, out] = fits(mid) ? [mid, out] : [inside, mid];
+            }
+            rho = inside;
+        }
+    }
     return { u: rho * Math.cos(phi), v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
 }
 
@@ -187,24 +316,19 @@ export function buildEnds(c: Carcass, b: Build): void
                 ],
             };
         const toe = endToe(c, end);
-        const low = inner - toe;
-        const floorOutline: Outline = toe === 0 ? outline : end.sweep === 180
-            ? {
-                start: [0, outer - low],
-                segments: [
-                    { kind: "arc", x: 0, y: outer + low, cx: 0, cy: outer, ccw: true },
-                    { kind: "line", x: 0, y: outer - low },
-                ],
-            }
-            : {
-                start: [0, outer - low],
-                segments: [
-                    { kind: "line", x: 0, y: usable },
-                    { kind: "line", x: low, y: usable },
-                    { kind: "line", x: low, y: outer },
-                    { kind: "arc", x: 0, y: outer - low, cx: 0, cy: outer, ccw: false },
-                ],
-            };
+        // a floor board cut smaller starts at its own front corner : the blank of the cut list is where the CNC sets 0
+        const kept = floorOutline(c, side);
+        const reach = kept === null ? null : bounds(tessellate(kept));
+        const floorShift = reach === null ? 0 : reach.minY;
+        const floor: Outline = kept === null ? outline : {
+            start: [kept.start[0], kept.start[1] - floorShift],
+            segments: kept.segments.map((s) =>
+            {
+                return s.kind === "arc" ? { ...s, y: s.y - floorShift, cy: s.cy - floorShift } : { ...s,
+                    y: s.y - floorShift };
+            }),
+        };
+        const floorLength = reach === null ? inner : reach.maxX;
         const xFace = side === "right" ? c.x + c.width : c.x;
         const uDir: Vec3 = side === "right" ? X : neg(X);
         const base = { item: c.id, itemName: c.name };
@@ -243,14 +367,16 @@ export function buildEnds(c: Carcass, b: Build): void
             const grounded = lv.y < c.y;
             const p = newPart({
                 ...base, id: `${c.id}/end/${side}/${lv.label}`, label: `${title}, ${lv.label.toLowerCase()}`,
-                role: lv.role, length: grounded ? low : inner, width: usable, thickness: board, decor: c.decor,
-                edges: !open ? [] : end.sweep === 90 ? ["v0", "u1"] : ["v0"],
-                frame: { o: [xFace, lv.y + board, c.z + depth], u: uDir, v: neg(Z), n: neg(Y) },
+                role: lv.role, length: grounded ? floorLength : inner, width: grounded ? usable - floorShift : usable,
+                thickness: board, decor: c.decor, edges: !open ? [] : end.sweep === 90 ? ["v0", "u1"] : ["v0"],
+                frame: { o: [xFace, lv.y + board, c.z + depth - (grounded ? floorShift : 0)], u: uDir, v: neg(Z),
+                         n: neg(Y) },
             });
-            p.outline = grounded ? floorOutline : outline;
+            p.outline = grounded ? floor : outline;
             if (grounded && toe > 0)
             {
-                p.notes.push(`Arc ramené de ${toe} mm au nu de la plinthe, hors des orteils`);
+                p.notes.push(end.sweep === 180 ? `Arc ramené de ${toe} mm au nu de la plinthe, hors des orteils`
+                    : `Anse de panier de deux arcs, du nu de la plinthe (${toe} mm) jusqu'au fond, hors des orteils`);
             }
             p.notes.push("Contour cintré : découpe CN d'après le DXF");
             if (open)
@@ -293,7 +419,9 @@ export function buildEnds(c: Carcass, b: Build): void
                 b.parts.push(piece);
                 const span = { lineAxis: "v" as const, line: post.v, from: post.u - post.w / 2, to: post.u + post.w / 2,
                                edgeFrom: 0, reversed: side === "left" };
-                b.joints.push({ edgePart: piece.id, edge: "u0", facePart: low.id, face: "A", ...span },
+                // the floor board's own frame starts floorShift further back
+                const below = n === 1 ? { ...span, line: post.v - floorShift } : span;
+                b.joints.push({ edgePart: piece.id, edge: "u0", facePart: low.id, face: "A", ...below },
                               { edgePart: piece.id, edge: "u1", facePart: high.id, face: "B", ...span });
                 n++;
             }
