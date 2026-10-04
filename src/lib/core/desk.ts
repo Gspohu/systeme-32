@@ -1,11 +1,11 @@
 // Desk tops : work surface height and room left for the legs underneath
 
 import type { Project, WallShelf } from "./model";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import { boxToWall, roomBox } from "./room";
 
 // BS EN 527-1:2011 as the Task Systems conformity sheet quotes it : a fixed desk at 740 +- 20 mm
-// with 850 mm of legroom width under it
+// the legroom need 850 mm of width under it
 // https://www.tasksystems.co.uk/cmsb/uploads/bs-en-527.pdf
 export const DESK_HEIGHT = 740;
 export const DESK_TOLERANCE = 20;

@@ -8,6 +8,8 @@ export interface Draft
     title: string;
     scale: string;
     canvas: Canvas;
+    // what the screen picks some sheets by, never by their title
+    kind?: "nesting";
 }
 
 export const BODY = 2.5;

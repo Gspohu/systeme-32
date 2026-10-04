@@ -62,4 +62,67 @@ describe("assembly sequences", () =>
         expect(of("Colonne gauche")).toContain("7 embases 174H7100E enfoncées dans les trous de la série");
         expect(of("Placards et tiroirs")).toContain("30 x Blum 609.1500 Vis agglo Ø3,5 x 15, coulisses vissées");
     });
+
+
+    it("screws the heavy 766H runners on the panels before the box stands, like the 760H", () =>
+    {
+        // the TV base is too shallow for the shortest 766H (NL 450), the dresser drawers take 766H4500S
+        const p = dresser();
+        let drawers = 0;
+        for (const it of p.items)
+        {
+            for (const f of it.kind === "carcass" ? it.fronts : [])
+            {
+                if (f.spec.type === "drawers")
+                {
+                    f.spec.runner = "766H";
+                    drawers++;
+                }
+            }
+        }
+        expect(drawers).toBeGreaterThan(0);
+        const o = computeOutputs(p);
+        const steps = assemblySequences(p, o.analysis, o.bom).flatMap((s) =>
+        {
+            return s.steps;
+        });
+        const said = (title: string): string =>
+        {
+            return steps.filter((st) =>
+            {
+                return st.title === title;
+            }).flatMap((st) =>
+            {
+                return st.lines;
+            }).join("\n");
+        };
+        expect(said("Préparer les panneaux")).toContain("766H");
+        expect(said("Tiroirs")).not.toContain("766H");
+    });
+
+
+    it("puts the Clamex connectors in a named step when the carcasses are joined with them", () =>
+    {
+        const p = dresser();
+        p.settings.joinery = "clamex";
+        const o = computeOutputs(p);
+        const all = assemblySequences(p, o.analysis, o.bom);
+        expect(all.flatMap((s) =>
+        {
+            return s.steps;
+        }).filter((st) =>
+        {
+            return st.title === "Préparer les panneaux";
+        }).flatMap((st) =>
+        {
+            return st.lines;
+        }).join("\n")).toContain("145334");
+        for (const s of all)
+        {
+            expect(s.steps.map((st) =>
+            {
+                return st.title;
+            })).not.toContain("Autres quincailleries");
+        }
+    });
 });

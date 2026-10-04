@@ -1,7 +1,9 @@
 // Project data model, all lengths in millimetres, pure data with no behavour
 
 import type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell_fittings";   
-export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell_fittings"; 
+export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell_fittings";
+import type { PriceEntry } from "../data/prices";
+export type { PriceEntry } from "../data/prices"; 
 
 export const SCHEMA_VERSION = 7;  
 
@@ -415,16 +417,6 @@ export interface Screen
     bottom: number;
     z: number;
     wallMounted: boolean;
-}
-
-
-export interface PriceEntry  
-{
-    // euros excluding VAT : per unit for hardware, per m2 for boards, per metre for edges
-    value: number;
-    unit: "u" | "m2" | "m";
-    source: string | null;
-    date: string | null;
 }
 
 

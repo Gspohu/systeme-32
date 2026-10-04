@@ -1,7 +1,14 @@
 // Public prices read on 1 and 2 October 2026, excluding VAT : TTC divided by 1.2, pounds and dollars at the ECB rate of
 // that day, import costs left out. An order of magnitude, a professional quote will differ
 
-import type { PriceEntry } from "../core/model";
+export interface PriceEntry
+{
+    // euros excluding VAT : per unit for hardware, per m2 for boards, per metre for edges
+    value: number;
+    unit: "u" | "m2" | "m";
+    source: string | null;
+    date: string | null;
+}
 
 
 const READ_ON = "2026-10-01";

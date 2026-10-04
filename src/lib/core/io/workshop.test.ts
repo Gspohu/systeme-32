@@ -149,6 +149,25 @@ function extent(q: Prim): [number, number, number, number]
 }
 
 
+describe("nesting sheets", () =>
+{
+    it("are marked for the screen to pick, three panels a sheet", () =>
+    {
+        for (const make of [tvWall, dresser])
+        {
+            const p = make();
+            const o = computeOutputs(p);
+            const marked = drawingSet(p, o).filter((page) =>
+            {
+                return page.kind === "nesting";
+            });
+            expect(o.nesting.sheets.length).toBeGreaterThan(0);
+            expect(marked.length, make.name).toBe(Math.ceil(o.nesting.sheets.length / 3));
+        }
+    });
+});
+
+
 describe("cover", () =>
 {
     it("states the shelf test load the deflection was checked under", () =>

@@ -2,7 +2,7 @@
 
 import type { Project, Wall } from "./model";
 import type { Build, Motion, Part, PartRole } from "./parts";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import type { Vec3 } from "./geometry";
 import { toRoom } from "./room";
 
@@ -230,7 +230,7 @@ export function swingChecks(p: Project, b: Build): Check[]
             hit = s === undefined ? null : { s, at: m.amount * k / steps };
             k++;
         }
-        // a door stopped past square still opens, it only falls short of what its hinges allow
+        // a door stopped past square still opens, it only fall short of what its hinges allow
         if (hit !== null && m.kind === "turn" && hit.at > SQUARE)
         {
             checks.push({ level: "warning", item: m.item, target: m.parts[0] ?? null,

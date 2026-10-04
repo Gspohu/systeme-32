@@ -2,7 +2,8 @@
 
 import type { Battens, Carcass, CurveTechnique, End, RoundCorner } from "./model";
 import type { ResolvedLayout } from "./layout";
-import { type Build, type Part, baseHeight, newPart } from "./parts";
+import type { Build, Part } from "./part_types";
+import { baseHeight, newPart } from "./part_base";
 import { type Outline, type Vec3, X, Y, Z, neg } from "./geometry";
 import { endReach, usableDepth } from "./extent";
 import { FLEX_MIN_RADIUS } from "../data/materials";

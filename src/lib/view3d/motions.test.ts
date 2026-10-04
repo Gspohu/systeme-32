@@ -13,7 +13,7 @@ function motion(o: Partial<Motion>): Motion
 }
 
 
-// where a point of a closed front lands once the group of its pose is applied, in mm
+// where a point of a closed façade lands once the group of its pose is applied, in mm
 function moved(m: Motion, at: Vec3): number[]
 {
     const pose = openPose(m);
@@ -54,13 +54,13 @@ describe("fronts opened in 3D", () =>
 
     it("moves the handle and the hinge cups with their door, not the plates on the side", () =>
     {
-        const fitted = (key: string, host: string | null): Fitted =>
+        const fitted = (key: string, host: string | null, purpose: Fitted["purpose"]): Fitted =>
         {
-            return { key, item: "k", ref: "", label: "", shape: "box", centre: [0, 0, 0], axes: [X, Y, Z],
+            return { key, item: "k", ref: "", label: "", purpose, shape: "box", centre: [0, 0, 0], axes: [X, Y, Z],
                      half: [1, 1, 1], host, hidden: false };
         };
         const door = motion({});
-        const all = [fitted("k/handle/f/barre", "k/front/f"), fitted("k/plate", "k/side/L")];
+        const all = [fitted("k/handle/f/barre", "k/front/f", "handle"), fitted("k/plate", "k/side/L", "system-plate")];
         const open = movers([door], all, () =>
         {
             return true;

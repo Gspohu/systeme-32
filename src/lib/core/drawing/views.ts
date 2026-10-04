@@ -4,7 +4,7 @@ import type { Carcass, Item, Project, Wall } from "../model";
 import { WALL_LABELS } from "../room";
 import { openingPoints } from "../cutouts";
 import type { Analysis } from "../analysis";
-import { PLINTH_FOOT_GAP, baseHeight } from "../parts";
+import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
 import { endReach, itemExtent, projectExtent, screenSize, sideFiller } from "../extent";
 import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
@@ -90,14 +90,48 @@ export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, o
 }
 
 
+// What drawing a carcass on a sheet reads : the canvas, its scale and page mapping, the analysis
+interface CarcassView
+{
+    canvas: Canvas;
+    k: Carcass;
+    scale: number;
+    pageX: ToPage;
+    pageY: ToPage;
+    a: Analysis;
+    withFronts: boolean;
+}
+
+
+// layers drawn in this order, each later one over the ones before
 function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, pageY: ToPage, a: Analysis,
                      withFronts: boolean): void
 {
+    const v: CarcassView = { canvas, k, scale, pageX, pageY, a, withFronts };
+    drawShell(v);
+    drawHardware(v);
+    drawEnds(v);
+    drawInside(v);
+    drawFronts(v);
+    drawOutlets(v);
+}
+
+
+// carcass points to the page
+function onPage(v: CarcassView, pts: [number, number][]): [number, number][]
+{
+    return pts.map(([x, y]): [number, number] => { return [v.pageX(v.k.x + x), v.pageY(v.k.y + y)]; });
+}
+
+
+// The outline, the fillers to the ceiling and beside the sides, the seat and the plinth
+function drawShell(v: CarcassView): void
+{
+    const { canvas, k, scale, pageX, pageY, a } = v;
     const bh = baseHeight(k);
-    const t = k.thickness;
     const at = (pts: [number, number][]): [number, number][] =>
     {
-        return pts.map(([x, y]): [number, number] => { return [pageX(k.x + x), pageY(k.y + y)]; });
+        return onPage(v, pts);
     };
     if (k.slope === null)
     {
@@ -138,7 +172,13 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
     {
         canvas.rect(pageX(k.x), pageY(k.y - PLINTH_FOOT_GAP), k.width / scale, (bh - PLINTH_FOOT_GAP) / scale, "thin");
     }
-    // the feet behind a plinth are hidden lines, the runner spaces only show where no front covers them
+}
+
+
+// the feet behind a plinth are hidden lines, the runner spaces only show where no front covers them
+function drawHardware(v: CarcassView): void
+{
+    const { canvas, k, scale, pageX, pageY, a, withFronts } = v;
     for (const f of a.build.fitted)
     {
         if (f.item !== k.id || f.host !== null || (f.hidden && withFronts))
@@ -149,6 +189,14 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
         canvas.rect(pageX(e.min[0]), pageY(e.max[1]), (e.max[0] - e.min[0]) / scale, (e.max[1] - e.min[1]) / scale,
                     f.hidden || k.base.type === "plinth" ? "dashed" : "thin");
     }
+}
+
+
+// Rounded ends : their reach and drop, the shelves and upright of an open one, the battens of a closed one
+function drawEnds(v: CarcassView): void
+{
+    const { canvas, k, scale, pageX, pageY } = v;
+    const t = k.thickness;
     for (const side of ["left", "right"] as const)
     {
         const end = k.ends[side];
@@ -184,7 +232,18 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
             }
         }
     }
-    // inner panels show where no front covers them
+}
+
+
+// inner panels show where no front covers them, with the rails and the lights of their cells
+function drawInside(v: CarcassView): void
+{
+    const { canvas, k, scale, pageX, pageY, a } = v;
+    const t = k.thickness;
+    const at = (pts: [number, number][]): [number, number][] =>
+    {
+        return onPage(v, pts);
+    };
     const W = k.width;
     if (k.slope === null)
     {
@@ -237,6 +296,13 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
             canvas.line(pageX(k.x + nb.x + FIT_PLAY), y, pageX(k.x + nb.x + nb.w - FIT_PLAY), y, "dashed");
         }
     }
+}
+
+
+// The fronts in white over the inside : the opening sign of a door, a flap or a leaf, a panel's cut-out
+function drawFronts(v: CarcassView): void
+{
+    const { canvas, k, pageX, pageY, a, withFronts } = v;
     for (const fp of withFronts ? a.build.fronts.get(k.id) ?? [] : [])
     {
         const x0 = pageX(k.x + fp.rect.x);
@@ -283,7 +349,13 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
             canvas.line((x0 + x1) / 2 - 3, midY, (x0 + x1) / 2 + 3, midY, "normal");
         }
     }
-    // socket holes, as hidden lines behind a façade drawn on this sheet or inside a shelf
+}
+
+
+// socket holes, as hidden lines behind a façade drawn on this sheet or inside a shelf
+function drawOutlets(v: CarcassView): void
+{
+    const { canvas, k, scale, pageX, pageY, a, withFronts } = v;
     for (const o of a.build.outlets)
     {
         if (o.item !== k.id)

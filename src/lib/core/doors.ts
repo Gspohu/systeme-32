@@ -226,7 +226,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 u: y - fp.rect.y,
                 v: hingeSide === "left" ? cupV : fp.rect.w - cupV,
                 diameter: CUP_DIAMETER, depth: CUP_DEPTH, face: "A",
-                label: `Cuvette ${DIAM}35 x 13, TB ${tb.toFixed(1)}`,
+                label: `Cuvette ${DIAM}35 x 13, TB ${tb.toFixed(1)}`, purpose: "hinge-cup",
             });
             if (face === null)
             {
@@ -237,9 +237,10 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
             {
                 face.part.holes.push(onSystem
                     ? { u: y + dy - face.uOrigin, v: line, diameter: EXPANDO_PLATE.hole, depth: s.pinDepth,
-                        face: face.face, label: `Embase ${EXPANDO_PLATE.ref} : cheville EXPANDO ${DIAM}5 (Blum p. 146)` }
+                        face: face.face, label: `Embase ${EXPANDO_PLATE.ref} : cheville EXPANDO ${DIAM}5 (Blum p. 146)`,
+                        purpose: "plate-dowel" as const }
                     : { u: y + dy - face.uOrigin, v: line, diameter: 0, depth: 0, face: face.face,
-                        label: `Embase 173H7100 : vis ${DIAM}3,5 x 15` });
+                        label: `Embase 173H7100 : vis ${DIAM}3,5 x 15`, purpose: "plate-screw" as const });
             }
         }
         if (face === null)
@@ -251,11 +252,12 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                       inset: push ? "70T3750.TL" : "71B3750" };
         const hingeRef = refs[fp.hingeKind!];
         b.hardware.push({ ref: hingeRef, qty: hingeTotal, item: c.id, itemName: c.name, target: fp.id,
-                         note: `TB ${tb.toFixed(1)}` });
+                         note: `TB ${tb.toFixed(1)}`, purpose: "hinge" });
         b.hardware.push({ ref: onSystem ? EXPANDO_PLATE.ref : "173H7100", qty: hingeTotal, item: c.id, itemName: c.name,
-                         target: fp.id, note: onSystem ? "dans les trous système" : null });
+                         target: fp.id, note: onSystem ? "dans les trous système" : null,
+                         purpose: onSystem ? "system-plate" : "screwed-plate" });
         b.hardware.push({ ref: "609.1500", qty: (onSystem ? 2 : 4) * hingeTotal, item: c.id, itemName: c.name,
-                         target: fp.id, note: onSystem ? "cuvettes" : "cuvettes et embases" });
+                         target: fp.id, note: onSystem ? "cuvettes" : "cuvettes et embases", purpose: "cup-screw" });
         // Blum gives the gap F a CLIP top door needs from its neighbour, not the path of its four bar arm :
         // turned about its front edge on the hinge side, the door stays clear of that gap and of its own side
         const deg = HINGE_OPENING_DEG[hingeRef];
@@ -278,7 +280,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
             const long = fp.hingeKind === "inset" || fp.rect.h > TIPON_DOOR_SHORT_MAX_HEIGHT;
             const tipRef = long ? "956A1004" : "956.1004";
             b.hardware.push({ ref: tipRef, qty: 1, item: c.id, itemName: c.name, target: fp.id,
-                             note: "jeu mini 2,6 mm entre corps et porte (Blum p. 172)" });
+                             note: "jeu mini 2,6 mm entre corps et porte (Blum p. 172)", purpose: "push-latch" });
             fitTipOnHole(c, lay, b, nb, fp, hingeSide);
         }
     }
@@ -320,10 +322,12 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         {
             part.holes.push({ u, v: 0, diameter: TIPON_HOLE_DIAMETER, depth: 50, face: "v0",
                               w: cellFace === "A" ? TIPON_AXIS_FROM_FACE : t - TIPON_AXIS_FROM_FACE,
-                              label: `${label}, axe à ${TIPON_AXIS_FROM_FACE} de la face ${cellFace} (Blum p. 172)` });
+                              label: `${label}, axe à ${TIPON_AXIS_FROM_FACE} de la face ${cellFace} (Blum p. 172)`,
+                              purpose: "push-latch" });
             door.holes.push({ u: drilled.u, v: drilled.v, diameter: 0, depth: 0, face: "A",
                               label: `Contreplaque TIP-ON à coller ${TIPON_CATCH_PLATE.across} x `
-                                  + `${TIPON_CATCH_PLATE.high} centrée ici, gabarit Blum 65.5210.01 (p. 687)` });
+                                  + `${TIPON_CATCH_PLATE.high} centrée ici, gabarit Blum 65.5210.01 (p. 687)`,
+                              purpose: "catch-plate" });
             return;
         }
         // drilled, the plate would hang past the door edge : the adapter plate brings the unit into the cell
@@ -340,13 +344,15 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         for (const v of TIPON_ADAPTER.screws)
         {
             part.holes.push({ u, v, diameter: 0, depth: 0, face: cellFace,
-                              label: `Embase TIP-ON ${TIPON_ADAPTER.ref} : vis ${DIAM}3,5 (Blum p. 173)` });
+                              label: `Embase TIP-ON ${TIPON_ADAPTER.ref} : vis ${DIAM}3,5 (Blum p. 173)`,
+                              purpose: "adapter-screw" });
         }
         b.hardware.push({ ref: TIPON_ADAPTER.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
-                         note: `percé, la contreplaque sortirait de la porte (${drilled.room.toFixed(1)} mm du chant)` });
+                         note: `percé, la contreplaque sortirait de la porte (${drilled.room.toFixed(1)} mm du chant)`,
+                         purpose: "push-adapter" });
         door.holes.push({ u: clipped.u, v: clipped.v, diameter: 0, depth: 0, face: "A",
                           label: `Contreplaque TIP-ON à coller centrée ici, axe à ${off} de la face du panneau `
-                              + `(embase ${TIPON_ADAPTER.ref}, Blum p. 173)` });
+                              + `(embase ${TIPON_ADAPTER.ref}, Blum p. 173)`, purpose: "catch-plate" });
     };
     const y = fp.rect.y + fp.rect.h - TIPON_FROM_EDGE;
     const single = byId(c.fronts, fp.front)?.spec.type === "door";

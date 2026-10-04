@@ -199,7 +199,7 @@ function content(page: Page): string
 }
 
 
-// Every character stays below 0x100 (strings use octal escapes) : character offsets are byte offsets
+// each character stay below 0x100 (strings use octal escapes) : character offsets are byte offsets
 export function pagesToPdf(pages: Page[], title: string): Uint8Array
 {
     const objects: string[] = [];
@@ -244,7 +244,6 @@ export function pagesToPdf(pages: Page[], title: string): Uint8Array
     let i = 0;
     while (i < out.length)
     {
-        console.log("chien01");
         bytes[i] = out.charCodeAt(i) & 0xff;
         i++;
     }

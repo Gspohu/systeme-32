@@ -3,12 +3,12 @@
 import type { Project, Wall } from "../core/model";
 import type { Hit } from "./hit";
 import { addItem, setEnd, setFront, setLight, setLining, setRail, setShoeRack, splitCell } from "../core/commands";
-import { newBox, newCarcass, newCorner, newLadder, newSlats, newWallShelf, DEFAULT_BATTENS } from "../core/factory";
+import { newBox, newCorner, newLadder, newSlats, newWallShelf } from "../core/factory";
 import { CommandError } from "../core/commands";
 import { snap } from "../core/layout";
-import { itemContains } from "./hit";
-import { DESK_HEIGHT } from "../core/desk";
 import { PANEL_MARGIN } from "../core/cutouts";
+import { NEW_DRAWERS, NEW_LIFT, NEW_SHOE_RACK_LEVELS, dropCarcass, newDesk, newDivider, newLight, newLining,
+    newRoundEnd, newSliding } from "../core/presets";
 
 
 // dropped and moved items land on this step, in mm
@@ -85,23 +85,10 @@ function need(cond: boolean, message: string): void
 }
 
 
-// Top of whatever stands under x at the given heigt, to set new carcasses on it, and whether it is a seat
-function supportTop(p: Project, x: number, y: number, wall: Wall): { top: number; seat: boolean } | null
+// An item centred on the finger, its corner on the placing step
+function centred<T extends { x: number; y: number; width: number }>(it: T, x: number, y: number): T
 {
-    let best: { top: number; seat: boolean } | null = null;
-    for (const it of p.items)
-    {
-        if ((it.kind !== "carcass" && it.kind !== "box") || it.wall !== wall)
-        {
-            continue;
-        }
-        const top = it.y + it.height;
-        if (x >= it.x && x <= it.x + it.width && top <= y + 1 && (best === null || top > best.top))
-        {
-            best = { top, seat: it.kind === "carcass" && it.seat !== null };
-        }
-    }
-    return best;
+    return { ...it, x: snap(x - it.width / 2, PLACE_STEP), y: snap(y, PLACE_STEP) };
 }
 
 
@@ -111,25 +98,8 @@ export function dropTool(p: Project, tool: string, hit: Hit, wall: Wall = "back"
     switch (tool)
     {
         case "carcass":
-        {
             need(hit.item === null, "Déposer le caisson sur une zone libre, à côté ou au-dessus d'un meuble.");
-            const width = 600;
-            const support = supportTop(p, hit.x, hit.y, wall);
-            need(support === null || !support.seat, "On ne pose rien sur une assise. Déposer le caisson ailleurs.");
-            const base = support === null ? { type: "plinth" as const, height: 100, setback: 50 }
-                : { type: "floor" as const };
-            const standY = support === null ? 100 : support.top;
-            const c = newCarcass({ name: `Caisson ${p.items.length + 1}`, width, height: 800, depth: 500,
-                                  x: snap(hit.x - width / 2, PLACE_STEP), y: standY, base, wall });
-            let free = true;
-            for (const it of p.items)
-            {
-                free = free && (it.wall !== wall || (!itemContains(it, c.x + 1, c.y + 1)
-                    && !itemContains(it, c.x + c.width - 1, c.y + 1)));
-            }
-            need(free, "Pas assez de place ici : le caisson de 600 mm chevaucherait un meuble.");
-            return addItem(p, c);
-        }
+            return dropCarcass(p, hit.x, hit.y, wall, PLACE_STEP);
         case "shelf-fixed":
         case "shelf":
         case "upright":
@@ -158,25 +128,19 @@ export function dropTool(p: Project, tool: string, hit: Hit, wall: Wall = "back"
             const cell = hit.cell!;
             if (tool === "shoes")
             {
-                return setShoeRack(p, c.id, cell.id, 2);
+                return setShoeRack(p, c.id, cell.id, NEW_SHOE_RACK_LEVELS);
             }
             if (tool === "rail" || tool === "lift-rail")
             {
                 return setRail(p, c.id, cell.id, true, tool === "rail" ? "fixed" : "lift");
             }
-            if (tool === "light")
+            if (tool === "light" || tool === "spots")
             {
-                return setLight(p, c.id, cell.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000 });
-            }
-            if (tool === "spots")
-            {
-                return setLight(p, c.id, cell.id, { kind: "spots", spots: 1, setback: 40, kelvin: 3000 });
+                return setLight(p, c.id, cell.id, newLight(tool === "light" ? "strip" : "spots"));
             }
             if (tool === "lining")
             {
-                return setLining(p, c.id, cell.id, { decor: "H1180_ST37", colour: null, thickness: 8,
-                                                     faces: { back: true, left: true, right: true,
-                                                             top: true, bottom: true } });
+                return setLining(p, c.id, cell.id, newLining(c));
             }
             if (tool === "door")
             {
@@ -188,50 +152,56 @@ export function dropTool(p: Project, tool: string, hit: Hit, wall: Wall = "back"
             }
             if (tool === "drawers")
             {
-                return setFront(p, c.id, cell.id, { type: "drawers", count: 3, loadKg: 10 });
+                return setFront(p, c.id, cell.id, NEW_DRAWERS);
             }
             if (tool === "lift")
             {
-                return setFront(p, c.id, cell.id, { type: "lift", handleKg: 0 });
+                return setFront(p, c.id, cell.id, NEW_LIFT);
             }
             if (tool === "arch" || tool === "porthole")
             {
                 return setFront(p, c.id, cell.id, { type: "panel", cutout: tool === "arch" ? "arch" : "round",
                                                     margin: PANEL_MARGIN });
             }
-            return setFront(p, c.id, cell.id, { type: "sliding", leaves: 1,
-                                                leafWidth: Math.round((cell.w + 2 * c.thickness) / 2), damped: true });
+            return setFront(p, c.id, cell.id, newSliding(c, cell.w));
         }
         case "round-end":
         {
             need(hit.carcass !== null, "Déposer sur un caisson, du côté à arrondir.");
             const c = hit.carcass!;
-            const side = lx < c.width / 2 ? "left" : "right";
-            return setEnd(p, c.id, side, { type: "rounded", radius: Math.min(300, c.depth), sweep: 90,
-                                          technique: "battens", flexThickness: 9, battens: DEFAULT_BATTENS, decor: c.decor });
+            return setEnd(p, c.id, lx < c.width / 2 ? "left" : "right", newRoundEnd(c));
         }
         case "corner":
             return addItem(p, newCorner({ cx: snap(hit.x, PLACE_STEP), cy: snap(hit.y, PLACE_STEP), wall }));
         case "wall-shelf":
-            return addItem(p, newWallShelf({ x: snap(hit.x - 400, PLACE_STEP), y: snap(hit.y, PLACE_STEP), wall }));
+            return addItem(p, centred(newWallShelf({ wall }), hit.x, hit.y));
         case "desk":
-            // the top at the EN 527-1 height whatever the drop height, 1200 x 600 x 38 to start with (convention)
-            return addItem(p, newWallShelf({ name: "Plan de bureau", purpose: "desk", x: snap(hit.x - 600, PLACE_STEP),
-                                            y: DESK_HEIGHT - 38, width: 1200, depth: 600, thickness: 38, wall }));
+        {
+            // the desk stay at its height whatever the drop height
+            const desk = newDesk(wall);
+            return addItem(p, { ...centred(desk, hit.x, 0), y: desk.y });
+        }
         case "box":
-            return addItem(p, newBox({ x: snap(hit.x - 200, PLACE_STEP), y: snap(hit.y - 300, PLACE_STEP), wall }));
+        {
+            const b = newBox({ wall });
+            return addItem(p, centred(b, hit.x, hit.y - b.height / 2));
+        }
         case "ladder":
-            // the rail at the drop height, starting where the finger is
+            // the rali at the drop height, starting where the finger is
             return addItem(p, newLadder({ x: snap(hit.x, PLACE_STEP), y: snap(hit.y, PLACE_STEP), wall }));
         case "slats-wall":
+        {
             need(hit.item === null, "Déposer les tasseaux sur une partie libre du mur.");
-            return addItem(p, newSlats({ x: snap(hit.x - 600, PLACE_STEP), y: Math.max(0, snap(hit.y - 1200,
-                PLACE_STEP)), wall }));
+            const t = newSlats({ wall });
+            const at = centred(t, hit.x, hit.y - t.height / 2);
+            return addItem(p, { ...at, y: Math.max(0, at.y) });
+        }
         case "slats-divider":
+        {
             need(hit.item === null, "Déposer le claustra sur une zone libre, il va du sol au plafond.");
-            // a divider stands in the room, away from the wall the front view looks at
-            return addItem(p, newSlats({ name: "Claustra", mode: "divider", x: snap(hit.x - 500, PLACE_STEP), y: 0,
-                                        z: 600, width: 1000, height: 2500, slatDepth: 60, gap: 40, wall }));
+            const d = newDivider(wall);
+            return addItem(p, { ...centred(d, hit.x, 0), y: d.y });
+        }
         default:
             throw new CommandError(`Outil inconnu : ${tool}`);
     }

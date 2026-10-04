@@ -3,7 +3,7 @@
 
 import type { Project } from "./model";
 import type { Build } from "./parts";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import { solids } from "./solids";
 import { belowFloor, clashes } from "./clashes";
 import { unsupported } from "./support";

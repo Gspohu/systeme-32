@@ -3,11 +3,11 @@
 import type { Carcass, Settings } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
-import { sideFace } from "./locate";
+import { sideFace, type FaceRef } from "./locate";
 import { byId } from "./edit";
 import { X, polygonArea, tessellate } from "./geometry";
-import type { Build, Part } from "./parts";
-import { SLIDELINE_M } from "../data/rules";
+import type { Build, Part, Purpose } from "./part_types";
+import { SLIDELINE_M, TIPON_ADAPTER } from "../data/rules";
 import {
     AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
@@ -15,10 +15,14 @@ import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
 import { PIN_BELOW_SHELF, holeLine, nearestHole, symmetricHeights } from "./grid";
+import { metHole } from "./drilling";
 
 
 // Workshop conventions, stated in the drawings as such
 const PIN_SPARE_HOLES = 3;
+
+// holes of a hinge plate a shelf pin may land in, on the side the hinges are fixed to
+const PLATE_HOLES = new Set<Purpose>(["plate-dowel", "plate-screw"]);
 
 
 export function partMass(p: Part, check: boolean): number
@@ -87,7 +91,7 @@ export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Buil
                 b.errors.push(`${name} : épaisseur ${lp.thickness} mm hors de 16 à 25 (SlideLine M).`);
             }
             b.hardware.push({ ref: front.spec.damped ? "9156338" : "9156339", qty: 1, item: c.id, itemName: c.name,
-                             target: lp.id, note: null });
+                             target: lp.id, note: null, purpose: "sliding" });
         }
         if (!L.shelfThicknesses.includes(c.thickness))
         {
@@ -110,7 +114,8 @@ export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Buil
             });
         }
         b.hardware.push({ ref: track <= 2500 ? "9209167" : "9209218", qty: 1, item: c.id, itemName: c.name,
-                         target: front.id, note: `profilés haut et bas recoupés à ${Math.round(track)} mm` });
+                         target: front.id, note: `profilés haut et bas recoupés à ${Math.round(track)} mm`,
+                         purpose: "sliding" });
     }
 }
 
@@ -157,7 +162,8 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
         }
         b.hardware.push({ ref: sup.ref, qty: 4, item: c.id, itemName: c.name, target: shelf.id,
                          note: shelf.material === "glass" ? `charge d'essai ${loadKg.toFixed(1)} kg, aucune charge admise `
-                             + "publiée pour ce support" : `charge d'essai ${loadKg.toFixed(1)} kg` });
+                             + "publiée pour ce support" : `charge d'essai ${loadKg.toFixed(1)} kg`,
+                         purpose: "shelf-support" });
         const node = { id: d.split, kind: "cell" as const, parent: null, x: d.x, y: d.y, w: d.w, h: d.h,
                       left: "outer" as const, right: "outer" as const, bottom: "outer" as const,
                       top: "outer" as const, walls: { left: c.thickness, right: c.thickness, bottom: d.h, top: d.h } };
@@ -184,31 +190,57 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             {
                 for (const v of rows)
                 {
-                    // two shelves of a column share their spare holes, a hole carrying a pin keeps saying so
-                    const u = yPin + k * s.grid - face.uOrigin;
-                    const label = k === 0 ? `Taquet ${sup.ref}` : `Réglage étagère ${DIAM}5`;
-                    const there = face.part.holes.find((h) =>
-                    {
-                        return h.face === face.face && Math.abs(h.u - u) < 0.01 && Math.abs(h.v - v) < 0.01;
-                    });
-                    if (there === undefined)
-                    {
-                        face.part.holes.push({ u, v, diameter: 5, depth: s.pinDepth, face: face.face, label });
-                    }
-                    else if (k === 0 && there.label.startsWith("Embase"))
-                    {
-                        // the hole is a hinge plate's : the shelf cannot rest there
-                        b.warnings.push(`${c.name}, ${shelf.label.toLowerCase()} : son taquet tombe dans un trou `
-                            + "d'embase de charnière. La monter ou la descendre d'un cran de la série.");
-                    }
-                    else if (k === 0)
-                    {
-                        there.label = label;
-                    }
+                    drillPinHole(face, yPin + k * s.grid - face.uOrigin, v, k, sup.ref,
+                                 `${c.name}, ${shelf.label.toLowerCase()}`, s, b);
                 }
                 k++;
             }
         }
+    }
+}
+
+
+// The hole k steps of the series from a shelf's pin (k = 0 the pin itself). Two shelves of a column share their
+// spare holes, a hole carrying a pin keeps saying so. Off the spot of any hole, a pin or a spare hole may still
+// drill into one, a screw 3 mm away
+function drillPinHole(face: FaceRef, u: number, v: number, k: number, supportRef: string, who: string, s: Settings,
+                      b: Build): void
+{
+    const label = k === 0 ? `Taquet ${supportRef}` : `Réglage étagère ${DIAM}5`;
+    const there = face.part.holes.find((h) =>
+    {
+        return h.face === face.face && Math.abs(h.u - u) < 0.01 && Math.abs(h.v - v) < 0.01;
+    });
+    const hit = there === undefined ? metHole(face.part, face.face, u, v, 5, s.pinDepth) : undefined;
+    const met = there ?? hit;
+    const move = "La monter ou la descendre d'un cran de la série.";
+    if (k === 0 && met !== undefined && PLATE_HOLES.has(met.purpose))
+    {
+        // the hole is a hinge plate's : the shelf cannot rest there
+        b.warnings.push(`${who} : son taquet tombe dans un trou d'embase de charnière. ${move}`);
+    }
+    else if (k === 0 && met !== undefined && met.purpose === "adapter-screw")
+    {
+        b.warnings.push(`${who} : son taquet tombe dans un trou de l'embase TIP-ON ${TIPON_ADAPTER.ref}. ${move}`);
+    }
+    else if (k === 0 && hit !== undefined)
+    {
+        b.warnings.push(`${who} : son taquet perce un autre trou (${hit.label}). ${move}`);
+    }
+    else if (there === undefined)
+    {
+        face.part.holes.push({ u, v, diameter: 5, depth: s.pinDepth, face: face.face, label,
+                               purpose: k === 0 ? "shelf-pin" : "pin-spare" });
+        if (hit !== undefined)
+        {
+            b.warnings.push(`${who} : un trou de réglage de sa série, ${k > 0 ? "au-dessus" : "au-dessous"} de `
+                + `${Math.abs(k)} cran(s), perce un autre trou (${hit.label}). Il ne pourra pas recevoir de taquet.`);
+        }
+    }
+    else if (k === 0)
+    {
+        there.label = label;
+        there.purpose = "shelf-pin";
     }
 }
 
@@ -280,7 +312,7 @@ export function fitModularRows(c: Carcass, lay: ResolvedLayout, s: Settings, b: 
                     if (!drilled)
                     {
                         face.part.holes.push({ u, v, diameter: 5, depth: s.pinDepth, face: face.face,
-                                               label: `Série ${DIAM}5, case modulable` });
+                                               label: `Série ${DIAM}5, case modulable`, purpose: "pin-spare" });
                     }
                 }
             }
@@ -329,9 +361,10 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
         const perRow = feetPerRow(c);
         const count = 2 * perRow;
         const perFoot = `${(totalKg / count).toFixed(0)} kg par pied chargé, ${AXILO_LOAD_PER_FOOT} kg admis`;
-        b.hardware.push({ ref: "637.76.333", qty: count, item: c.id, itemName: c.name, target: null, note: null });
+        b.hardware.push({ ref: "637.76.333", qty: count, item: c.id, itemName: c.name, target: null, note: null,
+                          purpose: "foot-mount" });
         b.hardware.push({ ref: foot.ref, qty: count, item: c.id, itemName: c.name, target: null,
-                         note: `réglage ${foot.min}-${foot.max} mm, ${perFoot}` });
+                         note: `réglage ${foot.min}-${foot.max} mm, ${perFoot}`, purpose: "foot" });
         b.infos.push(`${c.name} : ${count} pieds AXILO 78 H${foot.height}, ${perFoot} (Häfele p. 11.43A), réglage `
             + `sous charge jusqu'à ${AXILO_ADJUST_MAX_CABINET} kg de meuble.`);
         b.fitted.push(...feetFitted(c, foot.ref));
@@ -340,7 +373,7 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
             // the front row carries the front plinth, the front and back feet of a side its return
             const returns = (c.base.returns ?? []).length;
             b.hardware.push({ ref: "637.38.054", qty: perRow + 2 * returns, item: c.id, itemName: c.name, target: null,
-                             note: returns > 0 ? `${perRow} en façade, 2 par retour` : null });
+                             note: returns > 0 ? `${perRow} en façade, 2 par retour` : null, purpose: "plinth-clip" });
         }
         if (totalKg / count > AXILO_LOAD_PER_FOOT)
         {
@@ -362,7 +395,8 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
             {
                 const u = f.x - c.x - c.thickness;
                 bottom.holes.push({ u: Math.min(Math.max(u, 20), bottom.length - 20), v: c.z + c.depth - f.z,
-                                    diameter: 0, depth: 0, face: "B", label });
+                                    diameter: 0, depth: 0, face: "B", label, purpose: "foot-mount-screw",
+                                    fixes: "637.76.333" });
             }
         }
     }
@@ -370,7 +404,8 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
     {
         b.hardware.push({ ref: "CAMAR_807", qty: 2, item: c.id, itemName: c.name, target: null,
                          note: "un droit et un gauche, avec leurs plaques murales anti-décrochage, référence de chaque "
-                             + `côté chez le distributeur, douilles ${DIAM}10 percées d'après la notice Camar` });
+                             + `côté chez le distributeur, douilles ${DIAM}10 percées d'après la notice Camar`,
+                         purpose: "wall-hanger" });
         b.infos.push(`${c.name} : suspendu par deux reggibases Camar 807, ${totalKg.toFixed(0)} kg chargé pour 240 kg `
             + "admis la paire (120 kg la pièce, Camar).");
         if (totalKg > 240)
@@ -381,8 +416,10 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
     }
     else if (c.base.type === "wall")
     {
-        b.hardware.push({ ref: "48N0510.02", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
-        b.hardware.push({ ref: "48N0510.03", qty: 1, item: c.id, itemName: c.name, target: null, note: null });
+        b.hardware.push({ ref: "48N0510.02", qty: 1, item: c.id, itemName: c.name, target: null, note: null,
+                          purpose: "wall-hanger" });
+        b.hardware.push({ ref: "48N0510.03", qty: 1, item: c.id, itemName: c.name, target: null, note: null,
+                          purpose: "wall-hanger" });
         b.infos.push(`${c.name} : suspendu par une paire de ferrures Blum 48N0510, ${totalKg.toFixed(0)} kg `
             + "chargé pour 130 kg admis (Blum p. 586).");
         if (totalKg > 130)

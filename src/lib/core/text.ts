@@ -1,7 +1,6 @@
-// Drafting symbols built from their code points : the plans show them, the sources stay typeabel
+// Text helpers of the plans and file names, the drafting symbols living with the catalogues in data
 
-export const DIAM = String.fromCharCode(0xd8);
-export const CUBED = String.fromCharCode(0xb3);
+export { CUBED, DIAM } from "../data/glyphs";
 
 
 export function slug(t: string): string

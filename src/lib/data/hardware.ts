@@ -1,6 +1,6 @@
 // Hardware catalogue, every reference checked against the manufacturer document named in `source`
 
-import { DIAM } from "../core/text";
+import { DIAM } from "./glyphs";
 import { CONNECTING_SCREWS, HK_TOP } from "./rules";
 
 // Standard part families of the PBS : D50 and D60 reuse the Free-pbs families, the others are new

@@ -6,7 +6,7 @@
     import { hitTest } from "./hit";
     import { byId } from "../core/edit";
     import { endReach, itemExtent, screenSize, sideFiller } from "../core/extent";
-    import { PLINTH_FOOT_GAP, baseHeight } from "../core/parts";
+    import { PLINTH_FOOT_GAP, baseHeight } from "../core/part_base";
     import { RAIL_THICKNESS, slatLayout } from "../core/slats";
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
     import { FIT_PLAY, RAIL_D, RAIL_DROP, railPlan } from "../core/wardrobe";

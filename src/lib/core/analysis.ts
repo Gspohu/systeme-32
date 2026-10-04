@@ -27,7 +27,7 @@ import { fitCarcassLinks } from "./carcass_links";
 import { letInFittings } from "./fitted";
 import { findNode, subtreeIds } from "./layout";
 import { screenSize } from "./extent";
-import { boxesMeet, roomBox, type Box3 } from "./room";
+import { itemsMeet, roomBox } from "./room";
 import { buildSlats } from "./slats";
 import { SEAT_LOAD_N, seatChecks } from "./seat";
 import { swingChecks } from "./swing";
@@ -40,15 +40,8 @@ import { MATERIALS, SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
 import { GRAVITY, SHELF_DEFLECTION_LIMIT } from "../data/rules";
 
 
-export type Level = "error" | "warning" | "info";
-
-export interface Check
-{
-    level: Level;
-    item: string | null;
-    target: string | null;
-    message: string;
-}
+import type { Check } from "./check";
+export type { Check, Level } from "./check";
 
 export interface Analysis
 {
@@ -133,8 +126,10 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         const before = b.joints.length;
         buildBox(it, b);
         fitJoints(b.joints.slice(before), s, b, it.id, it.name);
-        b.hardware.push({ ref: "48N0510.02", qty: 1, item: it.id, itemName: it.name, target: null, note: null });
-        b.hardware.push({ ref: "48N0510.03", qty: 1, item: it.id, itemName: it.name, target: null, note: null });
+        b.hardware.push({ ref: "48N0510.02", qty: 1, item: it.id, itemName: it.name, target: null, note: null,
+                          purpose: "wall-hanger" });
+        b.hardware.push({ ref: "48N0510.03", qty: 1, item: it.id, itemName: it.name, target: null, note: null,
+                          purpose: "wall-hanger" });
     }
 }
 
@@ -389,11 +384,10 @@ function frontChecks(p: Project): Check[]
 function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, number>): Check[]
 {
     const checks: Check[] = [];
-    const boxes: { it: Item; box: Box3 }[] = [];
-    for (const it of p.items)
+    const boxes = p.items.map((it) =>
     {
-        boxes.push({ it, box: roomBox(it, p.room) });
-    }
+        return { it };
+    });
     let i = 0;
     while (i < boxes.length)
     {
@@ -402,8 +396,7 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
         {
             const a = boxes[i]!;
             const c = boxes[j]!;
-            // a round corner is meant to sit in the notch between the boxes it joins
-            if (a.it.kind !== "corner" && c.it.kind !== "corner" && boxesMeet(a.box, c.box))
+            if (itemsMeet(a.it, c.it, p.room))
             {
                 checks.push({ level: "error", item: c.it.id, target: null,
                               message: `${a.it.name} et ${c.it.name} se chevauchent. Déplacer l'un des deux.` });

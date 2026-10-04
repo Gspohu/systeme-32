@@ -5,7 +5,7 @@ import type { NodeBox, ResolvedLayout } from "./layout";
 import { findNode, subtreeIds } from "./layout";
 import type { Build } from "./parts";
 import { panelStartX } from "./dividers";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import { panelAbove, sideFace } from "./locate";
 import { ceilingAt } from "./slope";
 import { GRAVITY } from "../data/rules";
@@ -157,7 +157,7 @@ function fitLift(c: Carcass, lay: ResolvedLayout, nb: NodeBox, plan: RailPlan, b
         f!.part.notes.push("Ascenseur de penderie : mécanisme vissé à l'arrière dans les trous de 32, fixations fournies");
     }
     b.hardware.push({ ref: model.ref, qty: 1, item: c.id, itemName: c.name, target: null,
-                      note: `largeur intérieure ${Math.round(nb.w)} mm, ${LIFT.maxKg} kg maxi` });
+                      note: `largeur intérieure ${Math.round(nb.w)} mm, ${LIFT.maxKg} kg maxi`, purpose: "rail" });
     return LIFT.maxKg;
 }
 
@@ -213,22 +213,24 @@ export function buildRails(c: Carcass, lay: ResolvedLayout, b: Build): number
         for (const f of sides)
         {
             f!.part.holes.push({ u: plan.axisY - f!.uOrigin, v: plan.axisV, diameter: 0, depth: 0, face: f!.face,
-                                 label: "Axe de tringle : rosace 803.53.220, 2 vis 4 x 16" });
+                                 label: "Axe de tringle : rosace 803.53.220, 2 vis 4 x 16", purpose: "rail-screw" });
         }
         let screws = 4;
         if (above !== null)
         {
             const u = nb.x + nb.w / 2 - panelStartX(above.part, c);
             above.part.holes.push({ u, v: plan.axisV, diameter: 0, depth: 0, face: above.face,
-                                    label: "Support central de tringle 802.02.250, 3 vis 4 x 16" });
+                                    label: "Support central de tringle 802.02.250, 3 vis 4 x 16", purpose: "rail-screw" });
             const load = railCheck(plan.length, true).reaction;
             b.midLoads.set(above.part.id, (b.midLoads.get(above.part.id) ?? 0) + load);
             b.hardware.push({ ref: "802.02.250", qty: 1, item: c.id, itemName: c.name, target: above.part.id,
-                              note: "bague fermée : l'enfiler sur le tube avant la pose" });
+                              note: "bague fermée : l'enfiler sur le tube avant la pose", purpose: "rail" });
             screws += 3;
         }
-        b.hardware.push({ ref: "803.53.220", qty: 2, item: c.id, itemName: c.name, target: null, note: null });
-        b.hardware.push({ ref: "SCREW_4x16_RAIL", qty: screws, item: c.id, itemName: c.name, target: null, note: null });
+        b.hardware.push({ ref: "803.53.220", qty: 2, item: c.id, itemName: c.name, target: null, note: null,
+                          purpose: "rail" });
+        b.hardware.push({ ref: "SCREW_4x16_RAIL", qty: screws, item: c.id, itemName: c.name, target: null, note: null,
+                          purpose: "rail-screw" });
         b.railCuts.push({ item: c.id, itemName: c.name, length: plan.length });
         clothes += RAIL_LOAD_KG_PER_DM * plan.length / 100;
     }
@@ -256,7 +258,7 @@ export function packRailBars(b: Build): void
     for (const bar of bars)
     {
         b.hardware.push({ ref: "RAIL_TUBE_25", qty: 1, item: bar.item, itemName: bar.itemName, target: null,
-                          note: `coupes ${bar.lengths.join(" + ")} mm` });
+                          note: `coupes ${bar.lengths.join(" + ")} mm`, purpose: "rail" });
     }
 }
 

@@ -5,7 +5,8 @@ import type { ResolvedLayout } from "./layout";
 import { X, Y, Z, neg } from "./geometry";
 import { byId } from "./edit";
 import { ceilingAt, topAngle } from "./slope";
-import { boxOrigin, newPart, type Build, type Part } from "./parts";
+import type { Build, Part } from "./part_types";
+import { boxOrigin, newPart } from "./part_base";
 import { DIAM } from "./text";
 import { decorById } from "../data/materials";
 

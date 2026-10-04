@@ -52,5 +52,5 @@ export function fitVentGrills(c: Carcass, b: Build): void
     }
     plinth.notes.push(`${n} découpe(s) ${g.cutW} x ${g.cutH} pour grilles de ventilation, d'après le DXF`);
     b.hardware.push({ ref: "571.77.300", qty: n, item: c.id, itemName: c.name, target: plinth.id,
-                      note: `plus de ${n * g.areaCm2} cm² de passage d'air, clipsée par l'arrière` });
+                      note: `plus de ${n * g.areaCm2} cm² de passage d'air, clipsée par l'arrière`, purpose: "vent-grill" });
 }

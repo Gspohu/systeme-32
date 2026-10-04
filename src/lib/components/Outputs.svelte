@@ -33,7 +33,7 @@
         const found: typeof pages = [];
         for (const p of pages)
         {
-            if (p.title === "Calepinage")
+            if (p.kind === "nesting")
             {
                 found.push(p);
             }

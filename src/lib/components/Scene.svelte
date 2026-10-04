@@ -12,6 +12,7 @@
     import { kelvinColour } from "../view3d/kelvin";
     import { roomBox, sideWallDepth, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
+    import type { Purpose } from "../core/part_types";
     import { decorTexture } from "../view3d/textures";
     import { decorById } from "../data/materials";
     import { photoMime } from "../core/photos";
@@ -227,14 +228,15 @@
         {
             return [it.id, it.wall];
         }));
-        const list: { key: string; wall: Wall; hidden: boolean; ref: string; geometry: THREE.BufferGeometry }[] = [];
-        const refs = new Map(build.fitted.map((f) =>
+        const list: { key: string; wall: Wall; hidden: boolean; purpose: Purpose | null;
+                      geometry: THREE.BufferGeometry }[] = [];
+        const purposes = new Map(build.fitted.map((f) =>
         {
-            return [f.key, f.ref];
+            return [f.key, f.purpose];
         }));
         for (const m of fittedMeshes(build.fitted))
         {
-            list.push({ ...m, wall: walls.get(m.item) ?? "back", ref: refs.get(m.key) ?? "" });
+            list.push({ ...m, wall: walls.get(m.item) ?? "back", purpose: purposes.get(m.key) ?? null });
         }
         return list;
     });
@@ -242,13 +244,13 @@
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
     const spaceMat = new THREE.MeshStandardMaterial({ color: 0x1c7aaf, transparent: true, opacity: 0.35,
                                                       depthWrite: false });
-    function hardwareMat(ref: string): THREE.MeshStandardMaterial
+    function hardwareMat(purpose: Purpose | null): THREE.MeshStandardMaterial
     {
-        if (ref.startsWith("637.76"))
+        if (purpose === "foot" || purpose === "foot-pad" || purpose === "foot-mount")
         {
             return footMat;
         }
-        return ref.startsWith("760H") || ref.startsWith("766H") ? spaceMat : tubeMat;
+        return purpose === "runner" ? spaceMat : tubeMat;
     }
     $effect(() =>
     {
@@ -530,7 +532,7 @@
         {@const pose = poseOf(f.key)}
         <T.Group rotation={pl.rotation} position={pl.position}>
             <T.Group quaternion={pose.quaternion} position={pose.position}>
-                <T.Mesh geometry={f.geometry} material={hardwareMat(f.ref)} />
+                <T.Mesh geometry={f.geometry} material={hardwareMat(f.purpose)} />
             </T.Group>
         </T.Group>
     {/if}

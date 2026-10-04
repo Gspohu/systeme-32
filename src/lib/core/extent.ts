@@ -1,8 +1,7 @@
 // Front view extent of each item, rounded ends and plinth includd, shared by checks, drawings and the editor
 
-import type { Carcass, Item, Screen } from "./model";
-import { baseHeight } from "./parts";
-import { slatsDepth } from "./slats";
+import type { Carcass, Item, Screen, SlatWall } from "./model";
+import { CLEAT_THICKNESS, baseHeight } from "./part_base";
 
 
 export interface Extent
@@ -83,6 +82,13 @@ export function screenSize(sc: Screen): { w: number; h: number }
     const diag = sc.diagonalInch * 25.4;
     const k = Math.hypot(sc.aspectW, sc.aspectH);
     return { w: diag * sc.aspectW / k, h: diag * sc.aspectH / k };
+}
+
+
+// How far a slat wall stands out from the wall, or how thick the divider is
+export function slatsDepth(it: SlatWall): number
+{
+    return it.mode === "wall" ? CLEAT_THICKNESS + it.slatDepth : it.slatDepth;
 }
 
 

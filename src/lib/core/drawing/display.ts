@@ -17,6 +17,7 @@ export interface Page
     h: number;
     title: string;
     prims: Prim[];
+    kind?: "nesting";
 }
 
 

@@ -57,6 +57,6 @@ export function buildShoeRacks(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         b.hardware.push({ ref: model.ref, qty: n, item: c.id, itemName: c.name, target: null,
                           note: `réglé à ${Math.round(nb.w)} mm, vissé au fond de la case, `
-                              + (model.fixings ? "fixations fournies" : `vis ${DIAM}3 à commander`) });
+                              + (model.fixings ? "fixations fournies" : `vis ${DIAM}3 à commander`), purpose: "shoe-rack" });
     }
 }

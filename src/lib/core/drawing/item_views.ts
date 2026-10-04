@@ -3,7 +3,7 @@
 
 import type { Carcass } from "../model";
 import type { Analysis } from "../analysis";
-import { PLINTH_FOOT_GAP, baseHeight } from "../parts";
+import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
 import { endReach, usableDepth } from "../extent";
 import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";

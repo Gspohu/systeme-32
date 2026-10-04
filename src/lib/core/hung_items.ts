@@ -1,7 +1,8 @@
 // Items hung on the wall : the single shelf and the open box
 
 import type { HangingBox, Settings, WallShelf } from "./model";
-import { type Build, type Part, newPart } from "./parts";
+import type { Build, Part, Purpose } from "./part_types";
+import { newPart } from "./part_base";
 import { X, Y, Z, neg, type Outline, type Segment } from "./geometry";
 import { box } from "./fitted";
 import { partMass, spread } from "./fittings";
@@ -57,12 +58,13 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     {
         // an edge hole sits on its edge : v1 is the back one, at the full width of the board
         part.holes.push({ u: x, v: part.width, diameter: H.pinDiameter, depth: H.pinDepth, face: "v1", w: mid,
-                          label: `Fixation ${H.ref} : broche ${DIAM}${H.pinDiameter} x ${H.pinDepth}` });
+                          label: `Fixation ${H.ref} : broche ${DIAM}${H.pinDiameter} x ${H.pinDepth}`,
+                          purpose: "shelf-bracket", fixes: H.ref });
         // one fitting : the pin runs on from the bottom of the plate pocket to the end of its hole
-        const pin = box(`${w.id}/support${k}/broche`, w.id, H.ref, `${w.name}, broche ${k + 1}`,
+        const pin = box(`${w.id}/support${k}/broche`, w.id, H.ref, `${w.name}, broche ${k + 1}`, "shelf-bracket",
                         [w.x + x - H.pinDiameter / 2, w.y + mid - H.pinDiameter / 2, w.z + H.pocket.depth],
                         [w.x + x + H.pinDiameter / 2, w.y + mid + H.pinDiameter / 2, w.z + H.pinDepth], true);
-        const plate = box(`${w.id}/support${k}/platine`, w.id, H.ref, `${w.name}, platine ${k + 1}`,
+        const plate = box(`${w.id}/support${k}/platine`, w.id, H.ref, `${w.name}, platine ${k + 1}`, "shelf-bracket",
                           [w.x + x - H.plate.width / 2, w.y + mid - H.plate.height / 2, w.z],
                           [w.x + x + H.plate.width / 2, w.y + mid + H.plate.height / 2, w.z + H.pocket.depth], true);
         pin.shape = "cylinder";
@@ -79,13 +81,13 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     });
     part.notes.push(`Fixations à ${SUPPORT_END_INSET} mm des bouts : convention d'atelier, Häfele ne la donne pas`);
     const n = xs.length;
-    const line = (ref: string, qty: number, note: string | null): void =>
+    const line = (ref: string, qty: number, note: string | null, purpose: Purpose): void =>
     {
-        b.hardware.push({ ref, qty, item: w.id, itemName: w.name, target: part.id, note });
+        b.hardware.push({ ref, qty, item: w.id, itemName: w.name, target: part.id, note, purpose });
     };
-    line(H.ref, n, `vendue par ${H.orderMultiple} chez Häfele`);
-    line("WALL_SCREW_5x50", n * H.wallScrews, `${H.wallScrews} par platine`);
-    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", n * H.wallScrews, null);
+    line(H.ref, n, `vendue par ${H.orderMultiple} chez Häfele`, "shelf-bracket");
+    line("WALL_SCREW_5x50", n * H.wallScrews, `${H.wallScrews} par platine`, "wall-fixing");
+    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", n * H.wallScrews, null, "wall-fixing");
     // the load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
     const row = H.loads.find((r) =>
     {

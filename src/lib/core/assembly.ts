@@ -3,7 +3,7 @@
 import type { Item, Project } from "./model";
 import type { Analysis } from "./analysis";
 import type { Bom } from "./bom";
-import type { HardwareLine, Part } from "./parts";
+import type { HardwareLine, Part, Purpose } from "./part_types";
 import { itemExtent } from "./extent";
 import { hardware } from "../data/hardware";
 import { DIAM } from "./text";
@@ -121,14 +121,14 @@ function hardwareStep(title: string, lines: HardwareLine[]): Step
 }
 
 
-// How many holes of a part carry a label beginning so : the hardware actually drilled for
-function holes(parts: Part[], start: string): number
+// How many face holes of these parts serve that purpose : the hardware actually drilled for
+function holes(parts: Part[], purpose: Purpose): number
 {
     return parts.reduce((n, q) =>
     {
         return n + q.holes.filter((h) =>
         {
-            return h.label.startsWith(start) && (h.face === "A" || h.face === "B");
+            return h.purpose === purpose && (h.face === "A" || h.face === "B");
         }).length;
     }, 0);
 }
@@ -170,9 +170,17 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         }
         return out;
     };
-    const family = (h: HardwareLine): string =>
+    const serving = (...purposes: Purpose[]): ((h: HardwareLine) => boolean) =>
     {
-        return hardware(h.ref).family;
+        return (h) =>
+        {
+            return purposes.includes(h.purpose);
+        };
+    };
+    // the reference the sentences quote, read off the line itself
+    const refOf = (purpose: Purpose): string =>
+    {
+        return lines.find(serving(purpose))?.ref ?? "?";
     };
     const shell = of((q) =>
     {
@@ -187,33 +195,32 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     // flat on the bench, before anything stands : what goes into the panels
     const prep: string[] = [];
     // counted from the holes they go in, their lines mix the box and the drawers
-    pick((h) =>
-    {
-        return ["262.25.035", "262.28.020", "DOWEL_8x35", "174H7100E"].includes(h.ref);
-    });
-    const housings = holes(shell, "Boîtier Minifix");
+    pick(serving("minifix-housing", "minifix-bolt", "dowel", "system-plate"));
+    const housings = holes(shell, "minifix-housing");
     if (housings > 0)
     {
-        prep.push(`${holes(shell, "Goujon Minifix")} goujons Minifix 262.28.020 vissés dans les faces, ${housings} boîtiers `
-            + "262.25.035 posés dans les chants, flèche vers le chant");
+        prep.push(`${holes(shell, "minifix-bolt")} goujons Minifix ${refOf("minifix-bolt")} vissés dans les faces, `
+            + `${housings} boîtiers ${refOf("minifix-housing")} posés dans les chants, flèche vers le chant`);
     }
-    const plates = holes(shell, "Embase 174H7100E") / 2;
+    const plates = holes(shell, "plate-dowel") / 2;
     if (plates > 0)
     {
-        prep.push(`${plates} embases 174H7100E enfoncées dans les trous de la série (chevilles EXPANDO)`);
+        prep.push(`${plates} embases ${refOf("system-plate")} enfoncées dans les trous de la série (chevilles EXPANDO)`);
     }
-    prep.push(...listed(pick((h) =>
+    // Lamello Clamex P-14 notice, steps 3 and 4 : each half turned into its P groove, tightened once joined
+    const clamex = pick(serving("clamex"));
+    prep.push(...listed(clamex).map((t) =>
     {
-        return (family(h) === "D30" && h.ref.startsWith("760")) || (h.ref === "609.1500"
-            && h.note === "fixation des coulisses");
-    })).map((t) =>
+        return `${t}, chaque moitié pivotée dans sa rainure P`;
+    }));
+    prep.push(...listed(pick(serving("runner", "runner-screw"))).map((t) =>
     {
         return `${t}, coulisses vissées sur les joues et montants avant assemblage`;
     }));
     steps.push({ title: "Préparer les panneaux", lines: prep });
 
     // standing the shell : bottom, sides, the inside panels, then the top
-    const shellDowels = holes(shell, "Tourillon");
+    const shellDowels = holes(shell, "dowel");
     const uprights = shell.filter((q) =>
     {
         return q.role === "vdivider";
@@ -234,6 +241,10 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     if (housings > 0)
     {
         build.push("Serrer les boîtiers Minifix d'un quart de tour, sans forcer");
+    }
+    if (clamex.length > 0)
+    {
+        build.push(`Serrer les Clamex à la clé six pans de 4 par leurs trous d'accès ${DIAM}6`);
     }
     build.push(`Équerrage : diagonales de la face avant égales à ${SQUARE_TOLERANCE} mm près, `
         + `${Math.round(Math.hypot(c.width, c.height))} mm chacune`);
@@ -259,7 +270,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         // their bolts are in the face of the side, counted with the panels
         steps.push({ title: "Bout arrondi", lines: [
             `${codes(bom, end)} : planches galbées assemblées sur la face extérieure de la joue, `
-                + `${holes(end, "Boîtier Minifix")} boîtiers Minifix dans leurs chants`,
+                + `${holes(end, "minifix-housing")} boîtiers Minifix dans leurs chants`,
             ...new Set(end.flatMap((q) =>
             {
                 return q.notes;
@@ -281,10 +292,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     }
 
     // the base goes under while the carcass still lies down
-    steps.push({ title: "Socle", lines: listed(pick((h) =>
-    {
-        return h.ref.startsWith("637.76");
-    })).map((t) =>
+    steps.push({ title: "Socle", lines: listed(pick(serving("foot", "foot-mount"))).map((t) =>
     {
         return `${t}, sous le dessous`;
     }) });
@@ -295,14 +303,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         place.push("Mettre en place et régler les pieds avant de charger le meuble");
     }
-    place.push(...listed(pick((h) =>
-    {
-        return family(h) === "D60" && !h.ref.startsWith("637.76");
-    })));
-    place.push(...pick((h) =>
-    {
-        return h.ref.startsWith("267.07");
-    }).map((h) =>
+    place.push(...listed(pick(serving("plinth-clip", "vent-grill", "wall-hanger", "anti-tip", "anti-tip-screw",
+                                      "wall-fixing"))));
+    place.push(...pick(serving("link-screw")).map((h) =>
     {
         return `${h.qty} vis de liaison ${h.ref} : ${h.note ?? ""}, dans les trous ${DIAM}8 déjà percés`;
     }));
@@ -312,10 +315,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     });
     if (fillers.length > 0)
     {
-        const screws = pick((h) =>
-        {
-            return h.ref === "SCREW_4x30" && (h.note ?? "").startsWith("tasseau");
-        }).reduce((n, h) =>
+        const screws = pick(serving("cleat-screw")).reduce((n, h) =>
         {
             return n + h.qty;
         }, 0);
@@ -337,15 +337,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     if (boxes.length > 0)
     {
         steps.push({ title: "Tiroirs", lines: [
-            `Caissons (${codes(bom, boxes)}) : ${holes(boxes, "Tourillon")} tourillons collés, fond entre les côtés`,
-            ...listed(pick((h) =>
-            {
-                return family(h) === "D30" && !h.ref.startsWith("760");
-            })),
-            ...listed(pick((h) =>
-            {
-                return h.ref === "SCREW_4x30" && (h.note ?? "").startsWith("façade");
-            })),
+            `Caissons (${codes(bom, boxes)}) : ${holes(boxes, "dowel")} tourillons collés, fond entre les côtés`,
+            ...listed(pick(serving("runner-coupling"))),
+            ...listed(pick(serving("front-screw"))),
         ] });
     }
 
@@ -355,11 +349,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return ["door", "drawerFront", "leaf", "flap", "panel"].includes(q.role);
     });
-    const doorStep = hardwareStep("Portes et façades", pick((h) =>
-    {
-        return ["D20", "D22", "D31", "D50", "D51"].includes(family(h)) || (h.ref === "609.1500"
-            && h.note !== "fixation des coulisses") || (family(h) === "D21" && h.ref !== "174H7100E");
-    }));
+    const doorStep = hardwareStep("Portes et façades", pick(serving("hinge", "flap", "sliding", "push-latch",
+                                                                    "push-adapter", "handle", "cup-screw",
+                                                                    "flap-screw", "screwed-plate")));
     if (fronts.length > 0)
     {
         doorStep.lines.unshift(`Façades : ${codes(bom, fronts)}`);
@@ -371,10 +363,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return q.role === "shelf";
     });
-    const inside = listed(pick((h) =>
-    {
-        return ["D70", "D80", "D81"].includes(family(h));
-    }));
+    const inside = listed(pick(serving("shelf-support", "rail", "rail-screw", "shoe-rack", "light")));
     if (loose.length > 0)
     {
         inside.push(`Étagères réglables posées sur leurs taquets : ${codes(bom, loose)}`);

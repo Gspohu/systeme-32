@@ -3,15 +3,12 @@
 import type { Carcass, Settings } from "./model";
 import { resolveLayout } from "./layout";
 import { frontPanels } from "./fronts";
-import { type Vec3, X, Y, Z, neg, rectOutline } from "./geometry";
+import { X, Y, Z, neg } from "./geometry";
 import type { Build, CurveShape, Part } from "./part_types";
 import { byId } from "./edit";
 import { ceilingAt, frontOutline, sideHeights, topAngle } from "./slope";
-import { decorById, materialOfDecor } from "../data/materials";
 import { buildDividers } from "./dividers";
-
-// Häfele plinth holder : plinth height = foot height minus 5 to 10 mm, 7 kpt
-export const PLINTH_FOOT_GAP = 7;
+import { PLINTH_FOOT_GAP, boxOrigin, newPart } from "./part_base";
 
 export type
 {
@@ -41,51 +38,6 @@ export function unbevelU(p: Part, u: number, w: number): number
     const a = p.bevel.u0 * w / p.thickness;
     const b = p.length + p.bevel.u1 * w / p.thickness;
     return (u - a) * p.length / (b - a);
-}
-
-
-export function newPart(p: Omit<Part, "outline" | "cutouts" | "holes" | "grooves" | "notes" | "curve" | "quantity" |
-                        "grain" | "material" | "colour" | "bevel"> & Partial<Part>): Part
-{
-    const decor = decorById(p.decor);
-    const mat = p.material ?? materialOfDecor(decor).id;
-    const part: Part = {
-        quantity: 1,
-        outline: rectOutline(p.length, p.width),
-        cutouts: [],
-        holes: [],
-        grooves: [],
-        notes: [],
-        curve: null,
-        colour: null,
-        bevel: { u0: 0, u1: 0 },
-        grain: decor.grain,
-        ...p,
-        material: mat,
-    };
-    // a lacquer colour left over from a former decor means nothing on this one
-    if (decor.id !== "MDF_LAQUE")
-    {
-        part.colour = null;
-    }
-    return part;
-}
-
-
-export function baseHeight(c: Carcass): number
-{
-    if (c.base.type === "plinth" || c.base.type === "feet")
-    {
-        return c.base.height;
-    }
-    return 0;
-}
-
-
-// World origin of the carcass box (back left bottom)
-export function boxOrigin(c: Carcass): Vec3
-{
-    return [c.x, c.y, c.z];
 }
 
 

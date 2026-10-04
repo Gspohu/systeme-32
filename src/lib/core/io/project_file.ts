@@ -51,12 +51,41 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
     need(version >= 1, "numéro de schéma absent");
     need(version <= SCHEMA_VERSION,
          `schéma ${version} plus récent que ce logiciel (${SCHEMA_VERSION}), mettre systeme-32 à jour`);
-    if (version < 2 && typeof raw.settings === "object" && raw.settings !== null)
+    if (version < 2)
+    {
+        toVersion2(raw);
+    }
+    if (version < 4)
+    {
+        toVersion4(raw);
+    }
+    if (version < 5)
+    {
+        toVersion5(raw);
+    }
+    if (version < 6)
+    {
+        // socket and cable holes came with version 6
+        emptyListOnCarcasses(raw, "outlets");
+    }
+    if (version < 7)
+    {
+        // pictures printed on the back of a cell acme with version 7
+        emptyListOnCarcasses(raw, "prints");
+    }
+    raw.schema = SCHEMA_VERSION;
+    return raw;
+}
+
+
+function toVersion2(raw: Record<string, unknown>): void
+{
+    if (typeof raw.settings === "object" && raw.settings !== null)
     {
         // versin 2 added the wall type : a setting the file lacks takes its default
         raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
     }
-    if (version < 2 && typeof raw.textures === "object" && raw.textures !== null)
+    if (typeof raw.textures === "object" && raw.textures !== null)
     {
         // version 1 kept a bare file name per decor, version 2 adds the width the photo covers
         const moved: Record<string, unknown> = {};
@@ -66,111 +95,108 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
         }
         raw.textures = moved;
     }
-    if (version < 2 && Array.isArray(raw.items))
+    if (!Array.isArray(raw.items))
     {
-        // version 1 carried an unused clearance on hung carcasses, their y position already says it
-        for (const it of raw.items as { kind?: unknown; seat?: unknown; base?: { type?: unknown; clearance?: unknown } }[])
+        return;
+    }
+    // version 1 carried an unused clearance on hung carcasses, their y position already says it
+    for (const it of raw.items as { kind?: unknown; seat?: unknown; base?: { type?: unknown; clearance?: unknown } }[])
+    {
+        if (it.base?.type === "wall")
         {
-            if (it.base?.type === "wall")
+            delete it.base.clearance;
+        }
+        // version 2 also knows seats, a version 1 carcass never was one
+        if (it.kind === "carcass" && it.seat === undefined)
+        {
+            it.seat = null;
+        }
+        if (it.kind === "carcass" && (it as { slope?: unknown }).slope === undefined)
+        {
+            (it as { slope?: unknown }).slope = null;
+        }
+        if (it.kind === "carcass")
+        {
+            const k = it as { rails?: unknown; lights?: unknown };
+            k.rails = k.rails ?? [];
+            k.lights = k.lights ?? [];
+            givePerDivider((it as { root?: unknown }).root, "finishes");
+            for (const l of ((it as { linings?: { colour?: unknown }[] }).linings ?? []))
             {
-                delete it.base.clearance;
-            }
-            // version 2 also knows seats, a version 1 carcass never was one
-            if (it.kind === "carcass" && it.seat === undefined)
-            {
-                it.seat = null;
-            }
-            if (it.kind === "carcass" && (it as { slope?: unknown }).slope === undefined)
-            {
-                (it as { slope?: unknown }).slope = null;
-            }
-            if (it.kind === "carcass")
-            {
-                const k = it as { rails?: unknown; lights?: unknown };
-                k.rails = k.rails ?? [];
-                k.lights = k.lights ?? [];
-                givePerDivider((it as { root?: unknown }).root, "finishes");
-                for (const l of ((it as { linings?: { colour?: unknown }[] }).linings ?? []))
-                {
-                    l.colour = l.colour ?? null;
-                } 
+                l.colour = l.colour ?? null;
             }
         }
     }
-    // versions 3 and 4 grew on the same day and a file saved in between lacks part of it : one step
-    // filling only the missing defaults serves both
-    if (version < 4 && typeof raw.settings === "object" && raw.settings !== null)
+}
+
+
+// versions 3 and 4 grew on the same day and a file saved in between lacks part of it : one step
+// filling only the missing defaults serves both
+function toVersion4(raw: Record<string, unknown>): void
+{
+    if (typeof raw.settings !== "object" || raw.settings === null)
     {
-        // round spots came next to the LED profile, every older light was a profile
-        raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
-        // it also knows the side walls and the room, every older item stood against the back wall
-        raw.room = raw.room ?? { ...DEFAULT_ROOM };
-        for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; lights?: unknown;
-            wall?: unknown; ceilingFiller?: unknown; purpose?: unknown; corners?: unknown }[])
+        return;
+    }
+    // round spots came next to the LED profile, every older light was a profile
+    raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
+    // it also knows the side walls and the room, every older item stood against the back wall
+    raw.room = raw.room ?? { ...DEFAULT_ROOM };
+    for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; lights?: unknown;
+        wall?: unknown; ceilingFiller?: unknown; purpose?: unknown; corners?: unknown }[])
+    {
+        it.wall = it.wall ?? "back";
+        if (it.kind === "carcass")
         {
-            it.wall = it.wall ?? "back";
-            if (it.kind === "carcass")
+            it.ceilingFiller = it.ceilingFiller ?? false;
+            const k = it as { shoeRacks?: unknown };
+            k.shoeRacks = k.shoeRacks ?? [];
+            for (const r of (Array.isArray((it as { rails?: unknown }).rails)
+                ? (it as { rails: { kind?: unknown }[] }).rails : []))
             {
-                it.ceilingFiller = it.ceilingFiller ?? false;
-                const k = it as { shoeRacks?: unknown };
-                k.shoeRacks = k.shoeRacks ?? [];
-                for (const r of (Array.isArray((it as { rails?: unknown }).rails)
-                    ? (it as { rails: { kind?: unknown }[] }).rails : []))
-                {
-                    r.kind = r.kind ?? "fixed";
-                }
-            }
-            if (it.kind === "wallShelf")
-            {
-                it.purpose = it.purpose ?? "shelf";
-                it.corners = it.corners ?? { left: 0, right: 0 };
-            }
-            for (const l of (it.kind === "carcass" && Array.isArray(it.lights) ? it.lights : []) as
-                { kind?: unknown; spots?: unknown }[])
-            {
-                l.kind = l.kind ?? "strip";
-                l.spots = l.spots ?? 0;
+                r.kind = r.kind ?? "fixed";
             }
         }
-    }
-    if (version < 5 && Array.isArray(raw.items))
-    {
-        // shelves took the thickness of the sides until version 5, and no cell was drilled for later shelves
-        for (const it of raw.items as { kind?: unknown; shelfThickness?: unknown; root?: unknown;
-            modularCells?: unknown }[])
+        if (it.kind === "wallShelf")
         {
-            if (it.kind === "carcass")
-            {
-                it.shelfThickness = it.shelfThickness ?? null;
-                it.modularCells = it.modularCells ?? [];
-                givePerDivider(it.root, "thicknesses");
-            }
+            it.purpose = it.purpose ?? "shelf";
+            it.corners = it.corners ?? { left: 0, right: 0 };
+        }
+        for (const l of (it.kind === "carcass" && Array.isArray(it.lights) ? it.lights : []) as
+            { kind?: unknown; spots?: unknown }[])
+        {
+            l.kind = l.kind ?? "strip";
+            l.spots = l.spots ?? 0;
         }
     }
-    if (version < 6 && Array.isArray(raw.items))
+}
+
+
+// shelves took the thickness of the sides until version 5, and no cell was drilled for later shelves
+function toVersion5(raw: Record<string, unknown>): void
+{
+    for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; shelfThickness?: unknown;
+        root?: unknown; modularCells?: unknown }[])
     {
-        // socket and cable holes came with version 6
-        for (const it of raw.items as { kind?: unknown; outlets?: unknown }[])
+        if (it.kind === "carcass")
         {
-            if (it.kind === "carcass")
-            {
-                it.outlets = it.outlets ?? [];
-            }
+            it.shelfThickness = it.shelfThickness ?? null;
+            it.modularCells = it.modularCells ?? [];
+            givePerDivider(it.root, "thicknesses");
         }
     }
-    if (version < 7 && Array.isArray(raw.items)) 
+}
+
+
+function emptyListOnCarcasses(raw: Record<string, unknown>, key: "outlets" | "prints"): void
+{
+    for (const it of (Array.isArray(raw.items) ? raw.items : []) as ({ kind?: unknown } & Record<string, unknown>)[])
     {
-        // pictures printed on the back of a cell acme with version 7
-        for (const it of raw.items as { kind?: unknown; prints?: unknown }[])
+        if (it.kind === "carcass")
         {
-            if (it.kind === "carcass") 
-            {
-                it.prints = it.prints ?? [];  
-            } 
+            it[key] = it[key] ?? [];
         }
     }
-    raw.schema = SCHEMA_VERSION;
-    return raw;
 }
 
 

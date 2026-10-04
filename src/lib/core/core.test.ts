@@ -13,10 +13,11 @@ import { hardwareKey } from "./costing";
 import { hingeCount, minGap } from "./doors";
 import { chooseRunner, chooseTipOnSet } from "./drawers";
 import { shelfDeflection } from "./mechanics";
-import { newPart } from "./parts";
+import { newPart } from "./part_base";
 import { nest, type NestResult, type Placement } from "./nesting";
 import { encodeWinAnsi } from "./drawing/pdf";
 import { endReach } from "./extent";
+import { tvWall } from "./templates";
 import type { CutRow } from "./bom";
 import type { Carcass, End, Front, Project } from "./model";
 import { DEFAULT_SETTINGS, SCHEMA_VERSION } from "./model";
@@ -196,6 +197,39 @@ describe("Blum and Hettich rules", () =>
         expect(chooseRunner(492, 80)).toBeNull();
         expect(chooseTipOnSet(480, 12)).toBe("T60L7340");
         expect(chooseTipOnSet(270, 15)).toBe("T60L7140");
+    });
+
+
+    it("says which runner series lacks depth, and when the load is past every MOVENTO", () =>
+    {
+        // the TV base gives 392 mm : too shallow for the shortest 766H (NL 450), the 40 kg series fits
+        const errorsWith = (runner: "760H" | "766H" | undefined, loadKg: number): string =>
+        {
+            const p = tvWall();
+            for (const it of p.items)
+            {
+                for (const f of it.kind === "carcass" ? it.fronts : [])
+                {
+                    if (f.spec.type === "drawers")
+                    {
+                        f.spec.runner = runner;
+                        f.spec.loadKg = loadKg;
+                    }
+                }
+            }
+            return analyse(p).checks.filter((k) =>
+            {
+                return k.level === "error";
+            }).map((k) =>
+            {
+                return k.message;
+            }).join("\n");
+        };
+        const shallow = errorsWith("766H", 15);
+        expect(shallow).toContain("aucune coulisse MOVENTO 766H pour 392 mm de profondeur utile, la plus courte (NL 450) "
+            + "en demande 453");
+        expect(shallow).toContain("ou choisir les coulisses 40 kg (NL 250 mini)");
+        expect(errorsWith(undefined, 90)).toContain("90 kg par tiroir, 70 kg maxi pour les coulisses MOVENTO");
     });
 
     it("spreads connectors at the inset and never further apart than asked", () => 

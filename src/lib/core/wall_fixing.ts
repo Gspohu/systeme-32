@@ -1,7 +1,7 @@
 // Anti-tip brackets of a standing carcass : where they go, which ones something standing on the top leaves out
 
 import type { Carcass, Item, Settings } from "./model";
-import type { Build } from "./parts";
+import type { Build, Purpose } from "./part_types";
 import { byId } from "./edit";
 import { topAngle, topAt } from "./slope";
 import { box } from "./fitted";
@@ -92,7 +92,8 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
         // measured along a sloped top
         const u = (x - c.thickness) / Math.cos(topAngle(c));
         top.holes.push({ u, v: top.width - ANTI_TIP_FROM_BACK, diameter: 0, depth: 0, face: "B",
-                         label: `Équerre anti-basculement : vis 4 x 16, à ${ANTI_TIP_FROM_BACK} mm du chant arrière (convention)` });
+                         label: `Équerre anti-basculement : vis 4 x 16, à ${ANTI_TIP_FROM_BACK} mm du chant arrière (convention)`,
+                         purpose: "anti-tip-screw" });
         // one leg lying on the top from the wall, the other standing against the wall on it
         const y = bracketBox(c, x).min[1];
         const key = `${c.id}/equerre-${Math.round(x)}`;
@@ -100,8 +101,8 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
         const x0 = c.x + x - S / 2;
         const x1 = c.x + x + S / 2;
         b.fitted.push(
-            box(`${key}/a`, c.id, "ANTI_TIP_BRACKET", label, [x0, y, c.z], [x1, y + t, c.z + S], true),
-            box(`${key}/b`, c.id, "ANTI_TIP_BRACKET", label, [x0, y + t, c.z], [x1, y + S, c.z + t], true),
+            box(`${key}/a`, c.id, "ANTI_TIP_BRACKET", label, "anti-tip", [x0, y, c.z], [x1, y + t, c.z + S], true),
+            box(`${key}/b`, c.id, "ANTI_TIP_BRACKET", label, "anti-tip", [x0, y + t, c.z], [x1, y + S, c.z + t], true),
         );
     }
     const n = at.length;
@@ -109,17 +110,17 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
     {
         return;
     }
-    const line = (ref: string, note: string | null): void =>
+    const line = (ref: string, note: string | null, purpose: Purpose): void =>
     {
-        b.hardware.push({ ref, qty: n, item: c.id, itemName: c.name, target: top.id, note });
+        b.hardware.push({ ref, qty: n, item: c.id, itemName: c.name, target: top.id, note, purpose });
     };
-    line("ANTI_TIP_BRACKET", "sur le dessus, jamais dans le fond");
-    line("SCREW_4x16", null);
+    line("ANTI_TIP_BRACKET", "sur le dessus, jamais dans le fond", "anti-tip");
+    line("SCREW_4x16", null, "anti-tip-screw");
     if (s.wallType === "plasterboard")
     {
-        line("PLUG_HOLLOW_METAL", null);
+        line("PLUG_HOLLOW_METAL", null, "wall-fixing");
         return;
     }
-    line("WALL_SCREW_5x50", null);
-    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", null);
+    line("WALL_SCREW_5x50", null, "wall-fixing");
+    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", null, "wall-fixing");
 }

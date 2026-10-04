@@ -6,7 +6,7 @@ import { DIAM } from "./text";
 import type { NodeBox, ResolvedLayout } from "./layout";
 import type { Build, Part } from "./parts";
 import { panelStartX } from "./dividers";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import { panelAbove } from "./locate";
 import { FIT_PLAY } from "./wardrobe";
 import { WIFI_LED_CONTROLLER } from "../data/hardware";
@@ -97,10 +97,10 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
         p.grooves.push({ face: above.face, along: "u", at, from, to: from + plan.profile, width: LED_GROOVE_W,
                          depth: LED_GROOVE_D, label: "Rainure du profilé LED", weakens: true });
         p.holes.push({ u: from + 10, v: at, diameter: 0, depth: 0, face: above.face,
-                       label: "Sortie du câble du ruban : percer au diamètre du connecteur choisi" });
+                       label: "Sortie du câble du ruban : percer au diamètre du connecteur choisi", purpose: "light-lead" });
         const line = (ref: string, note: string | null): void =>
         {
-            b.hardware.push({ ref, qty: 1, item: c.id, itemName: c.name, target: p.id, note });
+            b.hardware.push({ ref, qty: 1, item: c.id, itemName: c.name, target: p.id, note, purpose: "light" });
         };
         // the profile runs from side to side of the cell, its ends hidden against them : no end cap
         line("LED_PROFILE_RECESS", `coupé à ${Math.round(plan.profile)} mm`);
@@ -114,14 +114,15 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
     {
         b.hardware.push({ ref: "LED_DRIVER_24V", qty: 1, item: c.id, itemName: c.name, target: null,
                           note: `${Math.ceil(watts / LED_DRIVER_LOAD)} W mini pour ${watts.toFixed(1)} W de LED `
-                              + `(${strips} éclairage(s), charge à 80 %)` });
+                              + `(${strips} éclairage(s), charge à 80 %)`, purpose: "light" });
     }
     if (wifi)
     {
         const W = WIFI_LED_CONTROLLER;
         const amps = watts / W.volts;
         b.hardware.push({ ref: W.ref, qty: 1, item: c.id, itemName: c.name, target: null,
-                          note: `entre l'alimentation et les rubans, ${amps.toFixed(2)} A sur une voie, pilotage local` });
+                          note: `entre l'alimentation et les rubans, ${amps.toFixed(2)} A sur une voie, pilotage local`,
+                          purpose: "light" });
         if (amps > W.ampsPerChannel)
         {
             b.errors.push(`${c.name}, éclairage : ${amps.toFixed(1)} A pour ${W.ampsPerChannel} A par voie du contrôleur `
@@ -178,12 +179,12 @@ function fitSpots(c: Carcass, nb: NodeBox, l: CellLight, above: { part: Part; fa
     {
         const u = x - panelStartX(p, c);
         p.holes.push({ u, v, diameter: SPOT_HOLE, depth: SPOT_DEPTH, face: above.face,
-                       label: `Logement de spot ${DIAM}${SPOT_HOLE} x ${SPOT_DEPTH}` });
+                       label: `Logement de spot ${DIAM}${SPOT_HOLE} x ${SPOT_DEPTH}`, purpose: "spot" });
         p.holes.push({ u, v, diameter: SPOT_LEAD_HOLE, depth: p.thickness, face: above.face,
-                       label: `Passage du câble ${DIAM}${SPOT_LEAD_HOLE}, débouchant` });
+                       label: `Passage du câble ${DIAM}${SPOT_LEAD_HOLE}, débouchant`, purpose: "light-lead" });
     }
     b.hardware.push({ ref: "LED_SPOT_ROUND", qty: n, item: c.id, itemName: c.name, target: p.id,
-                      note: `${l.kelvin} K, ${s.spotWatt} W chacun` });
+                      note: `${l.kelvin} K, ${s.spotWatt} W chacun`, purpose: "light" });
     return n * s.spotWatt;
 }
 

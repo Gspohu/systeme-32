@@ -3,7 +3,7 @@
 
 import type { LadderRail, Project } from "./model";
 import type { Build } from "./parts";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 
 
 export function buildLadder(l: LadderRail, b: Build): void
@@ -14,9 +14,9 @@ export function buildLadder(l: LadderRail, b: Build): void
             + `${Math.max(0, l.width - l.ladderWidth)} mm.`);
     }
     b.hardware.push({ ref: "LADDER_RAIL", qty: 1, item: l.id, itemName: l.name, target: null,
-                      note: `coupé à ${Math.round(l.width)} mm, axe à ${Math.round(l.y)} mm du sol` });
+                      note: `coupé à ${Math.round(l.width)} mm, axe à ${Math.round(l.y)} mm du sol`, purpose: "ladder" });
     b.hardware.push({ ref: "LADDER_SET", qty: 1, item: l.id, itemName: l.name, target: null,
-                      note: `largeur ${Math.round(l.ladderWidth)} mm, supports du rail selon le fabricant` });
+                      note: `largeur ${Math.round(l.ladderWidth)} mm, supports du rail selon le fabricant`, purpose: "ladder" });
 }
 
 

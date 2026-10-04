@@ -1,9 +1,9 @@
 // Seats : a carcass top someone sits on, checked for the seat static load of a seating test
 
-import type { Carcass, Project } from "./model";
+import type { Carcass, Item, Project } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { Build, Part } from "./parts";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import { byId } from "./edit";
 import { itemExtent } from "./extent";
 import { boxToRoom, roomBox } from "./room";
@@ -144,6 +144,19 @@ function endSeatChecks(c: Carcass, b: Build): Check[]
 }
 
 
+// `o` stands on the top of the seat `it` or is sunk in its cushion, read by the checks and by a drop
+export function restsOnSeat(p: Project, it: Carcass, o: Item): boolean
+{
+    const seatTop = itemExtent(it).y1;
+    const plate = boxToRoom(it.wall, p.room, { min: [it.x, it.y, it.z], max: [it.x + it.width, seatTop,
+        it.z + it.depth] });
+    const e = roomBox(o, p.room);
+    const acrossX = o.id !== it.id && e.min[0] < plate.max[0] && e.max[0] > plate.min[0];
+    const acrossZ = e.min[2] < plate.max[2] && e.max[2] > plate.min[2];
+    return acrossX && acrossZ && e.min[1] >= it.y + it.height - 0.5 && e.min[1] <= seatTop + 0.5;
+}
+
+
 // A seat holds a person, and nothing may stand on it
 export function seatChecks(p: Project, b: Build): Check[]
 {
@@ -196,17 +209,9 @@ export function seatChecks(p: Project, b: Build): Check[]
                           message: `${it.name} : coussin ${it.width} x ${it.depth} x ${it.seat.cushion} mm à faire `
                               + "réaliser par un tapissier." });
         }
-        const seatTop = itemExtent(it).y1;
-        const plate = boxToRoom(it.wall, p.room, { min: [it.x, it.y, it.z], max: [it.x +
-            it.width, seatTop, it.z + it.depth] });
         for (const o of p.items)
         {
-            const e = roomBox(o, p.room);
-            const acrossX = o.id !== it.id && e.min[0] < plate.max[0] && e.max[0] > plate.min[0];
-            const acrossZ = e.min[2] < plate.max[2] && e.max[2] > plate.min[2];
-            // standing on the top or sunk in the cushion
-            const resting = e.min[1] >= it.y + it.height - 0.5 && e.min[1] <= seatTop + 0.5;
-            if (acrossX && acrossZ && resting)
+            if (restsOnSeat(p, it, o))
             {
                 checks.push({ level: "error", item: o.id, target: null,
                               message: `${o.name} est posé sur l'assise de ${it.name}. Rien ne se pose sur une assise : `

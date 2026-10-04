@@ -4,32 +4,12 @@ import type { Settings } from "./model";
 import type { Build, Joint, Part } from "./parts";
 import { byId } from "./edit";
 import { spread } from "./fittings";
+import { meets } from "./drilling";
 import { MINIFIX, LAMELLO_P14 } from "../data/rules";
 import { DIAM } from "./text";
 
 // Nearest a connector comes to either end of its joint once moved off a clash
 const JOINT_END_CLEAR = 10;
-
-
-// A face drilling at (u, v) meets a hole already there : on the same face when the circles come within 2 mm, from
-// the other face when both run into each other. A screw point counts as Ø4 x 15
-export function meets(p: Part, face: "A" | "B", u: number, v: number, diameter: number, depth: number): boolean
-{
-    for (const h of p.holes)
-    {
-        if (h.face !== "A" && h.face !== "B")
-        {
-            continue;
-        }
-        const d = h.diameter === 0 ? 4 : h.diameter;
-        const deep = h.depth === 0 ? 15 : h.depth;
-        if (Math.hypot(h.u - u, h.v - v) < (d + diameter) / 2 + 2 && (h.face === face || deep + depth >= p.thickness))
-        {
-            return true;
-        }
-    }
-    return false;
-}
 
 
 export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string, itemName: string,
@@ -69,7 +49,8 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                                   depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 dans le chant" });
                 ep.holes.push({ u: edgeU + inward * 13.5, v: joint.edgeFrom + pos,
                                 diameter: LAMELLO_P14.accessDiameter, depth: 0, face: "A",
-                                label: `Accès levier Clamex ${DIAM}6, position selon notice Lamello` });
+                                label: `Accès levier Clamex ${DIAM}6, position selon notice Lamello`,
+                                purpose: "clamex-access" });
                 clamex++;
             }
             continue;
@@ -122,20 +103,21 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
             if (endConnector)
             {
                 fpart.holes.push({ ...f, diameter: MINIFIX.boltPilot, depth: MINIFIX.boltDepth, face: joint.face,
-                                   label: `Goujon Minifix 262.28.020, avant-trou ${DIAM}5` });
+                                   label: `Goujon Minifix 262.28.020, avant-trou ${DIAM}5`, purpose: "minifix-bolt" });
                 ep.holes.push({ u: edgeU + inward * MINIFIX.distanceB, v: joint.edgeFrom + pos,
                                 diameter: MINIFIX.housingDiameter, depth: MINIFIX.housingDepth, face: "A",
-                                label: `Boîtier Minifix 262.25.035 ${DIAM}15` });
+                                label: `Boîtier Minifix 262.25.035 ${DIAM}15`, purpose: "minifix-housing" });
                 ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: MINIFIX.distanceB,
-                                face: joint.edge, w: edgeThickness / 2, label: `Passage du goujon ${DIAM}8` });
+                                face: joint.edge, w: edgeThickness / 2, label: `Passage du goujon ${DIAM}8`,
+                                purpose: "minifix-passage" });
                 minifix++;
             }
             else
             {
                 fpart.holes.push({ ...f, diameter: 8, depth: s.dowelFaceDepth, face: joint.face,
-                                   label: `Tourillon ${DIAM}8 x 35` });
+                                   label: `Tourillon ${DIAM}8 x 35`, purpose: "dowel" });
                 ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: s.dowelEdgeDepth,
-                                face: joint.edge, w: edgeThickness / 2, label: `Tourillon ${DIAM}8 x 35` });
+                                face: joint.edge, w: edgeThickness / 2, label: `Tourillon ${DIAM}8 x 35`, purpose: "dowel" });
                 dowels++;
             }
             k++;
@@ -143,16 +125,19 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
     }
     if (minifix > 0)
     {
-        b.hardware.push({ ref: "262.25.035", qty: minifix, item: itemId, itemName, target: null, note: null });
-        b.hardware.push({ ref: "262.28.020", qty: minifix, item: itemId, itemName, target: null, note: null });
+        b.hardware.push({ ref: "262.25.035", qty: minifix, item: itemId, itemName, target: null, note: null,
+                          purpose: "minifix-housing" });
+        b.hardware.push({ ref: "262.28.020", qty: minifix, item: itemId, itemName, target: null, note: null,
+                          purpose: "minifix-bolt" });
     }
     if (dowels > 0)
     {
-        b.hardware.push({ ref: "DOWEL_8x35", qty: dowels, item: itemId, itemName, target: null, note: "collés" });
+        b.hardware.push({ ref: "DOWEL_8x35", qty: dowels, item: itemId, itemName, target: null, note: "collés",
+                          purpose: "dowel" });
     }
     if (clamex > 0)
     {
         b.hardware.push({ ref: "145334", qty: Math.ceil(clamex / 80), item: itemId, itemName, target: null,
-                         note: `${clamex} paires utilisées` });
+                         note: `${clamex} paires utilisées`, purpose: "clamex" });
     }
 }

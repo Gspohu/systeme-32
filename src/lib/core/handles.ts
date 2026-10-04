@@ -80,7 +80,8 @@ export function fitHandles(c: Carcass, b: Build): void
             const [hx, hy] = vertical ? [cx, cy + d] : [cx + d, cy];
             part.holes.push({ u: vertical ? hy - r.y : hx - r.x, v: vertical ? hx - r.x : hy - r.y,
                               diameter: BAR_HANDLE.screwHole, depth: fp.thickness, face: "B",
-                              label: `Poignée ${h.ref} : ${DIAM}${BAR_HANDLE.screwHole} traversant, vis M4 x 25` });
+                              label: `Poignée ${h.ref} : ${DIAM}${BAR_HANDLE.screwHole} traversant, vis M4 x 25`,
+                              purpose: "handle-screw", fixes: h.ref });
             // behind a drawer front the box end takes the screw head : a clear hole lets it bear on the front
             const end = fp.role === "drawer" ? byId(b.parts, `${c.id}/drawer/${fp.id}/endF`) : undefined;
             if (end !== undefined && end.frame !== null)
@@ -91,7 +92,8 @@ export function fitHandles(c: Carcass, b: Build): void
                     && v < end.width - SCREW_HEAD_PASSAGE / 2)
                 {
                     end.holes.push({ u, v, diameter: SCREW_HEAD_PASSAGE, depth: end.thickness, face: "A",
-                                     label: `Passage de la vis M4 de poignée, ${DIAM}${SCREW_HEAD_PASSAGE} traversant` });
+                                     label: `Passage de la vis M4 de poignée, ${DIAM}${SCREW_HEAD_PASSAGE} traversant`,
+                                     purpose: "screw-passage" });
                 }
             }
         }
@@ -101,7 +103,7 @@ export function fitHandles(c: Carcass, b: Build): void
         // the feet are drawn at the bar diameter, the maker gives no other figure for them
         const leg = BAR_HANDLE.projection - BAR_HANDLE.diameter;
         b.fitted.push({
-            key: `${key}/barre`, item: c.id, ref: h.ref, label: `${c.name}, poignée`, shape: "cylinder",
+            key: `${key}/barre`, item: c.id, ref: h.ref, label: `${c.name}, poignée`, purpose: "handle", shape: "cylinder",
             centre: [c.x + cx, c.y + cy, z + BAR_HANDLE.projection - radius],
             axes: [across, Z, along], half: [radius, radius, h.length / 2], host: part.id, hidden: false,
         });
@@ -109,12 +111,13 @@ export function fitHandles(c: Carcass, b: Build): void
         {
             const at: Vec3 = vertical ? [c.x + cx, c.y + cy + d, z + leg / 2] : [c.x + cx + d, c.y + cy, z + leg / 2];
             b.fitted.push({
-                key: `${key}/pied${k}`, item: c.id, ref: h.ref, label: `${c.name}, pied de poignée`, shape: "cylinder",
+                key: `${key}/pied${k}`, item: c.id, ref: h.ref, label: `${c.name}, pied de poignée`, purpose: "handle",
+                shape: "cylinder",
                 centre: at, axes: [X, Y, Z], half: [radius, radius, leg / 2], host: part.id, hidden: false,
             });
         });
         b.hardware.push({ ref: h.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
-                          note: vertical ? `axe à ${HANDLE_EDGE} mm du chant` : null });
+                          note: vertical ? `axe à ${HANDLE_EDGE} mm du chant` : null, purpose: "handle" });
         const half = h.length / 2;
         b.handles.push({ item: c.id, front: fp.id, ref: h.ref,
                          x0: vertical ? cx : cx - half, y0: vertical ? cy - half : cy,

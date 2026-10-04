@@ -1,7 +1,8 @@
 // Slat walls : vertical slats on cleats against a wall, or a room divider between a floor and a ceiling rail
 
 import type { Settings, SlatWall } from "./model";
-import { type Build, type Hole, newPart } from "./parts";
+import type { Build, Hole, Purpose } from "./part_types";
+import { CLEAT_THICKNESS, newPart } from "./part_base";
 import { X, Y, Z, neg } from "./geometry";
 import { spread } from "./fittings";
 import { decorById, materialOfDecor } from "../data/materials";
@@ -9,7 +10,6 @@ import { DIAM } from "./text";
 
 // Workshop conventions, stated in the drawings as such : cleats 20 x 40 no more than 600 apart and 100 from
 // the ends, a wall screw at least every 400, rails 30 thick, room for a screw head between two slats
-export const CLEAT_THICKNESS = 20;
 const CLEAT_HEIGHT = 40;
 const CLEAT_INSET = 100;
 const CLEAT_MAX_SPACING = 600;
@@ -32,13 +32,6 @@ export function slatLayout(it: SlatWall): { xs: number[]; gap: number }
         k++;
     }
     return { xs, gap };
-}
-
-
-// How far the item stands out from the wall, or how thick the divider is
-export function slatsDepth(it: SlatWall): number
-{
-    return it.mode === "wall" ? CLEAT_THICKNESS + it.slatDepth : it.slatDepth;
 }
 
 
@@ -86,13 +79,13 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
     const edges: ("v0" | "v1")[] = banded ? ["v0", "v1"] : [];
     const gapNote = `${slatCount} lattes, jour réel ${gap.toFixed(1).replace(".", ",")} mm (demandé ${it.gap})`;
     const plug = wallPlug(s);
-    // the metal plug of a plasterboard wall comes with its own screw
+    // the metal plug of a plasterboard wall carry its own screw
     const plasterboard = plug === "PLUG_HOLLOW_METAL"; 
-    const line = (ref: string, qty: number, note: string | null): void =>
+    const line = (ref: string, qty: number, note: string | null, purpose: Purpose): void =>
     {
         if (qty > 0)
         {
-            b.hardware.push({ ref, qty, item: it.id, itemName: it.name, target: null, note });
+            b.hardware.push({ ref, qty, item: it.id, itemName: it.name, target: null, note, purpose });
         }
     };
     if (it.slatWidth > it.width)
@@ -118,7 +111,8 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
             for (const u of screws)
             {
                 cleat.holes.push({ u, v: CLEAT_HEIGHT / 2, diameter: 5, depth: CLEAT_THICKNESS, face: "B",
-                                   label: `Vis murale 5 x 70 et cheville, ${DIAM}5 traversant (convention)` });
+                                   label: `Vis murale 5 x 70 et cheville, ${DIAM}5 traversant (convention)`,
+                                   purpose: "wall-screw" });
             }
             cleat.notes.push("Vissé au mur avant la pose des lattes, de niveau");
             b.parts.push(cleat);
@@ -136,9 +130,10 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
             b.parts.push(slat);
         }
         const fixings = levels.length * screws.length;
-        line("WALL_SCREW_5x70", plasterboard ? 0 : fixings, "liteaux dans le mur");
-        line(plug, fixings, "liteaux dans le mur");
-        line("BRAD_1_6x40", 2 * slatCount * levels.length, "2 pointes par croisement latte et liteau, avec colle");
+        line("WALL_SCREW_5x70", plasterboard ? 0 : fixings, "liteaux dans le mur", "wall-fixing");
+        line(plug, fixings, "liteaux dans le mur", "wall-fixing");
+        line("BRAD_1_6x40", 2 * slatCount * levels.length, "2 pointes par croisement latte et liteau, avec colle",
+             "slat-nail");
         return;
     }
 
@@ -160,12 +155,13 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         for (const x of xs)
         {
             rail.holes.push({ u: x + it.slatWidth / 2, v: it.slatDepth / 2, diameter: 8, depth: s.dowelFaceDepth,
-                              face: r.face, label: `Tourillon ${DIAM}8 x 35` });
+                              face: r.face, label: `Tourillon ${DIAM}8 x 35`, purpose: "dowel" });
         }
         for (const u of screws)
         {
             rail.holes.push({ u, v: it.slatDepth / 2, diameter: 5, depth: RAIL_THICKNESS, face: r.face,
-                              label: `Vis 5 x 70 et cheville, entre deux lattes, ${DIAM}5 traversant (convention)` });
+                              label: `Vis 5 x 70 et cheville, entre deux lattes, ${DIAM}5 traversant (convention)`,
+                              purpose: "wall-screw" });
         }
         rail.notes.push(r.key === "top" ? "Vissée au plafond : hauteur sol à plafond relevée sur place"
                                         : "Vissée au sol");
@@ -183,7 +179,7 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         const end = (face: "u0" | "u1"): Hole =>
         {
             return { u: face === "u0" ? 0 : inner, v: it.slatDepth / 2, diameter: 8, depth: s.dowelEdgeDepth, face,
-                     w: it.slatWidth / 2, label: `Tourillon ${DIAM}8 x 35` };
+                     w: it.slatWidth / 2, label: `Tourillon ${DIAM}8 x 35`, purpose: "dowel" };
         };
         slat.holes.push(end("u0"), end("u1"));
         if (k === 1)
@@ -192,9 +188,9 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         }
         b.parts.push(slat);
     }
-    line("DOWEL_8x35", 2 * slatCount, "collés, une latte par paire");
-    line("WALL_SCREW_5x70", plasterboard ? 0 : 2 * screws.length, "lisses au sol et au plafond");
-    line(plug, 2 * screws.length, "lisses au sol et au plafond");
+    line("DOWEL_8x35", 2 * slatCount, "collés, une latte par paire", "dowel");
+    line("WALL_SCREW_5x70", plasterboard ? 0 : 2 * screws.length, "lisses au sol et au plafond", "wall-fixing");
+    line(plug, 2 * screws.length, "lisses au sol et au plafond", "wall-fixing");
     if (gap < SCREW_GAP_MIN)
     {
         b.errors.push(`${it.name} : jour de ${gap.toFixed(1)} mm entre lattes, ${SCREW_GAP_MIN} mm mini pour visser `

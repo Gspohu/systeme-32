@@ -202,7 +202,7 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
             }
             const cx = (s.min[0] + s.max[0]) / 2;
             const cz = (s.min[2] + s.max[2]) / 2;
-            if (s.label.endsWith("patin"))
+            if (s.purpose === "foot-pad")
             {
                 let k = 0;
                 while (k < 16)

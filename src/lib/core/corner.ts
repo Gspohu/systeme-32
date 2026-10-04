@@ -2,7 +2,7 @@
 
 import type { Carcass, Project, Wall } from "./model";
 import type { FrontPanel } from "./fronts";
-import type { Check } from "./analysis";
+import type { Check } from "./check";
 import type { Build } from "./parts";
 import { boxesMeet, boxToRoom, boxToWall, roomBox, sideWallDepth, WALL_LABELS, type Box3 } from "./room";
 

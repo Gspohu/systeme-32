@@ -6,7 +6,7 @@ import type { Build, Part, PartRole } from "./parts";
 import { at, type Vec3 } from "./geometry";
 import { fittedExtent } from "./fitted";
 import { spread } from "./fittings";
-import { meets } from "./joints";
+import { meets } from "./drilling";
 import { CONNECTING_SCREW_HEAD, CONNECTING_SCREW_HOLE, CONNECTING_SCREWS } from "../data/rules";
 import { DIAM } from "./text";
 
@@ -191,15 +191,18 @@ function link(a: Part, c: Part, b: Build, out: { item: string; message: string }
             const [u, v] = alongU ? [at0, w] : [w, at0];
             const [uc, vc] = local(c, at(fa, u, v, 0));
             const label = `Vis de liaison ${screw.ref} vers ${c.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant`;
-            a.holes.push({ u, v, diameter: CONNECTING_SCREW_HOLE, depth: a.thickness, face: aInner, label });
+            a.holes.push({ u, v, diameter: CONNECTING_SCREW_HOLE, depth: a.thickness, face: aInner, label,
+                           purpose: "link-screw" });
             c.holes.push({ u: uc, v: vc, diameter: CONNECTING_SCREW_HOLE, depth: c.thickness, face: cInner,
-                           label: `Vis de liaison ${screw.ref} vers ${a.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant` });
+                           label: `Vis de liaison ${screw.ref} vers ${a.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant`,
+                           purpose: "link-screw" });
             placed++;
         }
     }
     if (placed > 0)
     {
         b.hardware.push({ ref: screw.ref, qty: placed, item: a.item, itemName: a.itemName, target: null,
-                         note: `${a.itemName} et ${c.itemName}, ${a.thickness + c.thickness} mm serrés`, partner: c.item });
+                         note: `${a.itemName} et ${c.itemName}, ${a.thickness + c.thickness} mm serrés`, partner: c.item,
+                         purpose: "link-screw" });
     }
 }

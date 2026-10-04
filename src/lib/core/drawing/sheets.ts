@@ -57,7 +57,7 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
         frameAndTitle(draft.canvas, { project: p.name, title: draft.title, date, scale: draft.scale, index: i + 1,
                                      count: drafts.length, revision,
                                      identification: `S32-${p.id.replace(/^p-/, "").toUpperCase()}`.slice(0, 16) });
-        pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims });
+        pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind });
     });
     return pages;
 }

@@ -76,11 +76,11 @@ export function feetFitted(c: Carcass, ref: string): Fitted[]
     {
         const top = f.floor + f.height;
         const name = `pied ${n + 1}`;
-        out.push(post(`${c.id}/pied${n}/patin`, c.id, ref, `${name}, patin`, f.x, f.z, f.floor, AXILO_PLATE_H,
-                      AXILO_PLATE_D, false));
-        out.push(post(`${c.id}/pied${n}/fut`, c.id, ref, `${name}, fût`, f.x, f.z, f.floor + AXILO_PLATE_H,
+        out.push(post(`${c.id}/pied${n}/patin`, c.id, ref, `${name}, patin`, "foot-pad", f.x, f.z, f.floor,
+                      AXILO_PLATE_H, AXILO_PLATE_D, false));
+        out.push(post(`${c.id}/pied${n}/fut`, c.id, ref, `${name}, fût`, "foot", f.x, f.z, f.floor + AXILO_PLATE_H,
                       f.height - AXILO_PLATE_H - AXILO_TOP.h, AXILO_SHAFT_D, false));
-        out.push(box(`${c.id}/pied${n}/embase`, c.id, "637.76.333", `${name}, embase`,
+        out.push(box(`${c.id}/pied${n}/embase`, c.id, "637.76.333", `${name}, embase`, "foot-mount",
                      [f.x - AXILO_TOP.w / 2, top - AXILO_TOP.h, f.z - AXILO_TOP.d / 2],
                      [f.x + AXILO_TOP.w / 2, top, f.z + AXILO_TOP.d / 2], false));
         n++;

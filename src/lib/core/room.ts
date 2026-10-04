@@ -129,6 +129,13 @@ export function boxesMeet(a: Box3, b: Box3): boolean
 }
 
 
+// Two items take the same room space, a round corner excepted : it is meant for the notch between the boxes it joins
+export function itemsMeet(a: Item, b: Item, room: Room): boolean
+{
+    return a.kind !== "corner" && b.kind !== "corner" && boxesMeet(roomBox(a, room), roomBox(b, room));
+}
+
+
 // How far a side wall runs from the back wall : its return in an alcove, else the depth of the room
 export function sideWallDepth(room: Room, side: "left" | "right"): number
 {

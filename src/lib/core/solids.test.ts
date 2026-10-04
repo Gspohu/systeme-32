@@ -119,11 +119,12 @@ describe("solids of the 3D view", () =>
             mid.o[1] + mid.u[1] * side.length / 2 + mid.v[1] * side.width / 2,
             mid.o[2] + mid.u[2] * side.length / 2 + mid.v[2] * side.width / 2,
         ];
-        b.fitted.push({ key: "essai/cube", item: side.item, ref: "essai", label: "cube d'essai", shape: "box", centre,
-                        axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], half: [20, 20, 20], host: null, hidden: true });
+        b.fitted.push({ key: "essai/cube", item: side.item, ref: "essai", label: "cube d'essai", purpose: "anti-tip",
+                        shape: "box", centre, axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], half: [20, 20, 20], host: null,
+                        hidden: true });
         const cup = b.fitted.find((f) =>
         {
-            return f.label.endsWith("cuvette de charnière");
+            return f.purpose === "hinge-cup";
         })!;
         expect(clashes(solids(p, b)).map((c) =>
         {

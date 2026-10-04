@@ -6,6 +6,7 @@
 import { at, tessellate, type Vec3 } from "./geometry";
 import { battenAngle, bevelU, unbevelU, type Build, type CurveShape, type Fitted, type Part } from "./parts";
 import type { Item, Project } from "./model";
+import type { Purpose } from "./part_types";
 import { toRoom, toWall } from "./room";
 
 // contact is not a clash : boards but against each other and a Häfele foot plate sits on the floor
@@ -27,6 +28,8 @@ export interface Solid
     host: string | null;
     // the part this volume belongs to, several for battens on an arc, none for hardware
     part: string | null;
+    // what a piece of hardware is there for, null for a board
+    purpose: Purpose | null;
 }
 
 
@@ -336,11 +339,11 @@ function partShapes(p: Part): Shape[]
 
 // a shape built in the frame of its wall, carried into the room
 function placed(it: Item, project: Project, key: string, label: string, s: Shape, host: string | null,
-                part: string | null): Solid
+                part: string | null, purpose: Purpose | null): Solid
 {
     const room = project.room;
     return {
-        key, item: it.id, label, host, part,
+        key, item: it.id, label, host, part, purpose,
         ...boxOf(s.points.map((q) =>
         {
             return toRoom(it.wall, room, q);
@@ -393,7 +396,7 @@ export function solids(project: Project, b: Build): Solid[]
         while (i < shapes.length)
         {
             const key = shapes.length > 1 ? `${p.id}#${i}` : p.id;
-            out.push(placed(it, project, key, `${p.itemName} : ${p.label}`, shapes[i]!, null, p.id));
+            out.push(placed(it, project, key, `${p.itemName} : ${p.label}`, shapes[i]!, null, p.id, null));
             i++;
         }
     }
@@ -402,7 +405,7 @@ export function solids(project: Project, b: Build): Solid[]
         const it = items.get(f.item);
         if (it !== undefined)
         {
-            out.push(placed(it, project, f.key, `${it.name} : ${f.label}`, fittedShape(f), f.host, null));
+            out.push(placed(it, project, f.key, `${it.name} : ${f.label}`, fittedShape(f), f.host, null, f.purpose));
         }
     }
     return out;

@@ -321,7 +321,7 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
     {
         if (f.host !== null || !part.holes.some((h) =>
         {
-            return h.label.includes(f.ref);
+            return h.fixes === f.ref;
         }))
         {
             continue;

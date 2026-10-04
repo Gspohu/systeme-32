@@ -140,7 +140,7 @@ export function nestingSheets(nesting: NestResult): Draft[]
                 y += 4;
             }
         }
-        out.push({ title: "Calepinage", scale: `1:${scale}`, canvas });
+        out.push({ title: "Calepinage", scale: `1:${scale}`, canvas, kind: "nesting" });
         i += k;
     }
     return out;

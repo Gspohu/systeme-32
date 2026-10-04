@@ -6,6 +6,20 @@ import type { Frame, Outline, Vec3 } from "./geometry";
 
 export type Edge = "u0" | "u1" | "v0" | "v1";
 
+// What a hardware line, a hole or a fitted volume is there for, read instead of its reference, label or note
+export const PURPOSES = [
+    "minifix-housing", "minifix-bolt", "minifix-passage", "dowel", "clamex", "clamex-access", "link-screw",
+    "hinge", "hinge-cup", "system-plate", "plate-dowel", "screwed-plate", "plate-screw", "cup-screw",
+    "push-latch", "push-adapter", "adapter-screw", "catch-plate", "flap", "flap-screw", "sliding",
+    "handle", "handle-screw", "screw-passage",
+    "runner", "runner-screw", "runner-hook", "runner-coupling", "front-screw",
+    "foot", "foot-pad", "foot-mount", "foot-mount-screw", "plinth-clip", "vent-grill", "wall-hanger",
+    "anti-tip", "anti-tip-screw", "wall-fixing", "wall-screw", "cleat-screw",
+    "shelf-support", "shelf-pin", "pin-spare", "shelf-bracket", "rail", "rail-screw", "shoe-rack", "light", "light-lead",
+    "spot", "ladder", "slat-nail",
+] as const;
+export type Purpose = (typeof PURPOSES)[number];
+
 
 export interface Hole
 {
@@ -19,6 +33,9 @@ export interface Hole
     // for edge holes, distance of the axis from face A across the thickness
     w?: number;
     label: string;
+    purpose: Purpose;
+    // catalogue reference of the article this hole holds, matched against the fitted volumes it is drawn with
+    fixes?: string;
 }
 
 
@@ -137,6 +154,7 @@ export interface HardwareLine
     // part or front the line belongs to, for the drawings
     target: string | null;
     note: string | null;
+    purpose: Purpose;
     // the other item hardware joining two of them goes into
     partner?: string;
 }
@@ -160,7 +178,6 @@ export interface Build
     railCuts: { item: string; itemName: string; length: number }[];
     // hardware as volumes, for the 3D view, the clash checks and the drawings
     fitted: Fitted[];
-    // how each front opens on the hardware it got
     motions: Motion[];
     // bar handles as the front view draws them : the bar from end to end, in the plane of the façades of its carcass
     handles: { item: string; front: string; ref: string; x0: number; y0: number; x1: number; y1: number }[];
@@ -200,6 +217,7 @@ export interface Fitted
     item: string;
     ref: string;
     label: string;
+    purpose: Purpose;
     shape: "box" | "cylinder";
     centre: Vec3;
     axes: [Vec3, Vec3, Vec3];

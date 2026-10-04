@@ -1,10 +1,10 @@
 // Up to the ceiling : the filler strip over a carcass, and whether a tall carcass can be raised in the room
 
 import type { Carcass, Project, Room } from "./model";
-import type { Check } from "./analysis";
-import { type Build, newPart } from "./parts";
+import type { Check } from "./check";
+import type { Build } from "./part_types";
+import { CLEAT_THICKNESS, newPart } from "./part_base";
 import { X, Y, Z, neg } from "./geometry";
-import { CLEAT_THICKNESS } from "./slats";
 
 // the slat cleats of the same project, 40 x 20
 export const CLEAT_WIDTH = 40;

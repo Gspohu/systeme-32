@@ -1,11 +1,11 @@
 // Side fillers : a strip in the plane of the fronts closing the gap between a carcass and the wall of an alcove
 
 import type { Carcass } from "./model";
-import { type Build, newPart, PLINTH_FOOT_GAP } from "./parts";
+import type { Build } from "./part_types";
+import { CLEAT_THICKNESS, newPart, PLINTH_FOOT_GAP } from "./part_base";
 import { X, Y, Z, neg } from "./geometry";
 import { sideFiller } from "./extent";
 import { spread } from "./fittings";
-import { CLEAT_THICKNESS } from "./slats";
 import { CLEAT_WIDTH } from "./ceiling";
 
 // workshop conventions : a strip closes 150 mm at most, past that a carcass or a shelf. A cleat screwed every 400
@@ -63,7 +63,8 @@ export function buildSideFillers(c: Carcass, b: Build): void
             }));
             strip.notes.push("Collé sur son tasseau, lui-même vissé sur la joue");
             b.hardware.push({ ref: "SCREW_4x30", qty: spread(c.height, 100, CLEAT_SCREW_PITCH).length, item: c.id,
-                             itemName: c.name, target: null, note: `tasseau du fileur ${where} sur la joue` });
+                             itemName: c.name, target: null, note: `tasseau du fileur ${where} sur la joue`,
+                             purpose: "cleat-screw" });
         }
         // the plinth carried on under the strip, a length cut from the same board
         if (c.base.type === "plinth")
