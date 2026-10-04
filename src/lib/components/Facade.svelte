@@ -4,6 +4,7 @@
     import { facadeBridge, clientToWorld } from "./bridge";
     import { handleDrop } from "./actions";
     import { hitTest } from "./hit";
+    import { GRIP_GAP, GRIP_H, GRIP_ROW, gripLabel, layoutGrips } from "./grips";
     import { byId } from "../core/edit";
     import { endReach, itemExtent, screenSize, sideFiller } from "../core/extent";
     import { PLINTH_FOOT_GAP, baseHeight } from "../core/part_base";
@@ -141,6 +142,16 @@
         return Math.max(w / Math.max(1, hostWidth), h / Math.max(1, hostHeight));
     });
 
+    // what the drawing shows of the world : the view box met into the host, centred, past it on one side
+    const shownRect = $derived.by(() =>
+    {
+        const cx = (extent.x0 + extent.x1) / 2 + panX;
+        const cy = (extent.y0 + extent.y1) / 2 + panY;
+        const hw = Math.max(1, hostWidth) * mmPerPx / 2;
+        const hh = Math.max(1, hostHeight) * mmPerPx / 2;
+        return { x0: cx - hw, x1: cx + hw, y0: cy - hh, y1: cy + hh };
+    });
+
 
     // cell under the finger while something is dragged, for the highlight
     const hover = $derived.by(() =>
@@ -218,40 +229,12 @@
         return `${outer} L ${X(0)} ${Y(r)} A ${r} ${r} 0 0 ${1 - sweep} ${X(r)} ${Y(0)} Z`;
     }
 
-    function gripLabel(name: string, roomPx: number): { text: string; px: number }
+    // grips that would run over each other are lifted, a dotted leader showing what each one moves
+    const grips = $derived(layoutGrips(shown.map((it) =>
     {
-        const px = Math.max(48, Math.min(Math.max(90, name.length * 8 + 20), roomPx));
-        const fits = Math.min(18, Math.floor((px - 20) / 8));
-        return { text: name.length > fits ? `${name.slice(0, Math.max(1, fits - 1))}...` : name, px };
-    }
-
-    // a grip keeps its whole name unless a neighbour at the same height would run over it :
-    // each one is narrowed to the gap between its centre and the nearest one of its row
-    const grips = $derived.by(() =>
-    {
-        const u = mmPerPx;
-        const rows: { id: string; name: string; mid: number; top: number }[] = [];
-        for (const it of shown)
-        {
-            const b = itemExtent(it);
-            rows.push({ id: it.id, name: it.name, mid: (b.x0 + b.x1) / 2, top: b.y1 });
-        }
-        const out = new Map<string, { text: string; px: number }>();
-        for (const g of rows)
-        {
-            let room = Infinity;
-            for (const o of rows)
-            {
-                // a grip is 28 px high : two tops further apart than that stack, they never touch
-                if (o.id !== g.id && Math.abs(o.top - g.top) < 28 * u)
-                {
-                    room = Math.min(room, Math.abs(o.mid - g.mid) / u - 6);
-                }
-            }
-            out.set(g.id, gripLabel(g.name, room));
-        }
-        return out;
-    });
+        const b = itemExtent(it);
+        return { id: it.id, name: it.name, mid: (b.x0 + b.x1) / 2, top: b.y1, width: b.x1 - b.x0 };
+    }), mmPerPx, shownRect));
 
     function hingeLines(x0: number, y0: number, x1: number, y1: number, hinge: "left" | "right" | null): string
     {
@@ -591,22 +574,33 @@
             {@const size = screenSize(sc)}
             <rect x={sc.cx - size.w / 2} y={-(sc.bottom + size.h)} width={size.w} height={size.h} class="screen" />
         {/if}
-        <!-- grips last : an item drawn after another one covered its label -->
+        <!-- the leaders of lifted grips under every grip, then the grips last : an item drawn after another
+             one covered its label -->
+        {#each shown as it (it.id)}
+            {@const spot = grips.get(it.id)}
+            {#if spot !== undefined && spot.leader}
+                {@const b = itemExtent(it)}
+                {@const mid = (b.x0 + b.x1) / 2}
+                <line x1={mid} y1={-b.y1} x2={mid + spot.dx * mmPerPx}
+                    y2={-(b.y1 + (GRIP_GAP + GRIP_ROW * spot.lift) * mmPerPx)} class="leader"
+                    stroke-width={1.5 * mmPerPx} stroke-dasharray={`${3 * mmPerPx} ${3 * mmPerPx}`} />
+            {/if}
+        {/each}
         {#each shown as it (it.id)}
             {@const b = itemExtent(it)}
             {@const u = mmPerPx}
-            {@const grip = grips.get(it.id) ?? gripLabel(it.name, Infinity)}
-            {@const label = grip.text}
+            {@const grip = grips.get(it.id) ?? { ...gripLabel(it.name), dx: 0, lift: 0, leader: false }}
             {@const gw = grip.px * u}
-            {@const mid = (b.x0 + b.x1) / 2}
+            {@const mid = (b.x0 + b.x1) / 2 + grip.dx * u}
+            {@const base = b.y1 + (GRIP_GAP + GRIP_ROW * grip.lift) * u}
             <g
                 class="grip" class:selected={sel !== null && sel.item === it.id}
                 role="button" tabindex="-1" aria-label={`Déplacer ${it.name}`}
                 onpointerdown={(e) => startItemDrag(e, it)}
             >
-                <rect x={mid - gw / 2} y={-(b.y1 + 34 * u)} width={gw} height={28 * u} rx={6 *
+                <rect x={mid - gw / 2} y={-(base + GRIP_H * u)} width={gw} height={GRIP_H * u} rx={6 *
                     u} stroke-width={1.5 * u} />
-                <text x={mid} y={-(b.y1 + 15 * u)} text-anchor="middle" font-size={13 * u}>{label}</text>
+                <text x={mid} y={-(base + 9 * u)} text-anchor="middle" font-size={13 * u}>{grip.text}</text>
             </g>
         {/each}
     </svg>
@@ -830,6 +824,13 @@
     .grip.selected rect
     {
         stroke: var(--colour-accent);
+    }
+
+
+    .leader
+    {
+        stroke: var(--colour-border-hover);
+        pointer-events: none;
     }
 
 
