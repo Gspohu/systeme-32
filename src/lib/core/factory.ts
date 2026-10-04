@@ -3,7 +3,7 @@
 import {
     DEFAULT_ROOM, DEFAULT_SETTINGS, SCHEMA_VERSION, type Battens, type Carcass, type CellNode, type DividerKind, type Front,
     type FrontSpec, type HangingBox, type LadderRail, type LayoutNode, type Project, type RoundCorner, type SlatWall, type SplitNode,
-    type WallShelf,
+    type WallShelf, type Device,
 } from "./model";
 import { DEFAULT_PRICES } from "../data/prices";
 
@@ -129,6 +129,14 @@ export function newLadder(o: Partial<LadderRail>): LadderRail
 {
     return { kind: "ladder", id: newId("e"), name: "Échelle sur rail", wall: "back", x: 0, y: 2000, z: 400, width: 2400,
              railDiameter: 30, ladderWidth: 450, ladderAt: 0, ...o };
+}
+
+
+// sizes and mass are the appliance's own, never a default
+export function newDevice(o: Partial<Device> & Pick<Device, "name" | "width" | "height" | "depth" | "massKg" |
+    "source">): Device
+{
+    return { kind: "device", id: newId("a"), wall: "back", x: 0, y: 0, z: 0, ...o };
 }
 
 

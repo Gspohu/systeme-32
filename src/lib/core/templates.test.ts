@@ -164,7 +164,7 @@ describe("the sketch templates", () =>
         expect(back.cutouts[0]!.segments[0]).toMatchObject({ kind: "arc", cx: 774, cy: 119, y: 79 });
     });
 
-    it("gives the TV wall an open quarter round, a cable hole, one door per zone and its two oak shelves", () =>
+    it("gives the TV wall an open quarter round, its cable holes, one door per zone and its two oak shelves", () =>
     {
         const p = tvWall();
         const a = analyse(p);
@@ -203,13 +203,18 @@ describe("the sketch templates", () =>
             return k.message.startsWith("Meuble bas, bout arrondi droit : assise");
         })!;
         expect(seat.level).toBe("info");
-        // the 60 hole in the middle of the lower left cell : 19 + 627 / 2 across, 19 + 219 / 2 up
-        const back = a.build.parts.find((q) =>
+        // the cables go through the column's technical cell now, the base back stays whole : two 60 holes 100 left
+        // and 120 right of the middle of that 155 cell, 19 + 155 / 2 up then 19 + 412 / 2 across, u up on that back
+        const backOf = (id: string): Part =>
         {
-            return q.id === `${base.id}/back`;
-        })!;
-        expect(back.cutouts).toHaveLength(1);
-        expect(back.cutouts[0]!.segments[0]).toMatchObject({ kind: "arc", cx: 19 + 627 / 2, cy: 19 + 219 / 2 });
+            return a.build.parts.find((q) => { return q.id === `${id}/back`; })!;
+        };
+        expect(backOf(base.id).cutouts).toEqual([]);
+        expect(backOf(p.items[1]!.id).cutouts.map((o) =>
+        {
+            return o.segments[0];
+        })).toMatchObject([{ kind: "arc", cx: 19 + 155 / 2, cy: 19 + 206 - 100 },
+                           { kind: "arc", cx: 19 + 155 / 2, cy: 19 + 206 + 120 }]);
         // four doors of two hinges, none of the small ones of the save lfet
         const hw = hardwareCount(tvWall);
         expect((hw.get("70T3550.TL") ?? 0) + (hw.get("70T3650.TL") ?? 0)).toBe(4 * 2);

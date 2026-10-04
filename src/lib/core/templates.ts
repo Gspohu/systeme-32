@@ -1,7 +1,8 @@
 // Starting projects : the two pieces Valentin's parents drew and saved, as they meant them once corrected
 
 import type { Carcass, Lining, Project } from "./model";
-import { cell, newCarcass, newFront, newId, newProject, newWallShelf, split, DEFAULT_BATTENS } from "./factory";
+import { cell, newCarcass, newDevice, newFront, newId, newProject, newWallShelf, split,
+        DEFAULT_BATTENS } from "./factory";
 
 const OAK = "H1180_ST37";
 const GREEN = "U604_ST9";
@@ -33,9 +34,8 @@ export function tvWall(): Project
     const project = newProject("Composition TV et bibliothèque");
 
     // four columns of 627 : a door before an adjustable shelf, two pairs of drawers, a door again
-    const cables = cell();
     // adjustable shelves rest on the system 32 line, 9.5 + 32k from the bottom : 5 mm under the parents' save
-    const leftDoor = split("h", [219], [cables, cell()], ["adjustable"]);
+    const leftDoor = split("h", [219], [cell(), cell()], ["adjustable"]);
     const drawersA = cell();
     const drawersB = cell();
     const rightDoor = split("h", [219], [cell(), cell()], ["adjustable"]);
@@ -55,9 +55,6 @@ export function tvWall(): Project
                      seat: true },
         },
     });
-    // a 60 mm hole through the back of the lower left cell for the cables, to set from the grommet bought
-    baseUnit.outlets.push({ id: newId("o"), cell: cables.id, panel: "back", shape: "round", w: 60, h: 60, dx: 0,
-                            dy: 0 });
     baseUnit.fronts.push(
         newFront(leftDoor.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(drawersA.id, { type: "drawers", count: 2, loadKg: 15 }, { decor: GREEN }),
@@ -68,7 +65,9 @@ export function tvWall(): Project
 
 
     // the column on the base : a door over three cells of adjustable shelves, an open lined niche, a door again
-    const lower = split("h", [155, 347], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
+    // The lowest cell is the technical one, the box in it
+    const technical = cell();
+    const lower = split("h", [155, 347], [technical, cell(), cell()], ["adjustable", "adjustable"]);
     const niche = cell();
     const upper = split("h", [151, 343], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
     const column = newCarcass({
@@ -82,6 +81,15 @@ export function tvWall(): Project
         newFront(upper.id, { type: "door", hinge: "left" }, PUSH_DOOR),
     );
     column.linings.push(lining(niche.id, OAK, true));
+    // two through the back for the mains and the fibre, the first behind the box, and one through the right side
+    // opening behind the amplifier, 85 off its back
+    for (const dx of [-100, 120])
+    {
+        column.outlets.push({ id: newId("o"), cell: technical.id, panel: "back", shape: "round", w: 60, h: 60, dx,
+                              dy: 0 });
+    }
+    column.outlets.push({ id: newId("o"), cell: technical.id, panel: "right", shape: "round", w: 60, h: 60, dx: -50,
+                          dy: 0 });
 
     // their 38 mm oak shelves in the Decospan 39, the nearest board sold
     const shelves = [[1860, 1600], [2230, 800]].map(([y, width]) =>
@@ -90,8 +98,20 @@ export function tvWall(): Project
                               corners: { left: 0, right: 50 } });
     });
 
-    project.items.push(baseUnit, column, ...shelves);
-    project.screen = { diagonalInch: 65, aspectW: 16, aspectH: 9, cx: 1375, bottom: 600, z: 100, wallMounted: false };
+    // their amplifier stood on its side against the right of the column, 30 clear each side in the 245 mm left
+    // before the screen, flush with the front : its bass port is at the back
+    const amplifier = newDevice({
+        name: "Ampli Marshall Stanmore", x: 480, y: 600, z: 215, width: 185, height: 350, depth: 185, massKg: 5.1,
+        source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé sur le flanc",
+        look: "amplifier",
+    });
+    // the box on the floor of the technical cell, 60 clear behind for its plugs
+    const box = newDevice({
+        name: "Freebox One", x: 40, y: 619, z: 60, width: 230, height: 55, depth: 200, massKg: 1,
+        source: "cotes non sourcées, à vérifier (230 x 200 x 55 d'un résumé de recherche), masse estimée",
+    });
+    project.items.push(baseUnit, column, ...shelves, amplifier, box);
+    project.screen = { diagonalInch: 65, aspectW: 16, aspectH: 9, cx: 1415, bottom: 600, z: 100, wallMounted: false };
     return project;
 }
 

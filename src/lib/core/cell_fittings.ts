@@ -11,13 +11,14 @@ export interface CellPrint
 }  
 
 
-// A socket or cable hole through the back of a cell or the panel above or below it, `w` the diameter of a round
-// one : its centre moved from the middle of the cell, across then up on the back or frontwards elsewhere
+// A socket or cable hole through the back of a cell, the panel above or below it or the one at its side, `w` the
+// diameter of a round one : its centre moved from the middle of the cell, across then up on the back, across then
+// frontwards above and below, frontwards then up on a side
 export interface Outlet
 {
     id: Id;
     cell: Id;
-    panel: "back" | "above" | "below";
+    panel: "back" | "above" | "below" | "left" | "right";
     shape: "round" | "rect";
     w: number;
     h: number;

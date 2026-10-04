@@ -13,7 +13,7 @@ import { SPOT_RIM, spotCentres } from "../lights";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
-import { endDrop, endPost, openEndLevels } from "../curves";
+import { endDrop, endPost, endToe, openEndLevels } from "../curves";
 import { chain } from "./plan";
 
 
@@ -68,8 +68,10 @@ export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, o
         canvas.poly(outline, true, "normal");
         return;
     }
-    const box = itemExtent(it); 
-    canvas.rect(pageX(box.x0), pageY(box.y1), (box.x1 - box.x0) / scale, (box.y1 - box.y0) / scale, "normal");
+    const box = itemExtent(it);
+    // an appliance is not made : dashed, behind a door or out in the open
+    canvas.rect(pageX(box.x0), pageY(box.y1), (box.x1 - box.x0) / scale, (box.y1 - box.y0) / scale,
+                it.kind === "device" ? "dashed" : "normal");
     if (it.kind === "box")
     {
         const t = it.thickness;
@@ -210,9 +212,13 @@ function drawEnds(v: CarcassView): void
         canvas.rect(pageX(x), pageY(k.y + k.height), reach / scale, (k.height + drop) / scale, "normal");
         if (end.open === true)
         {
-            for (const lv of openEndLevels(k, end)) 
+            const toe = endToe(k, end);
+            for (const lv of openEndLevels(k, end))
             {
-                canvas.rect(pageX(x), pageY(k.y + lv + t), reach / scale, t / scale, "thin");
+                // the floor board in line with the plinth, the side it butts never moving
+                const w = lv < 0 ? reach - toe : reach;
+                const left = side === "right" ? x : k.x - w;
+                canvas.rect(pageX(left), pageY(k.y + lv + t), w / scale, t / scale, "thin");
             }
             const post = endPost(k, side);  
             if (post !== null) 

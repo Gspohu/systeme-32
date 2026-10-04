@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import { battenAngle, bevelU, type Fitted, type Part, type CurveShape } from "../core/parts";
-import type { Carcass, LadderRail, Screen } from "../core/model";
+import type { Carcass, Device, LadderRail, Screen } from "../core/model";
 import { tessellate } from "../core/geometry";
 import { screenSize } from "../core/extent";
 import type { ResolvedLayout } from "../core/layout";
@@ -338,6 +338,65 @@ export function ladderMeshes(l: LadderRail): THREE.BufferGeometry[]
     for (const g of out)
     {
         g.scale(MM, MM, MM);
+    }
+    return out;
+}
+
+
+export type DeviceSkin = "body" | "grille" | "brass";
+
+
+// An appliance in the frame of its wall : a block, or an amplifier cabinet whose front is a grille and whose top
+// carries a brass plate with its knobs. Those details follow photographs by eye, they are not dimensioned and no
+// check reads them, only the overall box counts
+export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.BufferGeometry }[]
+{
+    const out: { skin: DeviceSkin; geometry: THREE.BufferGeometry }[] = [];
+    const piece = (skin: DeviceSkin, geometry: THREE.BufferGeometry, at: [number, number, number]): void =>
+    {
+        geometry.translate(...at);
+        out.push({ skin, geometry });
+    };
+    // built standing, then laid on its flank when it is taller than wide, its top turned to +x
+    const onFlank = d.look === "amplifier" && d.height > d.width;
+    const W = onFlank ? d.height : d.width;
+    const H = onFlank ? d.width : d.height;
+    const D = d.depth;
+    if (d.look !== "amplifier")
+    {
+        piece("body", new THREE.BoxGeometry(W, H, D), [W / 2, H / 2, D / 2]);
+    }
+    else
+    {
+        // the knobs inside the overall size, the cabinet lower by their height, the grille 1 mm proud of it
+        const plate = Math.min(D * 0.25, 45);
+        const knobH = plate * 0.3;
+        const top = H - knobH - 1;
+        const border = Math.min(W, top) * 0.08;
+        piece("body", new THREE.BoxGeometry(W, top, D - 1), [W / 2, top / 2, (D - 1) / 2]);
+        piece("grille", new THREE.BoxGeometry(W - 2 * border, top - 2 * border, 1), [W / 2, top / 2, D - 0.5]);
+        const along = D - 1 - border - plate / 2;
+        piece("brass", new THREE.BoxGeometry(W - 2 * border, 1, plate), [W / 2, top + 0.5, along]);
+        let k = 0;
+        while (k < 3)
+        {
+            const knob = new THREE.CylinderGeometry(plate * 0.22, plate * 0.22, knobH, 20);
+            piece("brass", knob, [W * (0.58 + 0.12 * k), top + 1 + knobH / 2, along]);
+            k++;
+        }
+        piece("brass", new THREE.BoxGeometry(plate * 0.12, knobH, plate * 0.12), [W * 0.42, top + 1 + knobH / 2, along]);
+    }
+    const place = new THREE.Matrix4();
+    if (onFlank)
+    {
+        // a quarter turn about z : the standing top at +x, its left end down on the floor of the appliance
+        place.makeRotationZ(-Math.PI / 2).premultiply(new THREE.Matrix4().makeTranslation(0, W, 0));
+    }
+    place.premultiply(new THREE.Matrix4().makeTranslation(d.x, d.y, d.z));
+    place.premultiply(new THREE.Matrix4().makeScale(MM, MM, MM));
+    for (const p of out)
+    {
+        p.geometry.applyMatrix4(place);
     }
     return out;
 }

@@ -232,8 +232,20 @@ export function validateProject(raw: unknown): Project
         need(typeof it === "object" && it !== null && typeof (it as { kind?: unknown }).kind === "string",
              "meuble sans type");
         const kind = (it as { kind: string }).kind;
-        need(["carcass", "corner", "wallShelf", "box", "slats", "ladder"].includes(kind),
+        need(["carcass", "corner", "wallShelf", "box", "slats", "ladder", "device"].includes(kind),
              `type de meuble inconnu : ${kind}`);
+        if (kind === "device")
+        {
+            const d = it as Record<string, unknown>;
+            for (const k of ["width", "height", "depth", "massKg", "x", "y", "z"])
+            {
+                need(typeof d[k] === "number" && Number.isFinite(d[k] as number), `appareil avec ${k} non numérique`);
+            }
+            need((d.width as number) > 0 && (d.height as number) > 0 && (d.depth as number) > 0
+                 && (d.massKg as number) >= 0, "appareil de taille ou de masse impossible");
+            need(typeof d.source === "string", "appareil sans provenance de ses cotes");
+            need(d.look === undefined || d.look === "amplifier", `aspect d'appareil inconnu : ${String(d.look)}`);
+        }
         const wall = (it as { wall?: unknown }).wall;
         need(wall === "back" || wall === "left" || wall === "right", `mur inconnu : ${String(wall)}`);
         if (kind === "carcass")

@@ -31,7 +31,11 @@ const BOX = new Set(["boxSide", "boxEnd", "boxBottom"]);
 // TODO an L of two walls goes up wall after wall by name, nothing yet weighs which corner carcass must stand first
 export function assemblyOrder(p: Project): Item[]
 {
-    return [...p.items].sort((a, b) =>
+    // an appliance is set in place by its owner, nothing to assemble
+    return p.items.filter((it) =>
+    {
+        return it.kind !== "device";
+    }).sort((a, b) =>
     {
         const ea = itemExtent(a);
         const eb = itemExtent(b);

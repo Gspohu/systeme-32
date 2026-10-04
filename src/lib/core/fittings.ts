@@ -9,7 +9,7 @@ import { X, polygonArea, tessellate } from "./geometry";
 import type { Build, Part, Purpose } from "./part_types";
 import { SLIDELINE_M, TIPON_ADAPTER } from "../data/rules";
 import {
-    AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
+    GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
 import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset, sideFootInset } from "./feet";
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
@@ -347,7 +347,8 @@ export function spread(length: number, inset: number, max: number): number[]
 }
 
 
-export function fitBase(c: Carcass, totalKg: number, b: Build): void
+// The base hardware and its drilling, what each foot or hanger then carries being checked once all is built
+export function fitBase(c: Carcass, b: Build): void
 {
     if (c.base.type === "plinth" || c.base.type === "feet")
     {
@@ -360,13 +361,10 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
         }
         const perRow = feetPerRow(c);
         const count = 2 * perRow;
-        const perFoot = `${(totalKg / count).toFixed(0)} kg par pied chargé, ${AXILO_LOAD_PER_FOOT} kg admis`;
         b.hardware.push({ ref: "637.76.333", qty: count, item: c.id, itemName: c.name, target: null, note: null,
                           purpose: "foot-mount" });
         b.hardware.push({ ref: foot.ref, qty: count, item: c.id, itemName: c.name, target: null,
-                         note: `réglage ${foot.min}-${foot.max} mm, ${perFoot}`, purpose: "foot" });
-        b.infos.push(`${c.name} : ${count} pieds AXILO 78 H${foot.height}, ${perFoot} (Häfele p. 11.43A), réglage `
-            + `sous charge jusqu'à ${AXILO_ADJUST_MAX_CABINET} kg de meuble.`);
+                         note: `réglage ${foot.min}-${foot.max} mm`, purpose: "foot" });
         b.fitted.push(...feetFitted(c, foot.ref));
         if (c.base.type === "plinth")
         {
@@ -375,19 +373,9 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
             b.hardware.push({ ref: "637.38.054", qty: perRow + 2 * returns, item: c.id, itemName: c.name, target: null,
                              note: returns > 0 ? `${perRow} en façade, 2 par retour` : null, purpose: "plinth-clip" });
         }
-        if (totalKg / count > AXILO_LOAD_PER_FOOT)
-        {
-            b.errors.push(`${c.name} : ${(totalKg / count).toFixed(0)} kg par pied, `
-                + `${AXILO_LOAD_PER_FOOT} kg maxi (AXILO 78).`);
-        }
         const bottom = byId(b.parts, `${c.id}/bottom`);
         if (bottom !== undefined)
         {
-            if (totalKg > AXILO_ADJUST_MAX_CABINET)
-            {
-                bottom.notes.push(`Meuble de ${totalKg.toFixed(0)} kg chargé : régler les pieds AXILO `
-                    + "avant chargement (réglage sous charge limité à 80 kg)");
-            }
             const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (axe à ${sideFootInset(c, "left")} mm de la joue `
                 + `gauche, ${sideFootInset(c, "right")} de la droite, ${FOOT_INSET} du fond, `
                 + `${frontFootInset(c)} mm de l'avant, convention)`;
@@ -406,13 +394,6 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
                          note: "un droit et un gauche, avec leurs plaques murales anti-décrochage, référence de chaque "
                              + `côté chez le distributeur, douilles ${DIAM}10 percées d'après la notice Camar`,
                          purpose: "wall-hanger" });
-        b.infos.push(`${c.name} : suspendu par deux reggibases Camar 807, ${totalKg.toFixed(0)} kg chargé pour 240 kg `
-            + "admis la paire (120 kg la pièce, Camar).");
-        if (totalKg > 240)
-        {
-            b.errors.push(`${c.name} : ${totalKg.toFixed(0)} kg suspendus, une paire de reggibases Camar 807 porte `
-                + "240 kg. Alléger le meuble ou le poser au sol.");
-        }
     }
     else if (c.base.type === "wall")
     {
@@ -420,13 +401,6 @@ export function fitBase(c: Carcass, totalKg: number, b: Build): void
                           purpose: "wall-hanger" });
         b.hardware.push({ ref: "48N0510.03", qty: 1, item: c.id, itemName: c.name, target: null, note: null,
                           purpose: "wall-hanger" });
-        b.infos.push(`${c.name} : suspendu par une paire de ferrures Blum 48N0510, ${totalKg.toFixed(0)} kg `
-            + "chargé pour 130 kg admis (Blum p. 586).");
-        if (totalKg > 130)
-        {
-            b.errors.push(`${c.name} : ${totalKg.toFixed(0)} kg suspendus, une paire de ferrures 48N0510 `
-                + "porte 130 kg (Blum p. 586). Alléger le meuble ou le poser au sol.");
-        }
     }
 }
 

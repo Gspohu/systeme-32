@@ -275,6 +275,10 @@
             "railDiameter"],
         ["Largeur échelle", "ladderWidth"], ["Position échelle", "ladderAt"],
     ];
+    const DEVICE_FIELDS: [string, "width" | "height" | "depth" | "y" | "z" | "massKg"][] = [
+        ["Largeur", "width"], ["Hauteur", "height"], ["Profondeur", "depth"], ["Pose (mm)", "y"],
+        ["Distance au mur", "z"], ["Masse (kg)", "massKg"],
+    ];
 
     const panelDecors: typeof DECORS = [];
     // slats also come in solid owod, never cut out of a sheet, and an adjustable shelf may be glass
@@ -558,8 +562,8 @@
                 <div class="section-title">Trous de prise</div>
                 {#each carcass.outlets.filter((o) => { return o.cell === nodeBox.id; }) as o (o.id)}
                     <div class="segmented">
-                        {#each ([["back", "Fond"], ["above", "Au-dessus"], ["below",
-                            "Au-dessous"]] as const) as [panel, label]}
+                        {#each ([["back", "Fond"], ["above", "Dessus"], ["below", "Dessous"], ["left", "Gauche"],
+                            ["right", "Droite"]] as const) as [panel, label]}
                             <button class="segmented-item" class:active={o.panel === panel}
                                 onclick={() => app.apply(updateOutlet, carcass.id, o.id, { panel })}>{label}</button>
                         {/each}
@@ -586,7 +590,7 @@
                             </span>
                         </label>
                     {/if}
-                    <label class="field" title="Depuis le milieu de la case : en largeur, puis en hauteur sur le fond ou vers l'avant ailleurs">
+                    <label class="field" title="Depuis le milieu de la case : largeur puis hauteur au fond, largeur puis avant dessus et dessous, avant puis hauteur sur un côté">
                         <span class="label">Décalage</span>
                         <span class="row">
                             <input class="input" type="number" aria-label="Décalage en largeur" value={o.dx}
@@ -1120,6 +1124,25 @@
                         onchange={(e) => patch({ [key]: num(e) } as Partial<Item>)} />
                 </label>
             {/each}
+        {/if}
+
+        {#if sel.kind === "item" && item.kind === "device"}
+            {@const d = item}
+            <div class="section-title" title="Appareil posé, pas fabriqué : il compte dans la place et la charge">
+                Appareil</div>
+            <label class="field"><span class="label">Nom</span>
+                <input class="input" maxlength="80" value={d.name} onchange={(e) => patch({ name: str(e) })} />
+            </label>
+            {#each DEVICE_FIELDS as [label, key] (key)}
+                <label class="field"><span class="label">{label}</span>
+                    <input class="input" type="number" min="0" value={d[key]}
+                        onchange={(e) => patch({ [key]: num(e) } as Partial<Item>)} />
+                </label>
+            {/each}
+            <label class="field"><span class="label">Source des cotes</span>
+                <input class="input" maxlength="160" value={d.source}
+                    onchange={(e) => patch({ source: str(e) } as Partial<Item>)} />
+            </label>
         {/if}
 
         {#if sel.kind === "item" && item.kind === "slats"}

@@ -129,10 +129,12 @@ export function boxesMeet(a: Box3, b: Box3): boolean
 }
 
 
-// Two items take the same room space, a round corner excepted : it is meant for the notch between the boxes it joins
+// Two items take the same room space, a round corner and an appliance excepted : the corner is meant for the notch
+// between the boxes it joins, an appliance may sit in a cell and has its own checks
 export function itemsMeet(a: Item, b: Item, room: Room): boolean
 {
-    return a.kind !== "corner" && b.kind !== "corner" && boxesMeet(roomBox(a, room), roomBox(b, room));
+    return a.kind !== "corner" && b.kind !== "corner" && a.kind !== "device" && b.kind !== "device"
+        && boxesMeet(roomBox(a, room), roomBox(b, room));
 }
 
 

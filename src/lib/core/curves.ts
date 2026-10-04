@@ -91,6 +91,18 @@ export function endDrop(c: Carcass, end: Extract<End, { type: "rounded" }>): num
 }
 
 
+// How far the floor board of an open end stays inside the arc of the boards above : in line with the plinth face
+// its edge kept off the toes like the plinth is
+export function endToe(c: Carcass, end: Extract<End, { type: "rounded" }>): number
+{
+    if (end.open !== true || endDrop(c, end) === 0 || c.base.type !== "plinth")
+    {
+        return 0;
+    }
+    return c.base.setback;
+}
+
+
 // The low end panel rests on the floor, the only way a load on the end reaches it
 export function endGrounded(c: Carcass, end: Extract<End, { type: "rounded" }>): boolean
 {
@@ -129,7 +141,8 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
     const a = POST_WIDTH / 2;
     const h = c.thickness / 2;
     const lead = a * Math.cos(phi) + h * Math.sin(phi);
-    const reach = outer - POST_SETBACK;
+    // it stands on the floor board, the smallest of the arcs
+    const reach = outer - endToe(c, end) - POST_SETBACK;
     const rho = -lead + Math.sqrt((lead * lead) - (a * a + h * h - reach * reach));
     return { u: rho * Math.cos(phi), v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
 }
@@ -173,6 +186,25 @@ export function buildEnds(c: Carcass, b: Build): void
                     { kind: "line", x: 0, y: 0 },
                 ],
             };
+        const toe = endToe(c, end);
+        const low = inner - toe;
+        const floorOutline: Outline = toe === 0 ? outline : end.sweep === 180
+            ? {
+                start: [0, outer - low],
+                segments: [
+                    { kind: "arc", x: 0, y: outer + low, cx: 0, cy: outer, ccw: true },
+                    { kind: "line", x: 0, y: outer - low },
+                ],
+            }
+            : {
+                start: [0, outer - low],
+                segments: [
+                    { kind: "line", x: 0, y: usable },
+                    { kind: "line", x: low, y: usable },
+                    { kind: "line", x: low, y: outer },
+                    { kind: "arc", x: 0, y: outer - low, cx: 0, cy: outer, ccw: false },
+                ],
+            };
         const xFace = side === "right" ? c.x + c.width : c.x;
         const uDir: Vec3 = side === "right" ? X : neg(X);
         const base = { item: c.id, itemName: c.name };
@@ -208,20 +240,25 @@ export function buildEnds(c: Carcass, b: Build): void
         }
         for (const lv of levels)
         {
+            const grounded = lv.y < c.y;
             const p = newPart({
                 ...base, id: `${c.id}/end/${side}/${lv.label}`, label: `${title}, ${lv.label.toLowerCase()}`,
-                role: lv.role, length: inner, width: usable, thickness: board, decor: c.decor,
+                role: lv.role, length: grounded ? low : inner, width: usable, thickness: board, decor: c.decor,
                 edges: !open ? [] : end.sweep === 90 ? ["v0", "u1"] : ["v0"],
                 frame: { o: [xFace, lv.y + board, c.z + depth], u: uDir, v: neg(Z), n: neg(Y) },
             });
-            p.outline = outline;
+            p.outline = grounded ? floorOutline : outline;
+            if (grounded && toe > 0)
+            {
+                p.notes.push(`Arc ramené de ${toe} mm au nu de la plinthe, hors des orteils`);
+            }
             p.notes.push("Contour cintré : découpe CN d'après le DXF");
             if (open)
             {
                 p.notes.push("Ouvert : chant cintré sur l'arc, posé à la main");
             }
             b.parts.push(p);
-            if (lv.y < c.y) 
+            if (grounded)
             {
                 p.notes.push("Posée au sol, sous le niveau de la joue");
                 continue;

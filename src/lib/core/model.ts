@@ -392,7 +392,27 @@ export interface LadderRail
 }
 
 
-export type Item = Carcass | RoundCorner | WallShelf | HangingBox | SlatWall | LadderRail;
+// An appliance set in or on the furniture, a box or an amplifier : it takes room and weighs, nothing is made of it
+export interface Device
+{
+    kind: "device";
+    id: Id;
+    name: string;
+    wall: Wall;
+    x: number;
+    y: number;
+    z: number;
+    width: number;
+    height: number;
+    depth: number;
+    massKg: number;
+    // where the sizes and the mass come from, a maker's sheet or a measure, said on the drawings
+    source: string;
+    // what it is, for the 3D : a plain block when none is told
+    look?: "amplifier";
+}
+
+export type Item = Carcass | RoundCorner | WallShelf | HangingBox | SlatWall | LadderRail | Device;
 
 // Wall an item stands against, seen from the room : x runs left to right, z comes out of the wall
 export type Wall = "back" | "left" | "right";

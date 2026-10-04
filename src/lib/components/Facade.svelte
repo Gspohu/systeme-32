@@ -576,6 +576,9 @@
                 <rect x={it.x} y={-(it.y + it.railDiameter / 2)} width={it.width} height={it.railDiameter} class="rail"
                     class:selected={selected} />
                 <rect x={it.x + it.ladderAt} y={-it.y} width={it.ladderWidth} height={it.y} class="ghost" />
+            {:else if it.kind === "device"}
+                <rect x={it.x} y={-(it.y + it.height)} width={it.width} height={it.height} class="device"
+                    class:selected={selected} />
             {:else}
                 <rect x={it.x} y={-(it.y + it.height)} width={it.width} height={it.height} fill={fill(it.decor)}
                     class="edge" class:selected={selected} />
@@ -666,6 +669,15 @@
         stroke-width: 4;
         stroke-dasharray: 40 20;
         pointer-events: none;
+    }
+
+    /* an appliance is not made : the ghost's dashes, open so a door in front still shows */
+    .device
+    {
+        fill: none;
+        stroke: var(--colour-border-hover);
+        stroke-width: 3;
+        stroke-dasharray: 16 10;
     }
 
     .ghost

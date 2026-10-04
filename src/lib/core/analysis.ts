@@ -30,6 +30,9 @@ import { screenSize } from "./extent";
 import { itemsMeet, roomBox } from "./room";
 import { buildSlats } from "./slats";
 import { SEAT_LOAD_N, seatChecks } from "./seat";
+import { deviceChecks, devicesOn } from "./devices";
+import { footLoadChecks } from "./foot_loads";
+import { cutoutChecks } from "./cutout_checks";
 import { swingChecks } from "./swing";
 import { slopeErrors } from "./slope";
 import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
@@ -53,7 +56,7 @@ export interface Analysis
 }
 
 
-function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): void
+function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, own: Map<string, number>): void
 {
     const s = p.settings;
     if (it.kind === "carcass")
@@ -98,10 +101,11 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
         }
         // a person sat on it weighs on the feet like any load
         const person = it.seat === null ? 0 : SEAT_LOAD_N / GRAVITY;
-        loads.set(it.id, content + shelves + person + clothes);
-        // the fillers weigh on the feet with the rest
+        loads.set(it.id, content + shelves + person + clothes + devicesOn(p, it));
+        // the fillers weigh on the feet with the rest, the appliances and what stands on top are put where they are
         buildSideFillers(it, b);
-        fitBase(it, itemMass(b, it.id) + content + shelves + person + clothes, b);
+        own.set(it.id, itemMass(b, it.id) + content + shelves + person + clothes);
+        fitBase(it, b);
         fitWallFixing(it, s, b, p.items);
         buildCeilingFiller(it, p.room, b);
     }
@@ -121,7 +125,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>): 
     {
         buildLadder(it, b);
     }
-    else
+    else if (it.kind === "box")
     {
         const before = b.joints.length;
         buildBox(it, b);
@@ -138,6 +142,8 @@ export function analyse(p: Project): Analysis
 {
     const b = emptyBuild();
     const loads = new Map<string, number>();
+    // each carcass with its own contents, what stands on it counted only once all is built
+    const own = new Map<string, number>();
     const checks: Check[] = [];
     for (const it of p.items)
     {
@@ -146,7 +152,7 @@ export function analyse(p: Project): Analysis
         let told = b.infos.length;
         try
         {
-            buildItem(it, p, b, loads);
+            buildItem(it, p, b, loads, own);
         }
         catch (e)
         {
@@ -180,7 +186,8 @@ export function analyse(p: Project): Analysis
         masses.set(it.id, itemMass(b, it.id));
     }
     const partReport = partChecks(p, b);
-    checks.push(...partReport.checks, ...frontChecks(p), ...itemChecks(p, masses, loads));
+    checks.push(...partReport.checks, ...frontChecks(p), ...itemChecks(p, masses, loads), ...deviceChecks(p, b),
+                ...footLoadChecks(p, b, own), ...cutoutChecks(b));
     const tippings: Tipping[] = [];
     for (const it of p.items)
     {
@@ -407,6 +414,10 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
     }
     for (const { it } of boxes)
     {
+        if (it.kind === "device")
+        {
+            continue;
+        }
         const m = masses.get(it.id) ?? 0;
         const load = loads.get(it.id) ?? 0;
         const loaded = load > 0 ? `, ${(m + load).toFixed(0)} kg chargé (charges d'essai)` : "";

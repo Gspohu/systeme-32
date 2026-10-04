@@ -7,8 +7,8 @@
     import { MediaQuery } from "svelte/reactivity";
     import { app } from "./app_state.svelte";
     import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
-    import { cushionMesh, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
-            type FittingMesh, type MeshSpec } from "../view3d/meshes";
+    import { cushionMesh, deviceMeshes, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
+            type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
     import { kelvinColour } from "../view3d/kelvin";
     import { roomBox, sideWallDepth, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
@@ -195,6 +195,37 @@
 
     const screenGeo = $derived(app.project.screen === null ? null : screenMesh(app.project.screen));
     const screenMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.3 });
+    // the colours of the appliances themselves : a block in the black of the screen, an amplifier in black tolex
+    // with its grille cloth and brass plate
+    const deviceMats: Record<DeviceSkin, Record<"block" | "amplifier", THREE.MeshStandardMaterial>> = {
+        body: { block: screenMat, amplifier: new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.85 }) },
+        grille: { block: screenMat, amplifier: new THREE.MeshStandardMaterial({ color: 0x262626, roughness: 1 }) },
+        brass: { block: screenMat, amplifier: new THREE.MeshStandardMaterial({ color: 0xb08d3e, metalness: 0.7,
+                                                                              roughness: 0.35 }) },
+    };
+    const devices = $derived(app.project.items.flatMap((it) =>
+    {
+        if (it.kind !== "device")
+        {
+            return [];
+        }
+        return deviceMeshes(it).map((m, k) =>
+        {
+            return { key: `${it.id}/${k}`, wall: it.wall, geometry: m.geometry,
+                     material: deviceMats[m.skin][it.look ?? "block"] };
+        });
+    }));
+    $effect(() =>
+    {
+        const current = devices;
+        return () =>
+        {
+            for (const d of current)
+            {
+                d.geometry.dispose();
+            }
+        };
+    });
     $effect(() =>
     {
         const current = screenGeo;
@@ -545,3 +576,7 @@
 {#if screenGeo !== null}
     <T.Mesh geometry={screenGeo} material={screenMat} />
 {/if}
+{#each devices as d (d.key)}
+    {@const pl = placement(d.wall)}
+    <T.Mesh geometry={d.geometry} material={d.material} rotation={pl.rotation} position={pl.position} />
+{/each}

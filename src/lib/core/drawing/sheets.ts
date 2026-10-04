@@ -96,6 +96,10 @@ function dims(it: Item): string
     {
         return `rail L ${it.width} ${DIAM}${it.railDiameter} à ${it.y} du sol, échelle de ${it.ladderWidth}`;
     }
+    if (it.kind === "device")
+    {
+        return `appareil L ${it.width} x H ${it.height} x P ${it.depth}, ${it.massKg} kg`;
+    }
     return `R ${it.outerRadius} x P ${it.depth}`;
 }
 

@@ -64,7 +64,7 @@ function boxOf(points: Vec3[]): { min: Vec3; max: Vec3 }
 
 
 // inside the polygon and futher than tol from each of its edges
-function insidePolygon(poly: [number, number][], x: number, y: number, tol: number): boolean
+export function insidePolygon(poly: [number, number][], x: number, y: number, tol: number): boolean
 {
     let inside = false;
     let i = 0;

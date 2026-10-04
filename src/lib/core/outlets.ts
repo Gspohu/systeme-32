@@ -1,11 +1,11 @@
-// Holes for a wall socket or a cable, cut through the back behind a cell or the pnel above or below it
+// Holes for a wall socket or a cable, cut through the back behind a cell or the pnel above, below or beside it
 
 import type { Carcass, Outlet } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { Build, Part } from "./parts";
 import type { Outline, Vec3 } from "./geometry";
 import { byId } from "./edit";
-import { panelAbove, panelBelow } from "./locate";
+import { panelAbove, panelBelow, sideFace } from "./locate";
 import { DIAM } from "./text";
 
 // a starting value, the socket or the grommet bought give the real size (convention)
@@ -56,7 +56,9 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         const where = `${c.name}, trou de prise`;
         const h = hole.shape === "round" ? hole.w : hole.h;
-        const cx = nb.x + nb.w / 2 + hole.dx;
+        const side = hole.panel === "left" || hole.panel === "right";
+        // across the cell on the back and on a shelf, frontwards on a side
+        const cx = side ? (hole.panel === "left" ? nb.x : nb.x + nb.w) : nb.x + nb.w / 2 + hole.dx;
         let part: Part | undefined;
         let near: Vec3;
         let far: Vec3;
@@ -69,6 +71,16 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             far = [c.x + cx + hole.w / 2, c.y + cy + h / 2, c.z];
             inside = cy - h / 2 >= nb.y && cy + h / 2 <= nb.y + nb.h;
         }
+        else if (hole.panel === "left" || hole.panel === "right")
+        {
+            part = sideFace(c, lay, b, nb, hole.panel)?.part;
+            const cz = (lay.zBack + lay.zFront) / 2 + hole.dx;
+            const cy = nb.y + nb.h / 2 + hole.dy;
+            near = [c.x + cx, c.y + cy - h / 2, c.z + cz - hole.w / 2];
+            far = [c.x + cx, c.y + cy + h / 2, c.z + cz + hole.w / 2];
+            inside = cy - h / 2 >= nb.y && cy + h / 2 <= nb.y + nb.h && cz - hole.w / 2 >= lay.zBack
+                && cz + hole.w / 2 <= lay.zFront;
+        }
         else
         {
             part = hole.panel === "above" ? panelAbove(c, lay, nb, b)?.part : panelBelow(c, lay, nb, b);
@@ -78,11 +90,13 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             far = [c.x + cx + hole.w / 2, y, c.z + cz + h / 2];
             inside = cz - h / 2 >= lay.zBack && cz + h / 2 <= lay.zFront;
         }
-        inside = inside && cx - hole.w / 2 >= nb.x && cx + hole.w / 2 <= nb.x + nb.w;
+        inside = inside && (side || (cx - hole.w / 2 >= nb.x && cx + hole.w / 2 <= nb.x + nb.w));
         if (part === undefined || part.frame === null)
         {
-            b.errors.push(`${where} : aucun panneau ${hole.panel === "back" ? "de fond" : hole.panel === "above"
-                ? "fixe au-dessus" : "fixe au-dessous"} de la case à percer. Choisir un autre panneau ou retirer le trou.`);
+            const missing = { back: "aucun panneau de fond", above: "aucun panneau fixe au-dessus",
+                              below: "aucun panneau fixe au-dessous", left: "aucune joue ni aucun montant à gauche",
+                              right: "aucune joue ni aucun montant à droite" }[hole.panel];
+            b.errors.push(`${where} : ${missing} de la case à percer. Choisir un autre panneau ou retirer le trou.`);
             continue;
         }
         if (part.role === "top" && c.slope !== null)
@@ -97,18 +111,19 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             continue;
         }
         part.cutouts.push(holeOutline(hole.shape, onPart(part, near), onPart(part, far)));
-        // seen from the front : the back hole as cut, a shelf one edge on over the thickness of its board
+        // seen from the front : the back hole as cut, a shelf or a side one edge on over the thickness of its board
         const f = part.frame;
         const edgeOn = hole.panel !== "back";
-        const x = cx - hole.w / 2;
-        const y = edgeOn ? Math.min(f.o[1], f.o[1] + f.n[1] * part.thickness) - c.y : near[1] - c.y;
-        const tall = edgeOn ? part.thickness : h;
+        const x = side ? Math.min(f.o[0], f.o[0] + f.n[0] * part.thickness) - c.x : cx - hole.w / 2;
+        const wide = side ? part.thickness : hole.w;
+        const y = edgeOn && !side ? Math.min(f.o[1], f.o[1] + f.n[1] * part.thickness) - c.y : near[1] - c.y;
+        const tall = edgeOn && !side ? part.thickness : h;
         const hidden = (b.fronts.get(c.id) ?? []).some((fp) =>
         {
-            return cx > fp.rect.x && cx < fp.rect.x + fp.rect.w && y + tall / 2 > fp.rect.y
+            return x + wide / 2 > fp.rect.x && x + wide / 2 < fp.rect.x + fp.rect.w && y + tall / 2 > fp.rect.y
                 && y + tall / 2 < fp.rect.y + fp.rect.h;
         });
-        b.outlets.push({ item: c.id, id: hole.id, shape: edgeOn ? "rect" : hole.shape, x, y, w: hole.w, h: tall,
+        b.outlets.push({ item: c.id, id: hole.id, shape: edgeOn ? "rect" : hole.shape, x, y, w: wide, h: tall,
                          edgeOn, hidden });
         part.notes.push(hole.shape === "round" ? `Trou ${DIAM}${hole.w} pour prise ou câble, d'après le DXF`
             : `Découpe ${hole.w} x ${hole.h} pour prise, d'après le DXF`);

@@ -153,6 +153,8 @@ add({ id: "48N0510.03", family: "D60", label: "Ferrure de suspension à visser, 
 add({ id: "CAMAR_807", family: "D60", label: "Reggibase réglable 807 pour meuble suspendu (120 kg la pièce)",
      brand: "Camar", ref: "807", source: "Camar, système 807, fiche produit",
      url: "https://www.camar.it/prodotti_sistemi_807.php" });
+export const BLUM_HANGER_PAIR_LOAD = 130;
+export const CAMAR_807_LOAD = 120;
 
 // Anti-tip fixing of a standing carcass : no manufacturer datasheet could be read (Häfele and Würth refuse
 // bots, Camar and Emuca list no reference), sizes follow the Furnica guide, a retailer blog

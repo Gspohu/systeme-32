@@ -212,9 +212,11 @@ describe("hardware the user is told about", () =>
     it("tells the load of each foot and of the wall hung fittings, with their source", () =>
     {
         const { p } = doorOn(235);
+        const axilo = new RegExp("pieds AXILO 78 H\\d+, \\d+ kg sur le pied le plus chargé, \\d+ en moyenne, "
+            + "150 kg admis \\(Häfele p\\. 11\\.43A\\)");
         expect(messages(p, "info").some((m) =>
         {
-            return /pieds AXILO 78 H\d+, \d+ kg par pied chargé, 150 kg admis \(Häfele p\. 11\.43A\)/.test(m);
+            return axilo.test(m);
         })).toBe(true);
         const hung = addItem(newProject("Rouffach"), newCarcass({ width: 600, height: 400, depth: 300, y: 1500,
                                                                   base: { type: "wall" } }));

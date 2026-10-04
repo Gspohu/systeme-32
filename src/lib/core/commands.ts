@@ -43,7 +43,15 @@ export function updateItem<T extends Item>(p: Project, id: string, patch: Partia
         {
             throw new CommandError("Meuble introuvable.");
         }
-        q.items[i] = { ...q.items[i]!, ...patch } as Item;
+        const it = { ...q.items[i]!, ...patch } as Item;
+        if (it.kind === "device" && !([it.width, it.height, it.depth].every((v) =>
+        {
+            return Number.isFinite(v) && v > 0;
+        }) && Number.isFinite(it.massKg) && it.massKg >= 0))
+        {
+            throw new CommandError("Un appareil a des cotes positives et une masse positive ou nulle : corriger la valeur.");
+        }
+        q.items[i] = it;
     });
 }
 
