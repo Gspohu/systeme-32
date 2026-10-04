@@ -98,7 +98,7 @@ function dims(it: Item): string
     }
     if (it.kind === "device")
     {
-        return `appareil L ${it.width} x H ${it.height} x P ${it.depth}, ${it.massKg} kg`;
+        return `appareil L ${it.width} x H ${it.height} x P ${it.depth}, ${String(it.massKg).replace(".", ",")} kg`;
     }
     return `R ${it.outerRadius} x P ${it.depth}`;
 }
@@ -120,12 +120,15 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
                 "Dossier de fabrication : plans cotés, fiche de débit, quincaillerie, calepinage, PBS, contrôles.", 3);
     cursorY += 5;
     section("Meubles");
-    for (const it of p.items)
+    // two columns of half a page : the sources at the foot need the height
+    const rows = Math.ceil(p.items.length / 2);
+    p.items.forEach((it, k) =>
     {
-        const mass = a.masses.get(it.id) ?? 0;
-        canvas.text(MARGIN + 8, cursorY, fit(`${it.name} : ${dims(it)}, ${mass.toFixed(1)} kg à vide`, BODY, 190), BODY);
-        cursorY += 4.5;
-    }
+        const mass = String((a.masses.get(it.id) ?? 0).toFixed(1)).replace(".", ",");
+        const line = it.kind === "device" ? `${it.name} : ${dims(it)}` : `${it.name} : ${dims(it)}, ${mass} kg à vide`;
+        canvas.text(MARGIN + 8 + (k < rows ? 0 : 195), cursorY + (k % rows) * 4.5, fit(line, BODY, 190), BODY);
+    });
+    cursorY += rows * 4.5;
     section("Légende");
     const legend: [string, (x: number, yy: number) => void][] = [
         ["Perçage face A (face vue)", (x, yy) =>
@@ -222,14 +225,20 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée "
         + `sous ${load} kg/dm²${use === undefined ? ", charge choisie hors catégorie" : `, ${use.label}`}`);
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
-    for (const line of sources)
+    // every source printed, the lines closing up to 3.2 rather than one dropped, and said when some still do not fit
+    const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 4;
+    const pitch = Math.max(3.2, Math.min(4, (bottom - cursorY) / sources.size));
+    const fits = Math.max(0, Math.floor((bottom - cursorY) / pitch) + 1);
+    const kept = sources.size <= fits ? [...sources] : [...sources].slice(0, Math.max(0, fits - 1));
+    for (const line of kept)
     {
-        if (cursorY > A3.h - MARGIN - TITLE_BLOCK_H - 4)
-        {
-            break;
-        }
         canvas.text(MARGIN + 8, cursorY, fit(`- ${line}`, 2.2, 390), 2.2);
-        cursorY += 4;
+        cursorY += pitch;
+    }
+    if (kept.length < sources.size)
+    {
+        canvas.text(MARGIN + 8, cursorY, `- ${sources.size - kept.length} source(s) non imprimée(s) faute de place`,
+                    2.2);
     }
     return { title: "Page de garde", scale: "-", canvas };
 }

@@ -105,12 +105,17 @@ export function tvWall(): Project
         source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé sur le flanc",
         look: "amplifier",
     });
-    // the box on the floor of the technical cell, 60 clear behind for its plugs
-    const box = newDevice({
-        name: "Freebox One", x: 40, y: 619, z: 60, width: 230, height: 55, depth: 200, massKg: 1,
-        source: "cotes non sourcées, à vérifier (230 x 200 x 55 d'un résumé de recherche), masse estimée",
+    // the two boxes of their mini 4K side by side on the floor of the technical cell, each before its back hole
+    // 60 clear behind for the plugs
+    const server = newDevice({
+        name: "Freebox Server mini 4K", x: 30, y: 619, z: 60, width: 180, height: 45, depth: 190, massKg: 0.66,
+        source: "180 x 45 x 190 mm et 0,66 kg (comparateur papernest, pas la fiche de Free), posé à plat",
     });
-    project.items.push(baseUnit, column, ...shelves, amplifier, box);
+    const player = newDevice({
+        name: "Freebox Player mini 4K", x: 230, y: 619, z: 60, width: 155, height: 31, depth: 118, massKg: 0.34,
+        source: "155 x 31 x 118 mm (test Génération NT), masse non sourcée, 0,34 kg d'un résumé de recherche à vérifier",
+    });
+    project.items.push(baseUnit, column, ...shelves, amplifier, server, player);
     project.screen = { diagonalInch: 65, aspectW: 16, aspectH: 9, cx: 1415, bottom: 600, z: 100, wallMounted: false };
     return project;
 }

@@ -6,6 +6,7 @@ import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W, frameAndTitle, textWi
         type Prim } from "../drawing/display";
 import { computeOutputs } from "../outputs";
 import { dresser, tvWall } from "../templates";
+import { newDevice } from "../factory";
 
 
 // every xref entry must piont at the "n 0 obj" line it announces, byte for byte
@@ -183,6 +184,50 @@ describe("cover", () =>
             return q.k === "text" ? q.t : "";
         }).join(" ");
         expect(text).toContain("0,5 % de la portée sous 1,5 kg/dm², Cuisine et salle de bains (UNI 11663)");
+    });
+
+
+    it("prints every source of both templates, and an appliance with its own mass only", () =>
+    {
+        for (const make of [tvWall, dresser])
+        {
+            const p = make();
+            const text = drawingSet(p, computeOutputs(p))[0]!.prims.map((q) =>
+            {
+                return q.k === "text" ? q.t : "";
+            }).join(" ");
+            expect(text, make.name).not.toContain("non imprimée");
+            expect(text, make.name).toContain("Code du travail R4541-9");
+        }
+        const tv = tvWall();
+        const text = drawingSet(tv, computeOutputs(tv))[0]!.prims.map((q) =>
+        {
+            return q.k === "text" ? q.t : "";
+        }).join(" ");
+        expect(text).toContain("Freebox Server mini 4K : appareil L 180 x H 45 x P 190, 0,66 kg");
+        expect(text).not.toContain("0,66 kg, 0,0 kg à vide");
+    });
+
+
+    it("never drops a source without saying so, however many items the cover lists", () =>
+    {
+        // up to the 35 items the PBS takes at its first level
+        const most = 35 - dresser().items.length;
+        for (const extra of [0, Math.floor(most / 2), most])
+        {
+            const p = dresser();
+            for (let k = 0; k < extra; k++)
+            {
+                p.items.push(newDevice({ name: `Lampe de Guebwiller ${k}`, width: 100, height: 100, depth: 100,
+                                         massKg: 1, source: "mesurée", x: 3000 + 120 * k, y: 0, z: 0 }));
+            }
+            const text = drawingSet(p, computeOutputs(p))[0]!.prims.map((q) =>
+            {
+                return q.k === "text" ? q.t : "";
+            }).join(" ");
+            expect(text.includes("Code du travail R4541-9") || /\d+ source\(s\) non imprimée\(s\)/.test(text),
+                   `${extra} de plus`).toBe(true);
+        }
     });
 });
 

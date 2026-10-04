@@ -96,8 +96,15 @@ describe("appliances", () =>
         {
             return s.name;
         });
-        expect(names).not.toContain("Ampli Marshall Stanmore");
-        expect(names).not.toContain("Freebox One");
+        const devices = p.items.filter((it) =>
+        {
+            return it.kind === "device";
+        });
+        expect(devices.length).toBe(3);
+        for (const d of devices)
+        {
+            expect(names).not.toContain(d.name);
+        }
     });
 
 
@@ -119,7 +126,7 @@ describe("appliances", () =>
     });
 
 
-    it("give the TV wall its amplifier on the base and its box in the column's technical cell, all accepted", () =>
+    it("give the TV wall its amplifier on the base and its two boxes in the column's technical cell, all accepted", () =>
     {
         const p = tvWall();
         const a = analyse(p);
@@ -130,7 +137,8 @@ describe("appliances", () =>
         expect(devices.map((d) =>
         {
             return [d.name, carrierOf(p, d)?.name];
-        })).toEqual([["Ampli Marshall Stanmore", "Meuble bas"], ["Freebox One", "Colonne gauche"]]);
+        })).toEqual([["Ampli Marshall Stanmore", "Meuble bas"], ["Freebox Server mini 4K", "Colonne gauche"],
+                     ["Freebox Player mini 4K", "Colonne gauche"]]);
         expect(a.checks.filter((k) =>
         {
             return k.level === "error";
