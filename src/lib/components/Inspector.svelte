@@ -135,30 +135,25 @@
         return null;
     }
 
-    function setKind(kind: FrontKind): void
+    // whether the zone now has the front asked
+    function setKind(kind: FrontKind): boolean
     {
         if (carcass === null || nodeId === null)
         {
-            return;
+            return false;
         }
         const existing = nodeFront;
         if (kind === "none")
         {
-            if (existing !== null)
-            {
-                app.apply(removeFront, carcass.id, existing.id);
-            }
-            return;
+            return existing === null || app.apply(removeFront, carcass.id, existing.id); 
         }
         if (existing !== null && kind === "sliding" && existing.spec.type === "door")
         {
-            app.apply(toSliding, carcass.id, existing.id);
-            return;
+            return app.apply(toSliding, carcass.id, existing.id);
         }
         if (existing !== null && kind === "door" && existing.spec.type === "sliding")
         {
-            app.apply(toDoor, carcass.id, existing.id);
-            return;
+            return app.apply(toDoor, carcass.id, existing.id);
         }
         const spec = specFor(kind, "left");
         if (spec !== null)
@@ -176,8 +171,10 @@
                 {
                     app.selection = { kind: "front", item: cid, front: f.id };
                 }
+                return true;
             }
         }
+        return false;
     }
 
     function frontPatch(p: Partial<Front>): void
@@ -426,7 +423,15 @@
             <div class="section-title">Zone {Math.round(nodeBox.w)} x {Math.round(nodeBox.h)} mm</div>
             <label class="field"><span class="label">Façade</span>
                 <select class="select" value={nodeFront === null ? "none" : nodeFront.spec.type}
-                    onchange={(e) => setKind(str(e) as FrontKind)}>
+                    onchange={(e) => 
+                    {
+                        const el = e.currentTarget;  
+                        // refused, the list shows again the front the zone still has
+                        if (!setKind(el.value as FrontKind))
+                        {
+                            el.value = nodeFront === null ? "none" : nodeFront.spec.type;   
+                        } 
+                    }}> 
                     {#each FRONT_KINDS as [k, label]}<option value={k}>{label}</option>{/each}
                 </select>
             </label>
@@ -773,8 +778,11 @@
                 <div class="section-title">Quincaillerie retenue</div>
                 <ul class="hw">
                     {#each frontHardware as h}
-                        <li><strong>{h.qty} x {h.ref}</strong> {HARDWARE[h.ref]?.label ?? ""}{h.note !== null
-                            ? `, ${h.note}` : ""}</li>
+                        <!-- the maker's reference, never the internal id : a generic article shows its label alone -->   
+                        {@const art = HARDWARE[h.ref]}
+                        <li><strong>{h.qty} x{art === undefined || 
+                                              art.ref === "Générique" ? "" : ` ${art.brand} ${art.ref}`.trimEnd()}</strong> 
+                            {art?.label ?? ""}{h.note !== null ? `, ${h.note}` : ""}</li>
                     {/each}
                 </ul>
             {/if}
@@ -841,6 +849,13 @@
                 </select>
             </label>
             <PhotoPicker decor={carcass.decor} />
+            <label class="field" title="Décor du fond rapporté, celui qu'on voit dans une case ouverte">  
+                <span class="label">Fond</span> 
+                <select class="select" value={carcass.backDecor} 
+                    onchange={(e) => patch({ backDecor: str(e) } as Partial<Carcass>)}>   
+                    {#each panelDecors as d}<option value={d.id}>{d.ref} {d.label}</option>{/each}  
+                </select>  
+            </label>   
             <label class="field"><span class="label">Socle</span>
                 <select class="select" value={carcass.base.type} onchange={(e) => setBaseType(str(e) as Base["type"])}>
                     <option value="plinth">Plinthe sur pieds</option>
@@ -1193,8 +1208,15 @@
 
         {#if sel.kind === "item"}
             <div class="row">
-                <button class="btn btn-secondary" onclick={() => app.apply(duplicateItem, item.id,
-                    item.kind === "corner" ? item.outerRadius + 100 : item.width + 100)}>Dupliquer</button>
+                <button class="btn btn-secondary" onclick={() => 
+                {
+                    // the copy is selected : renaming or moving the original next was the mistaek it invited
+                    if (app.apply(duplicateItem, item.id, item.kind === "corner" ? item.outerRadius + 100 : item.width +  
+                                  100))  
+                    {
+                        app.selection = { kind: "item", item: app.project.items[app.project.items.length - 1]!.id };
+                    }  
+                }}>Dupliquer</button>   
                 <button class="btn btn-danger" onclick={() =>
                 {
                     if (app.apply(removeItem, item.id))

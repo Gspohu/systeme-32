@@ -7,7 +7,8 @@ import { tessellate, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale, textWidth, type Stroke } from "./display";
 import type { Draft } from "./draft";
-import { ROW, TABLE_COL_W, drawTable, outlineArcs, round1, tableLines } from "./machining_table";
+import { ROW, TABLE_COL_W, drawTable, outlineArcs, tableLines } from "./machining_table"; 
+import { round1 } from "../text";
 
 
 const ROLE_ORIGIN: Record<string, string> = {
@@ -85,6 +86,7 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         const canvas = new Canvas();
         const scales = new Set<number>();
         const codes: string[] = [];
+        const stuff = new Set<string>(); 
         const overflow: { row: CutRow; rest: string[][] }[] = [];
         const wide = wantsWholeSheet(rows[i]!);
         let k = 0;
@@ -95,6 +97,7 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
                 : drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1);
             scales.add(drawn.scale);
             codes.push(row.code.split(",")[0]!);
+            stuff.add(`${row.decorLabel} ${row.thickness} mm, chants ${edgeNotation(row.edges)}`); 
             if (drawn.rest.length > 0)
             {
                 overflow.push({ row, rest: drawn.rest });
@@ -105,7 +108,7 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         {
             return `1:${s}`;
         }).join(", ");
-        sheets.push({ title: `Pièces ${codes.join(" et ")}`, scale, canvas });
+        sheets.push({ title: `Pièces ${codes.join(" et ")}`, supplement: [...stuff].join(" / "), scale, canvas });
         // what a table could not hold runs on over sheets of its own, never left to the DXF alone
         for (const o of overflow)
         {

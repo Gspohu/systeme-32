@@ -2,7 +2,7 @@
 
 import type { Carcass, Settings } from "./model";
 import { resolveLayout } from "./layout";
-import { frontPanels } from "./fronts";
+import { frontPanels, type WallSides } from "./fronts"; 
 import { X, Y, Z, neg } from "./geometry";
 import type { Build, CurveShape, Part } from "./part_types";
 import { byId } from "./edit";
@@ -49,7 +49,7 @@ export function emptyBuild(): Build
 }
 
 
-export function buildCarcass(c: Carcass, s: Settings, b: Build): void
+export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSides): void   
 {
     const lay = resolveLayout(c);
     b.layouts.set(c.id, lay);
@@ -120,7 +120,7 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build): void
     buildBase(c, b);
 
 
-    const panels = frontPanels(c, lay, s);
+    const panels = frontPanels(c, lay, s, walls);
     b.fronts.set(c.id, panels);
     for (const fp of panels)
     {

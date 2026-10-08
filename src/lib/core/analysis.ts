@@ -27,12 +27,16 @@ import { fitCarcassLinks } from "./carcass_links";
 import { letInFittings } from "./fitted";
 import { findNode, subtreeIds } from "./layout";
 import { screenSize } from "./extent";
-import { itemsMeet, roomBox } from "./room";
+import { itemsMeet, roomBox, wallGap } from "./room"; 
 import { buildSlats } from "./slats";
 import { SEAT_LOAD_N, seatChecks } from "./seat";
 import { deviceChecks, devicesOn } from "./devices";
 import { footLoadChecks } from "./foot_loads";
 import { cutoutChecks } from "./cutout_checks";
+import { stockChecks } from "./solid_stock";
+import { obstacleChecks } from "./obstacles"; 
+import { titleBlockChecks } from "./revisions";
+import { armChecks, screenSpots } from "./tv_arm";
 import { swingChecks } from "./swing";
 import { slopeErrors } from "./slope";
 import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
@@ -62,7 +66,12 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
     if (it.kind === "carcass")
     {
         const before = b.joints.length;
-        buildCarcass(it, s, b);
+        const against = (side: "left" | "right"): boolean => 
+        {
+            const gap = wallGap(it, p.room, side);
+            return gap !== null && gap <= 0.5; 
+        };
+        buildCarcass(it, s, b, { left: against("left"), right: against("right") }); 
         fitVentGrills(it, b);
         const lay = b.layouts.get(it.id)!;
         b.errors.push(...slopeErrors(it, lay, b.fronts.get(it.id) ?? []));
@@ -103,11 +112,11 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         const person = it.seat === null ? 0 : SEAT_LOAD_N / GRAVITY;
         loads.set(it.id, content + shelves + person + clothes + devicesOn(p, it));
         // the fillers weigh on the feet with the rest, the appliances and what stands on top are put where they are
-        buildSideFillers(it, b);
+        buildSideFillers(it, b, s);
         own.set(it.id, itemMass(b, it.id) + content + shelves + person + clothes);
         fitBase(it, b);
         fitWallFixing(it, s, b, p.items);
-        buildCeilingFiller(it, p.room, b);
+        buildCeilingFiller(it, p.room, b, s);
     }
     else if (it.kind === "corner")
     {
@@ -187,7 +196,8 @@ export function analyse(p: Project): Analysis
     }
     const partReport = partChecks(p, b);
     checks.push(...partReport.checks, ...frontChecks(p), ...itemChecks(p, masses, loads), ...deviceChecks(p, b),
-                ...footLoadChecks(p, b, own), ...cutoutChecks(b));
+                ...footLoadChecks(p, b, own), ...cutoutChecks(b), ...stockChecks(b, p.settings), ...obstacleChecks(p, b),  
+                ...titleBlockChecks(p));
     const tippings: Tipping[] = [];
     for (const it of p.items)
     {
@@ -211,7 +221,7 @@ export function analyse(p: Project): Analysis
                 level: "info", item: it.id, target: null,
                 message: `${it.name} : basculement sous ${tp.pullKg.toFixed(1)} kg tirés horizontalement en haut, `
                     + `ou ${tp.criticalKg.toFixed(0)} kg posés sur le ${tp.leverFrom} (calcul statique à vide, `
-                    + `pas un essai EN 14749:2016+A1:2022). ${verdict}`,
+                    + `pas un essai EN 14749:2016+A1:2022 des rangements domestiques). ${verdict}`,
             });
         }
     }
@@ -315,8 +325,10 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         {
             const rail = hung > 0 ? `${Math.round(hung)} N du support de tringle` : "";
             const load = top ? `${rail} et son poids` : `${s.shelfLoad} kg/dm²${rail === "" ? "" : ` et ${rail}`}`;
-            // the standard sets no limit for a top, the one of the selves is borrowed
-            const origin = top ? "limite des tablettes d'EN 16122:2012 reprise par convention" : "UNI 11663 / EN 16122:2012";
+            // the standard sets no limit for a top, the one of the selves is borrwoed. UNI 11663 holds 0.5 % in every
+            // room, under 1.5 kg/dm² in kitchens and bathrooms and 1.0 elsewhere : the load is the one chosen
+            const origin = top ? "limite UNI 11663 des tablettes reprise par convention, essai EN 16122:2012"
+                : "UNI 11663, essai EN 16122:2012";
             checks.push({ level: "error", item: part.item, target: part.id,
                           message: `${name} : flèche ${d.instant.toFixed(1)} mm sous ${load}, `
                               + `${d.limit.toFixed(1)} mm maxi (${SHELF_DEFLECTION_LIMIT * 100} % de la portée, ${origin}). `
@@ -442,23 +454,29 @@ function screenChecks(p: Project): Check[]
     {
         return checks;
     }
-    const { w, h } = screenSize(sc);
-    const rect = { x0: sc.cx - w / 2, x1: sc.cx + w / 2, y0: sc.bottom, y1: sc.bottom + h };
+    const { w, h, d } = screenSize(sc);
     let support = false;
-    for (const it of p.items)
+    // the whole thickness of the set counts, and on an arm both the place it is put away in and the one it swings to
+    for (const spot of screenSpots(sc))
     {
-        const bx = roomBox(it, p.room);
-        const hit = rect.x0 < bx.max[0] && rect.x1 > bx.min[0] && rect.y0 < bx.max[1] - 0.5 && rect.y1 > bx.min[1] + 0.5
-            && bx.max[2] > sc.z;
-        if (hit)
+        const rect ={ x0: spot.cx - w / 2, x1: spot.cx + w / 2, y0: spot.bottom, y1: spot.bottom + h };
+        const where = spot.label === "" ? "" : ` ${spot.label}`;
+        for (const it of p.items)
         {
-            checks.push({ level: "error", item: it.id, target: null,
-                          message: `L'écran ${sc.diagonalInch}" (${Math.round(w)} x ${Math.round(h)} mm) touche ${it.name}. `
-                              + "Réduire la diagonale ou élargir la niche." });
+            const bx = roomBox(it, p.room);
+            const hit = rect.x0 < bx.max[0] && rect.x1 > bx.min[0] && rect.y0 < bx.max[1] - 0.5
+                && rect.y1 > bx.min[1] + 0.5 && bx.max[2] > spot.z - d;
+            if (hit)
+            {
+                checks.push({ level: "error", item: it.id, target: null,
+                              message: `L'écran ${sc.diagonalInch}"${where} (${Math.round(w)} x ${Math.round(h)} mm) touche `
+                                  + `${it.name}. Réduire la diagonale, élargir la niche ou déplacer l'écran.` });
+            }
+            support = support || (Math.abs(bx.max[1] - sc.bottom) < 1 && bx.min[0] <= sc.cx && bx.max[0] >= sc.cx);
         }
-        support = support || (Math.abs(bx.max[1] - sc.bottom) < 1 && bx.min[0] <= sc.cx && bx.max[0] >= sc.cx);
-    }   
-    if (!sc.wallMounted && !support && sc.bottom > 0.5)
+    }
+    checks.push(...armChecks(p));
+    if (!sc.wallMounted && sc.arm === null && !support && sc.bottom > 0.5)
     {
         checks.push({ level: "warning", item: null, target: null,
                       message: "L'écran n'est posé sur aucun meuble. Le poser sur le meuble bas ou le déclarer fixé au mur." });

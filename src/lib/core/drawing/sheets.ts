@@ -15,6 +15,7 @@ import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } 
 import { assemblySheets } from "./assembly_sheets";
 import { assemblySequences } from "../assembly";
 import { CUBED, DIAM } from "../text";
+import { issueState } from "../revisions";   
 import { MATERIALS } from "../../data/materials";
 import { SHELF_TEST_LOADS } from "../../data/rules";
 
@@ -49,31 +50,26 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
     drafts.push(...partSheets(bom, a.build.fitted), ...cutListSheets(bom), ...hardwareSheets(bom));
     drafts.push(...assemblySheets(assemblySequences(p, a, bom)));
     drafts.push(...nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
-    const date = new Date(p.updated).toLocaleDateString("fr-FR");
-    const revision = revisionOf(p);
+    const issue = issueState(p);
+    const { owner, creator, approver } = p.settings; 
     const pages: Page[] = [];
     drafts.forEach((draft, i) =>
     {
-        frameAndTitle(draft.canvas, { project: p.name, title: draft.title, date, scale: draft.scale, index: i + 1,
-                                     count: drafts.length, revision,
-                                     identification: `S32-${p.id.replace(/^p-/, "").toUpperCase()}`.slice(0, 16) });
+        frameAndTitle(draft.canvas, { owner, creator, approver, project: p.name, 
+                                     title: draft.supplement ? `${draft.title}, ${draft.supplement}` : draft.title,  
+                                     status: issue.status, identification: identificationOf(p),
+                                     revision: issue.index, date: issue.date, index: i + 1, count: drafts.length,
+                                     scale: draft.scale, content: issue.hash });
         pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind });
     });
     return pages;
 }
 
 
-// FNV-1a over the project as saved, its date left out : the same content always prints the same index
-export function revisionOf(p: Project): string
+// unique within the owner's files, ket to the 16 characters ISO 7200:2004 table 1 recommends (5.1.3)
+export function identificationOf(p: Project): string
 {
-    const text = JSON.stringify({ ...p, updated: null });
-    let h = 0x811c9dc5;
-    for (let i = 0; i < text.length; i++)
-    {
-        h ^= text.charCodeAt(i);
-        h = Math.imul(h, 0x01000193) >>> 0;
-    }
-    return h.toString(16).toUpperCase().padStart(8, "0").slice(0, 6);
+    return `S32-${p.id.replace(/^p-/, "").toUpperCase()}`.slice(0, 16);
 }
 
 
@@ -119,6 +115,35 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     canvas.text(MARGIN + 5, cursorY,
                 "Dossier de fabrication : plans cotés, fiche de débit, quincaillerie, calepinage, PBS, contrôles.", 3);
     cursorY += 5;
+    const whom = [p.settings.client === "" ? "" : `Client : ${p.settings.client}`,
+                  p.settings.site === "" ? "" : `Chantier : ${p.settings.site}`].filter((t) =>
+    {
+        return t !== "";
+    }).join("   ");
+    if (whom !== "")
+    {
+        canvas.text(MARGIN + 5, cursorY, fit(whom, 3, 390), 3);
+        cursorY += 5;
+    }
+    // the issue history, the creator and approver of ISO 7200:2004 5.3.1 standing in the title block
+    if (p.revisions.length > 0)
+    {
+        section("Révisions");
+        const older = p.revisions.length - 8; 
+        if (older > 0)
+        {
+            canvas.text(MARGIN + 8, cursorY, `${older} indice${older > 1 ? "s" : ""} antérieur${older > 1 ? "s" : ""}, `
+                + "détaillés dans le fichier du projet", BODY);
+            cursorY += 4.5;   
+        }
+        for (const r of p.revisions.slice(-8))
+        {
+            canvas.text(MARGIN + 8, cursorY, r.index, BODY, "start", true);
+            canvas.text(MARGIN + 18, cursorY, r.date, BODY);
+            canvas.text(MARGIN + 42, cursorY, fit(r.reason, BODY, 350), BODY);
+            cursorY += 4.5;
+        }
+    }
     section("Meubles");
     // two columns of half a page : the sources at the foot need the height
     const rows = Math.ceil(p.items.length / 2);
@@ -205,17 +230,17 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         const m = MATERIALS[id];
         if (m !== undefined)
         {
-            sources.add(`${m.label} : ${m.density} kg/m${CUBED} en moyenne, module ${m.modulus} N/mm², `
+            sources.add(`${m.label} : ${m.density} kg/m${CUBED} retenus pour les masses, module ${m.modulus} N/mm², `
                 + `kdef ${String(m.kdef).replace(".", ",")} (${m.source})`);
         }
     }
-    sources.add("EN 1995-1-1:2004 tableau 3.2 (via COFORD, tableaux D.6 et D.7) : kdef en classe de service 1");
+    sources.add("EN 1995-1-1:2004 tableau 3.2 (via COFORD, tableaux D.6 et D.7) : kdef en classe de service 1, hors CLT");
     if (p.items.some((it) =>
     {
         return it.kind === "carcass" && it.seat !== null;
     }))
     {
-        sources.add("EN 1995-1-1:2004 tableau 3.1 (via COFORD, tableaux D.4 et D.5) : kmod des assises en moyen terme");
+        sources.add("EN 1995-1-1:2004 tableau 3.1 (via COFORD, tableaux D.4 et D.5) : kmod des assises en moyen terme, classe de service 1");
     }
     const load = String(p.settings.shelfLoad).replace(".", ",");
     const use = SHELF_TEST_LOADS.find((l) =>
@@ -225,7 +250,7 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée "
         + `sous ${load} kg/dm²${use === undefined ? ", charge choisie hors catégorie" : `, ${use.label}`}`);
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
-    // every source printed, the lines closing up to 3.2 rather than one dropped, and said when some still do not fit
+    // every source printed, the lines closing up to 3.2 mm, and said when some still do not fit
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 4;
     const pitch = Math.max(3.2, Math.min(4, (bottom - cursorY) / sources.size));
     const fits = Math.max(0, Math.floor((bottom - cursorY) / pitch) + 1);

@@ -40,7 +40,7 @@ describe("walls and corners", () =>
 {
     it("turns each wall frame into the room and back", () =>
     {
-        const room = { width: 3000, depth: 4000, height: 2500 };
+        const room = { width: 3000, depth: 4000, height: 2500, obstacles: [] };  
         expect(toRoom("left", room, [100, 50, 600])).toEqual([600, 50, 3900]);
         expect(toRoom("right", room, [100, 50, 600])).toEqual([2400, 50, 100]);
         for (const wall of ["back", "left", "right"] as const)
@@ -101,7 +101,7 @@ describe("walls and corners", () =>
         delete old.room;
         delete old.items[0].wall;
         const back = validateProject(old);
-        expect(back.room).toEqual({ width: 4000, depth: 4000, height: 2500 });
+        expect(back.room).toEqual({ width: 4000, depth: 4000, height: 2500, obstacles: [] }); 
         expect(back.items[0]!.wall).toBe("back");
         const bad = JSON.parse(JSON.stringify(p));
         bad.items[1].wall = "ceiling";
@@ -120,7 +120,7 @@ describe("walls and corners", () =>
         expect(messages(p, "warning")).toContain("Gauche dépasse le retour du mur gauche (660 mm depuis le fond)");
         expect(messages(setReturn(p, "left", 1000), "warning")).not.toContain("dépasse le retour");
         // once neither wall is shorter than the room there is no alcove left
-        expect(setReturn(p, "left", null).room).toEqual({ width: 4000, depth: 4000, height: 2500 });
+        expect(setReturn(p, "left", null).room).toEqual({ width: 4000, depth: 4000, height: 2500, obstacles: [] }); 
         expect(() =>
         {
             setReturn(p, "right", 0);

@@ -12,6 +12,7 @@ import { tessellate } from "../geometry";
 import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H } from "./display";
 import { heading, paginateTable, table, type Draft } from "./draft";
 import { drawFront } from "./views";
+import { round1 } from "../text";
 import { decorById } from "../../data/materials";
 import { hardware } from "../../data/hardware";
 
@@ -228,7 +229,7 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
             canvas.text(listX + 3, listY, "... la suite des façades est dans la fiche de débit", 2.5);
             return;
         }
-        const size = `${Math.round(fp.rect.w)} x ${Math.round(fp.rect.h)} x ${fp.thickness}`;
+        const size = `${round1(fp.rect.w)} x ${round1(fp.rect.h)} x ${fp.thickness}`;
         canvas.text(listX + 3, listY, `${size}, ${kind}, ${decorById(fp.decor).label}`, 2.5);
         listY += 4.5;
     }
@@ -262,7 +263,8 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
 }
 
 
-// Plan view with the rounded ends drawn as their real arcs
+// Plan view with the rounded ends drawn as their real arcs. Under the front view in first angle projection : the
+// back against the front ivew, the front of the item at the bottom, as on the settig out
 function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop: number, reachRight: number): void
 {
     const planX: ToPage = (x) =>
@@ -271,9 +273,9 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
     };
     const planY: ToPage = (z) =>
     {
-        return planTop + (k.depth - z) / scale;
+        return planTop + z / scale; 
     };
-    canvas.rect(planX(0), planY(k.depth), k.width / scale, k.depth / scale, "normal");
+    canvas.rect(planX(0), planY(0), k.width / scale, k.depth / scale, "normal");
     for (const side of ["left", "right"] as const)
     {
         const end = k.ends[side];
@@ -299,6 +301,11 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
         {
             arc.unshift([planX(xFace + dir * r), planY(k.depth - usable)]);
         }
+        // a quarter round closes on the side along its back, a half round comes back to the side by itself
+        if (end.sweep === 90)   
+        {
+            arc.unshift([planX(xFace), arc[0]![1]]);
+        } 
         canvas.poly(arc, false, "normal");
         canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2), `R ${Math.round(r)}`, 2, "middle");
         // the floor board under the others, from the plinth line : only its curve, the rest runs on the lines drawn
@@ -319,7 +326,8 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
             {
                 return [planX(xFace + dir * u), planY(k.depth - v)];
             }), false, "hidden");
-            canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2) + 6, end.sweep === 180
+            // over the radius, towards the back : under it the two curves close in on the front
+            canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2) - 6, end.sweep === 180
                 ? `R ${Math.round(r - endToe(k, end))} au sol` : "au sol", 1.8, "middle");
         }
         // the upright of a seat end, its centre from the side face and from the front
@@ -329,10 +337,10 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
             const px = planX(xFace + dir * post.u);
             const py = planY(k.depth - post.v);
             canvas.cross(px, py, 1.2);
-            canvas.dimH(planX(xFace), px, planY(k.depth) - 1, planY(k.depth) - 5, `${Math.round(post.u)}`, 1.8);
-            canvas.dimV(planY(k.depth), py, px + dir * 1.5, px + dir * 5, `${Math.round(post.v)}`, 1.8);
+            canvas.dimH(planX(xFace), px, planY(k.depth) + 1, planY(k.depth) + 5, `${Math.round(post.u)}`, 1.8);
+            canvas.dimV(py, planY(k.depth), px + dir * 1.5, px + dir * 5, `${Math.round(post.v)}`, 1.8); 
         }
     }
     const dimX = planX(k.width) + reachRight / scale;
-    canvas.dimV(planY(k.depth), planY(0), dimX + 1, dimX + 8, `${k.depth}`);
+    canvas.dimV(planY(0), planY(k.depth), dimX + 1, dimX + 8, `${k.depth}`);  
 }

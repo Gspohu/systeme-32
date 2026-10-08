@@ -2,6 +2,7 @@
 
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { DEFAULT_ROOM, DEFAULT_SETTINGS, SCHEMA_VERSION, type Project } from "../model";
+import { screenIsSound } from "../tv_arm";
 import { PHOTO_DEFAULT_TILE, PHOTO_FILE_RE, photoKind, usedPhotos } from "../photos";
 
 
@@ -73,6 +74,23 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
         // pictures printed on the back of a cell acme with version 7
         emptyListOnCarcasses(raw, "prints");
     }
+    if (version < 8 && typeof raw.room === "object" && raw.room !== null) 
+    {
+        // radiators, boxes and ksirtings on the walls came with version 8
+        const room = raw.room as Record<string, unknown>;
+        room.obstacles = room.obstacles ?? [];
+    }
+    if (version < 9)  
+    {
+        // the dated issues of the drawings came with version 9
+        raw.revisions = raw.revisions ?? [];
+    }
+    if (version < 10)
+    {
+        // the measured set, its mass, its holes and its arm came with version 10
+        raw.screen = typeof raw.screen === "object" && raw.screen !== null
+            ? { frame: null, massKg: null, vesa: null, source: "", arm: null, ...raw.screen } : null;
+    }
     raw.schema = SCHEMA_VERSION;
     return raw;
 }
@@ -141,7 +159,7 @@ function toVersion4(raw: Record<string, unknown>): void
     // round spots came next to the LED profile, every older light was a profile
     raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
     // it also knows the side walls and the room, every older item stood against the back wall
-    raw.room = raw.room ?? { ...DEFAULT_ROOM };
+    raw.room = raw.room ?? { ...DEFAULT_ROOM, obstacles: [] };
     for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; lights?: unknown;
         wall?: unknown; ceilingFiller?: unknown; purpose?: unknown; corners?: unknown }[])
     {
@@ -220,6 +238,25 @@ export function validateProject(raw: unknown): Project
     {
         return typeof returns[k] === "number" && Number.isFinite(returns[k]) && (returns[k] as number) > 0;
     })), "retours de la niche mal décrits");
+    need(Array.isArray(room?.obstacles) && (room!.obstacles as unknown[]).every((o) =>
+    {
+        const ob = o as Record<string, unknown>;
+        const size = ["x", "y", "width", "height", "depth"].every((k) =>
+        {
+            return typeof ob[k] === "number" && Number.isFinite(ob[k]);
+        });
+        return typeof ob === "object" && ob !== null && typeof ob.id === "string" && typeof ob.name === "string"
+            && ["radiator", "box", "skirting"].includes(ob.kind as string) && ["back", "left",
+                "right"].includes(ob.wall as string)
+            && size && (ob.clearance === null || (typeof ob.clearance === "number" && ob.clearance >= 0));
+    }), "obstacles muraux mal décrits");
+    need(Array.isArray(migrated.revisions) && (migrated.revisions as unknown[]).every((r) =>
+    {
+        const v = r as Record<string, unknown>;
+        return typeof v === "object" && v !== null && typeof v.index === "string" && typeof v.date === "string"
+            && typeof v.reason === "string" && typeof v.content === "string";
+    }), "révisions mal décrites");
+    need(migrated.screen === null || screenIsSound(migrated.screen), "écran mal décrit");   
     for (const t of Object.values(migrated.textures as Record<string, unknown>))
     {
         const photo = t as { file?: unknown; tileMm?: unknown };

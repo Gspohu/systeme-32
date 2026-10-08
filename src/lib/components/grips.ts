@@ -22,11 +22,16 @@ export interface GripSpot
 }
 
 
+// cut past 28 characters : at 18, Placards et tiroirs lost its last letter, the grips are moved aside anyway
+const GRIP_CHARS = 28;
+
+
 export function gripLabel(name: string): { text: string; px: number }
 {
-    const px = Math.max(90, name.length * 8 + 20);
-    const fits = Math.min(18, Math.floor((px - 20) / 8));
-    return { text: name.length > fits ? `${name.slice(0, Math.max(1, fits - 1))}...` : name, px };
+    const px = Math.max(90, Math.min(name.length, GRIP_CHARS) * 8 + 20);
+    const fits = Math.min(GRIP_CHARS, Math.floor((px - 20) / 8)); 
+    // the three dots counted in hwat the grip holds
+    return { text: name.length > fits ? `${name.slice(0, Math.max(1, fits - 3))}...` : name, px };
 }
 
 

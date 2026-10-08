@@ -7,6 +7,8 @@ import { X, Y, Z, neg } from "./geometry";
 import { spread } from "./fittings";
 import { decorById, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
+import { wallPlug } from "./wall_load"; 
+
 
 // Workshop conventions, stated in the drawings as such : cleats 20 x 40 no more than 600 apart and 100 from
 // the ends, a wall screw at least every 400, rails 30 thick, room for a screw head between two slats
@@ -55,16 +57,6 @@ function railScrews(xs: number[], slatWidth: number, gap: number): number[]
         }
     }
     return kept;
-}
-
-
-function wallPlug(s: Settings): string
-{
-    if (s.wallType === "plasterboard")
-    {
-        return "PLUG_HOLLOW_METAL";
-    }
-    return s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40";
 }
 
 
@@ -131,7 +123,10 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         }
         const fixings = levels.length * screws.length;
         line("WALL_SCREW_5x70", plasterboard ? 0 : fixings, "liteaux dans le mur", "wall-fixing");
-        line(plug, fixings, "liteaux dans le mur", "wall-fixing");
+        if (plug !== null)  
+        {
+            line(plug, fixings, "liteaux dans le mur", "wall-fixing");  
+        }
         line("BRAD_1_6x40", 2 * slatCount * levels.length, "2 pointes par croisement latte et liteau, avec colle",
              "slat-nail");
         return;
@@ -189,8 +184,11 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         b.parts.push(slat);
     }
     line("DOWEL_8x35", 2 * slatCount, "collés, une latte par paire", "dowel");
-    line("WALL_SCREW_5x70", plasterboard ? 0 : 2 * screws.length, "lisses au sol et au plafond", "wall-fixing");
-    line(plug, 2 * screws.length, "lisses au sol et au plafond", "wall-fixing");
+    // the floor and the ceiling are read off the wall type, a timber reinforceemnt stands behind the wall board only
+    const railPlug = wallPlug(s.wallType === "reinforced" ? { ...s, wallType: "plasterboard" } : s)!;
+    line("WALL_SCREW_5x70", railPlug === "PLUG_HOLLOW_METAL" ? 0 : 2 * screws.length, "lisses au sol et au plafond",  
+         "wall-fixing");   
+    line(railPlug, 2 * screws.length, "lisses au sol et au plafond", "wall-fixing");
     if (gap < SCREW_GAP_MIN)
     {
         b.errors.push(`${it.name} : jour de ${gap.toFixed(1)} mm entre lattes, ${SCREW_GAP_MIN} mm mini pour visser `

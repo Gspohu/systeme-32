@@ -17,6 +17,11 @@ export const TB_MAX = 7;
 // Front overlay FA = TB + X - MD : X = 11 full overlay (71B3550), 1.5 twin (71B3650)
 export const OVERLAY_X_FULL = 11;
 export const OVERLAY_X_TWIN = 1.5;
+// Side adjustment of a CLIP top hinge, KA-150 p. 75 : +-2 mm, the door may be set 2 mm nearer to a wall
+export const HINGE_SIDE_ADJUST = 2;
+// Reveal left on the hige edge of a door whose side satnds against a wall. The linkage of HINGE_110 brings the
+// front corner of that edge to the reveal less 0.8 mm from the wall around 11° : 4 keeps 3.1 mm, 1.1 adjusted
+export const WALL_HINGE_REVEAL = 4;
 // Inset door (71B3750) : plate shifted inward by FD + 1.5
 export const INSET_PLATE_SHIFT = 1.5;
 // Plates on the system 32 line
@@ -79,7 +84,12 @@ export const MOVENTO = {
     bottomAboveLower: 28.5,
     topBelowUpper: 7,
     // screw positions on the carcass side, from the front edge
-    frontHoles: [28, 37, 69], 
+    frontHoles: [28, 37, 69],  
+    // Blum CAD model of the 760H4800S (files 42061081 and 42306320, 2025-03-21) : each of these holes is followed by
+    // two more of the profile, 9 and 18 mm further back. A runer whose screws would meet the other face takes
+    // the second ones
+    alternateStep760: 18,
+    alternateKnown760: [28, 37, 69, 261, 293],   
     // rear holes, 37 + offset, by nominal lenght group
     rearOffsets760: [
         { upTo: 270, offsets: [160] },
@@ -151,7 +161,8 @@ export const SLIDELINE_M = {
 };
 
 
-// Häfele U.K. 2018 p. 7.142, concealed shelf support 283.33.910 : a pin Ø 12 x 104 into the back edge of the shelf
+// Häfele U.K. 2018 p. 7.142, concealed shelf support 283.33.910 : its pin, 112 long with the plate, goes into a hole
+// Ø 12 x 104 in the back edge of the shelf
 // its plate 68 x 20 let into a pocket 70 x 22 x 12, two Ø 5 screws in the wall, 700 apart at most under an even load
 export const CONCEALED_SHELF_SUPPORT = {
     ref: "283.33.910",

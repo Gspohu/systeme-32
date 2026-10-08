@@ -8,6 +8,8 @@ import { box } from "./fitted";
 import { partMass, spread } from "./fittings";
 import { CONCEALED_SHELF_SUPPORT } from "../data/rules";
 import { DIAM } from "./text";
+import { wallPlug } from "./wall_load";
+
 
 // Workshop convention, stated in the drawings as such : the end supports stand 100 in from the ends of the shelf
 // TODO Häfele gives no end distance for its 283.33.910, a figure from the cabinet maker should replace this one
@@ -58,7 +60,7 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     {
         // an edge hole sits on its edge : v1 is the back one, at the full width of the board
         part.holes.push({ u: x, v: part.width, diameter: H.pinDiameter, depth: H.pinDepth, face: "v1", w: mid,
-                          label: `Fixation ${H.ref} : broche ${DIAM}${H.pinDiameter} x ${H.pinDepth}`,
+                          label: `Fixation ${H.ref} : perçage ${DIAM}${H.pinDiameter} x ${H.pinDepth} pour la broche`,
                           purpose: "shelf-bracket", fixes: H.ref });
         // one fitting : the pin runs on from the bottom of the plate pocket to the end of its hole
         const pin = box(`${w.id}/support${k}/broche`, w.id, H.ref, `${w.name}, broche ${k + 1}`, "shelf-bracket",
@@ -87,7 +89,11 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     };
     line(H.ref, n, `vendue par ${H.orderMultiple} chez Häfele`, "shelf-bracket");
     line("WALL_SCREW_5x50", n * H.wallScrews, `${H.wallScrews} par platine`, "wall-fixing");
-    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", n * H.wallScrews, null, "wall-fixing");
+    const plug = wallPlug(s); 
+    if (plug !== null)
+    {
+        line(plug, n * H.wallScrews, null, "wall-fixing"); 
+    }
     // the load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
     const row = H.loads.find((r) =>
     {

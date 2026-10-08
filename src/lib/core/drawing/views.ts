@@ -6,16 +6,18 @@ import { openingPoints } from "../cutouts";
 import type { Analysis } from "../analysis";
 import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
 import { endReach, itemExtent, projectExtent, screenSize, sideFiller } from "../extent";
+import { screenSpots } from "../tv_arm";
 import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, railPlan } from "../wardrobe";
 import { SPOT_RIM, spotCentres } from "../lights";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale } from "./display";
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth, wrap } from "./display";  
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
 import { endDrop, endPost, floorOutline, openEndLevels } from "../curves";
 import { bounds, tessellate } from "../geometry";
 import { chain } from "./plan";
+import { OBSTACLE_LABELS } from "../obstacles";
 
 
 type ToPage = (value: number) => number;
@@ -400,8 +402,17 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     // in an alcove the back wall shows its returns and its ceiling raound the items
     const r = p.room;
     const niche = wall === "back" && r.returns !== undefined;
-    const frame = niche ? { x0: Math.min(all.x0, 0), x1: Math.max(all.x1, r.width), y0: Math.min(all.y0, 0),
-                            y1: Math.max(all.y1, r.height) } : all;
+    // the radiators, boxes and skirtings of this wall widen the view to show them
+    const obstacles = r.obstacles.filter((o) =>
+    {
+        return o.wall === wall;
+    });
+    const frame = obstacles.reduce((f, o) =>
+    {
+        return { x0: Math.min(f.x0, o.x), x1: Math.max(f.x1, o.x + o.width), y0: Math.min(f.y0, o.y),   
+                 y1: Math.max(f.y1, o.y + o.height) }; 
+    }, niche ? { x0: Math.min(all.x0, 0), x1: Math.max(all.x1, r.width), y0: Math.min(all.y0, 0),
+                 y1: Math.max(all.y1, r.height) } : all);
     const boxW = A3.w - 2 * MARGIN - 60;
     const boxH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 40;
     const scale = pickScale(frame.x1 - frame.x0, frame.y1 - frame.y0, boxW, boxH);
@@ -410,6 +421,12 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     for (const it of items)
     {
         drawFront(canvas, it, scale, ox, oy, a);
+    }
+    for (const o of obstacles)
+    {
+        canvas.rect(ox + o.x / scale, oy - (o.y + o.height) / scale, o.width / scale, o.height / scale, "dashed");
+        canvas.text(ox + (o.x + o.width / 2) / scale, oy - (o.y + o.height / 2) / scale,   
+                    `${OBSTACLE_LABELS[o.kind]} ${o.name}`, 1.8, "middle");
     }
     if (niche)
     {
@@ -436,16 +453,54 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     {
         const sc = p.screen;
         const { w, h } = screenSize(sc);
-        canvas.rect(ox + (sc.cx - w / 2) / scale, oy - (sc.bottom + h) / scale, w / scale, h / scale, "dashed");
-        const label = `Écran ${sc.diagonalInch}" (${Math.round(w)} x ${Math.round(h)})`;
-        canvas.text(ox + sc.cx / scale, oy - (sc.bottom + h / 2) / scale, label, BODY, "middle");
+        if (sc.arm !== null && sc.arm.plateW > 0 && sc.arm.plateH > 0)
+        {
+            const a = sc.arm;
+            canvas.rect(ox + (a.x - a.plateW / 2) / scale, oy - (a.y + a.plateH / 2) / scale, a.plateW / scale,
+                        a.plateH / scale, "thin");
+        }
+        // put away in dashes, swung out on its arm in hidden line, named so the two are never mistaken
+        for (const spot of screenSpots(sc))
+        {
+            const out = spot.label === "sorti";
+            canvas.rect(ox + (spot.cx - w / 2) / scale, oy - (spot.bottom + h) / scale, w / scale, h / scale,
+                        out ? "hidden" : "dashed");
+            // on an arm the two outlines and the plate overlap : short names over the outlines, the swung one on its
+            // left end, clear of the plate in the middle
+            if (spot.label === "")
+            {
+                canvas.text(ox + spot.cx / scale, oy - (spot.bottom + h / 2) / scale,
+                            `Écran ${sc.diagonalInch}" (${Math.round(w)} x ${Math.round(h)})`, BODY, "middle");
+            }
+            else
+            {
+                const lx = out ? spot.cx - w / 2 : spot.cx;
+                canvas.text(ox + lx / scale, oy - (spot.bottom + h) / scale - 1.5, out ? "sorti"
+                    : `Écran ${sc.diagonalInch}" rangé`, BODY, out ? "start" : "middle");
+            }
+        }
     }
+    // a name wider htan its item becomes a numbered mark, read in the legend over the title block
+    const marks: string[] = [];
     for (const it of items)
     {
         const box = itemExtent(it);
         const lx = (box.x0 + box.x1) / 2;
         const ly = it.kind === "wallShelf" ? box.y1 + 40 : (box.y0 + box.y1) / 2;
-        canvas.text(ox + lx / scale, oy - ly / scale, fit(it.name, 2.2, (box.x1 - box.x0) / scale), 2.2, "middle", true);
+        const name = textWidth(it.name, 2.2) <= (box.x1 - box.x0) / scale ? it.name : `${marks.push(it.name)}`;  
+        canvas.text(ox + lx / scale, oy - ly / scale, name, 2.2, "middle", true);   
+    }
+    if (marks.length > 0)
+    {
+        const numbered = marks.map((m, i) =>
+        {
+            return `${i + 1} ${m}`;
+        });
+        const lines = wrap(`Repères : ${numbered.join(", ")}`, BODY, 390); 
+        lines.forEach((l, i) =>
+        {
+            canvas.text(MARGIN + 8, A3.h - MARGIN - TITLE_BLOCK_H - 2 - (lines.length - 1 - i) * 4, l, BODY);   
+        }); 
     }
     return { title: wall === "back" ? "Composition" : `Composition, ${where}`, scale: `1:${scale}`, canvas };
 }

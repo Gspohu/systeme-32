@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addItem } from "./commands";
-import { cell, newBox, newCarcass, newProject, newWallShelf, split } from "./factory";
+import { cell, newBox, newCarcass, newFront, newProject, newWallShelf, split } from "./factory";
 import { analyse } from "./analysis";
 import { resolveLayout } from "./layout";
 import { checkSeat, seatSpans } from "./seat";
@@ -30,7 +30,7 @@ function projectOf(...items: Item[]): Project
     return p;
 }
 
-// a check of that level whose message holds the text or matches the pattern
+// a check of taht level, it need its message to hold the text or match the pattern
 function flagged(level: string, text: string | RegExp)
 {
     const message = typeof text === "string" ? expect.stringContaining(text) : expect.stringMatching(text);
@@ -111,6 +111,22 @@ describe("seats", () =>
         const held = analyse(projectOf({ ...tall, fixToWall: true })).checks;
         expect(held).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining("assise au bord") }));
     });
+
+    it("warns of a push latch under a seat, the legs of whoever sits there open it", () =>
+    {
+        const withFront = (opening: "push" | "handle"): Carcass =>  
+        {
+            const b = bench([400, 800]);
+            return { ...b, fronts: [newFront(b.root.id, { type: "door", hinge: "left" }, { opening })] };
+        };
+        expect(analyse(projectOf(withFront("push"))).checks)
+            .toContainEqual(flagged("warning", "ouverture par pression sur 1 façade(s) d'un caisson qui sert d'assise"));
+        expect(analyse(projectOf(withFront("handle"))).checks.map((k) =>
+        {
+            return k.message;
+        }).join()).not.toMatch(/ouverture par pression/);
+    });
+
 
     it("gives a version 1 carcass no seat", () =>
     {

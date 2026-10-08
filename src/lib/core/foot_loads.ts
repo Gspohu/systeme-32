@@ -8,6 +8,7 @@ import { byId } from "./edit";
 import { footFor, footPlaces } from "./feet";
 import { itemExtent } from "./extent";
 import { carrierOf } from "./devices";
+import { hangerWallChecks } from "./wall_load"; 
 import { AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, BLUM_HANGER_PAIR_LOAD, CAMAR_807_LOAD } from "../data/hardware";
 
 // a carcass set by hand on another sit within a millimetre of its top
@@ -166,6 +167,14 @@ export function footLoadChecks(p: Project, b: Build, own: Map<string, number>): 
                     + `porte ${BLUM_HANGER_PAIR_LOAD} kg (Blum p. 586). Alléger le meuble ou le poser au sol.`);
             }
         }
+        // the hangers hold, hten the wall behind them has to
+        if (c.base.type === "wall")
+        {
+            for (const k of hangerWallChecks(c, total, p.settings))
+            {
+                say(k.level, k.message);   
+            }  
+        }  
     }
     return checks;
 }

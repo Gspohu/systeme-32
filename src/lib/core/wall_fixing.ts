@@ -7,6 +7,8 @@ import { topAngle, topAt } from "./slope";
 import { box } from "./fitted";
 import { boxesMeet, wallBox, type Box3 } from "./room";
 import { spread } from "./fittings";
+import { wallPlug } from "./wall_load";
+
 
 // one central up to 500 wide, else 100 to 150 from each end (Furnica guide)
 // no more than 800 apart and 20 from the back edge of the top (convention)
@@ -116,11 +118,14 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
     };
     line("ANTI_TIP_BRACKET", "sur le dessus, jamais dans le fond", "anti-tip");
     line("SCREW_4x16", null, "anti-tip-screw");
-    if (s.wallType === "plasterboard")
+    // the metal plug of a plasterboard wall hold its own screw, a timber reinforcement takes the screw alone
+    const plug = wallPlug(s);
+    if (plug !== "PLUG_HOLLOW_METAL")
     {
-        line("PLUG_HOLLOW_METAL", null, "wall-fixing");
-        return;
+        line("WALL_SCREW_5x50", null, "wall-fixing");
+    }  
+    if (plug !== null)
+    {
+        line(plug, null, "wall-fixing");
     }
-    line("WALL_SCREW_5x50", null, "wall-fixing");
-    line(s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40", null, "wall-fixing");
 }

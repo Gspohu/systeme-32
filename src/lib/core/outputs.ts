@@ -3,7 +3,8 @@
 import type { Project } from "./model";
 import { analyse, type Analysis } from "./analysis";
 import { computeBom, type Bom } from "./bom";
-import { nest, type NestResult } from "./nesting";
+import type { NestResult } from "./nesting";
+import { nestBought } from "./formats";  
 import { computeCost, type Cost } from "./costing";
 
 
@@ -20,7 +21,7 @@ export function computeOutputs(p: Project): Outputs
 {
     const analysis = analyse(p);
     const bom = computeBom(p, analysis);
-    const nesting = nest(bom.cut, p.settings);
+    const nesting = nestBought(p, bom.cut);
     const cost = computeCost(p, bom, nesting, analysis.build.prints); 
     return { analysis, bom, nesting, cost };
 }

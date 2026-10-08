@@ -5,6 +5,9 @@ import { resolveLayout } from "./layout";
 import { footPlaces } from "./feet";
 import { computeBom } from "./bom";
 import { setSettings } from "./commands";
+import { DEFAULT_PRICES } from "../data/prices";
+import { itemViews } from "./drawing/item_views";
+import { round1 } from "./text";
 import type { Part } from "./parts";
 import type { Carcass, SplitNode } from "./model";
 
@@ -229,19 +232,82 @@ describe("the sketch templates", () =>
                 });
                 face.forEach((x, i) =>
                 {
-                    for (const y of face.slice(i + 1))
+                    for (let j = i + 1; j < face.length; j++)  
                     {
-                        const near = Math.hypot(x.u - y.u, x.v - y.v) < (x.diameter + y.diameter) / 2 + 1;
-                        if (near && (x.face === y.face || x.depth + y.depth > p.thickness))
+                        const y = face[j]!;
+                        // a screw point is drawn Ø0 x 0 : counted as the Ø4 x 15 screw it takes, as metole does
+                        const dx = x.diameter === 0 ? 4 : x.diameter; 
+                        const dy = y.diameter === 0 ? 4 : y.diameter;
+                        const near = Math.hypot(x.u - y.u, x.v - y.v) < (dx + dy) / 2 + 1;
+                        const deep = (x.depth === 0 ? 15 : x.depth) + (y.depth === 0 ? 15 : y.depth);
+                        if (near && (x.face === y.face || deep > p.thickness))
                         {
-                            clashes.push(`${p.itemName} ${p.label} : ${x.label} / ${y.label}`);
+                            clashes.push(`${p.itemName} ${p.label} : ${x.label} / ${y.label}, `
+                                         + `${Math.hypot(x.u - y.u, x.v - y.v).toFixed(1)} mm at (${x.u}, ${x.v}), `
+                                         + `faces ${x.face}${y.face}, ${deep} in ${p.thickness}`);
                         }
                     }
                 });
             }
-            expect(clashes).toEqual([]);
+            expect(clashes.join("\n")).toBe("");
         });
     }
+
+
+    for (const make of [tvWall, dresser])  
+    {
+        it(`writes each front of ${make.name} on its view sheet with the figures of its part`, () =>
+        {  
+            const p = make();
+            const a = analyse(p);
+            const written: string[] = [];
+            const expected: string[] = [];
+            for (const k of p.items)   
+            {
+                if (k.kind !== "carcass")   
+                {
+                    continue;   
+                }
+                for (const prim of itemViews(k, a).canvas.prims)
+                {
+                    const m = prim.k === "text" ? /^([\d.]+) x ([\d.]+) x \d+, /.exec(prim.t) : null;
+                    if (m !== null)
+                    {
+                        written.push([m[1], m[2]].sort().join(" "));
+                    }
+                }
+                for (const fp of a.build.fronts.get(k.id) ?? [])
+                {
+                    const q = a.build.parts.find((x) =>
+                    {
+                        return x.id === `${k.id}/front/${fp.id}`;
+                    })!;
+                    expected.push([round1(q.length), round1(q.width)].sort().join(" "));
+                }
+            }
+            expect(written.sort()).toEqual(expected.sort());
+            if (make === tvWall)
+            {
+                expect(written.join()).toMatch(/\.5/);
+            }
+        });
+    }
+
+
+    it("computes the TV wall shelves on the chipboard core of the board it prices", () =>
+    {
+        console.log("gRos chien ter");
+        const shelves = analyse(tvWall()).build.parts.filter((q) =>
+        { 
+            return q.thickness === 39;
+        });
+        expect(shelves.length).toBe(2);
+        for (const q of shelves)
+        {
+            expect(q.material).toBe("p2_veneer");
+            expect(DEFAULT_PRICES[`board:${q.decor}:39`]?.source).toContain("âme aggloméré");
+        }
+    });
 
 
     it("closes the dresser's alcove with two fillers and keeps Blum's gap F between them and the doors", () =>

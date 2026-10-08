@@ -262,8 +262,9 @@ add({ id: "145415", family: "D41", label: "Tenso P-14, boîte de 80 paires", bra
      source: LAMELLO_P14, url: "https://lamello.com/fileadmin/products/Operating_instructions_Clamex_P14.pdf" });
 add({ id: "DOWEL_8x35", family: "D42", label: `Tourillon hêtre ${DIAM}8 x 35 cannelé`, brand: "",
      ref: "Générique", source: "Article générique, sans référence fabricant" });
-// 16 mm of drawer box and 14 into a 19 mm front, 5 left before its face
-add({ id: "SCREW_4x30", family: "D41", label: "Vis aggloméré 4 x 30, façade de tiroir vissée depuis le caisson",
+// 16 mm of drawer box and 14 into a 19 mm front, 5 left befoe its face, or a 20 mm cleat and 10 into a side
+// What each one holds goes in the note of its line
+add({ id: "SCREW_4x30", family: "D41", label: "Vis aggloméré 4 x 30",  
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
 
 

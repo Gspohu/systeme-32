@@ -117,7 +117,10 @@ export class Canvas
         this.line(x1, y, x2, y, "thin");
         this.arrowHead(x1, y, 1, 0);
         this.arrowHead(x2, y, -1, 0);
-        this.text((x1 + x2) / 2, y - 0.8, label, size, "middle");
+        if (label !== "")
+        {
+            this.text((x1 + x2) / 2, y - 0.8, label, size, "middle");
+        }
     }
 
     dimV(y1: number, y2: number, xRef: number, x: number, label: string, size = 2.2): void
@@ -127,7 +130,10 @@ export class Canvas
         this.line(x, y1, x, y2, "thin");
         this.arrowHead(x, y1, 0, 1);
         this.arrowHead(x, y2, 0, -1);
-        this.text(x - 0.8, (y1 + y2) / 2, label, size, "middle", false, 90);
+        if (label !== "")
+        {
+            this.text(x - 0.8, (y1 + y2) / 2, label, size, "middle", false, 90);
+        }
     }
 
     arrowHead(x: number, y: number, dx: number, dy: number): void
@@ -142,33 +148,38 @@ export class Canvas
 
 export interface TitleInfo
 {
+    owner: string;
+    creator: string;
+    approver: string;
+    // the title is the project, the supplementary title what this sheet shows
     project: string;
     title: string;
-    date: string;
-    scale: string;
-    index: number;
-    count: number;
-    // tells one state of the project from another, the drawings of two states never mix
-    revision: string;
+    status: string;
     // the document number, unique to the project and kept from one revision to the next
     identification: string;
+    revision: string; 
+    date: string;
+    index: number;
+    count: number;
+    scale: string;
+    // tells one state of the project from another, the drawings of two states never mix
+    content: string;
 }
 
 
 // ISO 5456-2:1996 first angle : the truncated cone on the left, its small end leftmost, its end view on the right
-// (drawn as the European symbol of the Çukurova EEE114 course, week 7)
-function firstAngleSymbol(c: Canvas, x: number, cy: number): void
+// (drawn as the European symbol of the Çukurova EEE114 course, week 7), u its size against the 8 mm high original
+function firstAngleSymbol(c: Canvas, x: number, cy: number, u = 1): void
 {
-    c.poly([[x, cy - 2], [x + 10, cy - 4], [x + 10, cy + 4], [x, cy + 2]], true, "thin");
-    c.circle(x + 18, cy, 4, "thin");
-    c.circle(x + 18, cy, 2, "thin");
-    c.line(x - 2, cy, x + 24, cy, "centre");
+    c.poly([[x, cy - 2 * u], [x + 10 * u, cy - 4 * u], [x + 10 * u, cy + 4 * u], [x, cy + 2 * u]], true, "thin");
+    c.circle(x + 18 * u, cy, 4 * u, "thin");
+    c.circle(x + 18 * u, cy, 2 * u, "thin");
+    c.line(x - 2 * u, cy, x + 24 * u, cy, "centre");
 }
 
 
-// ISO 7200:2004 title block, its eight mandatory fields (iTeh sample, tables 1 to 3) : title, legal owner, number
-// date of issue, sheet, creator, approval person, document type. Revision, scale, unit, tolerances and projection
-// beside them. The names the software cannot know are left to fill by hand
+// ISO 7200:2004 title block in the compact form of its figure 1, with the eight mandatory fields of its tables 1 to 3
+// The last row holds what § 4 shows outside the block when used : scale, general tolerances and projection
 export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): void
 {
     c.rect(MARGIN, MARGIN, w - 2 * MARGIN, h - 2 * MARGIN, "thick");
@@ -176,34 +187,75 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     const x = w - MARGIN - TITLE_BLOCK_W;
     const row = TITLE_BLOCK_H / 4;
     c.rect(x, y, TITLE_BLOCK_W, TITLE_BLOCK_H, "normal");
-    const [b, s, p] = [85, 117, 152];
-    for (const at of [b, s, p])
+    const [people, title, number] = [40, 85, 137];
+    const [date, lang, sheet] = [145, 163, 169];
+    c.line(x + people, y, x + people, y + 3 * row, "thin");
+    c.line(x + title, y, x + title, y + TITLE_BLOCK_H, "thin");
+    c.line(x + number, y, x + number, y + TITLE_BLOCK_H, "thin");
+    for (const at of [date, lang, sheet])
     {
-        c.line(x + at, y, x + at, y + TITLE_BLOCK_H, "thin");
+        c.line(x + at, y + 2 * row, x + at, y + 3 * row, "thin");
     }
-    for (let k = 1; k < 4; k++)
+    c.line(x + people, y + row, x + TITLE_BLOCK_W, y + row, "thin");
+    c.line(x + people, y + 2 * row, x + title, y + 2 * row, "thin");
+    c.line(x + number, y + 2 * row, x + TITLE_BLOCK_W, y + 2 * row, "thin");
+    c.line(x, y + 3 * row, x + TITLE_BLOCK_W, y + 3 * row, "thin");
+    // a small name over each field as in the figure, its value under it
+    const label = (col: number, k: number, text: string): void =>
     {
-        c.line(x, y + k * row, x + (k === 2 ? TITLE_BLOCK_W : p), y + k * row, "thin");
-    }
-    const cell = (col: number, k: number, text: string, size = 2.4, bold = false): void =>
-    {
-        c.text(x + col + 2, y + k * row + row - 2, text, size, "start", bold);
+        c.text(x + col + 1, y + k * row + 2.2, text, 1.6, "start");
     };
-    cell(0, 0, fit(info.project, 3, b - 4), 3, true);
-    cell(0, 1, fit(info.title, 2.8, b - 4), 2.8);
-    cell(0, 2, "Dossier de fabrication");
+    const value = (col: number, k: number, text: string, width: number, size = 2.4, bold = false): void =>
+    {
+        c.text(x + col + 1, y + (k * row) + 6, fit(text, size, width - 2), size, "start", bold);
+    };
+    label(0, 0, "Propriétaire");
+    // a naem of any length (table 1), up to three lines centred in its tall cell
+    const names = wrap(info.owner, 2.6, people - 4);
+    const owned = [names[0] ?? "", names[1] ?? "", fit(names.slice(2).join(" "), 2.6, people - 4)]; 
+    const used = owned.filter((l) =>
+    {
+        return l !== "";
+    }).length;
+    owned.forEach((l, i) => 
+    {
+        c.text(x + people / 2, y + 1.5 * row + 2 + (i - (used - 1) / 2) * 3.4, l, 2.6, "middle", true);
+    });
+    label(people, 0, "Dessiné par");
+    value(people, 0, info.creator, title - people);
+    label(people, 1, "Approuvé par");
+    value(people, 1, info.approver, title - people);
+    label(people, 2, "Empreinte du contenu");
+    value(people, 2, info.content, title - people);
+    label(title, 0, "Type de document");
+    value(title, 0, "Dossier de fabrication", number - title);
+    label(title, 1, "Titre, titre complémentaire");
+    c.text(x + title + 1, y + row + 5.6, fit(info.project, 2.6, number - title - 2), 2.6, "start", true);
+    // the supplemnetary title takes two lines of 25 characters or so (table 2), always two for a block of fixed size
+    const more = wrap(info.title, 2.2, number - title - 2);
+    const lines = [more[0] ?? "", fit(more.slice(1).join(" "), 2.2, number - title - 2)];
+    lines.forEach((l, i) =>
+    {
+        c.text(x + title + 1, y + row + 9.4 + i * 3.2, l, 2.2, "start");
+    });
+    label(number, 0, "Statut");
+    value(number, 0, info.status, TITLE_BLOCK_W - number);
+    c.text(x + (number + TITLE_BLOCK_W) / 2, y + row + 5, fit(info.identification, 2.8, TITLE_BLOCK_W - number - 2),
+           2.8, "middle", true);   
+    label(number, 2, "Ind.");
+    value(number, 2, info.revision, date - number);
+    label(date, 2, "Date d'émission");
+    value(date, 2, info.date, lang - date);
+    label(lang, 2, "Lang.");
+    // the language code of ISO 7200:2004 5.1.8, the sheets are writen in French only
+    value(lang, 2, "fr", sheet - lang);
+    label(sheet, 2, "Planche");
+    value(sheet, 2, `${info.index}/${info.count}`, TITLE_BLOCK_W - sheet);
     // the class named in or near the title block (ISO 2768-1:1989 via the Zeiss quality forum chart)
-    cell(0, 3, "Cotes en mm, tolérances générales ISO 2768-1:1989 classe m", 2.2);
-    cell(b, 0, `Échelle ${info.scale}`);
-    cell(b, 1, info.date);
-    cell(b, 2, `Indice ${info.revision}`);
-    cell(b, 3, `N° ${info.identification}`);
-    cell(s, 0, `Planche ${info.index}/${info.count}`);
-    cell(s, 1, "Dessiné par :");
-    cell(s, 2, "Approuvé par :");
-    cell(s, 3, "Propriétaire :");
-    firstAngleSymbol(c, x + p + 3, y + row);
-    cell(p, 3, "systeme-32", 2.4, true);
+    c.text(x + 1, y + 3 * row + 4.6, "Cotes en mm, tolérances générales ISO 2768-1:1989 classe m", 2.2, "start");
+    label(title, 3, "Échelle");
+    value(title, 3, info.scale, number - title);
+    firstAngleSymbol(c, x + number + 12, y + 3.5 * row, 0.75);  
 }
 
 

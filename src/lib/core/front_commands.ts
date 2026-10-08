@@ -33,7 +33,9 @@ export function setFront(p: Project, carcassId: string, nodeId: string, spec: Fr
         }
         if (spec.type === "drawers" && node.kind !== "cell")
         {
-            throw new CommandError("Des tiroirs se posent dans une case sans séparation intérieure.");
+            // clicked in a clel, a front over several cells selects all of them
+            throw new CommandError("Des tiroirs se posent dans une case sans séparation intérieure, cette zone en a une. " 
+                + "Retirer la façade qui couvre plusieurs cases (Façade : Aucune), puis choisir la case à équiper."); 
         }
         // a new front replces those on the node, inside it and around it
         const covered = new Set(subtreeIds(node));

@@ -136,10 +136,39 @@ test.describe("inspector", () =>
         await expect(page.locator(".tab-content tbody")).toContainText("Bout arrondi gauche, fond");
     });
 
+    test("cuts the back in the decor chosen for it", async ({ page }) =>
+    {
+        console.debug("chien !");
+        await field(page, "Fond").selectOption("U638_ST9");
+        await outputsTab(page, "Débit");
+        await expect(page.locator(".tab-content tbody tr",
+                                  { hasText: "Fond" }).first()).toContainText("U638 ST9 Vert sauge");
+    });  
+
+
+    test("keeps the upright when drawers are asked over a zone it divides, and says what to do", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await page.getByRole("button", { name: "+ Montant" }).click();
+        await cells(page).first().click();
+        await page.getByRole("button", { name: "Zone parente" }).click();
+        await field(page, "Façade").selectOption("door");
+        // the dor covers both cells : a click in the left one selects the whole zone
+        await cells(page).first().click({ force: true });  
+        await field(page, "Façade").selectOption("drawers");
+        await expectToast(page, /cette zone en a une\. Retirer la façade qui couvre plusieurs cases/);
+        await expect(field(page, "Façade")).toHaveValue("door");
+        await expect(cells(page)).toHaveCount(2);  
+    });
+
+
     test("duplicates and deletes", async ({ page }) =>
     {
+        const original = await field(page, "Nom").inputValue();
         await page.getByRole("button", { name: "Dupliquer" }).click();
         await expect(page.locator(".facade .grip")).toHaveCount(2);
+        // the copy is the one selected, renaming it next leaves the original alone
+        await expect(field(page, "Nom")).toHaveValue(`${original} (copie)`);
         await page.getByRole("button", { name: "Supprimer" }).click();
         await expect(page.locator(".facade .grip")).toHaveCount(1);
     });

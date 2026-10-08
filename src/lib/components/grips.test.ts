@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GRIP_GAP, GRIP_H, GRIP_ROW, layoutGrips, type GripSpot } from "./grips";
+import { GRIP_GAP, GRIP_H, GRIP_ROW, gripLabel, layoutGrips, type GripSpot } from "./grips";
+
 
 type Spec = { id: string; name: string; mid: number; top: number; width: number };
 
@@ -92,5 +93,15 @@ describe("grips over the front view", () =>
             return { id: name, name, mid: 100 + 10 * k, top: 500, width: 100 - k };
         });
         expect(apart(crowd, 2)).toBe(true);
+    });
+
+
+    it("writes the usual names whole, cutting only past 28 characters", () =>
+    {
+        expect(gripLabel("Placards et tiroirs").text).toBe("Placards et tiroirs");
+        expect(gripLabel("Ampli Marshall Stanmore").text).toBe("Ampli Marshall Stanmore");  
+        const long = gripLabel("Colonne aspirateur et balai de Riquewihr");
+        expect(long.text.endsWith("...")).toBe(true);
+        expect(long.text.length).toBeLessThanOrEqual(28);
     });
 });

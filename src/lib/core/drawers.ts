@@ -10,6 +10,7 @@ import { spread } from "./fittings";
 import { fitJoints } from "./joints";
 import { sideFace } from "./locate";
 import { box } from "./fitted";
+import { meets } from "./drilling";
 import { X, Y, Z, neg } from "./geometry";
 import { MOVENTO } from "../data/rules";
 import { MOVENTO_760H, MOVENTO_766H, TIPON_BLUMOTION_SETS } from "../data/hardware";
@@ -370,9 +371,41 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
             b.errors.push(`${c.name} : face de fixation des coulisses introuvable pour le tiroir ${fp.number}.`);
             continue;
         }
-        for (const o of offs)
+        const u = axis - fr.uOrigin;   
+        const hits = (set: number[]): boolean =>
         {
-            fr.part.holes.push({ u: axis - fr.uOrigin, v: o + shift, diameter: 0, depth: 0, face: fr.face,
+            return set.some((o) =>
+            {
+                return meets(fr.part, fr.face, u, o + shift, 4, 15);
+            }); 
+        };
+        let set = offs;
+        if (hits(offs))
+        {
+            // a runner already screwed on the other face of a mid panel, at the asme heigth
+            const known = runner.series === "760H" && offs.every((o) =>
+            {
+                return MOVENTO.alternateKnown760.includes(o);
+            });   
+            set = known ? offs.map((o) =>
+            {
+                return o + MOVENTO.alternateStep760;  
+            }) : offs;
+            if (!known || hits(set))
+            {
+                b.errors.push(`${c.name}, ${fr.part.label} : les vis de la coulisse ${runner.ref} du tiroir ${fp.number} `
+                    + "rencontrent celles de l'autre face. Décaler un des tiroirs en hauteur ou épaissir le montant.");   
+            }
+            else
+            {
+                fr.part.notes.push(`Coulisse ${runner.ref} du tiroir ${fp.number} : vissée dans les deuxièmes trous `
+                    + `du profil, ${MOVENTO.alternateStep760} mm en arrière des positions du catalogue, l'autre face `  
+                    + "portant déjà des vis à cette hauteur");  
+            }
+        }
+        for (const o of set)
+        {  
+            fr.part.holes.push({ u, v: o + shift, diameter: 0, depth: 0, face: fr.face,
                                 label: `Coulisse ${runner.ref} : vis ${DIAM}3,5 x 15 (609.1500)`,
                                 purpose: "runner-screw", fixes: runner.ref });
         }

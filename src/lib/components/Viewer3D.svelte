@@ -18,6 +18,13 @@
         <label class="form-check" title="Toucher une façade l'ouvre ou la ferme seule">
             <input type="checkbox" checked={app.frontsOpen} onchange={(e) => app.openFronts(e.currentTarget.checked)} />
             Ouvrir les façades</label>
+        {#if app.project.screen?.arm}
+            <label class="form-check" title="Fait glisser l'écran de sa place rangée à sa place sortie">
+                Bras <input type="range" min="0" max="1" step="0.01" aria-label="Position du bras de l'écran"
+                    bind:value={app.armT} /></label>
+            <label class="form-check" title="Demi-anneau où le dos de l'écran peut aller, depuis la platine choisie">
+                <input type="checkbox" bind:checked={app.showArmZone} /> Zone du bras</label>
+        {/if}
     </div>
 </div>
 

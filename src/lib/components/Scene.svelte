@@ -7,8 +7,9 @@
     import { MediaQuery } from "svelte/reactivity";
     import { app } from "./app_state.svelte";
     import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
-    import { cushionMesh, deviceMeshes, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes, screenMesh, MM,
-            type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
+    import { armMesh, armZoneMesh, cushionMesh, deviceMeshes, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes,
+             screenMesh, MM, type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
+    import { armPose } from "../core/tv_arm";
     import { kelvinColour } from "../view3d/kelvin";
     import { roomBox, sideWallDepth, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
@@ -193,8 +194,27 @@
         return m;
     }
 
-    const screenGeo = $derived(app.project.screen === null ? null : screenMesh(app.project.screen));
+    // the screen where the arm slider puts it, the arm from its plate, and the ring the arm can reach
+    const pose = $derived(app.project.screen === null ? null : armPose(app.project.screen, app.armT));
+    const screenGeo = $derived(app.project.screen === null || pose === null ? null
+        : screenMesh(app.project.screen, pose));
+    const armGeo = $derived(app.project.screen === null || pose === null ? null : armMesh(app.project.screen, pose));
+    const zoneGeo = $derived(app.project.screen === null || !app.showArmZone ? null : armZoneMesh(app.project.screen));
     const screenMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.3 });
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.6, roughness: 0.4 });
+    const zoneMat = new THREE.MeshBasicMaterial({ color: 0x1f6fd1, transparent: true, opacity: 0.18,
+                                                  side: THREE.DoubleSide, depthWrite: false });
+    $effect(() =>
+    {
+        const current = [armGeo, zoneGeo];
+        return () =>
+        {
+            for (const g of current)
+            {
+                g?.dispose();
+            }
+        };
+    });
     // the colours of the appliances themselves : a block in the black of the screen, an amplifier in black tolex
     // with its grille cloth and brass plate
     const deviceMats: Record<DeviceSkin, Record<"block" | "amplifier", THREE.MeshStandardMaterial>> = {
@@ -575,6 +595,12 @@
 
 {#if screenGeo !== null}
     <T.Mesh geometry={screenGeo} material={screenMat} />
+{/if}
+{#if armGeo !== null}
+    <T.Mesh geometry={armGeo} material={armMat} />
+{/if}
+{#if zoneGeo !== null}
+    <T.Mesh geometry={zoneGeo} material={zoneMat} />
 {/if}
 {#each devices as d (d.key)}
     {@const pl = placement(d.wall)}

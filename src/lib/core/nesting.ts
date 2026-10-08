@@ -164,9 +164,23 @@ class MaxRects
 }
 
 
-export function nest(rows: CutRow[], s: Settings): NestResult
+export interface Format
 {
-    // boards in the order their first row appears, which is the order of the sheets
+    length: number;
+    width: number;
+}
+
+
+export const STANDARD_FORMAT: Format = { length: SHEET_LENGTH, width: SHEET_WIDTH };
+
+
+// the size of the boards bought for each decor and thickness, the stadard one unless told otherwise
+export function nest(rows: CutRow[], s: Settings, formatOf: (decor: string, thickness: number) => Format = () => 
+{
+    return STANDARD_FORMAT;
+}): NestResult
+{
+    // boards in the order the list first need them, which is the order of the sheets
     const byBoard = new Map<string, { decor: string; thickness: number; pieces: Piece[] }>();
     const all: { key: string; piece: Piece }[] = [];
     for (const r of rows)
@@ -202,10 +216,11 @@ export function nest(rows: CutRow[], s: Settings): NestResult
     }
     const unplaced: NestResult["unplaced"] = [];
     const sheets: Sheet[] = [];
-    const W = SHEET_LENGTH - 2 * s.trim;
-    const H = SHEET_WIDTH - 2 * s.trim;
     for (const g of byBoard.values())
     {
+        const f = formatOf(g.decor, g.thickness);
+        const W = f.length - 2 * s.trim;
+        const H = f.width - 2 * s.trim;
         const bins: MaxRects[] = [];
         for (const pc of g.pieces)
         {
@@ -252,11 +267,11 @@ export function nest(rows: CutRow[], s: Settings): NestResult
                 decor: g.decor,
                 decorLabel: `${decor.ref} ${decor.label}`.trim(),
                 thickness: g.thickness,
-                length: SHEET_LENGTH,
-                width: SHEET_WIDTH,
+                length: f.length,  
+                width: f.width,
                 trim: s.trim,
                 placements,
-                used: area / (SHEET_LENGTH * SHEET_WIDTH),
+                used: area / (f.length * f.width),
             });
         }
     }

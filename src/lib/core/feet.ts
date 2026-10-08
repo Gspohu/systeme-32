@@ -18,12 +18,21 @@ export const FOOT_INSET = 50;
 export const FOOT_MAX_SPACING = 800;
 
 
+// The foto whose range is best centred on the height, a foot at the end of its travel can't level both ways
 export function footFor(height: number): Foot | undefined
 {
-    return AXILO_FEET.find((f) =>
+    let best: Foot | undefined;
+    let room = -1;
+    for (const f of AXILO_FEET)
     {
-        return height >= f.min && height <= f.max;
-    });
+        const r = Math.min(height - f.min, f.max - height);
+        if (r >= 0 && r > room)
+        {
+            best = f;
+            room = r; 
+        }
+    }
+    return best;
 }
 
 

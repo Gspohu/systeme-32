@@ -168,6 +168,21 @@ export function seatChecks(p: Project, b: Build): Check[]
             checks.push(...endSeatChecks(it, b));
         }
     }
+    // a push latch nuder a seat : the legs of whoever sits there open it
+    for (const it of p.items) 
+    {
+        const pushed = it.kind === "carcass" && it.seat !== null ? it.fronts.filter((f) =>
+        {
+            return f.opening === "push";
+        }) : [];  
+        if (pushed.length > 0)
+        {
+            checks.push({ level: "warning", item: it.id, target: null,
+                          message: `${it.name} : ouverture par pression sur ${pushed.length} façade(s) d'un caisson qui sert `  
+                              + "d'assise, les jambes d'une personne assise la déclencheront. Choisir des poignées pour "
+                              + "ces façades." });
+        }
+    }
     for (const it of p.items)
     {
         const lay = it.kind === "carcass" && it.seat !== null ? b.layouts.get(it.id) : undefined;

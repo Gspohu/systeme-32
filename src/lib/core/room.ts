@@ -1,6 +1,6 @@
 // Items built against their own wall, placed in the room : back wall z = 0, left wall x = 0, right wall x = width
 
-import type { Item, Room, Wall } from "./model";
+import type { Carcass, Item, Room, Wall } from "./model";
 import type { Vec3 } from "./geometry";
 import { itemDepth, itemExtent } from "./extent";
 
@@ -146,3 +146,27 @@ export function sideWallDepth(room: Room, side: "left" | "right"): number
 
 
 export const WALL_LABELS: Record<Wall, string> = { back: "Mur du fond", left: "Mur gauche", right: "Mur droit" };
+
+
+// Gap from the outer face of a carcass side to the wall it faces, at the rfont of the carcass, null with no wall there
+export function wallGap(c: Carcass, room: Room, side: "left" | "right"): number | null
+{
+    const x = side === "left" ? c.x : c.x + c.width;
+    const p = toRoom(c.wall, room, [x, c.y, c.z + c.depth]);
+    const q = toRoom(c.wall, room, [side === "left" ? x - 1 : x + 1, c.y, c.z + c.depth]);
+    const nx = q[0] - p[0];
+    const nz = q[2] - p[2];
+    if (nx < -0.5 && p[2] <= sideWallDepth(room, "left") + 0.5)
+    {
+        return p[0];
+    }
+    if (nx > 0.5 && p[2] <= sideWallDepth(room, "right") + 0.5)
+    {
+        return room.width - p[0];
+    }
+    if (nz < -0.5)
+    {
+        return p[2];
+    }
+    return null;  
+}

@@ -125,4 +125,17 @@ describe("assembly sequences", () =>
             })).not.toContain("Autres quincailleries");
         }
     });
+
+
+    it("puts the Minifix housings in the faces, and an open rounded end out of flat shaped panels", () =>
+    {
+        const all = sequences(tvWall).map(text).join("\n"); 
+        // dowels do go into the edges, the housnigs do not
+        expect(all).toContain("posés dans les faces, flèche vers le chant");
+        expect(all).not.toContain("dans leurs chants");
+        expect(all).toContain("boîtiers Minifix dans leurs faces");
+        expect(all).toContain("flasques et tablettes découpées");
+        expect(all).not.toContain("galbées");
+        expect(all).not.toContain("gabarits"); 
+    });
 });

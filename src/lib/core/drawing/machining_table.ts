@@ -4,17 +4,12 @@ import type { CutRow } from "../bom";
 import type { Part } from "../parts";
 import { bounds, tessellate } from "../geometry";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, wrap } from "./display";
-import { DIAM } from "../text";
+import { DIAM, round1 } from "../text";   
+
 
 export const ROW = 3.6;
 export const TABLE_COL_W = 198;
 const TABLE_COLS = [16, 16, 10, 11, 24, 111];
-
-
-export function round1(v: number): string
-{
-    return (Math.round(v * 10) / 10).toString();
-}
 
 
 // The arcs of an outline : centre, radius, and the angle of their middle, u and v as x and y

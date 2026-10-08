@@ -6,6 +6,8 @@ import { Canvas, MARGIN, fit, wrap } from "./display";
 export interface Draft
 {
     title: string;
+    // carride on to the supplementary title of the title block, the material of a workpiece sheet
+    supplement?: string;  
     scale: string;
     canvas: Canvas;
     // what the screen picks some sheets by, never by their title

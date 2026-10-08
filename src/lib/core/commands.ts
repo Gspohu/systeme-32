@@ -1,8 +1,13 @@
 // Project level editing commands, and the single entry point that re-exports the layout and front ones
 
-import type { Item, LayoutNode, PriceEntry, Project, Room, Screen, Settings, UserTexture } from "./model";
+import type { Item, LayoutNode, Obstacle, ObstacleKind, PriceEntry, Project, Room, Screen, Settings, UserTexture,
+    Wall } from "./model";
+import { OBSTACLE_DEFAULTS } from "./obstacles";
+import { sideWallDepth } from "./room";
 import { newId } from "./factory";
 import { PHOTO_FILE_RE } from "./photos";
+import { contentHash, nextRevisionIndex } from "./revisions";
+import { screenIsSound } from "./tv_arm";
 import { CommandError, byId, edit, withoutId } from "./edit";
 
 
@@ -116,6 +121,21 @@ export function duplicateItem(p: Project, id: string, dx: number): Project
                 s.id = newId("h");
                 s.cell = renamed.get(s.cell) ?? s.cell;
             }
+            // the socket holes, the prints and the cells dirlled full height follow their cells too
+            for (const o of copy.outlets)
+            {
+                o.id = newId("o");
+                o.cell = renamed.get(o.cell) ?? o.cell;
+            }
+            for (const pr of copy.prints)
+            {
+                pr.id = newId("p");
+                pr.cell = renamed.get(pr.cell) ?? pr.cell;
+            }
+            copy.modularCells = copy.modularCells.map((c) =>
+            {
+                return renamed.get(c) ?? c;
+            });
         }
         q.items.push(copy);
     });
@@ -131,7 +151,8 @@ export function setSettings(p: Project, patch: Partial<Settings>): Project
         if (typeof value === "number" && (!Number.isFinite(value) || value < 0 || (strict && value === 0)))
         {
             const names: Record<string, string> = { grid: "Pas de la grille", ledCutPitch: "Pas de coupe LED",
-                                                    ledWattPerMetre: "Ruban LED", spotWatt: "Spot LED" };
+                                                    ledWattPerMetre: "Ruban LED", spotWatt: "Spot LED",
+                                                    makeHours: "Heures de fabrication", fitHours: "Heures de pose" };
             throw new CommandError(`Réglage ${names[key] ?? key} invalide (${value}). Saisir un nombre positif.`);
         }
     }
@@ -170,19 +191,100 @@ export function setReturn(p: Project, side: "left" | "right", value: number | nu
     }
     return edit(p, (q) =>
     {
-        const { width, depth, height } = q.room;
+        const { width, depth, height, obstacles } = q.room;
         const next = { ...q.room.returns ?? { left: depth, right: depth }, [side]: value ?? depth };
-        q.room = next.left < depth || next.right < depth ? { width, depth, height, returns: next }
-            : { width, depth, height };
+        q.room = next.left < depth || next.right < depth ? { width, depth, height, obstacles, returns: next }
+            : { width, depth, height, obstacles };
+    });
+}
+
+
+// A radiator, a box or a skirting on a wall, at its starting size against the left of that wall
+export function addObstacle(p: Project, kind: ObstacleKind, wall: Wall): Project
+{
+    return edit(p, (q) =>
+    {
+        const n = q.room.obstacles.filter((o) =>
+        {
+            return o.kind === kind;
+        }).length + 1;
+        q.room.obstacles.push({ id: newId("w"), name: `${n}`, kind, wall, ...OBSTACLE_DEFAULTS[kind] });
+    });
+}
+
+
+export function updateObstacle(p: Project, id: string, patch: Partial<Omit<Obstacle, "id" | "kind">>): Project
+{
+    return edit(p, (q) =>
+    {
+        const o = byId(q.room.obstacles, id);
+        if (o === undefined)
+        {
+            throw new CommandError("Obstacle introuvable. Il a peut-être été supprimé.");
+        }
+        const next = { ...o, ...patch };
+        const sizes = next.width > 0 && next.height > 0 && next.depth > 0 && Number.isFinite(next.x)
+            && Number.isFinite(next.y);  
+        if (!sizes || (next.clearance !== null && !(next.clearance >= 0)))
+        {
+            throw new CommandError(`${next.name} : cote illisible. Saisir des mm, largeur, hauteur et saillie plus grandes `   
+                + "que 0, un dégagement positif ou vide.");
+        }
+        const length = next.wall === "back" ? q.room.width : sideWallDepth(q.room, next.wall);
+        if (next.x < 0 || next.y < 0 || next.x + next.width > length + 0.01 || next.y + next.height > q.room.height +
+            0.01)
+        {
+            throw new CommandError(`${next.name} : ${next.width} x ${next.height} à ${next.x} / ${next.y} sort du mur `
+                + `(${length} x ${q.room.height}). Le recentrer ou le réduire.`);
+        }
+        Object.assign(o, next);
+    });
+}
+
+
+export function removeObstacle(p: Project, id: string): Project
+{
+    return edit(p, (q) =>
+    {
+        q.room.obstacles = withoutId(q.room.obstacles, id);
+    });
+}
+
+
+// A new issue of the drawings, dated as 2026-10-08, with what changed
+export function addRevision(p: Project, reason: string, date: string): Project
+{
+    if (reason.trim() === "")
+    {
+        throw new CommandError("Motif de la révision vide. Dire ce qui change, par exemple 'Portes à 444,5 de large'.");
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    {
+        throw new CommandError(`Date d'émission ${date} illisible. L'écrire en année-mois-jour, par exemple 2026-10-08.`);
+    }
+    const content = contentHash(p);
+    const last = p.revisions.at(-1);
+    if (last !== undefined && last.content === content)
+    {
+        throw new CommandError(`Rien n'a changé depuis l'indice ${last.index}. Modifier le projet avant d'émettre un nouvel indice.`);
+    }
+    return edit(p, (q) =>
+    {
+        q.revisions.push({ index: nextRevisionIndex(q.revisions.length), date, reason: reason.trim(), content });
     });
 }
 
 
 export function setScreen(p: Project, screen: Screen | null): Project
 {
+    if (screen !== null && !screenIsSound(screen))
+    {
+        throw new CommandError("Écran ou bras mal saisi : cotes et poids positifs, VESA en largeur x hauteur, déport "
+            + "mini au plus égal au maxi. Corriger la valeur.");
+    }
     return edit(p, (q) =>
     {
-        q.screen = screen === null ? null : { ...screen };
+        q.screen = screen === null ? null : structuredClone(screen);
     });
 }
 

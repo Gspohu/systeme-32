@@ -1,6 +1,8 @@
 // Three.js geometry for every part : flat parts extruedd from their outline, skins and battens on their arcs
 
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import type { ScreenSpot } from "../core/tv_arm";
 import { battenAngle, bevelU, type Fitted, type Part, type CurveShape } from "../core/parts";
 import type { Carcass, Device, LadderRail, Screen } from "../core/model";
 import { tessellate } from "../core/geometry";
@@ -402,11 +404,61 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
 }
 
 
-export function screenMesh(sc: Screen): THREE.BufferGeometry
+export function screenMesh(sc: Screen, at: ScreenSpot = { label: "", cx: sc.cx, bottom: sc.bottom, z: sc.z }):
+    THREE.BufferGeometry
 {
-    const { w, h } = screenSize(sc);
-    const geo = new THREE.BoxGeometry(w, h, 40);
-    geo.translate(sc.cx, sc.bottom + h / 2, sc.z + 20);
+    // a set of unknown thickness keeps the 40 mm it was always shown with, its front on the screen plane
+    const { w, h, d } = screenSize(sc);
+    const t = d > 0 ? d : 40;
+    const geo = new THREE.BoxGeometry(w, h, t);
+    geo.translate(at.cx, at.bottom + h / 2, d > 0 ? at.z - t / 2 : at.z + t / 2);
+    geo.scale(MM, MM, MM);
+    return geo;
+}
+
+
+// The plate on the wall and a rod from it to the back of the screen where the arm holds it
+export function armMesh(sc: Screen, at: ScreenSpot): THREE.BufferGeometry | null
+{
+    const arm = sc.arm;
+    if (arm === null || arm.plateW <= 0 || arm.plateH <= 0)
+    {
+        return null;
+    }
+    const { h, d } = screenSize(sc);
+    const plate = new THREE.BoxGeometry(arm.plateW, arm.plateH, 10);
+    plate.translate(arm.x, arm.y, 5);
+    const from = new THREE.Vector3(arm.x, arm.y, 10);
+    const to = new THREE.Vector3(at.cx, at.bottom + h / 2, at.z - d);
+    const length = Math.max(1, from.distanceTo(to));
+    const rod = new THREE.CylinderGeometry(15, 15, length, 12);
+    rod.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0),
+                                                                  to.clone().sub(from).normalize()));
+    rod.translate((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
+    const geo = mergeGeometries([plate.toNonIndexed(), rod.toNonIndexed()])!;
+    geo.scale(MM, MM, MM);
+    return geo;
+}
+
+
+// What the back of the screen can sweep : the half ring in front of the plate between the folded and stretched reach
+// as tall as the screen and centred on the plate, seen from any side where a flat ring would show edge on
+export function armZoneMesh(sc: Screen): THREE.BufferGeometry | null
+{
+    const arm = sc.arm;
+    if (arm === null || arm.reachMax <= 0)
+    {
+        return null;
+    }
+    const { h } = screenSize(sc);
+    const shape = new THREE.Shape();
+    shape.absarc(0, 0, arm.reachMax, 0, Math.PI, false);
+    shape.absarc(0, 0, arm.reachMin, Math.PI, 0, true);
+    const tall = h > 0 ? h : arm.plateH;
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: tall, bevelEnabled: false, curveSegments: 48 });
+    // drawn along the wall and into the room, then stood up : the extrusion runs downwards from the top of the screen
+    geo.rotateX(Math.PI / 2);
+    geo.translate(arm.x, arm.y + tall / 2, 0);
     geo.scale(MM, MM, MM);
     return geo;
 }

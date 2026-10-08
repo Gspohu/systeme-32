@@ -1,8 +1,11 @@
-// A cut-out sawn through a hole already drilled : run once every part of the build is drilled, connectors last
+// A cut-out sawn throuhg a hole already drilled, or two holes meeting : run once every part of the build is
+// drilled, connectors last
 
 import type { Build, Hole, Part } from "./part_types";
 import type { Check } from "./check";
 import { insidePolygon, tessellate } from "./geometry";
+import { crossedHoles } from "./drilling";
+
 
 // the clearance metHole hold between two drillings
 const CLEAR = 2;
@@ -66,5 +69,20 @@ export function cutoutChecks(b: Build): Check[]
                 + `découpe tombe sur ${labels.join(", ")}. Déplacer la découpe ou le perçage.` });
         }
     }
+    for (const p of b.parts)
+    {
+        const pairs = crossedHoles(p);
+        if (pairs.length === 0)
+        {
+            continue;
+        }
+        const kinds = [...new Set(pairs.map(([x, y]) =>
+        {
+            return x.label === y.label ? x.label : `${x.label} et ${y.label}`;
+        }))];
+        checks.push({ level: "error", item: p.item, target: p.id, message: `${p.itemName}, ${p.label} : `
+            + `${pairs.length} paire(s) de perçages se rencontrent dans l'épaisseur (${kinds.join(" ; ")}). `
+            + "Décaler un des deux perçages." });
+    }  
     return checks;
 }

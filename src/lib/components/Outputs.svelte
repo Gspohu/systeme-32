@@ -3,17 +3,22 @@
     import { app } from "./app_state.svelte";
     import { checked, num, str } from "./events";
     import { drawingSet, workshopArchive } from "../core/io/workshop";
-    import { slug } from "../core/text";
+    import { eur, slug } from "../core/text";
+    import { costCsv } from "../core/costing";
+    import GroupOrder from "./GroupOrder.svelte";
     import { pagesToPdf } from "../core/drawing/pdf";
     import { pageToDataUri } from "../core/drawing/svg";
     import { cutListCsv, edgeNotation, hardwareCsv, pbsJson, type PbsNode } from "../core/bom";
-    import { setPrice, setReturn, setRoom, setScreen, setSettings, rename } from "../core/commands";
+    import { addObstacle, addRevision, removeObstacle, setPrice, setReturn, setRoom, setScreen, setSettings, rename,
+             updateObstacle } from "../core/commands";
+    import { isoDay, issueState, nextRevisionIndex } from "../core/revisions";
+    import { OBSTACLE_LABELS } from "../core/obstacles";
     import { sideWallDepth } from "../core/room";
     import { assemblySequences } from "../core/assembly";
     import { shareOrDownload } from "../storage/files";
     import { FAMILY_LABELS } from "../data/hardware";
     import { HANDLING_LIMITS, SHELF_TEST_LOADS } from "../data/rules";
-    import type { Joinery, Screen, Settings, WallType } from "../core/model";
+    import type { Joinery, ObstacleKind, Screen, ScreenArm, Settings, Wall, WallType } from "../core/model";
 
 
     const TABS = ["Plans", "Montage", "Débit", "Quincaillerie", "Calepinage", "PBS", "Chiffrage", "Réglages"];
@@ -55,6 +60,9 @@
         return { onSheets, offSheet };
     });
     const base = $derived(slug(project.name) || "projet");
+    // the content print runs over the whole project : only while the settings are open
+    const issue = $derived(current === "Réglages" ? issueState(project) : { status: "" });
+    let reason = $state("");
 
 
     async function send(bytes: Uint8Array, name: string, mime: string): Promise<void>
@@ -78,8 +86,56 @@
             return;
         }
         const baseScreen: Screen = cur ?? { diagonalInch: 65, aspectW: 16, aspectH: 9, cx: 1000, bottom: 600,
-                                           z: 100, wallMounted: false };
+                                           z: 100, wallMounted: false, frame: null, massKg: null, vesa: null,
+                                           source: "", arm: null };
         app.apply(setScreen, { ...baseScreen, ...p });
+    }
+
+
+    // a new arm : its plate behind the screen, its sheet at zero until the notice is read
+    function arm(p: Partial<ScreenArm> | null): void
+    {
+        const sc = project.screen;
+        if (sc === null)
+        {
+            return;
+        }
+        if (p === null)
+        {
+            screen({ arm: null });
+            return;
+        }
+        const h = sc.frame?.h ?? 0;
+        const base: ScreenArm = sc.arm ?? { model: "", maxKg: 0, vesa: [], reachMin: 0, reachMax: 0, plateW: 0,
+                                            plateH: 0, x: sc.cx, y: Math.round(sc.bottom + h / 2), out: null,
+                                            source: "" };
+        screen({ arm: { ...base, ...p } });
+    }
+
+
+    function vesaText(list: [number, number][]): string
+    {
+        return list.map(([w, h]) =>
+        {
+            return `${w} x ${h}`;
+        }).join(", ");
+    }
+
+
+    function vesaList(text: string): [number, number][]
+    {
+        return text.split(",").map(pairOf).filter((v): v is [number, number] =>
+        {
+            return v !== null;
+        });
+    }
+
+
+    // "200 x 200" or "200x200" into a pair, anything else into null
+    function pairOf(text: string): [number, number] | null
+    {
+        const m = /^\s*(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)\s*$/.exec(text);
+        return m === null ? null : [Number(m[1]!.replace(",", ".")), Number(m[2]!.replace(",", "."))];
     }
 
 
@@ -91,11 +147,6 @@
             flatPbs(c, depth + 1, acc);
         }
         return acc;
-    }
-
-    function eur(v: number): string
-    {
-        return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
     }
 </script>
 
@@ -212,7 +263,7 @@
                 </table>
             </div>
         {:else if current === "Calepinage"}
-            <p class="muted">{out.nesting.sheets.length} panneaux 2800 x 2070, trait de scie {project.settings.kerf} mm,
+            <p class="muted">{out.nesting.sheets.length} panneaux, trait de scie {project.settings.kerf} mm,
                 délignage {project.settings.trim} mm.</p>
             {#each out.nesting.unplaced as u}
                 <div class="alert alert-danger">Non placé : {u.code} {u.label}, {u.reason}</div>
@@ -237,43 +288,71 @@
             </div>
         {:else if current === "Chiffrage"}
             <p class="muted">Prix hors taxes saisis par vous : les lignes sans prix restent listées, jamais comptées à zéro.</p>
+            <div class="row"><button class="btn btn-secondary" onclick={() => send(strToU8(costCsv(out.cost)),
+                `${base}_chiffrage.csv`, "text/csv")}>Exporter en CSV</button></div>
             <div class="table-container">
-                <table class="table table-compact">
+                <table class="table table-compact cost-table">
                     <thead><tr><th>Poste</th><th>Quantité</th><th>Prix unitaire HT</th><th>Source</th><th>Total</th></tr></thead>
                     <tbody>
                         {#each out.cost.lines as l (l.key)}
                             <tr>
                                 <td>{l.label}</td>
-                                <td>{l.qty.toFixed(l.unit === "u" ? 0 : 2)} {l.unit === "m2" ? "m²" : l.unit === "m" ? "m" : "u"}</td>
-                                <td><input class="input price" type="number" min="0" step="0.01" value={l.price?.value ?? ""}
-                                    onchange={(e) =>
-                                    {
-                                        const v = str(e);
-                                        const today = new Date().toISOString().slice(0, 10);
-                                        app.apply(setPrice, l.key, v === "" ? null : { value: Number(v), unit: l.unit,
-                                                                                        source: l.price?.source ?? null, date: today });
-                                    }} /></td>
-                                <td><input class="input" type="text" maxlength="80" value={l.price?.source ?? ""}  
-                                    placeholder="Fournisseur, date"
-                                    onchange={(e) =>
-                                    {
-                                        if (l.price !== null)
+                                <td data-label="Quantité">{l.qty.toFixed(l.unit === "u" ? 0 : 2).replace(".",
+                                    ",")} {l.unit === "m2" ? "m²" : l.unit}
+                                    {#if l.bought !== null}
+                                        <br /><span class="muted">achat {l.bought} {l.unit === "m2" ? "m²" : l.unit}, reste
+                                            {(l.bought - l.qty).toFixed(l.unit === "u" ? 0 : 2).replace(".", ",")}</span>
+                                    {/if}
+                                    {#if l.used !== undefined}
+                                        <br /><span class="muted">utilisé {l.used.toFixed(2).replace(".", ",")} m², reste
+                                            {(l.qty - l.used).toFixed(2).replace(".", ",")} m²</span>
+                                    {/if}</td>
+                                {#if l.format !== undefined}
+                                    <!-- the price of the size bought, read from the board's offer : typing here would replace the board's own price -->
+                                    <td data-label="Prix unitaire HT">{l.price?.value.toFixed(2).replace(".",
+                                        ",") ?? "-"}</td>
+                                    <td data-label="Source" class="muted">{l.price?.source ?? ""}</td>
+                                {:else}
+                                    <td data-label="Prix unitaire HT"><input class="input price" type="number" min="0" step="0.01" value={l.price?.value ?? ""}
+                                        onchange={(e) =>
                                         {
-                                            app.apply(setPrice, l.key, { ...l.price, source: str(e) || null });
-                                        }
-                                    }} /></td>
-                                <td>{l.total === null ? "-" : eur(l.total)}</td>
+                                            const v = str(e);
+                                            const today = new Date().toISOString().slice(0, 10);
+                                            // a roll or a box keeps its size, a board its other sizes, when the price is
+                                            // typed again
+                                            app.apply(setPrice, l.key, v === "" ? null : { value: Number(v),
+                                                unit: l.unit,
+                                                                                            source: l.price?.source ?? null, date: today,
+                                                                                            pack: l.price?.pack, formats: l.price?.formats });
+                                        }} /></td>
+                                    <!-- the whole source read without entering the field, the longest default ones run past 200 -->
+                                    <td data-label="Source"><textarea class="input source" rows="3" maxlength="300"
+                                        placeholder="Fournisseur, date" value={l.price?.source ?? ""}  
+                                        onchange={(e) =>
+                                        {
+                                            if (l.price !== null)
+                                            {
+                                                app.apply(setPrice, l.key, { ...l.price, source: str(e) || null });
+                                            } 
+                                        }}></textarea></td>
+                                {/if}
+                                <td data-label="Total">{l.total === null ? "sans prix" : eur(l.total)}</td>
                             </tr>
                         {/each}
                     </tbody>
                 </table>
             </div>
             <p>
-                <strong>Total HT : {eur(out.cost.total)}</strong>
+                <strong>Total HT : {eur(out.cost.total)}</strong>, soit {eur(out.cost.totalTtc)} TTC
                 {#if out.cost.missing.length > 0}
                     <span class="badge badge-warning">{out.cost.missing.length} ligne(s) sans prix</span>
                 {/if}
             </p>
+            {#each out.cost.notes as n}
+                <p class="muted">{n}</p>
+            {/each}
+            <GroupOrder />
+
         {:else}
             {@const s = project.settings}
             <div class="section-title">Projet</div>
@@ -330,8 +409,56 @@
                     <option value="solid">Béton, brique pleine</option>
                     <option value="aerated">Béton cellulaire</option>
                     <option value="plasterboard">Plaque de plâtre</option>
+                    <option value="reinforced">Plaque de plâtre sur renfort bois</option>
                 </select>
             </label>
+
+            <div class="section-title">Obstacles muraux</div>
+            <label class="field"><span class="label">Ajouter</span>
+                <select class="select" aria-label="Ajouter un obstacle mural" value=""
+                    onchange={(e) =>
+                    {
+                        const kind = e.currentTarget.value as ObstacleKind;
+                        e.currentTarget.value = "";
+                        app.apply(addObstacle, kind, "back");
+                    }}>
+                    <option value="" disabled>Choisir...</option>
+                    {#each Object.entries(OBSTACLE_LABELS) as [kind, label]}<option value={kind}>{label}</option>{/each}
+                </select>
+            </label>
+            {#each project.room.obstacles as o (o.id)}
+                <div class="row">
+                    <strong>{OBSTACLE_LABELS[o.kind]}</strong> 
+                    <button class="btn btn-ghost" onclick={() => app.apply(removeObstacle, o.id)}>Retirer</button>
+                </div>
+                <label class="field"><span class="label">Nom</span>
+                    <input class="input" maxlength="40" value={o.name} onchange={(e) => app.apply(updateObstacle,
+                        o.id, { name: str(e) })} />
+                </label>
+                <label class="field"><span class="label">Mur</span>
+                    <select class="select" value={o.wall} onchange={(e) => app.apply(updateObstacle, o.id,
+                        { wall: str(e) as Wall })}>
+                        <option value="back">Fond</option>
+                        <option value="left">Gauche</option>
+                        <option value="right">Droite</option>
+                    </select>
+                </label>
+                {#each [["x", "Position X"], ["y", "Hauteur du bas"], ["width", "Largeur"], ["height", "Hauteur"],
+                        ["depth", "Saillie"]] as const as [key, label]}
+                    <label class="field"><span class="label">{label}</span>
+                        <input class="input" type="number" value={o[key]} onchange={(e) => app.apply(updateObstacle,
+                            o.id, { [key]: num(e) })} />
+                    </label>
+                {/each}
+                {#if o.kind === "radiator"}
+                    <label class="field" title="Le plus grand dégagement demandé par la notice du radiateur, vide tant qu'elle n'est pas lue">
+                        <span class="label">Dégagement</span>
+                        <input class="input" type="number" min="0" value={o.clearance ?? ""}
+                            onchange={(e) => app.apply(updateObstacle, o.id,
+                                                       { clearance: str(e) === "" ? null : num(e) })} />
+                    </label>
+                {/if}
+            {/each}
             <label class="field" title="Puissance du ruban 24 V acheté"><span class="label">Ruban LED (W/m)</span>
                 <input class="input" type="number" min="1" step="0.1" value={s.ledWattPerMetre}
                     onchange={(e) => settings({ ledWattPerMetre: num(e) })} />
@@ -363,6 +490,46 @@
                 </select>
             </label>
 
+            <div class="section-title">Main-d'oeuvre</div>
+            <label class="field" title="Heures annoncées par l'atelier, vide tant qu'elles ne sont pas chiffrées">
+                <span class="label">Heures de fabrication</span>
+                <input class="input" type="number" min="0" step="0.5" value={s.makeHours ?? ""}
+                    onchange={(e) => settings({ makeHours: str(e) === "" ? null : num(e) })} />
+            </label>
+            <label class="field" title="Heures de pose sur place, vide tant qu'elles ne sont pas chiffrées">
+                <span class="label">Heures de pose</span>
+                <input class="input" type="number" min="0" step="0.5" value={s.fitHours ?? ""}
+                    onchange={(e) => settings({ fitHours: str(e) === "" ? null : num(e) })} />
+            </label>
+
+            <div class="section-title">Cartouche</div>
+            <!-- ISO 7200:2004 tables 1 and 3 : 20 characters for a person, the owner left unbounded by the standard -->
+            {#each [["owner", "Propriétaire", 40, "Entreprise ou personne à qui appartiennent les plans"],
+                    ["creator", "Dessiné par", 20, "Qui a dessiné ou révisé les plans"],
+                    ["approver", "Approuvé par", 20, "Qui a validé les plans avant fabrication"],
+                    ["client", "Client", 60, "Pour qui le meuble est fait, sur la page de garde"],
+                    ["site", "Chantier", 60, "Où le meuble est posé, sur la page de garde"]] as const
+                    as [key, label, max, hint] (key)}
+                <label class="field" title={hint}><span class="label">{label}</span>
+                    <input class="input" maxlength={max} value={s[key]} onchange={(e) => settings({ [key]: str(e).trim() })} />
+                </label>
+            {/each}
+            <div class="row"><span class="label">Statut</span><strong>{issue.status}</strong></div>
+            <label class="field" title="Ce qui change depuis l'indice précédent, imprimé sur la page de garde">
+                <span class="label">Motif</span>
+                <input class="input" maxlength="120" bind:value={reason} placeholder="Première émission" />
+            </label>
+            <button class="btn" onclick={() =>
+            {
+                if (app.apply(addRevision, reason, isoDay(new Date())))
+                {
+                    reason = "";   
+                }
+            }}>Émettre l'indice {nextRevisionIndex(project.revisions.length)}</button>
+            {#each project.revisions.slice().reverse() as r (r.index)}
+                <div class="row"><strong>{r.index}</strong><span>{r.date}</span><span>{r.reason}</span></div>
+            {/each}
+
             <div class="section-title">Conventions d'atelier</div>
             <label class="field"><span class="label">Connecteurs du chant</span>
                 <input class="input" type="number" value={s.connectorInset}
@@ -393,6 +560,82 @@
                 </label>
                 <label class="form-check"><input type="checkbox" checked={sc.wallMounted}
                     onchange={(e) => screen({ wallMounted: checked(e) })} /> Fixé au mur</label>
+                <label class="field" title="Cadre compris, sans le pied : vide pour la dalle déduite de la diagonale">
+                    <span class="label">Cadre L x H x P</span>
+                    <span class="row">
+                        {#each [["w", "Largeur"], ["h", "Hauteur"], ["d", "Épaisseur"]] as const as [key, name] (key)}
+                            <input class="input" type="number" min="1" aria-label={`${name} de l'écran`}
+                                value={sc.frame?.[key] ?? ""}
+                                onchange={(e) =>
+                                {
+                                    const next = { w: sc.frame?.w ?? 0, h: sc.frame?.h ?? 0, d: sc.frame?.d ?? 0,
+                                                   [key]: str(e) === "" ? 0 : num(e) };
+                                    screen({ frame: next.w > 0 && next.h > 0 && next.d > 0 ? next : null });
+                                }} />
+                        {/each}
+                    </span>
+                </label>
+                <label class="field"><span class="label">Poids sans pied (kg)</span>
+                    <input class="input" type="number" min="0.1" step="0.1" value={sc.massKg ?? ""}
+                        onchange={(e) => screen({ massKg: str(e) === "" ? null : num(e) })} />
+                </label>
+                <label class="field" title="Écart des trous au dos, largeur x hauteur, par exemple 200 x 200">
+                    <span class="label">VESA</span>
+                    <input class="input" value={sc.vesa === null ? "" : `${sc.vesa[0]} x ${sc.vesa[1]}`}
+                        onchange={(e) => screen({ vesa: pairOf(str(e)) })} />
+                </label>
+                <label class="field"><span class="label">Source</span>
+                    <input class="input" maxlength="300" value={sc.source} onchange={(e) => screen({ source: str(e) })} />
+                </label>
+
+                <label class="form-check"><input type="checkbox" checked={sc.arm !== null}
+                    onchange={(e) => arm(checked(e) ? {} : null)} /> Sur un bras mural</label>
+                {#if sc.arm !== null}
+                    {@const a = sc.arm}
+                    <label class="field"><span class="label">Modèle du bras</span>
+                        <input class="input" maxlength="80" value={a.model} onchange={(e) => arm({ model: str(e) })} />
+                    </label>
+                    <label class="field"><span class="label">Charge maxi (kg)</span>
+                        <input class="input" type="number" min="0" value={a.maxKg} onchange={(e) => arm({ maxKg: num(e) })} />
+                    </label>
+                    <label class="field" title="Entraxes acceptés par sa platine, séparés par des virgules">
+                        <span class="label">VESA acceptés</span>
+                        <input class="input" value={vesaText(a.vesa)} onchange={(e) => arm({ vesa: vesaList(str(e)) })} />
+                    </label>
+                    <label class="field" title="Distance du mur au dos de l'écran, replié puis déplié">
+                        <span class="label">Déport mini / maxi</span>
+                        <span class="row">
+                            <input class="input" type="number" min="0" aria-label="Déport mini du bras" value={a.reachMin}
+                                onchange={(e) => arm({ reachMin: num(e) })} />
+                            <input class="input" type="number" min="0" aria-label="Déport maxi du bras" value={a.reachMax}
+                                onchange={(e) => arm({ reachMax: num(e) })} />
+                        </span>
+                    </label>
+                    <label class="field" title="Centre de la platine sur le mur du fond, depuis le mur gauche et le sol">
+                        <span class="label">Platine X / Y</span>
+                        <span class="row">
+                            <input class="input" type="number" aria-label="Centre X de la platine" value={a.x}
+                                onchange={(e) => arm({ x: num(e) })} />
+                            <input class="input" type="number" aria-label="Hauteur de la platine" value={a.y}
+                                onchange={(e) => arm({ y: num(e) })} />
+                        </span>
+                    </label>
+                    <label class="field" title="Où le bras amène l'écran pour le regarder : centre X et avancée de sa face">
+                        <span class="label">Sorti : centre X / avancée</span>
+                        <span class="row">
+                            <input class="input" type="number" aria-label="Centre X de l'écran sorti" value={a.out?.cx ?? ""}
+                                onchange={(e) => arm({ out: str(e) === "" ? null : { cx: num(e),
+                                    z: a.out?.z ?? sc.z } })} />
+                            <input class="input" type="number" min="1" aria-label="Avancée de l'écran sorti"
+                                value={a.out?.z ?? ""}
+                                onchange={(e) => arm({ out: str(e) === "" ? null : { cx: a.out?.cx ?? sc.cx,
+                                    z: num(e) } })} />
+                        </span>
+                    </label>
+                    <label class="field"><span class="label">Source du bras</span>
+                        <input class="input" maxlength="300" value={a.source} onchange={(e) => arm({ source: str(e) })} />
+                    </label>
+                {/if}
             {/if}
         {/if}
         {/key}
@@ -447,6 +690,78 @@
     .price
     {
         width: 7rem;
+    }
+
+    .source
+    {
+        width: 100%;
+        min-width: 20rem;
+        resize: vertical;
+    }
+
+
+    /* the design sytem table never wraps : the long psots would push the total off the screen */
+    .cost-table td:first-child
+    {
+        white-space: normal;
+    }
+
+
+    /* under the tablet breakpoint each line becomes a card, its post as a title and every value labelled */  
+    @media (max-width: 1100px)
+    {
+        .cost-table thead
+        {
+            display: none;
+        }
+
+        /* a table keeps its own width even in cards : held to the screen, the text wraps */ 
+        .cost-table,
+        .cost-table tbody
+        {
+            display: block;
+            width: 100%;
+        }
+
+        .cost-table tr
+        {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: var(--spacing-2xs);
+            padding: var(--spacing-xs) 0;
+            border-bottom: var(--border-width) solid var(--colour-border);  
+        }
+
+
+        .cost-table td
+        {
+            display: grid;
+            grid-template-columns: 9rem minmax(0, 1fr);
+            gap: var(--spacing-xs);
+            border: none;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+
+        .cost-table td:first-child
+        {
+            display: block;
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .cost-table td[data-label]::before
+        {
+            content: attr(data-label);
+            color: var(--colour-text-secondary);
+        }
+
+
+        .source
+        {
+            min-width: 0;
+        }
     }
 
 

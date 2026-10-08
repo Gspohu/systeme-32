@@ -442,7 +442,8 @@ export function buildEnds(c: Carcass, b: Build): void
                     frame: { o: [side === "right" ? xFace : xFace - outer, y0, c.z + c.back.thickness], u: Y, v: X,
                              n: neg(Z) },
                 });
-                back.notes.push("Vissé en applique sur les chants arrière des flasques et des gabarits");
+                back.notes.push(open ? "Vissé en applique sur les chants arrière des flasques et des tablettes"  
+                    : "Vissé en applique sur les chants arrière des flasques et des gabarits"); 
                 b.parts.push(back);
             }
         }

@@ -1,6 +1,6 @@
 // Assembly sequence of each item, read off what the analysis built : parts, joints, hardware, fronts, base, links
 
-import type { Item, Project } from "./model";
+import type { End, Item, Project } from "./model";
 import type { Analysis } from "./analysis";
 import type { Bom } from "./bom";
 import type { HardwareLine, Part, Purpose } from "./part_types";
@@ -204,7 +204,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     if (housings > 0)
     {
         prep.push(`${holes(shell, "minifix-bolt")} goujons Minifix ${refOf("minifix-bolt")} vissés dans les faces, `
-            + `${housings} boîtiers ${refOf("minifix-housing")} posés dans les chants, flèche vers le chant`);
+            + `${housings} boîtiers ${refOf("minifix-housing")} posés dans les faces, flèche vers le chant`); 
     }
     const plates = holes(shell, "plate-dowel") / 2;
     if (plates > 0)
@@ -271,10 +271,19 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     const end = of(onEnd);
     if (end.length > 0)
     {
-        // their bolts are in the face of the side, counted with the panels
+        // their bolts are in the face of the isde, counted with the panels. An open end has no bent skin
+        const carcass = p.items.find((it) => 
+        {
+            return it.id === id;
+        });
+        const isOpen = (e: End): boolean =>
+        {
+            return e.type !== "square" && e.open === true;
+        };
+        const open = carcass?.kind === "carcass" && (isOpen(carcass.ends.left) || isOpen(carcass.ends.right));  
         steps.push({ title: "Bout arrondi", lines: [
-            `${codes(bom, end)} : planches galbées assemblées sur la face extérieure de la joue, `
-                + `${holes(end, "minifix-housing")} boîtiers Minifix dans leurs chants`,
+            `${codes(bom, end)} : ${open ? "flasques et tablettes découpées" : "planches galbées"} assemblées sur la `  
+                + `face extérieure de la joue, ${holes(end, "minifix-housing")} boîtiers Minifix dans leurs faces`,  
             ...new Set(end.flatMap((q) =>
             {
                 return q.notes;

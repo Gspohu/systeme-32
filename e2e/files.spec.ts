@@ -1,4 +1,4 @@
-import { addCarcass, download, expect, expectToast, openBlank, selectItem, test, unzip } from "./helpers";
+import { addCarcass, download, expect, expectToast, openBlank, outputsTab, selectItem, test, unzip } from "./helpers";
 import { strFromU8 } from "fflate";
 import type { Locator, Page } from "@playwright/test";
 
@@ -102,6 +102,48 @@ test.describe("files", () =>
         await expect(dialog).toHaveCount(0);
         await expect(page.locator(".facade .grip")).toHaveCount(1);
         await expect(name).toHaveValue("Penderie de Haguenau");
+    });
+
+
+    test("keeps a change made just before the page closes", async ({ page }) =>
+    {
+        await openBlank(page);
+        const name = page.getByLabel("Nom du projet");
+        await name.fill("Banc de Riquewihr");
+        await name.press("Tab");
+        await addCarcass(page);
+        // closed within the second the autosave waits : the page hiding saevs at once
+        const context = page.context();
+        await page.close({ runBeforeUnload: true });
+        const again = await context.newPage();
+        await again.goto("/");
+        await expect(again.locator(".facade .grip")).toHaveCount(1);
+        await expect(again.getByLabel("Nom du projet")).toHaveValue("Banc de Riquewihr");
+    });
+
+
+    test("saves no copy of a template opened and left as it is, and numbers a namesake", async ({ page }) =>
+    {
+        await openBlank(page);
+        const picker = page.getByLabel("Nouveau projet");
+        await picker.selectOption({ label: "Composition TV et bibliothèque" });
+        await picker.selectOption({ label: "Composition TV et bibliothèque" });
+        await page.getByRole("button", { name: "Mes projets" }).click();
+        const dialog = page.getByRole("dialog", { name: "Mes projets" });
+        await expect(dialog.getByText("Aucun projet enregistré ici.")).toBeVisible(); 
+        await dialog.getByRole("button", { name: "Fermer" }).click();
+        // changed, a setting will do, it is saved, and the next one of that template gets a number
+        await outputsTab(page, "Réglages");
+        const kerf = page.locator(".field", { hasText: "Trait de scie" }).locator("input");
+        await kerf.fill("5");
+        await kerf.press("Tab"); 
+        await expect.poll(() =>
+        {
+            return storedItems(page, "Composition TV et bibliothèque");
+        }, { timeout: 10000 })
+            .toBeGreaterThan(0);
+        await picker.selectOption({ label: "Composition TV et bibliothèque" });
+        await expect(page.getByLabel("Nom du projet")).toHaveValue("Composition TV et bibliothèque (2)");
     });
 
 

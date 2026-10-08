@@ -5,6 +5,8 @@ import type { Check } from "./check";
 import type { Build } from "./part_types";
 import { CLEAT_THICKNESS, newPart } from "./part_base";
 import { X, Y, Z, neg } from "./geometry";
+import { buttedLengths, type Cut } from "./solid_stock";
+
 
 // the slat cleats of the same project, 40 x 20
 export const CLEAT_WIDTH = 40;
@@ -16,7 +18,7 @@ export function fillerGap(c: Carcass, room: Room): number
 }
 
 
-export function buildCeilingFiller(c: Carcass, room: Room, b: Build): void
+export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): void
 {
     if (!c.ceilingFiller)
     {
@@ -45,26 +47,31 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build): void
     });
     strip.notes.push(`Hauteur théorique ${Math.round(gap)} mm : plafond rarement droit, ajuster sur place`);
     b.parts.push(strip);
-    // solid wood like the slat cleats, a 20 mm melamine board does not exist
-    const common = { item: c.id, itemName: c.name, decor: "CHENE_MASSIF", id: `${c.id}/filler-cleat`,
-                    label: "Tasseau du fileur",
-                     role: "cleat" as const, length: c.width - 2 * t, edges: [] };
-    if (gap >= CLEAT_WIDTH)
-    {
-        b.parts.push(newPart({ ...common, width: CLEAT_WIDTH, thickness: CLEAT_THICKNESS,
-                               frame: { o: [c.x + t, c.y + c.height, c.z + c.depth - CLEAT_THICKNESS], u: X, v: Y,
-                                       n: Z } }));
-    }
-    else if (gap >= CLEAT_THICKNESS)
-    {
-        // laid flat on the top, behind the strip
-        b.parts.push(newPart({ ...common, width: CLEAT_WIDTH, thickness: CLEAT_THICKNESS,
-                               frame: { o: [c.x + t, c.y + c.height + CLEAT_THICKNESS, c.z + c.depth], u: X, v: neg(Z),
-                                        n: neg(Y) } }));
-    }
-    else
+    // solid wood like the slat cleats, a 20 mm melamine board does not exist. In lengths butted end to end when
+    // no board on sale gives it whole
+    const lengths = buttedLengths(c.width - 2 * t, "CHENE_MASSIF", CLEAT_THICKNESS, cut);
+    const many = lengths.length > 1;
+    if (gap < CLEAT_THICKNESS)
     {
         strip.notes.push("Trop étroit pour un tasseau : coller le fileur sur le chant du dessus");
+        return;
+    }
+    let x = c.x + t;
+    lengths.forEach((l, k) =>
+    {
+        const common = { item: c.id, itemName: c.name, decor: "CHENE_MASSIF",
+                         id: `${c.id}/filler-cleat${many ? `/${k + 1}` : ""}`,
+                         label: `Tasseau du fileur${many ? `, morceau ${k + 1}/${lengths.length}` : ""}`,
+                         role: "cleat" as const, length: l, edges: [], width: CLEAT_WIDTH, thickness: CLEAT_THICKNESS };
+        // standing behind the strip, or laid flat on the top when the gap is lower than the cleat is wdie
+        b.parts.push(newPart({ ...common, frame: gap >= CLEAT_WIDTH
+            ? { o: [x, c.y + c.height, c.z + c.depth - CLEAT_THICKNESS], u: X, v: Y, n: Z }
+            : { o: [x, c.y + c.height + CLEAT_THICKNESS, c.z + c.depth], u: X, v: neg(Z), n: neg(Y) } }));
+        x += l;
+    });
+    if (many) 
+    {
+        strip.notes.push(`Tasseau en ${lengths.length} morceaux aboutés`);
     }
 }
 

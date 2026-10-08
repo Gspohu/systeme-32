@@ -6,6 +6,7 @@ import type { Part, Edge } from "./parts";
 import { partMass } from "./fittings";
 import { bounds, polygonArea, tessellate } from "./geometry";
 import { groupBySignature } from "./signature";
+import { round1 } from "./text";  
 import { MATERIALS, decorById } from "../data/materials";
 import { FAMILY_LABELS, HARDWARE, type Family } from "../data/hardware";
 
@@ -14,7 +15,8 @@ export const EDGE_OVERLENGTH = 30;
 
 
 // lets a French spreadsheet detect UTF-8, built from its code point to keep the source ASCII
-const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);   
+export const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
+
 
 // A cut list row is one workpiece, its Part fields keep their meaning over the merged identical parts
 export interface CutRow extends Pick<Part, "label" | "quantity" | "length" | "width" | "thickness" | "decor" | "grain"
@@ -145,6 +147,47 @@ function processOf(first: Part): string
 }
 
 
+// The name of a group of identical parts : theisr when they share it, else the words they all have with the number
+// that tells them apart dropped, else every name. The first one's name mad one drawer front stand for four
+export function groupLabel(labels: string[]): string
+{
+    const names = [...new Set(labels)]; 
+    if (names.length === 1)
+    {
+        return names[0]!;
+    }  
+    const words = names.map((n) =>
+    {
+        return n.split(" ");
+    });
+    if (words.every((w) =>
+    {
+        return w.length === words[0]!.length;
+    }))
+    {
+        const kept = words[0]!.flatMap((w, i) =>
+        {
+            const same = words.every((x) =>
+            {
+                return x[i] === w;
+            });
+            const numbered = /^\d+,?$/.test(w) && words.every((x) =>
+            {
+                return /^\d+,?$/.test(x[i]!);
+            });
+            // a number differing between them goes, a comma it carried stays on the word before
+            return same ? [w] : numbered ? [w.endsWith(",") ? "," : ""] 
+                : [null];
+        });
+        if (!kept.includes(null))
+        {
+            return kept.join(" ").replace(/\s+,/g, ",").replace(/\s+/g, " ").trim(); 
+        }
+    }
+    return names.join(" / ");
+}
+
+
 // PBS tree : one assembly per item holding its workpieces, then its hardware aggregated by reference
 function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { root: PbsNode; hwRows: Map<string,
     HardwareRow> }
@@ -182,14 +225,17 @@ function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { ro
             const decor = decorById(first.decor);
             assembly.children.push(pbsNode({
                 code,
-                label: first.label,
+                label: groupLabel(parts.map((q) =>
+                {
+                    return q.label;
+                })),
                 fab_source: "interne",
                 manuf_method: "other",
                 mfg_process: processOf(first),
                 material: `${decor.brand} ${decor.ref} ${decor.label}, ${first.thickness} mm`.trim(),
                 quantity: totalQuantity(parts),
                 weight_g: Math.round(partMass(first, false) / first.quantity * 1000),
-                comment: `${Math.round(first.length)} x ${Math.round(first.width)} x ${first.thickness}`,
+                comment: `${round1(first.length)} x ${round1(first.width)} x ${first.thickness}`,
             }, now));
         }
         const agg = new Map<string, { qty: number; notes: string[] }>();
@@ -391,10 +437,16 @@ export function edgeNotation(edges: Edge[]): string
 }
 
 
+// a text cell quoted when it holds the separator, a quote or a line break
+export function csvQuote(s: string): string
+{
+    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+
 function csvCell(v: string | number): string
 {
-    const s = typeof v === "number" ? String(Math.round(v * 10) / 10).replace(".", ",") : v;
-    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    return csvQuote(typeof v === "number" ? String(Math.round(v * 10) / 10).replace(".", ",") : v);
 }
 
 
@@ -429,8 +481,8 @@ export function hardwareCsv(b: Bom): string
 }
 
 
-// Same shape as PBSTree.to_dict() in Free-pbs : PBSTree.from_dict loads the file as is
+// The shape PBSTree.from_dict in Free-pbs loads : its mechsim_diagrams key is optional there, and meant for MechSim
 export function pbsJson(p: Project, b: Bom): string
 {
-    return JSON.stringify({ project_name: p.name, mechsim_diagrams: {}, root: b.pbs }, null, 2);
+    return JSON.stringify({ project_name: p.name, root: b.pbs }, null, 2);
 }

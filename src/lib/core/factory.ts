@@ -154,6 +154,7 @@ export function newProject(name: string): Project
         screen: null,
         prices: structuredClone(DEFAULT_PRICES),
         textures: {},
-        room: { ...DEFAULT_ROOM },
+        room: { ...DEFAULT_ROOM, obstacles: [] }, 
+        revisions: [],   
     };
 }

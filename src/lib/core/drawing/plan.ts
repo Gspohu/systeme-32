@@ -1,8 +1,9 @@
 // Setting out of the room seen from above, and the chans of dimensions the plans run along an edge
 
 import type { Project } from "../model";
-import { roomBox, sideWallDepth } from "../room";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale } from "./display";
+import { boxToRoom, roomBox, sideWallDepth } from "../room";
+import { OBSTACLE_LABELS, obstacleBox } from "../obstacles";
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth } from "./display";
 import { heading, table, type Draft } from "./draft";
 
 type ToPage = (value: number) => number;
@@ -65,6 +66,15 @@ export function roomPlan(p: Project): Draft
         canvas.dimV(pageZ(0), pageZ(right), pageX(room.width) + 6, pageX(room.width) + 14, `${right}`);
     }
     canvas.dimH(pageX(0), pageX(room.width), pageZ(0) - 2, pageZ(0) - 10, `${room.width}`);
+    // what stands on the walls, seen from above against its wall
+    for (const o of room.obstacles)
+    {
+        const b = boxToRoom(o.wall, room, obstacleBox(o));
+        canvas.rect(pageX(b.min[0]), pageZ(b.min[2]), (b.max[0] - b.min[0]) / scale, (b.max[2] - b.min[2]) /
+                    scale, "dashed");
+        canvas.text(pageX((b.min[0] + b.max[0]) / 2), pageZ(b.max[2]) + 3, `${OBSTACLE_LABELS[o.kind]} ${o.name}`, 1.6,
+                    "middle");
+    }
     // footprints overlap once items stand on or hang over others : open outlines, a mark at the front left corner
     // of each, the items sharing a corner sharing its mark, and the names in the legend
     const corners = new Map<string, { x: number; z: number; marks: number[] }>();
@@ -137,17 +147,65 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
     {
         return p - q;
     });
-    for (let i = 0; i + 1 < xs.length; i++)
+    const size = 1.8;
+    const out = Math.sign(line - ref);
+    const segs = xs.slice(1).map((x, i) =>
     {
-        const label = `${xs[i + 1]! - xs[i]!}`;
+        const [p, q] = [page(xs[i]!), page(x)];
+        const label = `${x - xs[i]!}`;
+        return { p: Math.min(p, q), q: Math.max(p, q), label, fits: textWidth(label, size) + 1 <= Math.abs(q - p) };
+    });
+    // a figure longer than its segment steps away frm the line, outwards, to the first level where it overlaps
+    // no other figure : still facing its own segment
+    const taken: [number, number][][] = [];
+    const place = (s: (typeof segs)[number]): number =>
+    {
+        const half = textWidth(s.label, size) / 2 + 0.5;
+        const [a, b] = [(s.p + s.q) / 2 - half, (s.p + s.q) / 2 + half]; 
+        let level = 0;
+        while ((taken[level] ?? []).some(([c, d]) =>
+        {
+            return a < d && c < b;
+        })) 
+        {
+            level++;
+        }
+        taken[level] = [...(taken[level] ?? []), [a, b]];
+        return level;
+    };
+    const levels = new Map<(typeof segs)[number], number>();
+    // the figures that fit between their arrows first, the ones pushed outside take the levels left
+    const fitting = segs.filter((x) =>
+    {
+        return x.fits;
+    });
+    const outside = segs.filter((x) =>
+    {
+        return !x.fits;
+    });
+    for (const s of [...fitting, ...outside])
+    {
+        levels.set(s, place(s));
+    }
+    for (const s of segs)
+    {
+        const level = levels.get(s)!;
+        const shift = out * level * (size + 1.2);
         if (dir === "h")
         {
-            canvas.dimH(page(xs[i]!), page(xs[i + 1]!), ref, line, label, 1.8);
+            canvas.dimH(s.p, s.q, ref, line, level === 0 ? s.label : "", size);
+            if (level > 0)
+            {
+                canvas.text((s.p + s.q) / 2, line - 0.8 + shift, s.label, size, "middle");
+            }
         }
         else
         {
-            const [p, q] = [page(xs[i]!), page(xs[i + 1]!)];
-            canvas.dimV(Math.min(p, q), Math.max(p, q), ref, line, label, 1.8);
+            canvas.dimV(s.p, s.q, ref, line, level === 0 ? s.label : "", size);
+            if (level > 0)
+            {
+                canvas.text(line - 0.8 + shift, (s.p + s.q) / 2, s.label, size, "middle", false, 90);
+            }
         }
     }
 }

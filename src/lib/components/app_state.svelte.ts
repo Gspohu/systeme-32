@@ -40,6 +40,9 @@ class AppState
     ledsOn = $state(false);
     // every front open in 3D, and the ones a click turned the other way from that
     frontsOpen = $state(false);
+    // the screen on its arm, 0 put away to 1 swung out, and the ring its arm reaches drawn in front of the wall
+    armT = $state(0);
+    showArmZone = $state(true);
     flipped = new SvelteSet<string>();
     private nextToast = 0;
 

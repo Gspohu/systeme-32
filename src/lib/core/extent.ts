@@ -76,12 +76,16 @@ export function itemExtent(it: Item): Extent
 }
 
 
-// Width and height in mm of a screen given by its diagonal in inches and its aspect ratio
-export function screenSize(sc: Screen): { w: number; h: number } 
+// Width, height and thickness in mm of a screen : its measured frame, else the bare panel of its diagonal
+export function screenSize(sc: Screen): { w: number; h: number; d: number }
 {
+    if (sc.frame !== null)
+    {
+        return { ...sc.frame };
+    }
     const diag = sc.diagonalInch * 25.4;
     const k = Math.hypot(sc.aspectW, sc.aspectH);
-    return { w: diag * sc.aspectW / k, h: diag * sc.aspectH / k };
+    return { w: diag * sc.aspectW / k, h: diag * sc.aspectH / k, d: 0 };
 }
 
 

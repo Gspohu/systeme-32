@@ -7,13 +7,15 @@ import { X, Y, Z, neg } from "./geometry";
 import { sideFiller } from "./extent";
 import { spread } from "./fittings";
 import { CLEAT_WIDTH } from "./ceiling";
+import { buttedLengths, type Cut } from "./solid_stock";
+
 
 // workshop conventions : a strip closes 150 mm at most, past that a carcass or a shelf. A cleat screwed every 400
 const FILLER_MAX = 150;
 const CLEAT_SCREW_PITCH = 400;
 
 
-export function buildSideFillers(c: Carcass, b: Build): void
+export function buildSideFillers(c: Carcass, b: Build, cut: Cut): void  
 {
     const t = c.thickness;
     const front = c.fronts[0];
@@ -53,16 +55,28 @@ export function buildSideFillers(c: Carcass, b: Build): void
         }
         else
         {
-            // solid wood against the outer face of the side, behind the strip, glued to it
-            b.parts.push(newPart({
-                item: c.id, itemName: c.name, decor: "CHENE_MASSIF", id: `${c.id}/side-filler/${side}/cleat`,
-                label: `Tasseau du fileur ${where}`, role: "cleat", length: c.height, width: CLEAT_WIDTH,
-                thickness: CLEAT_THICKNESS, edges: [],
-                frame: { o: [left ? c.x : c.x + c.width, c.y, c.z + c.depth - CLEAT_WIDTH], u: Y, v: Z,
-                         n: left ? neg(X) : X },
-            }));
-            strip.notes.push("Collé sur son tasseau, lui-même vissé sur la joue");
-            b.hardware.push({ ref: "SCREW_4x30", qty: spread(c.height, 100, CLEAT_SCREW_PITCH).length, item: c.id,
+            // solid wood against the outer face of the sied, behind the strip, glued to it, in lengths butted end
+            // to end when no board on sale gives it whole
+            const lengths = buttedLengths(c.height, "CHENE_MASSIF", CLEAT_THICKNESS, cut);
+            const many = lengths.length > 1;
+            let y = c.y;
+            let screws = 0;
+            lengths.forEach((l, k) =>
+            {
+                b.parts.push(newPart({
+                    item: c.id, itemName: c.name, decor: "CHENE_MASSIF",
+                    id: `${c.id}/side-filler/${side}/cleat${many ? `/${k + 1}` : ""}`,
+                    label: `Tasseau du fileur ${where}${many ? `, morceau ${k + 1}/${lengths.length}` : ""}`,
+                    role: "cleat", length: l, width: CLEAT_WIDTH, thickness: CLEAT_THICKNESS, edges: [],
+                    frame: { o: [left ? c.x : c.x + c.width, y, c.z + c.depth - CLEAT_WIDTH], u: Y, v: Z,
+                             n: left ? neg(X) : X },
+                }));
+                y += l;
+                screws += spread(l, 100, CLEAT_SCREW_PITCH).length;
+            });
+            strip.notes.push(many ? `Collé sur son tasseau en ${lengths.length} morceaux aboutés, vissés sur la joue`
+                : "Collé sur son tasseau, lui-même vissé sur la joue");
+            b.hardware.push({ ref: "SCREW_4x30", qty: screws, item: c.id,
                              itemName: c.name, target: null, note: `tasseau du fileur ${where} sur la joue`,
                              purpose: "cleat-screw" });
         }

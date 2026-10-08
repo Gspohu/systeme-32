@@ -2,9 +2,19 @@
 
 import type { Carcass, Front, Settings } from "./model";
 import type { NodeBox, Rect, ResolvedLayout } from "./layout";
-import { OVERLAY_X_FULL, OVERLAY_X_TWIN, INSET_PLATE_SHIFT } from "../data/rules";
+import { OVERLAY_X_FULL, OVERLAY_X_TWIN, INSET_PLATE_SHIFT, WALL_HINGE_REVEAL } from "../data/rules";
 
 export type HingeKind = "full" | "twin" | "inset";
+
+// Sides of the carcass standing against a wall of the room
+export interface WallSides
+{
+    left: boolean;
+    right: boolean;
+}
+
+
+const NO_WALLS: WallSides = { left: false, right: false };   
 
 
 export interface FrontPanel
@@ -72,7 +82,7 @@ function hingeKindFor(nb: NodeBox, side: "left" | "right", mount: Front["mount"]
 }
 
 
-export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings): FrontPanel[]
+export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings, walls: WallSides = NO_WALLS): FrontPanel[]
 {
     const out: FrontPanel[] = [];
     const ft = frontThickness(c);
@@ -87,45 +97,59 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings): Front
         const z = front.mount === "inset" ? c.depth - ft : c.depth;
         const base = { front: front.id, node: front.node, z, thickness: ft, decor: front.decor ?? c.decor, number: 0 };
         const spec = front.spec;
-        const hingeOverlayOf = (side: "left" | "right"): number =>
+        const hingeOverlayOf = (side: "left" | "right", r: Rect): number =>  
         {
-            return side === "left" ? nb.x - outer.x : outer.x + outer.w - (nb.x + nb.w);
+            return side === "left" ? nb.x - r.x : r.x + r.w - (nb.x + nb.w);
+        };
+        // A door hinged against a wall keeps a wider reveal on that edeg, or its front corner rubs the wall
+        const offWall = (side: "left" | "right", r: Rect): Rect =>  
+        {
+            const boundary = side === "left" ? nb.left : nb.right; 
+            const cut = WALL_HINGE_REVEAL - s.edgeReveal;
+            if (!walls[side] || boundary !== "outer" || front.mount === "inset" || cut <= 0)
+            {
+                return r;
+            }
+            return side === "left" ? { ...r, x: r.x + cut, w: r.w - cut } : { ...r, w: r.w - cut };
         };
         if (spec.type === "door")
         {
+            const rect = offWall(spec.hinge, outer);
             out.push({
                 ...base,
                 id: `${front.id}#0`,
                 role: "door",
                 index: 0,
-                rect: outer,
+                rect,
                 hinge: spec.hinge,
                 hingeKind: hingeKindFor(nb, spec.hinge, front.mount),
-                hingeOverlay: hingeOverlayOf(spec.hinge),
+                hingeOverlay: hingeOverlayOf(spec.hinge, rect),
             });
         }
         else if (spec.type === "doubleDoor")
         {
             const leafW = (outer.w - s.frontGap) / 2;
+            const leftLeaf = offWall("left", { x: outer.x, y: outer.y, w: leafW, h: outer.h });
+            const rightLeaf = offWall("right", { x: outer.x + leafW + s.frontGap, y: outer.y, w: leafW, h: outer.h });
             out.push({
                 ...base,
                 id: `${front.id}#0`,
                 role: "door",
                 index: 0,
-                rect: { x: outer.x, y: outer.y, w: leafW, h: outer.h },
+                rect: leftLeaf,
                 hinge: "left",
                 hingeKind: hingeKindFor(nb, "left", front.mount),
-                hingeOverlay: hingeOverlayOf("left"),
+                hingeOverlay: hingeOverlayOf("left", leftLeaf),
             });
             out.push({
                 ...base,
                 id: `${front.id}#1`,
                 role: "door",
                 index: 1,
-                rect: { x: outer.x + leafW + s.frontGap, y: outer.y, w: leafW, h: outer.h },
+                rect: rightLeaf,
                 hinge: "right",
                 hingeKind: hingeKindFor(nb, "right", front.mount),
-                hingeOverlay: hingeOverlayOf("right"),
+                hingeOverlay: hingeOverlayOf("right", rightLeaf),
             });
         }
         else if (spec.type === "lift" || spec.type === "panel")

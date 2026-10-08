@@ -101,6 +101,14 @@ export const SOLID_WOOD: BoardMaterial = {
         + "Module et résistance : valeur prudente non sourcée, non utilisée par les contrôles",
 };
 
+// Solid wood sold by the board, keyed decor:thickness. Brico Dépôt plaend oak, ref. 3663602861539, read on
+// 2026-10-08 : 2000 x 140 x 20 by the piece
+// https://www.bricodepot.fr/p/3663602861539/planche-rabotee-en-chene-massif-l-200-cm-section-140-x-20-mm
+export const SOLID_STOCK: Record<string, { length: number; width: number }> = {
+    "CHENE_MASSIF:20": { length: 2000, width: 140 },
+};
+
+
 // Decospan Decopanel MDF-BOARD datasheet (2021) : standard MDF 570 to 720 kg/m3, MOE 1500 to 2400
 // MOR 15 to 23, E1. The low ends go to the deflection check, 900 kg/m3 for loads as for any MDF (Hettich)
 // 2800 x 2070 stocked in 4, 9, 13, 16, 17, 19, 23, 26, 29, 31 and 39 mm
@@ -118,6 +126,23 @@ export const MDF_VENEER: BoardMaterial = {
     thicknesses: [4, 9, 13, 16, 17, 19, 23, 26, 29, 31, 39],
     source: "Decospan Decopanel MDF-BOARD fiche technique 2021, Hettich SlideLine M 2017, "
         + "EN 1995-1-1:2004 tab. 3.2 via COFORD",
+};
+
+// Decospan Decopanel CHIPBOARD datasheet (2019) : P2 core 610 to 750 kg/m3, MOE 1200 to 1800, MOR 10 to 14. The
+// heavy and weak ends taken as for the MDF-BOARD, creep as for P2. 2800 x 2070 stocked up to 39 mm
+// https://media.tis.rs/2020/08/Decospan-data-sheet-chipboard.pdf
+export const CHIPBOARD_VENEER: BoardMaterial = {
+    id: "p2_veneer", 
+    label: "Aggloméré P2 plaqué bois véritable",
+    kind: "melamine",
+    density: 750,
+    densityCheck: 750,
+    modulus: 1200,
+    strength: 10,
+    kdef: PARTICLEBOARD.kdef,
+    kmod: PARTICLEBOARD.kmod,
+    thicknesses: [9, 13, 16, 17, 19, 23, 26, 29, 39],
+    source: "Decospan Decopanel CHIPBOARD fiche technique 2019 (EN 323, EN 310), kdef et kmod repris du P2",
 };
 
 
@@ -145,6 +170,7 @@ export const MATERIALS: Record<string, BoardMaterial> = {
     [PARTICLEBOARD.id]: PARTICLEBOARD,
     [MDF.id]: MDF,
     [MDF_VENEER.id]: MDF_VENEER,
+    [CHIPBOARD_VENEER.id]: CHIPBOARD_VENEER,
     [MDF_FLEX.id]: MDF_FLEX,
     [SOLID_WOOD.id]: SOLID_WOOD,
     [GLASS.id]: GLASS,
@@ -181,6 +207,16 @@ export const SHEET_LENGTH = 2800;
 export const SHEET_WIDTH = 2070;
 
 
+// the same Decospan oak veneer on its MDF and its chipboard cores
+const OAK_VENEER = {
+    grain: true,
+    rgb: [178, 154, 125] as [number, number, number],
+    rgbDark: [158, 132, 101] as [number, number, number], 
+    rgbLight: [200, 178, 151] as [number, number, number],
+    colourSource: "Couleur d'affichage reprise du H1180, pas une mesure du placage : importer une photo de l'échantillon",
+    edge: "Chant placage chêne, référence au choix du distributeur",
+};
+
 export const DECORS: Decor[] = [
     {
         id: "H1180_ST37",
@@ -208,6 +244,48 @@ export const DECORS: Decor[] = [
         references: "NCS S5010-G30Y, RAL 7033, Pantone 5635U",
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/U604_9?country=FR",
         edge: "Chant ABS U604 ST9 23x0,8 (Jean Hue Socoda)",
+    },
+    // asked by Thomas D. at Colmar for a softer green and a lighter oak, read on egger.com on 2026-10-08 : the colours
+    // are the mean of Egger's decor picture, no French merchant price found yet
+    {
+        id: "U638_ST9",
+        label: "Vert sauge",
+        brand: "Egger",
+        ref: "U638 ST9",
+        material: "p2",
+        grain: false,
+        rgb: [193, 187, 164],   
+        colourSource: "Moyenne de l'image décor Egger",
+        url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/U638_9?country=FR",
+        edge: "Chant ABS Egger U638 ST9 assorti",
+    },
+    {
+        id: "H3165_ST12",
+        label: "Chêne Vicenza clair",
+        brand: "Egger",
+        ref: "H3165 ST12",
+        material: "p2",
+        grain: true,
+        rgb: [216, 192, 165],
+        rgbDark: [203, 179, 152],
+        rgbLight: [227, 203, 177],
+        colourSource: "Image décor Egger : moyenne, 10e et 90e centiles de clarté",
+        url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/H3165_12?country=FR",
+        edge: "Chant ABS Egger H3165 ST12 assorti",
+    },
+    {
+        id: "H1367_ST40",
+        label: "Chêne Casella naturel clair",
+        brand: "Egger",
+        ref: "H1367 ST40",
+        material: "p2",
+        grain: true,
+        rgb: [205, 176, 139],
+        rgbDark: [193, 163, 126],
+        rgbLight: [217, 188, 151],
+        colourSource: "Image décor Egger : moyenne, 10e et 90e centiles de clarté",
+        url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/H1367_40?country=FR",
+        edge: "Chant ABS Egger H1367 ST40 assorti",
     },
     {
         id: "W1000_ST9",
@@ -286,13 +364,15 @@ export const DECORS: Decor[] = [
         brand: "Decospan",
         ref: "MDF-BOARD chêne",
         material: "mdf_veneer",
-        grain: true,
-        rgb: [178, 154, 125],
-        rgbDark: [158, 132, 101],
-        rgbLight: [200, 178, 151],
-        colourSource: "Couleur d'affichage reprise du H1180, pas une mesure du placage : "
-            + "importer une photo de l'échantillon",
-        edge: "Chant placage chêne, référence au choix du distributeur",
+        ...OAK_VENEER,
+    }, 
+    {
+        id: "CHENE_PLAQUE_AGGLO",
+        label: "Aggloméré plaqué chêne",
+        brand: "Decospan",
+        ref: "Decopanel CHIPBOARD chêne",
+        material: "p2_veneer",
+        ...OAK_VENEER,
     },
     {
         id: "MDF_LAQUE",

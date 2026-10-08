@@ -45,6 +45,36 @@ function holeOutline(shape: Outlet["shape"], a: [number, number], b: [number, nu
 }
 
 
+// The linings of the carcass doubling a board over a hole : parallel to it, against one of its faces, and over the
+// whole hole
+function liningsOver(c: Carcass, board: Part, near: Vec3, far: Vec3, b: Build): Part[]
+{
+    const f = board.frame!;
+    const along = (q: Vec3, n: Vec3, o: Vec3): number => 
+    {
+        return (q[0] - o[0]) * n[0] + (q[1] - o[1]) * n[1] + (q[2] - o[2]) * n[2];   
+    };
+    return b.parts.filter((q) =>
+    {
+        if (q.item !== c.id || q.role !== "lining" || q.frame === null) 
+        {
+            return false;
+        }
+        const g = q.frame;
+        const parallel = Math.abs(Math.abs(g.n[0] * f.n[0] + g.n[1] * f.n[1] + g.n[2] * f.n[2]) - 1) < 1e-9;
+        // the gap between the two boards, whichever side of the board the lining stands on
+        const gap = along(g.o, f.n, f.o);
+        const against = gap > -q.thickness - 0.01 && gap < board.thickness + q.thickness + 0.01;
+        const [a, z] = [onPart(q, near), onPart(q, far)];
+        const over = [a, z].every(([u, v]) =>
+        {
+            return u >= -0.01 && u <= q.length + 0.01 && v >= -0.01 && v <= q.width + 0.01;
+        });
+        return parallel && against && over;
+    });
+}
+
+
 export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
 {
     for (const hole of c.outlets)
@@ -106,11 +136,21 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         if (!inside)
         {
-            b.errors.push(`${where} : ${hole.w} x ${h} mm décalé de ${hole.dx} / ${hole.dy} sort de sa case `
-                + `(${Math.round(nb.w)} mm de large). Le réduire ou le recentrer.`);
+            // the two sizes of the cell the hole lies across, a side seen across its depth, a shelf from above
+            const deep = Math.round(lay.zFront - lay.zBack);
+            const cell = hole.panel === "back" ? `${Math.round(nb.w)} x ${Math.round(nb.h)} mm`
+                : side ? `${deep} de profondeur x ${Math.round(nb.h)} de haut` : `${Math.round(nb.w)} x ${deep} de profondeur`;
+            b.errors.push(`${where} : ${hole.w} x ${h} mm décalé de ${hole.dx} / ${hole.dy} sort de sa case (${cell}). `
+                + "Le réduire ou le recentrer.");
             continue;
         }
         part.cutouts.push(holeOutline(hole.shape, onPart(part, near), onPart(part, far)));
+        // a lining ladi against that board, in this ecll or the next one, takes the same hole or it blocks it
+        for (const lining of liningsOver(c, part, near, far, b))
+        {
+            lining.cutouts.push(holeOutline(hole.shape, onPart(lining, near), onPart(lining, far)));
+            lining.notes.push(`Même découpe que ${part.label.toLowerCase()}, d'après le DXF`);
+        }
         // seen from the front : the back hole as cut, a shelf or a side one edge on over the thickness of its board
         const f = part.frame;
         const edgeOn = hole.panel !== "back";

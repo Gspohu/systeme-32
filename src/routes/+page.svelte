@@ -49,7 +49,8 @@
             app.notify("Stockage du navigateur indisponible (navigation privée ?) : enregistrer le projet en fichier.",
                        "warning");
         }
-        else
+        let reloaded = false;
+        if (app.storageOk)
         {
             const last = await loadLast().catch(() =>
             {
@@ -58,10 +59,23 @@
             if (last !== null)
             {
                 app.load(last.project, last.textures);
+                reloaded = true;
             }
+        }
+        // the TV wall shown when nothing was reloaded is a template like any toher, saved once changed : unmarked
+        // it was saved a secodn after the page opened, whatever was opened next
+        if (!reloaded)
+        {
+            untouched = app.project;
         }
         ready = true;
     });
+
+
+    // a template or a blank project just opened, saved only once it is changed : opening one thrice made three copies
+    let untouched: unknown = null;
+    // the save waiting for its second, run at once when the page goes away
+    let pending: (() => void) | null = null;
 
 
     // autosave one second after the last chaneg
@@ -69,28 +83,55 @@
     {
         const p = app.project;
         const tex = app.textures;
-        if (!ready || !app.storageOk)
+        if (!ready || !app.storageOk || p === untouched)
         {
             return;
         }
-        const t = setTimeout(() =>
+        const save = (): void =>
         {
+            pending = null;
             saveLocal(p, tex).catch((e: Error) =>
             {
                 app.notify(`Sauvegarde locale impossible : ${e.message}. Enregistrer en fichier.`, "danger");
             });
-        }, 1000);
-        return () =>   
+        };
+        pending = save; 
+        const t = setTimeout(save, 1000);
+        return () =>
         {
             clearTimeout(t);
         };
     });
 
 
-    function newFrom(id: string): void
+    function flush(): void
+    {
+        pending?.();
+    }
+
+
+    async function newFrom(id: string): Promise<void>
     {
         const tpl = byId(TEMPLATES, id);
-        app.load(tpl === undefined ? newProject("Nouveau projet") : tpl.make(), new Map());
+        const p = tpl === undefined ? newProject("Nouveau projet") : tpl.make();
+        // a name already saved in this browser gets a number, the list would shwo two of the same otherwise
+        const stored = await listLocal().catch(() =>
+        {
+            return [];
+        });
+        const names = new Set(stored.map((s) =>
+        {
+            return s.name;
+        }));
+        let n = 2;
+        const base = p.name;
+        while (names.has(p.name))
+        {
+            p.name = `${base} (${n})`;
+            n++;
+        }  
+        app.load(p, new Map());
+        untouched = app.project;
         mode = "design";
     }
 
@@ -183,7 +224,9 @@
     }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} onpagehide={flush} />
+<!-- a phone hides the page before killing it, pagehide may never come -->
+<svelte:document onvisibilitychange={() => { if (document.visibilityState === "hidden") { flush(); } }} />
 
 <div class="app">
     <header class="toolbar bar">
@@ -293,7 +336,8 @@
                     {#each localProjects as lp (lp.id)}
                         <li>  
                             <button class="btn btn-ghost" onclick={() => openLocal(lp.id)}>{lp.name}</button>
-                            <span class="muted">{new Date(lp.saved).toLocaleString("fr-FR")}</span>
+                            <span class="muted">{new Date(lp.saved).toLocaleString("fr-FR")}{lp.id === app.project.id
+                                ? ", ouvert" : ""}</span>
                             <button class="btn btn-ghost btn-icon" title="Supprimer"
                                 onclick={() => removeLocal(lp.id)}>&#10005;</button>
                         </li>

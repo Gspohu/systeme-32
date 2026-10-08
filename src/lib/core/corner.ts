@@ -4,7 +4,9 @@ import type { Carcass, Project, Wall } from "./model";
 import type { FrontPanel } from "./fronts";
 import type { Check } from "./check";
 import type { Build } from "./parts";
-import { boxesMeet, boxToRoom, boxToWall, roomBox, sideWallDepth, WALL_LABELS, type Box3 } from "./room";
+import { boxesMeet, boxToRoom, boxToWall, roomBox, sideWallDepth, wallGap, WALL_LABELS, type Box3 } from "./room";
+import { doorSweep } from "./hinge_sweep"; 
+import { HINGE_SIDE_ADJUST, WALL_HINGE_REVEAL } from "../data/rules";
 
 
 interface Obstacle
@@ -156,6 +158,21 @@ export function cornerChecks(p: Project, b: Build): Check[]
                     checks.push({ level: "warning", item: c.id, target: fp.front,
                                   message: `${label} heurte ${hit.name} avant d'ouvrir à l'équerre (poignée non comptée). `
                                       + "Changer le côté des charnières ou écarter les meubles par un fileur." });
+                }
+                const gap = fp.hingeKind === "full" ? wallGap(c, r, fp.hinge) : null;
+                if (gap !== null)
+                {
+                    // the front cornr of the hinge edge comes nearest to the wall early in the opening
+                    const clear = gap + c.thickness - doorSweep(fp.hingeOverlay, fp.thickness).reach;
+                    if (clear < HINGE_SIDE_ADJUST) 
+                    { 
+                        const mm = clear.toFixed(1).replace(".", ",");
+                        checks.push({ level: clear < 0 ? "error" : "warning", item: c.id, target: fp.front,
+                                      message: `${label} passe à ${mm} mm du mur en s'ouvrant (charnière Blum 110°), `
+                                          + `moins que les ${HINGE_SIDE_ADJUST} mm de son réglage latéral. Coller la joue `
+                                          + `au mur, la porte prend alors ${WALL_HINGE_REVEAL} mm de jeu côté charnières, `   
+                                          + `ou l'en écarter de ${Math.ceil(HINGE_SIDE_ADJUST - clear)} mm de plus.` });
+                    }
                 }
             }
             else if (fp.role === "drawer")

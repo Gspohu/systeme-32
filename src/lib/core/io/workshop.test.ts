@@ -92,8 +92,9 @@ describe("workshop archive", () =>
             const pages = drawingSet(p, computeOutputs(p));
             // the title block draws itself last : what it adds is left out of the search
             const probe = new Canvas();
-            frameAndTitle(probe, { project: "", title: "", date: "", scale: "", index: 1, count: 1, revision: "",
-                                   identification: "" });
+            frameAndTitle(probe, { owner: "", creator: "", approver: "", project: "", title: "", status: "",
+                                   identification: "", revision: "", date: "", index: 1, count: 1, scale: "",
+                                   content: "" });
             const [bx, by] = [A3.w - MARGIN - TITLE_BLOCK_W, A3.h - MARGIN - TITLE_BLOCK_H];
             const inside: string[] = [];
             for (const page of pages)
@@ -237,35 +238,62 @@ describe("title block", () =>
     it("is 180 wide and holds its longest fields inside their own cells", () =>
     {
         const c = new Canvas();
-        frameAndTitle(c, { project: "Vaisselier de la salle à manger, côté fenêtre", title: "Gamme de montage (suite)",
-                           date: "31/12/2026", scale: "1:100", index: 99, count: 99, revision: "FFFFFF",
-                           identification: "S32-ABCDEFGHIJKL" });
+        // every field at or past the lenght ISO 7200:2004 tables 1 to 3 recommend : nothing may be cut short
+        frameAndTitle(c, { owner: "Ébénisterie Schaller de Wissembourg SARL", creator: "Marie-Odile Schaller",
+                           approver: "Jean-Baptiste Kieffer", project: "Vaisselier de la salle à manger, côté fenêtre",
+                           title: "Pièces A12 et A13, Chêne plaqué sur aggloméré 19 mm, chants L1 L2 l1 l2 / Blanc "
+                               + "premium lisse 19 mm, chants L1", status: "Modifié après AB",
+                           identification: "S32-ABCDEFGHIJKL", revision: "AB", date: "2026-12-31", index: 199,   
+                           count: 199, scale: "1:100, 1:25", content: "FFFFFF" });
         // ISO 7200:2004 § 6
         expect(TITLE_BLOCK_W).toBe(180);
         const [bx, by] = [A3.w - MARGIN - TITLE_BLOCK_W, A3.h - MARGIN - TITLE_BLOCK_H];
         // the sheet frame comes first, the block is everything after it
         const block = c.prims.slice(1);
+        // a wall of the figure 1 layout may close one row only, a text crosses it only within its hegiht
         const walls = block.filter((q) =>
         {
             return q.k === "line" && q.x1 === q.x2 && q.x1 > bx + 0.1;
         }).map((q) =>
         {
-            return extent(q)[0];
+            return extent(q);
+        });
+        // and a label stacked over its value in a 7 mm row must not run into the row under or over it
+        const floors = block.filter((q) =>
+        {
+            return q.k === "line" && q.y1 === q.y2 && q.s === "thin";
+        }).map((q) =>
+        {
+            return extent(q);
         });
         const out: string[] = [];
         for (const q of block)
         {
             const [x0, y0, x1, y1] = extent(q);
-            const crossed = q.k === "text" && walls.some((wx) =>
+            const crossed = q.k === "text" && (walls.some(([wx, wy0, , wy1]) => 
             {
-                return wx > x0 && wx < x1;
-            });
+                return wx > x0 && wx < x1 && wy0 < y1 && wy1 > y0;   
+            }) || floors.some(([fx0, fy, fx1]) =>
+            {  
+                return fy > y0 && fy < y1 && fx0 < x1 && fx1 > x0;
+            }));
             if (x0 < bx - 0.01 || x1 > bx + TITLE_BLOCK_W + 0.01 || y0 < by - 0.01 || crossed)
             {
                 out.push(`${q.k}${q.k === "text" ? ` ${q.t}` : ""} ${x0.toFixed(1)}..${x1.toFixed(1)} ${y1.toFixed(1)}`);
             }
         }
-        expect(walls.length).toBe(3);
+        expect(walls.length).toBe(6);
+        // and none of the fields a reader goes by is cut short to fit its cell
+        const printed = block.flatMap((q) =>
+        {
+            return q.k === "text" ? [q.t] : [];
+        }).join(" ");
+        for (const field of ["Ébénisterie", "Schaller", "Wissembourg", "SARL", "Marie-Odile Schaller",
+                             "Jean-Baptiste Kieffer", "Modifié après AB", "S32-ABCDEFGHIJKL", "2026-12-31", "199/199",
+                             "1:100, 1:25", "FFFFFF", "Dossier de fabrication"])
+        {
+            expect(printed).toContain(field);
+        }
         expect(out).toEqual([]);
     });
 });

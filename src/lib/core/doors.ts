@@ -14,6 +14,7 @@ import {
     TIPON_HOLE_DIAMETER,
 } from "../data/rules";
 import { DIAM } from "./text";
+import { meets } from "./drilling";
 import { holeLine, nearestHole } from "./grid";
 import { at, neg, Y, type Frame, type Vec3 } from "./geometry";
 
@@ -21,6 +22,9 @@ import { at, neg, Y, type Frame, type Vec3 } from "./geometry";
 // Workshop conventions, stated in the drawings as such
 const PLATE_CLEARANCE = 25;
 const TIPON_FROM_EDGE = 100;
+// a TIP-ON on an adapter whose screws would meet a drilling already there oges down by steps, 50 mm at most
+const TIPON_STEP = 10;
+const TIPON_SHIFT_MAX = 50;
 
 
 export function hingeCount(height: number, kg: number): number | null
@@ -134,6 +138,8 @@ function hingeOnLine(c: Carcass, s: Settings, fp: FrontPanel, y: number, blocked
 
 export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
 {
+    // the TIP-ON units come after every hinge of the carcass, to stay clear of the plates of the next door
+    const tipOns: (() => void)[] = [];
     for (const fp of b.fronts.get(c.id) ?? [])
     {
         if (fp.role !== "door")
@@ -281,8 +287,15 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
             const tipRef = long ? "956A1004" : "956.1004";
             b.hardware.push({ ref: tipRef, qty: 1, item: c.id, itemName: c.name, target: fp.id,
                              note: "jeu mini 2,6 mm entre corps et porte (Blum p. 172)", purpose: "push-latch" });
-            fitTipOnHole(c, lay, b, nb, fp, hingeSide);
+            tipOns.push(() =>
+            {
+                fitTipOnHole(c, lay, b, nb, fp, hingeSide); 
+            });
         }
+    }
+    for (const fit of tipOns)
+    {
+        fit();
     }
 }
 
@@ -333,6 +346,27 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         // drilled, the plate would hang past the door edge : the adapter plate brings the unit into the cell
         // TODO the adapter stands 14.5 into the cell and is no fitted solid yet, a shelf at its height clashes unseen
         const off = TIPON_ADAPTER.axisOffFace;
+        // the door opening against the other face of a mid panel has its TIP-ON or its hinge plate there
+        let down = 0;  
+        while (TIPON_ADAPTER.screws.some((v) =>
+        {
+            return meets(part, cellFace, u - down, v, 4, 15);
+        })) 
+        {
+            down += TIPON_STEP;
+            if (down > TIPON_SHIFT_MAX) 
+            {
+                b.errors.push(`${c.name}, porte ${fp.number} : les vis de l'embase TIP-ON rencontrent les perçages de `  
+                    + `l'autre face sur ${TIPON_SHIFT_MAX} mm de haut. Ouvrir la porte avec une poignée.`);
+                return; 
+            }
+        }
+        if (down > 0)   
+        {  
+            part.notes.push(`TIP-ON de la porte ${fp.number} décalé de ${down} mm : l'autre face porte déjà des `
+                + "perçages à sa hauteur");
+            u -= down; 
+        }
         const clipped = onDoor(at(part.frame!, u, 0, cellFace === "A" ? -off : t + off));
         if (clipped.room < half)
         {
@@ -348,7 +382,8 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
                               purpose: "adapter-screw" });
         }
         b.hardware.push({ ref: TIPON_ADAPTER.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
-                         note: `percé, la contreplaque sortirait de la porte (${drilled.room.toFixed(1)} mm du chant)`,
+                         note: `monté sur embase : percé dans le panneau, il placerait sa contreplaque à ` 
+                             + `${drilled.room.toFixed(1).replace(".", ",")} mm du chant de la porte, trop près pour la coller`,
                          purpose: "push-adapter" });
         door.holes.push({ u: clipped.u, v: clipped.v, diameter: 0, depth: 0, face: "A",
                           label: `Contreplaque TIP-ON à coller centrée ici, axe à ${off} de la face du panneau `

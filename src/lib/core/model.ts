@@ -5,7 +5,7 @@ export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell
 import type { PriceEntry } from "../data/prices";
 export type { PriceEntry } from "../data/prices"; 
 
-export const SCHEMA_VERSION = 7;  
+export const SCHEMA_VERSION = 10;  
 
 
 export type Id = string;
@@ -46,9 +46,19 @@ export interface Settings
     ledCutPitch: number;
     // power of one round spot
     spotWatt: number;
+    // hours of the workshop and of fitting on site, typed by whoever quotes them : null until then
+    makeHours: number | null;
+    fitHours: number | null;
+    // the people of the title block (ISO 7200:2004 : creator, approval person, legal owner) and whom it is made for
+    creator: string;
+    approver: string;
+    owner: string; 
+    client: string;
+    site: string;
 }
 
-export type WallType = "solid" | "aerated" | "plasterboard";
+// a reinforced partition has a timber cross piece fixed to its studs ebhind the board, the screws go into it
+export type WallType = "solid" | "aerated" | "plasterboard" | "reinforced";
 
 export const DEFAULT_SETTINGS: Settings = {
     grid: 32,
@@ -73,6 +83,13 @@ export const DEFAULT_SETTINGS: Settings = {
     ledCutPitch: 50,
     // Häfele Loox 24V LED 3001 downlight (TCH Design 2017 p. 5.119)
     spotWatt: 1.7,
+    makeHours: null,
+    fitHours: null,
+    creator: "",
+    approver: "",
+    owner: "",
+    client: "",
+    site: "",
 };
 
 
@@ -425,6 +442,27 @@ export interface Room
     height: number;
     // an alcove : each side wall stops that far from the back wall, the room opens out beyond
     returns?: { left: number; right: number };
+    // what stands on the awlls before any furniture : bought nothing of, drwn and checked against
+    obstacles: Obstacle[];  
+} 
+
+
+export type ObstacleKind = "radiator" | "box" | "skirting";
+
+// x along its wall from the left as seen from the room, y from the floor, depth out of the wall
+export interface Obstacle
+{
+    id: Id;
+    name: string;
+    kind: ObstacleKind;
+    wall: Wall;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    depth: number;
+    // a radiator : the room its notice asks on every side, null until it is read
+    clearance: number | null;  
 }
 
 export interface Screen
@@ -432,11 +470,37 @@ export interface Screen
     diagonalInch: number;
     aspectW: number;
     aspectH: number;
-    // centre of the screen in the front view, and its front plane
+    // centre of the screen in the front view, and its front plane : where it stands, or is put away on its arm
     cx: number;
     bottom: number;
     z: number;
     wallMounted: boolean;
+    // the set as measured, its bezel and thickness included : null leaves the panel worked out from the diagonal
+    frame: { w: number; h: number; d: number } | null;
+    massKg: number | null;
+    // hole spacing of its back, width then height in mm
+    vesa: [number, number] | null;
+    source: string;
+    arm: ScreenArm | null;
+}
+
+// A full motion arm screwed to the back wall : what its maker gives, where its plate goes, where it brings the screen
+export interface ScreenArm
+{
+    model: string;
+    maxKg: number;
+    vesa: [number, number][];
+    // distance from the wall to the back of the screen, folded flat then stretched out
+    reachMin: number;
+    reachMax: number;
+    plateW: number;
+    plateH: number;
+    // centre of the plate on the back wall
+    x: number;
+    y: number;
+    // the screen swung out to be watched : its centre in the front view and its front plane, null when only stored
+    out: { cx: number; z: number } | null;
+    source: string;
 }
 
 
@@ -454,10 +518,24 @@ export interface Project
     // user images packed in the archive, keyed by decor id
     textures: Record<string, UserTexture>;
     room: Room;
+    // the issues of the drawings, oldest first : their index A, B, C... without I and O (ISO 7200:2004 5.1.4)
+    // dated and explained
+    revisions: Revision[]; 
+}
+
+
+export interface Revision
+{
+    index: string;
+    date: string;
+    reason: string;
+    // the content print at issue, the title block tells an issued set from one changed since
+    content: string;
 }
 
 // a room of 4 x 4 m under a 2.50 m ceiling until the real one is measured (convention)
-export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500 };
+export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500, obstacles: [] };
+
 
 // A photo of a decor sample : its file in the archive and the panel width it shows, in mm
 export interface UserTexture

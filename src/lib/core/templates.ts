@@ -90,17 +90,17 @@ export function tvWall(): Project
     column.outlets.push({ id: newId("o"), cell: technical.id, panel: "right", shape: "round", w: 60, h: 60, dx: -50,
                           dy: 0 });
 
-    // their 38 mm oak shelves in the Decospan 39, the nearest board sold
+    // their 38 mm oak shelves in the Decospan 39, the nearets board sold, on the chipboard core priced
     const shelves = [[1860, 1600], [2230, 800]].map(([y, width]) =>
     {
-        return newWallShelf({ x: 450, y, width, depth: 250, thickness: 39, decor: "CHENE_PLAQUE",
+        return newWallShelf({ x: 450, y, width, depth: 250, thickness: 39, decor: "CHENE_PLAQUE_AGGLO",
                               corners: { left: 0, right: 50 } });
     });
 
-    // their amplifier stood on its side against the right of the column, 30 clear each side in the 245 mm left
-    // before the screen, flush with the front : its bass port is at the back
+    // their amplifier stood on its side, flush with the front : its bass port is at the back. Moved right of the
+    // stored screen once the screen went on an arm, 30 clear, the place left of it kept for the column Gilles asks
     const amplifier = newDevice({
-        name: "Ampli Marshall Stanmore", x: 480, y: 600, z: 215, width: 185, height: 350, depth: 185, massKg: 5.1,
+        name: "Ampli Marshall Stanmore", x: 1530, y: 600, z: 215, width: 185, height: 350, depth: 185, massKg: 5.1,
         source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé sur le flanc",
         look: "amplifier",
     });
@@ -108,14 +108,28 @@ export function tvWall(): Project
     // 60 clear behind for the plugs
     const server = newDevice({
         name: "Freebox Server mini 4K", x: 30, y: 619, z: 60, width: 180, height: 45, depth: 190, massKg: 0.66,
-        source: "180 x 45 x 190 mm et 0,66 kg (comparateur papernest, pas la fiche de Free), posé à plat",
+        source: "180 x 45 x 190 mm et 0,66 kg d'un comparateur en ligne, à vérifier sur l'appareil, posé à plat", 
     });
     const player = newDevice({
         name: "Freebox Player mini 4K", x: 230, y: 619, z: 60, width: 155, height: 31, depth: 118, massKg: 0.34,
-        source: "155 x 31 x 118 mm (test Génération NT), masse non sourcée, 0,34 kg d'un résumé de recherche à vérifier",
+        source: "155 x 31 x 118 mm (test Génération NT), 0,34 kg estimés, à peser",
     });
     project.items.push(baseUnit, column, ...shelves, amplifier, server, player);
-    project.screen = { diagonalInch: 65, aspectW: 16, aspectH: 9, cx: 1415, bottom: 600, z: 100, wallMounted: false };
+    // their set, read off its back label, on a wall arm : put away right of a 250 column (the width Gilles weighs
+    // between 200 and 300), swung out over it to face the middle of their 1880 sofa set against the left wall
+    project.screen = {
+        diagonalInch: 32, aspectW: 16, aspectH: 9, cx: 1112, bottom: 664, z: 80, wallMounted: false,
+        frame: { w: 764, h: 463, d: 30 }, massKg: 7, vesa: [200, 200],
+        source: "Samsung UE32D4000NW (étiquette du dos) : 763,6 x 463,1 x 29,9 mm et 7 kg sans pied, VESA 200 x 200 "
+            + "(fiches tvsfaq et manua.ls, aucune fiche Samsung lue : mesurer l'écart des trous au dos)",
+        arm: {
+            model: "One For All WM 2251", maxKg: 30, vesa: [[75, 75], [100, 100], [200, 100], [200, 200]],
+            reachMin: 49, reachMax: 393, plateW: 240, plateH: 249, x: 1026, y: 896,
+            out: { cx: 940, z: 250 },
+            source: "fiche oneforall.com relevée le 2026-10-08 : 13 à 43 pouces, VESA 75 x 75 à 200 x 200, 30 kg, "
+                + "49 à 393 mm du mur, 180° ; platine prise à son encombrement de 24 x 24,9 cm",
+        },
+    };
     return project;
 }
 

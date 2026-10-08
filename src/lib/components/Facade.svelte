@@ -7,6 +7,7 @@
     import { GRIP_GAP, GRIP_H, GRIP_ROW, gripLabel, layoutGrips } from "./grips";
     import { byId } from "../core/edit";
     import { endReach, itemExtent, screenSize, sideFiller } from "../core/extent";
+    import { screenSpots } from "../core/tv_arm";
     import { PLINTH_FOOT_GAP, baseHeight } from "../core/part_base";
     import { RAIL_THICKNESS, slatLayout } from "../core/slats";
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
@@ -572,7 +573,10 @@
         {#if project.screen !== null && app.wall === "back"}
             {@const sc = project.screen}
             {@const size = screenSize(sc)}
-            <rect x={sc.cx - size.w / 2} y={-(sc.bottom + size.h)} width={size.w} height={size.h} class="screen" />
+            {#each screenSpots(sc) as spot (spot.label)}
+                <rect x={spot.cx - size.w / 2} y={-(spot.bottom + size.h)} width={size.w} height={size.h} class="screen"
+                    class:out={spot.label === "sorti"} />
+            {/each}
         {/if}
         <!-- the leaders of lifted grips under every grip, then the grips last : an item drawn after another
              one covered its label -->
@@ -598,6 +602,8 @@
                 role="button" tabindex="-1" aria-label={`Déplacer ${it.name}`}
                 onpointerdown={(e) => startItemDrag(e, it)}
             >
+                <!-- the whole name under the pointer when the grip cuts it -->  
+                <title>{it.name}</title>   
                 <rect x={mid - gw / 2} y={-(base + GRIP_H * u)} width={gw} height={GRIP_H * u} rx={6 *
                     u} stroke-width={1.5 * u} />
                 <text x={mid} y={-(base + 9 * u)} text-anchor="middle" font-size={13 * u}>{grip.text}</text>
@@ -848,5 +854,12 @@
         stroke-width: 6;
         stroke-dasharray: 30 20;
         pointer-events: none;
+    }
+
+    /* swung out on its arm : the same colour, finer dots, it is a place it goes to, not where it lives */
+    .screen.out
+    {
+        stroke-width: 4;
+        stroke-dasharray: 6 14;
     }
 </style>
