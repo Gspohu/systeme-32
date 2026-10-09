@@ -80,6 +80,18 @@ export function tvWall(): Project
         newFront(upper.id, { type: "door", hinge: "left" }, PUSH_DOOR),
     );
     column.linings.push(lining(niche.id, OAK, true));
+
+    // Gilles' open column against it, from his sketch of 2026-10-08 : 250 wide (his 200 to 300), 150 deep for a book
+    // up under the lower wall shelf that caps it, no back. Two bays of 96.5 behind a middle upright, the shelves of
+    // the right one half a pitch above the left : 281 clear takes a large format of 240
+    const bookLeft = split("v", [96.5], [split("h", [280, 580, 880], [cell(), cell(), cell(), cell()]),
+                                         split("h", [130, 430, 730, 1030], [cell(), cell(), cell(), cell(), cell()])]);
+    const books = newCarcass({
+        name: "Colonne à livres",
+        width: 250, height: 1260, depth: 150, x: 450, y: 600, z: 0,
+        decor: OAK, backDecor: OAK, base: { type: "floor" }, back: { type: "none" },
+        root: bookLeft,
+    });
     // two through the back for the mains and the fibre, the first behind the box, and one through the right side
     // opening behind the amplifier, 85 off its back
     for (const dx of [-100, 120])
@@ -98,7 +110,7 @@ export function tvWall(): Project
     });
 
     // their amplifier stood on its side, flush with the front : its bass port is at the back. Moved right of the
-    // stored screen once the screen went on an arm, 30 clear, the place left of it kept for the column Gilles asks
+    // stored screen once the screen went on an arm, 30 clear, its old place taken by Gilles' column
     const amplifier = newDevice({
         name: "Ampli Marshall Stanmore", x: 1530, y: 600, z: 215, width: 185, height: 350, depth: 185, massKg: 5.1,
         source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé sur le flanc",
@@ -114,7 +126,7 @@ export function tvWall(): Project
         name: "Freebox Player mini 4K", x: 230, y: 619, z: 60, width: 155, height: 31, depth: 118, massKg: 0.34,
         source: "155 x 31 x 118 mm (test Génération NT), 0,34 kg estimés, à peser",
     });
-    project.items.push(baseUnit, column, ...shelves, amplifier, server, player);
+    project.items.push(baseUnit, column, books, ...shelves, amplifier, server, player);
     // their set, read off its back label, on a wall arm : put away right of a 250 column (the width Gilles weighs
     // between 200 and 300), swung out over it to face the middle of their 1880 sofa set against the left wall
     project.screen = {

@@ -465,8 +465,8 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
             const out = spot.label === "sorti";
             canvas.rect(ox + (spot.cx - w / 2) / scale, oy - (spot.bottom + h) / scale, w / scale, h / scale,
                         out ? "hidden" : "dashed");
-            // on an arm the two outlines and the plate overlap : short names over the outlines, the swung one on its
-            // left end, clear of the plate in the middle
+            // on an arm the two outlines and the plate overlap : short names over the outlines, the swung one a line
+            // higher, both centred on their own outline
             if (spot.label === "")
             {
                 canvas.text(ox + spot.cx / scale, oy - (spot.bottom + h / 2) / scale,
@@ -474,9 +474,8 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
             }
             else
             {
-                const lx = out ? spot.cx - w / 2 : spot.cx;
-                canvas.text(ox + lx / scale, oy - (spot.bottom + h) / scale - 1.5, out ? "sorti"
-                    : `Écran ${sc.diagonalInch}" rangé`, BODY, out ? "start" : "middle");
+                canvas.text(ox + spot.cx / scale, oy - (spot.bottom + h) / scale - (out ? 5.5 : 1.5), out ? "sorti"
+                    : `Écran ${sc.diagonalInch}" rangé`, BODY, "middle");
             }
         }
     }

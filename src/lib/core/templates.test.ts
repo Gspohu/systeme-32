@@ -351,7 +351,10 @@ describe("the sketch templates", () =>
             });
         };
         // 19 + 19 sits in the middle of 36-42, at the very end of 32-38 (Häfele 2017 p. 11.138)
-        expect(links(tvWall)).toEqual(["267.07.903 x4 Meuble bas et Colonne gauche, 38 mm serrés"]);
+        // Gilles' 150 deep column stands on the base and against the left column : both hold it up
+        expect(links(tvWall)).toEqual(["267.07.903 x4 Meuble bas et Colonne gauche, 38 mm serrés",
+                                       "267.07.903 x4 Meuble bas et Colonne à livres, 38 mm serrés",
+                                       "267.07.903 x6 Colonne gauche et Colonne à livres, 38 mm serrés"]);
         expect(links(dresser)).toContain("267.07.903 x6 Niche et Placards hauts, 38 mm serrés");
         expect(links(dresser)).toHaveLength(8);
     });
