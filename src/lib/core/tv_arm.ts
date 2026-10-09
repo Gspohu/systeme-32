@@ -1,19 +1,27 @@
-// A screen on a full motion arm : the two places it takes, and what the arm and the wall behind it must carry
+// A screen on a full motion arm : the places it takes, the way between them, and what the arm and the wall must carry
 
 import type { Project, Screen } from "./model";
 import type { Check } from "./check";
 import { screenSize } from "./extent";
+import { roomBox } from "./room";
 import { PLASTERBOARD_LIMITS } from "../data/wall_fixings";
 
 const G = 9.81;
+// steps of the way out checked against the furniture, enough for a 764 wide set to never jump a 19 mm board
+const PATH_STEPS = 40;
 
+// where the arm holds the screen : the centre of the set in the front view, its front plane at the centre and how
+// far it is turned in degrees, positive to face the right of the room
 export interface ScreenSpot
 {
     label: string;
     cx: number;
     bottom: number;
     z: number;
+    yaw: number;
 }
+
+type Pt = [number, number];
 
 
 // A screen as read from a file or typed in : numbers a drawing can use, the sheet of an arm at zero until it is read
@@ -47,11 +55,12 @@ export function screenIsSound(raw: unknown): boolean
         return frameOk && massOk && vesaOk;
     }
     const o = a.out as Record<string, unknown> | null;
+    const outOk = o === null || (typeof o === "object" && Number.isFinite(o.cx) && positive(o.z)
+        && (o.yaw === undefined || (typeof o.yaw === "number" && Math.abs(o.yaw) <= 90)));
     const armOk = typeof a === "object" && typeof a.model === "string" && typeof a.source === "string"
         && known(a.maxKg) && Array.isArray(a.vesa) && a.vesa.every(pair) && known(a.reachMin)
         && known(a.reachMax) && (a.reachMax === 0 || (a.reachMin as number) <= (a.reachMax as number))
-        && known(a.plateW) && known(a.plateH) && Number.isFinite(a.x) && Number.isFinite(a.y)
-        && (o === null || (typeof o === "object" && Number.isFinite(o.cx) && positive(o.z)));
+        && known(a.plateW) && known(a.plateH) && Number.isFinite(a.x) && Number.isFinite(a.y) && outOk;
     return frameOk && massOk && vesaOk && armOk;
 }
 
@@ -59,25 +68,167 @@ export function screenIsSound(raw: unknown): boolean
 // Where the screen stands or is put away, then where its arm swings it out to be watched : the arm keeps its height
 export function screenSpots(sc: Screen): ScreenSpot[]
 {
-    const spots: ScreenSpot[] = [{ label: sc.arm === null ? "" : "rangé", cx: sc.cx, bottom: sc.bottom, z: sc.z }];
+    const spots: ScreenSpot[] = [{ label: sc.arm === null ? "" : "rangé", cx: sc.cx, bottom: sc.bottom, z: sc.z,
+                                   yaw: 0 }];
     if (sc.arm !== null && sc.arm.out !== null)
     {
-        spots.push({ label: "sorti", cx: sc.arm.out.cx, bottom: sc.bottom, z: sc.arm.out.z });
+        spots.push({ label: "sorti", cx: sc.arm.out.cx, bottom: sc.bottom, z: sc.arm.out.z, yaw: sc.arm.out.yaw ?? 0 });
     }
     return spots;
 }
 
 
-// The screen part way along its arm, t from 0 put away to 1 swung out : the 3D view slides it to show the way
-export function armPose(sc: Screen, t: number): ScreenSpot
+// The four corners of the set in plan, x along the wall and z into the room : it turns about the middle of its
+// back, where the arm holds it
+export function screenFootprint(sc: Screen, spot: ScreenSpot): Pt[]
 {
-    const out = sc.arm?.out ?? null;
-    if (out === null)
+    const { w, d } = screenSize(sc);
+    const a = spot.yaw * Math.PI / 180;
+    const across: Pt = [Math.cos(a), -Math.sin(a)];
+    const facing: Pt = [Math.sin(a), Math.cos(a)];
+    const hold: Pt = [spot.cx, spot.z - d];
+    const corners: Pt[] = [];
+    for (const [u, v] of [[-w / 2, 0], [w / 2, 0], [w / 2, d], [-w / 2, d]])
     {
-        return { label: "", cx: sc.cx, bottom: sc.bottom, z: sc.z };
+        corners.push([hold[0] + u! * across[0] + v! * facing[0], hold[1] + u! * across[1] + v! * facing[1]]);
     }
-    const k = Math.min(1, Math.max(0, t));
-    return { label: "", cx: sc.cx + (out.cx - sc.cx) * k, bottom: sc.bottom, z: sc.z + (out.z - sc.z) * k };
+    return corners;
+}
+
+
+// The width the set covers along the wall, turned or not, for the front views
+export function spotSpan(sc: Screen, spot: ScreenSpot): [number, number]
+{
+    const xs = screenFootprint(sc, spot).map((c) =>
+    {
+        return c[0];
+    });
+    return [Math.min(...xs), Math.max(...xs)];
+}
+
+
+// separating axis test of a turned rectangle against a box square to the walls, in plan
+function overlaps(corners: Pt[], box: { x0: number; z0: number; x1: number; z1: number }): boolean
+{
+    const boxCorners: Pt[] = [[box.x0, box.z0], [box.x1, box.z0], [box.x1, box.z1], [box.x0, box.z1]];
+    const axes: Pt[] = [[1, 0], [0, 1], [corners[1]![0] - corners[0]![0], corners[1]![1] - corners[0]![1]],
+                        [corners[3]![0] - corners[0]![0], corners[3]![1] - corners[0]![1]]];
+    for (const [ax, az] of axes)
+    {
+        const project = (pts: Pt[]): [number, number] =>
+        {
+            const s = pts.map(([x, z]) =>
+            {
+                return x * ax + z * az;
+            });
+            return [Math.min(...s), Math.max(...s)];
+        };
+        const [a0, a1] = project(corners);
+        const [b0, b1] = project(boxCorners);
+        // half a millimetre of play : touching faces are not a clash
+        const slack = 0.5 * Math.hypot(ax, az);
+        if (a1 <= b0 + slack || b1 <= a0 + slack)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+// What the set runs into at that spot : the items it enters, and the back wall (no id) when it turns into it. Every
+// item is read in the room frame, the screen is on the back wall
+export function spotClashes(p: Project, spot: ScreenSpot): { id: string | null; name: string }[]
+{
+    const sc = p.screen;
+    const hit: { id: string | null; name: string }[] = [];
+    if (sc !== null)
+    {
+        const { h } = screenSize(sc);
+        const corners = screenFootprint(sc, spot);
+        if (Math.min(...corners.map((c) =>
+        {
+            return c[1];
+        })) < -0.5)
+        {
+            hit.push({ id: null, name: "le mur" });
+        }
+        for (const it of p.items)
+        {
+            const bx = roomBox(it, p.room);
+            const level = spot.bottom < bx.max[1] - 0.5 && spot.bottom + h > bx.min[1] + 0.5;
+            if (level && overlaps(corners, { x0: bx.min[0], z0: bx.min[2], x1: bx.max[0], z1: bx.max[2] }))
+            {
+                hit.push({ id: it.id, name: it.name });
+            }
+        }
+    }
+    return hit;
+}
+
+
+// The way a hand takes the set out on its arm : pulled out square to the wall first, then slid and turned, then
+// pushed to its depth, as the arm opens. Each step is a spot to check
+export function armPath(sc: Screen): ScreenSpot[]
+{
+    const [stored, out] = screenSpots(sc);
+    if (stored === undefined || out === undefined)
+    {
+        return [];
+    }
+    const deep = Math.max(stored.z, out.z);
+    const way: ScreenSpot[] = [];
+    const lerp = (a: number, b: number, k: number): number =>
+    {
+        return a + (b - a) * k;
+    };
+    for (let i = 0; i <= PATH_STEPS; i++)
+    {
+        const k = i / PATH_STEPS;
+        way.push({ ...stored, label: "", z: lerp(stored.z, deep, k) });
+    }
+    for (let i = 1; i <= PATH_STEPS; i++)
+    {
+        const k = i / PATH_STEPS;
+        way.push({ ...stored, label: "", cx: lerp(stored.cx, out.cx, k), z: deep, yaw: lerp(0, out.yaw, k) });
+    }
+    for (let i = 1; i <= PATH_STEPS; i++)
+    {
+        way.push({ ...out, label: "", z: lerp(deep, out.z, i / PATH_STEPS) });
+    }
+    return way;
+}
+
+
+// A spot asked for in the 3D view, brought back within the reach of the arm : never closer to the wall than folded
+// never further from the plate than stretched
+export function reachable(sc: Screen, want: { cx: number; z: number; yaw: number }): ScreenSpot
+{
+    const spot: ScreenSpot = { label: "", cx: want.cx, bottom: sc.bottom, z: want.z, yaw: Math.max(-90,
+                                                                                                    Math.min(90,
+                                                                                                        want.yaw)) };
+    const arm = sc.arm;
+    if (arm === null || arm.reachMax <= 0)
+    {
+        return spot;
+    }
+    const { d } = screenSize(sc);
+    let dx = spot.cx - arm.x;
+    let back = Math.max(arm.reachMin, spot.z - d);
+    const reach = Math.hypot(dx, back);
+    if (reach > arm.reachMax)
+    {
+        dx *= arm.reachMax / reach;
+        back *= arm.reachMax / reach;
+    }
+    return { ...spot, cx: arm.x + dx, z: back + d };
+}
+
+
+// The spot the 3D view shows : where the screen is put away until one is asked for, then the asked one within reach
+export function spotFor(sc: Screen, want: { cx: number; z: number; yaw: number } | null): ScreenSpot
+{
+    return want === null || sc.arm === null ? screenSpots(sc)[0]! : reachable(sc, want);
 }
 
 
@@ -133,16 +284,31 @@ export function armChecks(p: Project): Check[]
     {
         const back = spot.z - d;
         const reach = Math.hypot(spot.cx - arm.x, back);
-        const where = spot.label === "" ? "" : ` ${spot.label}`;
         if (back < arm.reachMin - 0.5)
         {
-            say("error", `Écran${where} à ${Math.round(back)} mm du mur, le bras ${arm.model} replié en tient `
+            say("error", `Écran ${spot.label} à ${Math.round(back)} mm du mur, le bras ${arm.model} replié en tient `
                 + `${arm.reachMin}. Avancer l'écran.`);
         }
         else if (reach > arm.reachMax + 0.5)
         {
-            say("error", `Écran${where} à ${Math.round(reach)} mm de la platine, le bras ${arm.model} va jusqu'à `
+            say("error", `Écran ${spot.label} à ${Math.round(reach)} mm de la platine, le bras ${arm.model} va jusqu'à `
                 + `${arm.reachMax}. Rapprocher la platine ou prendre un bras plus long.`);
+        }
+    }
+    // the two ends are checked with the furniture, the way between them here : the first clash is enough to say
+    const way = armPath(sc);
+    for (let i = 1; i < way.length - 1; i++)
+    {
+        const hit = spotClashes(p, way[i]!);
+        if (hit.length > 0)
+        {
+            const names = hit.map((x) =>
+            {
+                return x.name;
+            }).join(" et ");
+            say("error", `Bras ${arm.model} : en sortant l'écran de sa place, il heurte ${names}. Le sortir plus loin `
+                + "du mur avant de le pivoter, ou déplacer la platine.");
+            break;
         }
     }
     const centre = sc.bottom + h / 2;

@@ -36,7 +36,7 @@ import { cutoutChecks } from "./cutout_checks";
 import { stockChecks } from "./solid_stock";
 import { obstacleChecks } from "./obstacles"; 
 import { titleBlockChecks } from "./revisions";
-import { armChecks, screenSpots } from "./tv_arm";
+import { armChecks, screenSpots, spotClashes } from "./tv_arm";
 import { swingChecks } from "./swing";
 import { slopeErrors } from "./slope";
 import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
@@ -454,27 +454,24 @@ function screenChecks(p: Project): Check[]
     {
         return checks;
     }
-    const { w, h, d } = screenSize(sc);
-    let support = false;
-    // the whole thickness of the set counts, and on an arm both the place it is put away in and the one it swings to
+    const { w, h } = screenSize(sc);
+    // the whole thickness of the set counts, turned as it is, and on an arm both the place it is put away in and the
+    // one it swings to
     for (const spot of screenSpots(sc))
     {
-        const rect ={ x0: spot.cx - w / 2, x1: spot.cx + w / 2, y0: spot.bottom, y1: spot.bottom + h };
         const where = spot.label === "" ? "" : ` ${spot.label}`;
-        for (const it of p.items)
+        for (const hit of spotClashes(p, spot))
         {
-            const bx = roomBox(it, p.room);
-            const hit = rect.x0 < bx.max[0] && rect.x1 > bx.min[0] && rect.y0 < bx.max[1] - 0.5
-                && rect.y1 > bx.min[1] + 0.5 && bx.max[2] > spot.z - d;
-            if (hit)
-            {
-                checks.push({ level: "error", item: it.id, target: null,
-                              message: `L'écran ${sc.diagonalInch}"${where} (${Math.round(w)} x ${Math.round(h)} mm) touche `
-                                  + `${it.name}. Réduire la diagonale, élargir la niche ou déplacer l'écran.` });
-            }
-            support = support || (Math.abs(bx.max[1] - sc.bottom) < 1 && bx.min[0] <= sc.cx && bx.max[0] >= sc.cx);
+            checks.push({ level: "error", item: hit.id, target: null,
+                          message: `L'écran ${sc.diagonalInch}"${where} (${Math.round(w)} x ${Math.round(h)} mm) touche `
+                              + `${hit.name}. Réduire la diagonale, élargir la niche ou déplacer l'écran.` });
         }
     }
+    const support = p.items.some((it) =>
+    {
+        const bx = roomBox(it, p.room);
+        return Math.abs(bx.max[1] - sc.bottom) < 1 && bx.min[0] <= sc.cx && bx.max[0] >= sc.cx;
+    });
     checks.push(...armChecks(p));
     if (!sc.wallMounted && sc.arm === null && !support && sc.bottom > 0.5)
     {

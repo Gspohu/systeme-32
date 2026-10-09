@@ -9,7 +9,7 @@
     import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
     import { armMesh, armZoneMesh, cushionMesh, deviceMeshes, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes,
              screenMesh, MM, type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
-    import { armPose } from "../core/tv_arm";
+    import { spotClashes, spotFor } from "../core/tv_arm";
     import { kelvinColour } from "../view3d/kelvin";
     import { roomBox, sideWallDepth, wallPlacement } from "../core/room";
     import type { Wall } from "../core/model";
@@ -195,12 +195,16 @@
     }
 
     // the screen where the arm slider puts it, the arm from its plate, and the ring the arm can reach
-    const pose = $derived(app.project.screen === null ? null : armPose(app.project.screen, app.armT));
+    const pose = $derived(app.project.screen === null ? null : spotFor(app.project.screen, app.armSpot));
+    // the set turns red as long as it is in something, the names are given in the toggles
+    const clashing = $derived(pose !== null && spotClashes(app.project, pose).length > 0);
     const screenGeo = $derived(app.project.screen === null || pose === null ? null
         : screenMesh(app.project.screen, pose));
     const armGeo = $derived(app.project.screen === null || pose === null ? null : armMesh(app.project.screen, pose));
     const zoneGeo = $derived(app.project.screen === null || !app.showArmZone ? null : armZoneMesh(app.project.screen));
     const screenMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.3 });
+    // --colour-danger of the design system, the set in something
+    const clashMat = new THREE.MeshStandardMaterial({ color: 0xc84555, roughness: 0.3 });
     const armMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.6, roughness: 0.4 });
     const zoneMat = new THREE.MeshBasicMaterial({ color: 0x1f6fd1, transparent: true, opacity: 0.18,
                                                   side: THREE.DoubleSide, depthWrite: false });
@@ -594,7 +598,7 @@
 {/each}
 
 {#if screenGeo !== null}
-    <T.Mesh geometry={screenGeo} material={screenMat} />
+    <T.Mesh geometry={screenGeo} material={clashing ? clashMat : screenMat} />
 {/if}
 {#if armGeo !== null}
     <T.Mesh geometry={armGeo} material={armMat} />

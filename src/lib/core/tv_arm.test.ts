@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { addItem, setScreen, setSettings } from "./commands";
-import { newCarcass, newProject } from "./factory";
+import { newCarcass, newDevice, newProject } from "./factory";
 import { analyse } from "./analysis";
 import { tvWall } from "./templates";
-import { armChecks, armPose, screenSpots } from "./tv_arm";
+import { armChecks, armPath, reachable, screenSpots, spotClashes, spotFor } from "./tv_arm";
 import { migrate, packProject, unpackProject, validateProject } from "./io/project_file";
 import type { Project, Screen, ScreenArm } from "./model";
 
@@ -65,14 +65,59 @@ describe("a screen on a wall arm", () =>
         expect(said(setSettings(tvWall(), { wallType: "plasterboard" }))).toBe("");
     });
 
-    it("slides the screen from where it is put away to where it is swung, and leaves a plain one in place", () =>
+    it("takes the screen out square to the wall before sliding it, clear of the book column a straight line hit", () =>
+    {
+        const p = tvWall();
+        // a fifth of the straight line from put away to swung out, the way the first 3D slider took it
+        const diagonal = { label: "", cx: 1077.6, bottom: 664, z: 114, yaw: 0 };
+        expect(spotClashes(p, diagonal).map((h) =>
+        {
+            return h.name;
+        })).toEqual(["Colonne à livres"]);
+        const way = armPath(p.screen!);
+        expect(way.every((s) =>
+        {
+            return spotClashes(p, s).length === 0;
+        })).toBe(true);
+        expect(way[40]).toMatchObject({ cx: 1112, z: 250 });
+    });
+
+    it("says when only the way out runs into something, both ends being clear", () =>
+    {
+        // a box of Haguenau hung 100 off the wall in front of the stored set, the swung one far right of it and in
+        // front of the amplifier
+        const box = newDevice({ name: "Boîtier", x: 1000, y: 700, z: 100, width: 200, height: 100, depth: 50, massKg: 1,
+                                source: "essai" });
+        const p = withArm({}, { x: 1400, out: { cx: 1700, z: 450 } });
+        const q = addItem(p, box);
+        expect(said(q)).toMatch(/^error .*en sortant l'écran de sa place, il heurte Boîtier/m);
+        expect(spotClashes(q, screenSpots(q.screen!)[0]!)).toEqual([]);
+        expect(spotClashes(q, screenSpots(q.screen!)[1]!)).toEqual([]);
+    });
+
+    it("swings the screen to the right of its plate and turns it towards the room, but not into the wall", () =>
+    {
+        const right = withArm({}, { out: { cx: 1300, z: 250, yaw: 30 } });
+        expect(said(right)).toBe("");
+        expect(analyse(right).checks.filter((k) =>
+        {
+            return k.level === "error";
+        })).toEqual([]);
+        const turned = withArm({}, { out: { cx: 1300, z: 100, yaw: 80 } });
+        expect(analyse(turned).checks.map((k) =>
+        {
+            return k.message;
+        }).join("\n")).toMatch(/L'écran 32" sorti .* touche le mur/);
+    });
+
+    it("keeps a spot asked in the 3D view within the reach of the arm, and the stored one until one is asked", () =>
     {
         const sc = tvWall().screen!;
-        expect(armPose(sc, 0)).toMatchObject({ cx: 1112, z: 80, bottom: 664 });
-        expect(armPose(sc, 1)).toMatchObject({ cx: 940, z: 250 });
-        expect(armPose(sc, 0.5)).toMatchObject({ cx: 1026, z: 165 });
-        expect(armPose(sc, 3)).toMatchObject({ cx: 940, z: 250 });
-        expect(armPose({ ...sc, arm: null }, 1)).toMatchObject({ cx: 1112, z: 80 });
+        const far = reachable(sc, { cx: 3000, z: 2000, yaw: 120 });
+        expect(Math.hypot(far.cx - 1026, far.z - 30)).toBeCloseTo(393, 6);
+        expect(far.yaw).toBe(90);
+        expect(reachable(sc, { cx: 1026, z: 10, yaw: 0 }).z).toBe(79);
+        expect(spotFor(sc, null)).toMatchObject({ cx: 1112, z: 80, yaw: 0 });
     });
 
     it("checks nothing on an arm whose sheet is still to read", () =>

@@ -7,7 +7,7 @@
     import { GRIP_GAP, GRIP_H, GRIP_ROW, gripLabel, layoutGrips } from "./grips";
     import { byId } from "../core/edit";
     import { endReach, itemExtent, screenSize, sideFiller } from "../core/extent";
-    import { screenSpots } from "../core/tv_arm";
+    import { screenSpots, spotSpan } from "../core/tv_arm";
     import { PLINTH_FOOT_GAP, baseHeight } from "../core/part_base";
     import { RAIL_THICKNESS, slatLayout } from "../core/slats";
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
@@ -574,7 +574,8 @@
             {@const sc = project.screen}
             {@const size = screenSize(sc)}
             {#each screenSpots(sc) as spot (spot.label)}
-                <rect x={spot.cx - size.w / 2} y={-(spot.bottom + size.h)} width={size.w} height={size.h} class="screen"
+                {@const span = spotSpan(sc, spot)}
+                <rect x={span[0]} y={-(spot.bottom + size.h)} width={span[1] - span[0]} height={size.h} class="screen"
                     class:out={spot.label === "sorti"} />
             {/each}
         {/if}

@@ -1,4 +1,4 @@
-// Application state : history of plain projects, selection, derived outputs, notifications
+// Application state : history of plain projects, selection, derived outputs, notificatons
 
 import type { Project, Wall } from "../core/model";
 import { historyOf, push, redo, undo, CommandError, type History } from "../core/commands";
@@ -26,7 +26,7 @@ class AppState
     history = $state.raw<History>(historyOf(tvWall()));
     textures = $state.raw<Map<string, Uint8Array>>(new Map());
     selection = $state<Selection | null>(null);
-    // the wall the façade shows, where dropped items land
+    // the wall the façade shows, where droped items land
     wall = $state<Wall>("back");
     toasts = $state<Toast[]>([]);
     storageOk = $state(true);
@@ -36,12 +36,12 @@ class AppState
     showHardware = $state(false);
     // the back wall, the ceiling and the side walls an item stands against
     showRoom = $state(true);
-    // the room dimmed and every LED strip or spot lighting what is under it
+    // the room dimmed and every LED strip or spot lighting what is undre it
     ledsOn = $state(false);
     // every front open in 3D, and the ones a click turned the other way from that
     frontsOpen = $state(false);
-    // the screen on its arm, 0 put away to 1 swung out, and the ring its arm reaches drawn in front of the wall
-    armT = $state(0);
+    // where the 3D view puts the screen on its arm, null where it is put away, and the room its arm reaches
+    armSpot = $state<{ cx: number; z: number; yaw: number } | null>(null);
     showArmZone = $state(true);
     flipped = new SvelteSet<string>();
     private nextToast = 0;

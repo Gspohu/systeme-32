@@ -498,8 +498,9 @@ export interface ScreenArm
     // centre of the plate on the back wall
     x: number;
     y: number;
-    // the screen swung out to be watched : its centre in the front view and its front plane, null when only stored
-    out: { cx: number; z: number } | null;
+    // the screen swung out to be watched : its centre in the front view, its front plane and how far it is turned
+    // in degrees, positive to face the right of the room. Null when only stored
+    out: { cx: number; z: number; yaw?: number } | null;
     source: string;
 }
 

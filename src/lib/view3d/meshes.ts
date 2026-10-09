@@ -404,14 +404,17 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
 }
 
 
-export function screenMesh(sc: Screen, at: ScreenSpot = { label: "", cx: sc.cx, bottom: sc.bottom, z: sc.z }):
-    THREE.BufferGeometry
+export function screenMesh(sc: Screen,
+    at: ScreenSpot = { label: "", cx: sc.cx, bottom: sc.bottom, z: sc.z, yaw: 0 }): THREE.BufferGeometry
 {
-    // a set of unknown thickness keeps the 40 mm it was always shown with, its front on the screen plane
+    // a set of unknown thickness keeps the 40 mm it was always shown with, its front on the screen plane. It turns
+    // about the middle of its back, where the arm holds it, as screenFootprint does
     const { w, h, d } = screenSize(sc);
     const t = d > 0 ? d : 40;
     const geo = new THREE.BoxGeometry(w, h, t);
-    geo.translate(at.cx, at.bottom + h / 2, d > 0 ? at.z - t / 2 : at.z + t / 2);
+    geo.translate(0, h / 2, t / 2);
+    geo.rotateY(at.yaw * Math.PI / 180);
+    geo.translate(at.cx, at.bottom, d > 0 ? at.z - d : at.z);
     geo.scale(MM, MM, MM);
     return geo;
 }

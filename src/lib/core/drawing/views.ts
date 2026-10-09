@@ -6,7 +6,7 @@ import { openingPoints } from "../cutouts";
 import type { Analysis } from "../analysis";
 import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
 import { endReach, itemExtent, projectExtent, screenSize, sideFiller } from "../extent";
-import { screenSpots } from "../tv_arm";
+import { screenSpots, spotSpan } from "../tv_arm";
 import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, railPlan } from "../wardrobe";
@@ -463,7 +463,9 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
         for (const spot of screenSpots(sc))
         {
             const out = spot.label === "sorti";
-            canvas.rect(ox + (spot.cx - w / 2) / scale, oy - (spot.bottom + h) / scale, w / scale, h / scale,
+            // a turned set covers its own width and part of its thickness along the wall
+            const [x0, x1] = spotSpan(sc, spot);
+            canvas.rect(ox + x0 / scale, oy - (spot.bottom + h) / scale, (x1 - x0) / scale, h / scale,
                         out ? "hidden" : "dashed");
             // on an arm the two outlines and the plate overlap : short names over the outlines, the swung one a line
             // higher, both centred on their own outline

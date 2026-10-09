@@ -621,15 +621,20 @@
                         </span>
                     </label>
                     <label class="field" title="Où le bras amène l'écran pour le regarder : centre X et avancée de sa face">
-                        <span class="label">Sorti : centre X / avancée</span>
+                        <span class="label">Sorti : centre X / avancée / angle</span>
                         <span class="row">
                             <input class="input" type="number" aria-label="Centre X de l'écran sorti" value={a.out?.cx ?? ""}
                                 onchange={(e) => arm({ out: str(e) === "" ? null : { cx: num(e),
-                                    z: a.out?.z ?? sc.z } })} />
+                                    z: a.out?.z ?? sc.z, yaw: a.out?.yaw ?? 0 } })} />
                             <input class="input" type="number" min="1" aria-label="Avancée de l'écran sorti"
                                 value={a.out?.z ?? ""}
                                 onchange={(e) => arm({ out: str(e) === "" ? null : { cx: a.out?.cx ?? sc.cx,
-                                    z: num(e) } })} />
+                                    z: num(e), yaw: a.out?.yaw ?? 0 } })} />
+                            <input class="input" type="number" min="-90" max="90" aria-label="Angle de l'écran sorti"
+                                title="Degrés, positif pour tourner l'écran vers la droite de la pièce" value={a.out?.yaw ?? 0}
+                                disabled={a.out === null}
+                                onchange={(e) => arm({ out: { cx: a.out?.cx ?? sc.cx, z: a.out?.z ?? sc.z,
+                                                             yaw: num(e) } })} />
                         </span>
                     </label>
                     <label class="field"><span class="label">Source du bras</span>
