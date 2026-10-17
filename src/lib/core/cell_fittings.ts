@@ -55,4 +55,6 @@ export interface CellLight
     kelvin: 2700 | 3000 | 4000;
     // Dimmed and switched from a phone through a Wi-Fi controller on the driver output
     wifi?: boolean;
+    // Let into the underside of the carcass bottom, below a cell standing on it : it lights what is under the box
+    under?: boolean;
 }

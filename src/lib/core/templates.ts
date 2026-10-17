@@ -1,6 +1,6 @@
 // Starting projects : the two pieces Valentin's parents drew and saved, as they meant them once corrected
 
-import type { Carcass, Lining, Project } from "./model";
+import type { Carcass, LayoutNode, Lining, Project } from "./model";
 import { cell, newCarcass, newDevice, newFront, newId, newProject, newWallShelf, split,
         DEFAULT_BATTENS } from "./factory";
 import { NICHE_SETBACK } from "./layout_commands";
@@ -147,18 +147,21 @@ export function tvWall(): Project
 }
 
 
-// Their dresser, as their sketch wants it : a wide niche no row of columns can give, their sides would cut it
-// A full height column at each end, three carcasses stacked between them
-// TODO the end column widths and every split are read off the sketch, their save only gives the envelope
-export function dresser(): Project
+function dresserBox(name: string, x: number, y: number, width: number, height: number, root: LayoutNode,
+    standing: boolean): Carcass
 {
-    const project = newProject("Vaisselier bibliothèque");
-    const box = (name: string, x: number, y: number, width: number, height: number,
-        root: ReturnType<typeof split>, standing: boolean): Carcass =>
-    {
-        return newCarcass({ name, width, height, depth: 500, x, y, z: 0, decor: OAK, backDecor: BACK, root,
-                            base: standing ? { type: "floor" } : { type: "plinth", height: 100, setback: 50 } });
-    };
+    return newCarcass({ name, width, height, depth: 500, x, y, z: 0, decor: OAK, backDecor: BACK, root,
+                        base: standing ? { type: "floor" } : { type: "plinth", height: 100, setback: 50 } });
+}
+
+
+// What both dressers share : a full height column at each end, the row of cupboards under three drawers
+// between them, and their alcove. The part over the drawers is each variant's own
+// TODO the end column widths and every split are read off the sketch, their save only gives the envelope
+function dresserFrame(name: string, upper: Carcass[]): Project
+{
+    const project = newProject(name);
+    const box = dresserBox;
 
     // The left column cut at two heights, the right one behind a single full height door over its two shelves
     const left = [cell(), cell(), cell()];
@@ -193,6 +196,25 @@ export function dresser(): Project
         low.fronts.push(newFront(c.id, { type: "drawers", count: 1, loadKg: 10 }, { decor: GREEN }));
     }
 
+    project.items.push(kl, low, ...upper, kr);
+    // Their alcove as measured : 3010 wide, 2440 under the ceiling, returns 660 on the left and 610 on the right
+    // the 2880 of the piece centred in it
+    project.room = { ...project.room, width: 3010, height: 2440, returns: { left: 660, right: 610 } };
+    for (const k of [kl, low, ...upper, kr])
+    {
+        k.x += (3010 - 2880) / 2;
+    }
+    // The two 65 mm gaps to the returns closed by fillers in the front decor, scribed on site
+    kl.sideFillers = { left: 65, right: 0 };
+    kr.sideFillers = { left: 0, right: 65 };
+    return project;
+}
+
+
+// Their dresser, as their sketch wants it : a wide niche no row of columns can give, their sides would cut it
+export function dresser(): Project
+{
+    const box = dresserBox;
     // The niche : two narrow columns of small shelves around a 1084 wide opening, close to their 1100 x 600 box
     // Their shelves and the uprights parting them from the opening stand back, the opening keeps its full depth
     const sideShelves = (): ReturnType<typeof split> =>
@@ -217,23 +239,69 @@ export function dresser(): Project
         newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(top[2]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
     );
+    return dresserFrame("Vaisselier bibliothèque", [niche, high]);
+}
 
-    project.items.push(kl, low, niche, high, kr);
-    // Their alcove as measured : 3010 wide, 2440 under the ceiling, returns 660 on the left and 610 on the right
-    // the 2880 of the piece centred in it
-    project.room = { ...project.room, width: 3010, height: 2440, returns: { left: 660, right: 610 } };
-    for (const k of [kl, low, niche, high, kr])
+
+// The variant they asked on 2026-10-17 : no niche box, only its two triple columns set into the opening at each
+// end, their shelves standing back. The strip goes under the bottom of the cupboards above, over the opening
+export function smallNichesDresser(): Project
+{
+    const box = dresserBox;
+    const triple = (name: string, x: number): Carcass =>
     {
-        k.x += (3010 - 2880) / 2;
-    }
-    // The two 65 mm gaps to the returns closed by fillers in the front decor, scribed on site
-    kl.sideFillers = { left: 65, right: 0 };
-    kr.sideFillers = { left: 0, right: 65 };
-    return project;
+        const shelves = split("h", [201, 421], [cell(), cell(), cell()]);
+        shelves.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
+        return box(name, x, 960, 250, 680, shelves, true);
+    };
+    const top = [cell(), cell(), cell()];
+    const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [512, 1040], top), true);
+    high.fronts.push(
+        newFront(top[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
+        newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
+        newFront(top[2]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
+    );
+    // Its middle cell is the one wholly over the opening, the side ones sit partly on the small columns
+    high.lights.push({ id: newId("li"), cell: top[1]!.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
+                       wifi: true, under: true });
+    return dresserFrame("Vaisselier petites niches", [triple("Petite niche gauche", 600), high,
+                                                      triple("Petite niche droite", 1950)]);
+}
+
+
+// Their second sketch of 2026-10-17 : no small niches, an open column of shelves either side running up to the
+// top, a narrower niche between them under a cupboard of two doors. The 400 / 800 / 400 and the 760 high niche
+// are its proportions rounded, nothing on it is dimensioned
+export function openDresser(): Project
+{
+    const box = dresserBox;
+    // Over the drawers 1396 are left : 1358 inside, three equal cells of 440 between two shelves
+    const column = (name: string, x: number): Carcass =>
+    {
+        return box(name, x, 960, 400, 1396, split("h", [440, 899], [cell(), cell(), cell()]), true);
+    };
+    const opening = cell();
+    const niche = box("Niche", 1000, 960, 800, 760, opening, true);
+    niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
+                        wifi: true });
+    // Two doors over the niche, a shelf behind each halfway up its 598
+    const halves = [0, 1].map(() =>
+    {
+        return split("h", [289], [cell(), cell()]);
+    });
+    const high = box("Placard haut", 1000, 1720, 800, 636, split("v", [371], halves), true);
+    high.fronts.push(
+        newFront(halves[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
+        newFront(halves[1]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
+    );
+    return dresserFrame("Vaisselier colonnes ouvertes", [column("Colonne ouverte gauche", 600), niche, high,
+                                                         column("Colonne ouverte droite", 1800)]);
 }
 
 
 export const TEMPLATES = [
     { id: "tv", label: "Composition TV et bibliothèque", make: tvWall },
     { id: "dresser", label: "Vaisselier bibliothèque", make: dresser },
+    { id: "dresser-small", label: "Vaisselier petites niches", make: smallNichesDresser },
+    { id: "dresser-open", label: "Vaisselier colonnes ouvertes", make: openDresser },
 ];

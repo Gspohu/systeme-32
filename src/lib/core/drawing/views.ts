@@ -10,7 +10,7 @@ import { screenSpots, spotSpan } from "../tv_arm";
 import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, railPlan } from "../wardrobe";
-import { SPOT_RIM, spotCentres } from "../lights";
+import { SPOT_RIM, lightLevel, spotCentres } from "../lights";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth, wrap } from "./display";  
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
@@ -293,7 +293,7 @@ function drawInside(v: CarcassView): void
         {
             continue;
         }
-        const y = pageY(k.y + nb.y + nb.h) + 0.6;
+        const y = pageY(k.y + lightLevel(nb, l)) + 0.6;
         if (l.kind === "spots")
         {
             for (const x of spotCentres(nb, l))

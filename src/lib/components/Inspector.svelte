@@ -549,6 +549,12 @@
                             onclick={() => app.apply(setLight, carcass.id, nodeBox.id, { ...light, kind: "spots",
                                                      spots: Math.max(1, light.spots) })}>Spots</button>
                     </div>
+                    <label class="form-check" title="Encastré sous le caisson, il éclaire ce qui est dessous">
+                        <input type="checkbox" checked={light.under === true}
+                            onchange={(e) => app.apply(setLight, carcass.id, nodeBox.id, { ...light,
+                                under: checked(e) })} />
+                        Sous le caisson
+                    </label>
                     {#if light.kind === "spots"}
                         <label class="field"><span class="label">Spots</span>
                             <input class="input" type="number" min="1" step="1" value={light.spots}

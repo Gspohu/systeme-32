@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyse } from "./analysis";
-import { dresser, tvWall } from "./templates";
+import { dresser, openDresser, smallNichesDresser, tvWall } from "./templates";
 import { resolveLayout } from "./layout";
 import { footPlaces } from "./feet";
 import { computeBom } from "./bom";
@@ -560,5 +560,83 @@ describe("the sketch templates", () =>
             return d.y;
         })).size).toBe(1);
         expect(drawers[0]!.h).toBe(171);
+    });
+});
+
+
+describe("the dresser with open columns", () =>
+{
+    it("runs an open column of shelves up each side of a narrower niche, under a cupboard of two doors", () =>
+    {
+        const p = openDresser();
+        const named = (name: string): Carcass =>
+        {
+            return p.items.find((it) =>
+            {
+                return it.kind === "carcass" && it.name === name;
+            }) as Carcass;
+        };
+        const top = named("Colonne gauche").y + named("Colonne gauche").height;
+        for (const name of ["Colonne ouverte gauche", "Colonne ouverte droite"])
+        {
+            const c = named(name);
+            expect(c.fronts).toEqual([]);
+            expect(c.width).toBe(400);
+            // From the top of the drawers to the top of the end columns
+            expect(c.y).toBe(named("Placards et tiroirs").y + named("Placards et tiroirs").height);
+            expect(c.y + c.height).toBe(top);
+            expect((c.root as SplitNode).cuts.length).toBe(2);
+        }
+        const niche = named("Niche");
+        expect(niche.width).toBe(800);
+        expect(niche.root.kind).toBe("cell");
+        expect(named("Placard haut").fronts.length).toBe(2);
+        expect(named("Placard haut").y + named("Placard haut").height).toBe(top);
+        expect(analyse(p).build.errors).toEqual([]);
+    });
+});
+
+
+describe("the dresser with small niches", () =>
+{
+    it("sets two triple columns in the opening and lights it from under the cupboards above", () =>
+    {
+        const p = smallNichesDresser();
+        expect(p.items.some((it) =>
+        {
+            return it.kind === "carcass" && it.name === "Niche";
+        })).toBe(false);
+        const a = analyse(p);
+        expect(a.build.errors).toEqual([]);
+        const shelves = a.build.parts.filter((q) =>
+        {
+            return q.itemName.startsWith("Petite niche") && q.role === "hdivider";
+        });
+        expect(shelves.length).toBe(4);
+        const bottom = a.build.parts.find((q) =>
+        {
+            return q.itemName === "Placards hauts" && q.id.endsWith("/bottom");
+        })!;
+        // The groove is cut in the face looking down, the one the room sees
+        expect(bottom.grooves.map((g) =>
+        {
+            return g.face;
+        })).toEqual(["B"]);
+    });
+
+    it("refuses a light under the carcass from a cell that does not stand on its bottom", () =>
+    {
+        const p = smallNichesDresser();
+        const high = p.items.find((it) =>
+        {
+            return it.kind === "carcass" && it.name === "Placards hauts";
+        }) as Carcass;
+        expect(analyse(p).build.errors).toEqual([]);
+        // On feet the underside is the gap above the floor : nothing to light there
+        high.base = { type: "feet", height: 100 };
+        expect(analyse(p).build.errors.some((e) =>
+        {
+            return e.includes("éclairage sous le caisson");
+        })).toBe(true);
     });
 });

@@ -300,7 +300,7 @@ export function liftChecks(p: Project, b: Build): Check[]
             for (const l of c.lights)
             {
                 const cell = lay.nodes.get(l.cell);
-                const under = cell !== undefined && cell.x >= nb.x - 0.01 && cell.x + cell.w <= nb.x + nb.w + 0.01
+                const under = l.under !== true && cell !== undefined && cell.x >= nb.x - 0.01 && cell.x + cell.w <= nb.x + nb.w + 0.01
                     && touchesTop(nb, cell);
                 if (!under || l.setback >= HK_TOP.minInnerDepth)
                 {

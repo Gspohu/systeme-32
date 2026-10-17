@@ -8,6 +8,7 @@ import type { Build, Part } from "./parts";
 import { panelStartX } from "./dividers";
 import type { Check } from "./check";
 import { panelAbove } from "./locate";
+import { byId } from "./edit";
 import { FIT_PLAY } from "./wardrobe";
 import { WIFI_LED_CONTROLLER } from "../data/hardware";
 
@@ -57,7 +58,13 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
             continue;
         }
         const where = `${c.name}, éclairage`;
-        const above = panelAbove(c, lay, nb, b);
+        const above = light.under === true ? panelUnder(c, nb, b) : panelAbove(c, lay, nb, b);
+        if (above === null && light.under === true)
+        {
+            b.errors.push(`${where} sous le caisson : la case doit reposer sur le dessous, et le caisson sans socle `
+                + "ni pieds. Choisir une case du bas ou poser l'éclairage dans la case.");
+            continue;
+        }
         if (above === null)
         {
             b.errors.push(`${where} sous une étagère réglable : le câble ne suit pas. Passer la tablette en fixe.`);
@@ -129,6 +136,25 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
                 + "Wi-Fi (Shelly). Répartir les rubans sur plusieurs voies ou retirer un éclairage.");
         }
     }
+}
+
+
+// The bottom of the carcass seen from below, when the cell stands on it and nothing hides that face
+function panelUnder(c: Carcass, nb: NodeBox, b: Build): { part: Part; face: "A" | "B" } | null
+{
+    if (nb.y > c.thickness + 0.01 || c.base.type === "plinth" || c.base.type === "feet")
+    {
+        return null;
+    }
+    const bottom = byId(b.parts, `${c.id}/bottom`);
+    return bottom === undefined ? null : { part: bottom, face: "B" };
+}
+
+
+// Local carcass height of the face a light is let into : under the panel over its cell, or under the carcass
+export function lightLevel(nb: NodeBox, l: CellLight): number
+{
+    return l.under === true ? 0 : nb.y + nb.h;
 }
 
 

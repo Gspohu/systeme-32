@@ -9,7 +9,7 @@ import { tessellate } from "../core/geometry";
 import { screenSize } from "../core/extent";
 import type { ResolvedLayout } from "../core/layout";
 import { FIT_PLAY, RAIL_D, railPlan } from "../core/wardrobe";
-import { LED_GROOVE_W, SPOT_RIM, spotCentres } from "../core/lights";
+import { LED_GROOVE_W, SPOT_RIM, lightLevel, spotCentres } from "../core/lights";
 
 // Scene unit is the metre
 export const MM = 0.001;
@@ -269,19 +269,21 @@ export function fittingMeshes(c: Carcass,
         {
             continue;
         }
+        // 1 mm into the face it is let in, from below
+        const lit = c.y + lightLevel(nb, l) + (l.under === true ? 1 : -1);
         if (l.kind === "spots")
         {
             for (const x of spotCentres(nb, l))
             {
                 const disc = new THREE.CylinderGeometry(SPOT_RIM / 2, SPOT_RIM / 2, 2, 24);
-                disc.translate(c.x + x, c.y + nb.y + nb.h - 1, front - l.setback - SPOT_RIM / 2);
+                disc.translate(c.x + x, lit, front - l.setback - SPOT_RIM / 2);
                 disc.scale(MM, MM, MM);
                 out.push({ key: `${l.id}/${x}`, light: true, kelvin: l.kelvin, geometry: disc });
             }
             continue;
         }
         const geo = new THREE.BoxGeometry(nb.w - 2 * FIT_PLAY, 2, LED_GROOVE_W);
-        geo.translate(c.x + nb.x + nb.w / 2, c.y + nb.y + nb.h - 1, front - l.setback - LED_GROOVE_W / 2);
+        geo.translate(c.x + nb.x + nb.w / 2, lit, front - l.setback - LED_GROOVE_W / 2);
         geo.scale(MM, MM, MM);
         out.push({ key: l.id, light: true, kelvin: l.kelvin, geometry: geo });
     }

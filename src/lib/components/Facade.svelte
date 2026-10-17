@@ -12,7 +12,7 @@
     import { RAIL_THICKNESS, slatLayout } from "../core/slats";
     import { ceilingAt, frontOutline, topAt } from "../core/slope";
     import { FIT_PLAY, RAIL_D, RAIL_DROP, railPlan } from "../core/wardrobe";
-    import { SPOT_RIM, spotCentres } from "../core/lights";
+    import { SPOT_RIM, lightLevel, spotCentres } from "../core/lights";
     import { openingPoints } from "../core/cutouts";
     import { endDrop, endPost, openEndLevels } from "../core/curves";
     import { photoMime } from "../core/photos";
@@ -444,11 +444,11 @@
                             {@const nb = lay.nodes.get(l.cell)}
                             {#if nb !== undefined && l.kind === "spots"}
                                 {#each spotCentres(nb, l) as x (x)}
-                                    <rect x={x - SPOT_RIM / 2} y={-(nb.y +
-                                                                    nb.h)} width={SPOT_RIM} height="6" class="led" />
+                                    <rect x={x - SPOT_RIM / 2} y={-lightLevel(nb, l)} width={SPOT_RIM} height="6"
+                                        class="led" />
                                 {/each}
                             {:else if nb !== undefined}
-                                <rect x={nb.x + FIT_PLAY} y={-(nb.y + nb.h)} width={nb.w - 2 * FIT_PLAY} height="6"
+                                <rect x={nb.x + FIT_PLAY} y={-lightLevel(nb, l)} width={nb.w - 2 * FIT_PLAY} height="6"
                                     class="led" />
                             {/if}
                         {/each}
