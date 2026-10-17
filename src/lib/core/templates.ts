@@ -250,15 +250,16 @@ export function dresser(): Project
 
 
 // The variant they asked on 2026-10-17 : no niche box, only its two triple columns set into the opening at each
-// end, their shelves standing back. The strip goes under the bottom of the cupboards above, over the opening
+// end. Their own save of that evening makes those 300 deep against the wall, the whole box 200 behind the
+// fronts instead of its shelves alone. The strip goes under the bottom of the cupboards above, over the opening
 export function smallNichesDresser(): Project
 {
     const box = dresserBox;
     const triple = (name: string, x: number): Carcass =>
     {
-        const shelves = split("h", [201, 421], [cell(), cell(), cell()]);
-        shelves.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
-        return box(name, x, 960, 250, 680, shelves, true);
+        const c = box(name, x, 960, 250, 680, split("h", [201, 421], [cell(), cell(), cell()]), true);
+        c.depth = 300;
+        return c;
     };
     const top = [cell(), cell(), cell()];
     const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [512, 1040], top), true);

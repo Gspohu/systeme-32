@@ -613,6 +613,15 @@ describe("the dresser with small niches", () =>
             return q.itemName.startsWith("Petite niche") && q.role === "hdivider";
         });
         expect(shelves.length).toBe(4);
+        // As their save has them : the box 300 deep against the wall stands back, its shelves flush with it
+        for (const it of p.items)
+        {
+            if (it.kind === "carcass" && it.name.startsWith("Petite niche"))
+            {
+                expect([it.depth, it.z]).toEqual([300, 0]);
+                expect((it.root as SplitNode).setbacks).toEqual([null, null]);
+            }
+        }
         const bottom = a.build.parts.find((q) =>
         {
             return q.itemName === "Placards hauts" && q.id.endsWith("/bottom");
