@@ -76,7 +76,9 @@ describe("the sketch templates", () =>
             expect([turns.length, slides.length]).toEqual([doors, drawers]);
             for (const m of turns)
             {
-                expect(m.amount).toBe(110);
+                // Their hinges' 110, short of it only where a wall of the room stops the door, and that wall named
+                expect(m.stoppedBy === undefined ? m.amount : m.full).toBe(110);
+                expect(m.stoppedBy === undefined || m.amount < 110).toBe(true);
             }
             for (const m of slides)
             {

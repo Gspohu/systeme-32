@@ -206,6 +206,9 @@ export interface Motion
     // The hardware that sets the movement, quoted in the message of a clash, and what to do then
     source: string;
     remedy: string;
+    // A wall of the room that stops a door short of what its hinges give, and that full angle
+    stoppedBy?: string;
+    full?: number;
 }
 
 

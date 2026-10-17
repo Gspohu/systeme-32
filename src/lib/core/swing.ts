@@ -4,7 +4,8 @@ import type { Project, Wall } from "./model";
 import type { Build, Motion, Part, PartRole } from "./parts";
 import type { Check } from "./check";
 import type { Vec3 } from "./geometry";
-import { toRoom } from "./room";
+import { sideWallDepth, toRoom } from "./room";
+import { shownSideWalls } from "./room_dressing";
 
 // A touch is not a clash : boards laid face to face or a front on the edges of its carcass
 const TOUCH = 1;
@@ -147,6 +148,99 @@ function offHinge(m: Motion, b: Obb): number
 }
 
 
+// How far a box reaches past the planes of the room walls standing, in mm, 0 when it stays inside
+function pastWalls(o: Obb, p: Project, sides: Set<"left" | "right">): { wall: string; by: number } | null
+{
+    const reach = (k: 0 | 1 | 2): number =>
+    {
+        return Math.abs(o.half[0] * o.axes[0][k]) + Math.abs(o.half[1] * o.axes[1][k]) + Math.abs(o.half[2] *
+            o.axes[2][k]);
+    };
+    const [x0, x1] = [o.centre[0] - reach(0), o.centre[0] + reach(0)];
+    const z0 = o.centre[2] - reach(2);
+    if (z0 < -TOUCH)
+    {
+        return { wall: "le mur du fond", by: -z0 };
+    }
+    if (sides.has("left") && x0 < -TOUCH && z0 < sideWallDepth(p.room, "left"))
+    {
+        return { wall: "le mur gauche", by: -x0 };
+    }
+    if (sides.has("right") && x1 > p.room.width + TOUCH && z0 < sideWallDepth(p.room, "right"))
+    {
+        return { wall: "le mur droit", by: x1 - p.room.width };
+    }
+    return null;
+}
+
+
+// Every door stopped at the last whole degree before it, or what it carries, goes through a wall of the room :
+// the 3D view and the checks open it that far and no further
+export function stopAtWalls(p: Project, b: Build): void
+{
+    const sides = shownSideWalls(p);
+    const wallOf = new Map(p.items.map((it) =>
+    {
+        return [it.id, it.wall];
+    }));
+    const boxes = new Map<string, Obb>();
+    for (const q of b.parts)
+    {
+        const box = partBox(q);
+        if (box !== null)
+        {
+            boxes.set(q.id, box);
+        }
+    }
+    for (const f of b.fitted)
+    {
+        if (f.host !== null)
+        {
+            boxes.set(f.key, { centre: f.centre, axes: f.axes, half: f.half });
+        }
+    }
+    for (const m of b.motions)
+    {
+        if (m.kind !== "turn")
+        {
+            continue;
+        }
+        const wall = wallOf.get(m.item) ?? "back";
+        const moved = [...m.parts, ...b.fitted.filter((f) =>
+        {
+            return f.host !== null && m.parts.includes(f.host);
+        }).map((f) =>
+        {
+            return f.key;
+        })].flatMap((id) =>
+        {
+            const box = boxes.get(id);
+            return box === undefined ? [] : [box];
+        });
+        let deg = 1;
+        while (deg <= m.amount)
+        {
+            const at = { ...m, amount: deg };
+            const hit = moved.map((box) =>
+            {
+                return pastWalls(inRoom(carried(box, at, 1), wall, p), p, sides);
+            }).find((h) =>
+            {
+                return h !== null;
+            });
+            if (hit !== undefined && hit !== null)
+            {
+                m.full = m.amount;
+                m.stoppedBy = hit.wall;
+                m.amount = deg - 1;
+                break;
+            }
+            deg++;
+        }
+    }
+}
+
+
 export function swingChecks(p: Project, b: Build): Check[]
 {
     const walls = new Map(p.items.map((it) =>
@@ -201,6 +295,19 @@ export function swingChecks(p: Project, b: Build): Check[]
         });
     };
     const checks: Check[] = [];
+    for (const m of b.motions)
+    {
+        if (m.stoppedBy === undefined)
+        {
+            continue;
+        }
+        const said = `${m.label} : ${m.stoppedBy} l'arrête à ${m.amount}° au lieu des ${m.full}° de ses charnières`;
+        checks.push(m.amount < SQUARE
+            ? { level: "warning", item: m.item, target: m.parts[0] ?? null,
+                message: `${said}, elle ne s'ouvre pas d'équerre. Élargir le fileur côté mur ou poser les charnières de `
+                    + "l'autre côté." }
+            : { level: "info", item: m.item, target: m.parts[0] ?? null, message: `${said}.` });
+    }
     for (const m of b.motions)
     {
         const mine = new Set(movingOf(m));

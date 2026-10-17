@@ -37,7 +37,7 @@ import { stockChecks } from "./solid_stock";
 import { obstacleChecks } from "./obstacles"; 
 import { titleBlockChecks } from "./revisions";
 import { armChecks, screenSpots, spotClashes } from "./tv_arm";
-import { swingChecks } from "./swing";
+import { stopAtWalls, swingChecks } from "./swing";
 import { slopeErrors } from "./slope";
 import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
 import { buildLights, lightChecks } from "./lights";
@@ -189,6 +189,8 @@ export function analyse(p: Project): Analysis
     }
     packRailBars(b);
     b.fitted.push(...letInFittings(b.parts));
+    // Once every part and handle stands where it goes, the walls of the room stop the doors that would go through
+    stopAtWalls(p, b);
     const masses = new Map<string, number>();
     for (const it of p.items)
     {

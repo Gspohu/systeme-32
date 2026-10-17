@@ -144,11 +144,12 @@ export function tvWall(): Project
                 + "49 à 393 mm du mur, 180° ; platine prise à son encombrement de 24 x 24,9 cm",
         },
     };
+    const sc = project.screen;
     // Their room : the left wall runs 3100 to the wall facing the set, their 1880 sofa backed against that one and
     // centred on the swung out screen. Its depth and heights are the starting ones until measured
     project.room = { ...project.room, depth: 3100, walls: ["left"],
-                     sofas: [{ id: newId("sofa"), name: "Canapé", ...SOFA_START, width: 1880, x: 940 - 1880 / 2,
-                               distance: 3100 }] };
+                     sofas: [{ id: newId("sofa"), name: "Canapé", ...SOFA_START, width: 1880,
+                               x: sc.arm!.out!.cx - 1880 / 2, distance: 3100 }] };
     return project;
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addItem, setFront } from "./commands";
 import { newCarcass, newProject } from "./factory";
+import { setSideWall } from "./room_dressing";
 import { analyse } from "./analysis";
 import { tvWall } from "./templates";
 import { boxesClash, carried } from "./swing";
@@ -88,5 +89,57 @@ describe("fronts swept through their opening", () =>
             const pair = /^warning \| Meuble bas, tiroir [24] et meuble bas, porte \d se heurtent/;
             expect(s).toMatch(pair);
         }
+    });
+});
+
+
+describe("doors stopped by the walls of the room", () =>
+{
+    // A cupboard of Colmar hinged on its left, x off the left wall of the room, that wall up or not
+    function stopped(x: number, wall: boolean, opening: "push" | "handle" = "push"): Motion
+    {
+        const c = newCarcass({ name: "Placard", width: 600, height: 800, depth: 500, x,
+                               sideFillers: { left: x, right: 0 } });
+        let p = addItem(newProject("Colmar"), c);
+        p = setFront(p, c.id, c.root.id, { type: "door", hinge: "left" }, { opening });
+        p = setSideWall(p, "left", wall);
+        return analyse(p).build.motions[0]!;
+    }
+
+    it("opens the door its full 110 deg with no wall beside it", () =>
+    {
+        const m = stopped(0, false);
+        expect([m.amount, m.stoppedBy]).toEqual([110, undefined]);
+    });
+
+    it("stops a door hinged against the left wall square at most, past it with a filler between", () =>
+    {
+        const flush = stopped(0, true);
+        expect(flush.stoppedBy).toBe("le mur gauche");
+        expect(flush.full).toBe(110);
+        expect(flush.amount).toBeLessThanOrEqual(90);
+        const filled = stopped(30, true);
+        expect(filled.amount).toBeGreaterThan(90);
+        expect(filled.amount).toBeLessThan(110);
+        // 30 of filler and the 1.5 reveal before the door, a 597 leaf : asin(31.5 / 597) past square
+        expect(filled.amount).toBe(90 + Math.floor(Math.asin(31.5 / 597) * 180 / Math.PI));
+    });
+
+    it("stops it square again once an Oslo pull on its free edge leans its lip towards the wall", () =>
+    {
+        // Square, the face looks at the wall and the lip 25 proud of it leaves 6 of the 31.5 : one more degree
+        // brings the free edge of a 597 leaf some 10 nearer
+        expect(stopped(30, true, "handle").amount).toBe(90);
+    });
+
+    it("warns when the wall keeps a door from opening square", () =>
+    {
+        const c = newCarcass({ name: "Placard", width: 600, height: 800, depth: 500, x: 0 });
+        let p = addItem(newProject("Colmar"), c);
+        p = setSideWall(setFront(p, c.id, c.root.id, { type: "door", hinge: "left" }), "left", true);
+        expect(analyse(p).checks.some((k) =>
+        {
+            return k.level === "warning" && k.message.includes("le mur gauche l'arrête");
+        })).toBe(true);
     });
 });
