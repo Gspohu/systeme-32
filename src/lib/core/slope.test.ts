@@ -9,7 +9,7 @@ import type { Carcass, Item, Project } from "./model";
 import type { Part } from "./parts";
 
 
-// an atitc cupboard in Colmar : 1000 inside, sides of 1500 and 2000, the top rising 1 in 2
+// An atitc cupboard in Colmar : 1000 inside, sides of 1500 and 2000, the top rising 1 in 2
 function attic(o: Partial<Carcass> = {}): Carcass
 {
     return newCarcass({ name: "Comble", width: 1038, height: 2000, depth: 500, slope: { low: "left", height: 1500 },
@@ -73,7 +73,7 @@ describe("sloped tops", () =>
         expect(topAngle(c)).toBeCloseTo(Math.atan(0.5), 12);
         expect(topAt(c, 19)).toBeCloseTo(1500, 9);
         expect(topAt(c, 1019)).toBeCloseTo(2000, 9);
-        // a 19 mm borad at 1 in 2 is 19 / cos thick measured upright
+        // A 19 mm borad at 1 in 2 is 19 / cos thick measured upright
         expect(topAt(c, 19) - ceilingAt(c, 19)).toBeCloseTo(19 / COS, 9);
         expect(partOf(c, "top").length).toBeCloseTo(1000 / COS, 9);
         expect(partOf(c, "side/L").length).toBe(1500);
@@ -100,7 +100,7 @@ describe("sloped tops", () =>
     it("never lets the back rise past the square head of the high side", () =>
     {
         const c = attic();
-        // taller than wide : the outline u runs up the carcass
+        // Taller than wide : the outline u runs up the carcass
         const us = tessellate(partOf(c, "back").outline, 4).map(([u]) => { return u; });
         expect(Math.max(...us)).toBeCloseTo(2000, 9);
         expect(Math.min(...us.filter((u) => { return u > 0; }))).toBeCloseTo(1500 - 19 / 2, 9);
@@ -117,7 +117,7 @@ describe("sloped tops", () =>
     {
         expect(complains(attic({ root: split("h", [1700], [cell(), cell()]) }),
             "tablette passe au-dessus du rampant")).toBe(true);
-        // a 1000 span in particleboard sags too much, a matter for the shelf check and not the slope
+        // A 1000 span in particleboard sags too much, a matter for the shelf check and not the slope
         expect(complains(attic({ root: split("h", [1000], [cell(), cell()]) }), "rampant")).toBe(false);
     });
 

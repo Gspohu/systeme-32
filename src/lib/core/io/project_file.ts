@@ -26,8 +26,8 @@ function need(cond: boolean, msg: string): void
 }
 
 
-// Version 2 gives every divider its own finish and version 5 its own thickness, an older tree has none
-function givePerDivider(node: unknown, key: "finishes" | "thicknesses"): void
+// Version 2 gives every divider its own finish, version 5 its own thickness and version 11 its setback
+function givePerDivider(node: unknown, key: "finishes" | "thicknesses" | "setbacks"): void
 {
     const n = node as { kind?: unknown; cuts?: unknown[]; children?: unknown[] } & Record<string, unknown>;
     if (typeof node !== "object" || node === null || n.kind !== "split")
@@ -66,30 +66,46 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
     }
     if (version < 6)
     {
-        // socket and cable holes came with version 6
+        // Socket and cable holes came with version 6
         emptyListOnCarcasses(raw, "outlets");
     }
     if (version < 7)
     {
-        // pictures printed on the back of a cell acme with version 7
+        // Pictures printed on the back of a cell acme with version 7
         emptyListOnCarcasses(raw, "prints");
     }
     if (version < 8 && typeof raw.room === "object" && raw.room !== null) 
     {
-        // radiators, boxes and ksirtings on the walls came with version 8
+        // Radiators, boxes and ksirtings on the walls came with version 8
         const room = raw.room as Record<string, unknown>;
         room.obstacles = room.obstacles ?? [];
     }
     if (version < 9)  
     {
-        // the dated issues of the drawings came with version 9
+        // The dated issues of the drawings came with version 9
         raw.revisions = raw.revisions ?? [];
     }
     if (version < 10)
     {
-        // the measured set, its mass, its holes and its arm came with version 10
+        // The measured set, its mass, its holes and its arm came with version 10
         raw.screen = typeof raw.screen === "object" && raw.screen !== null
             ? { frame: null, massKg: null, vesa: null, source: "", arm: null, ...raw.screen } : null;
+    }
+    if (version < 11)
+    {
+        // every divider stood flush with the front until version 11, and every handle was a bar
+        for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; root?: unknown;
+            fronts?: Record<string, unknown>[] }[])
+        {
+            if (it.kind === "carcass")
+            {
+                givePerDivider(it.root, "setbacks");
+                for (const f of Array.isArray(it.fronts) ? it.fronts : [])
+                {
+                    f.handle = f.handle ?? "bar";
+                }
+            }
+        }
     }
     raw.schema = SCHEMA_VERSION;
     return raw;
@@ -100,7 +116,7 @@ function toVersion2(raw: Record<string, unknown>): void
 {
     if (typeof raw.settings === "object" && raw.settings !== null)
     {
-        // versin 2 added the wall type : a setting the file lacks takes its default
+        // Versin 2 added the wall type : a setting the file lacks takes its default
         raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
     }
     if (typeof raw.textures === "object" && raw.textures !== null)
@@ -148,7 +164,7 @@ function toVersion2(raw: Record<string, unknown>): void
 }
 
 
-// versions 3 and 4 grew on the same day and a file saved in between lacks part of it : one step
+// Versions 3 and 4 grew on the same day and a file saved in between lacks part of it : one step
 // filling only the missing defaults serves both
 function toVersion4(raw: Record<string, unknown>): void
 {
@@ -156,9 +172,9 @@ function toVersion4(raw: Record<string, unknown>): void
     {
         return;
     }
-    // round spots came next to the LED profile, every older light was a profile
+    // Round spots came next to the LED profile, every older light was a profile
     raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
-    // it also knows the side walls and the room, every older item stood against the back wall
+    // It also knows the side walls and the room, every older item stood against the back wall
     raw.room = raw.room ?? { ...DEFAULT_ROOM, obstacles: [] };
     for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; lights?: unknown;
         wall?: unknown; ceilingFiller?: unknown; purpose?: unknown; corners?: unknown }[])
@@ -190,7 +206,7 @@ function toVersion4(raw: Record<string, unknown>): void
 }
 
 
-// shelves took the thickness of the sides until version 5, and no cell was drilled for later shelves
+// Shelves took the thickness of the sides until version 5, and no cell was drilled for later shelves
 function toVersion5(raw: Record<string, unknown>): void
 {
     for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; shelfThickness?: unknown;
@@ -332,7 +348,7 @@ export function unpackProject(bytes: Uint8Array): ProjectArchive
     }
     catch
     {
-        // a bare project.json is accepted too
+        // A bare project.json is accepted too
         return { project: parseJson(strFromU8(bytes)), textures: new Map() };
     }
     const json = files["project.json"];
@@ -340,7 +356,7 @@ export function unpackProject(bytes: Uint8Array): ProjectArchive
     const textures = new Map<string, Uint8Array>();
     for (const [name, data] of Object.entries(files))
     {
-        // a file of another name, or bytes that are no image, never reach the 3D view
+        // A file of another name, or bytes that are no image, never reach the 3D view
         const file = name.startsWith("textures/") ? name.slice("textures/".length) : "";
         if (PHOTO_FILE_RE.test(file) && photoKind(data) !== null)
         {

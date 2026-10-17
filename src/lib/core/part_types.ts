@@ -23,18 +23,18 @@ export type Purpose = (typeof PURPOSES)[number];
 
 export interface Hole
 {
-    // part coordinates of the axis, and the face or edge it is drilled from
+    // Part coordinates of the axis, and the face or edge it is drilled from
     u: number;
     v: number;
     // 0 marks a screw position without pre-drilling
     diameter: number;
     depth: number;
     face: "A" | "B" | Edge;
-    // for edge holes, distance of the axis from face A across the thickness
+    // For edge holes, distance of the axis from face A across the thickness
     w?: number;
     label: string;
     purpose: Purpose;
-    // catalogue reference of the article this hole holds, matched against the fitted volumes it is drawn with
+    // Catalogue reference of the article this hole holds, matched against the fitted volumes it is drawn with
     fixes?: string;
 }
 
@@ -50,7 +50,7 @@ export interface Groove
     width: number;
     depth: number;
     label: string;
-    // taken off the section in the deflection check of a shelf, a joinery slot is too short to count
+    // Taken off the section in the deflection check of a shelf, a joinery slot is too short to count
     weakens?: boolean;
 }
 
@@ -80,7 +80,7 @@ export interface Part
     itemName: string;
     label: string;
     role: PartRole;
-    // lenght runs along the grain when the decor has one
+    // Lenght runs along the grain when the decor has one
     length: number;
     width: number;
     thickness: number;
@@ -90,7 +90,7 @@ export interface Part
     quantity: number;
     edges: Edge[];
     outline: Outline;
-    // openings cut through the board, inside the outline
+    // Openings cut through the board, inside the outline
     cutouts: Outline[];
     // face A is at w = 0 and drilling goes along +n
     frame: Frame | null;
@@ -98,11 +98,11 @@ export interface Part
     grooves: Groove[];
     pockets?: Pocket[];
     notes: string[];
-    // flexible skins and battens are cut flat but sit on an arc in the model
+    // Flexible skins and battens are cut flat but sit on an arc in the model
     curve: CurveShape | null;
-    // lacquer colour of a lacquered MDF part, shown in 3D and noted for the painter
+    // Lacquer colour of a lacquered MDF part, shown in 3D and noted for the painter
     colour: string | null;
-    // where each end of the board lies on face B, along u, measured from where it lies on face A : a plumb cut
+    // Where each end of the board lies on face B, along u, measured from where it lies on face A : a plumb cut
     // under a roof or a chamfered head, the outline being face A only
     bevel: { u0: number; u1: number };
 }
@@ -113,15 +113,15 @@ export interface CurveShape
     // "z" works in the x-y plane (angle 0 = +x, 90 = +y)
     centre: Vec3;
     axis: "y" | "z";
-    // radius of the outer afce of the skin, the skin thickness goes inward
+    // Radius of the outer afce of the skin, the skin thickness goes inward
     rOuter: number;
     thickness: number;
     a0: number;
     a1: number;
-    // extent along the axis, measured from the centre
+    // Extent along the axis, measured from the centre
     from: number;
     to: number;
-    // flat run continuing the skin towards -z from the arc end at angle `straightAt` (axis "y" only)
+    // Flat run continuing the skin towards -z from the arc end at angle `straightAt` (axis "y" only)
     straight: number;
     straightAt: number;
 }
@@ -134,14 +134,14 @@ export interface Joint
     edge: Edge;
     facePart: string;
     face: "A" | "B";
-    // on the face part, the joint line centre is at `line` on axis `lineAxis`, from `from` to `to` on the other axis
+    // On the face part, the joint line centre is at `line` on axis `lineAxis`, from `from` to `to` on the other axis
     lineAxis: "u" | "v";
     line: number;
     from: number;
     to: number;
-    // on the edge part, the same span measured along its edge, same direction as from/to
+    // On the edge part, the same span measured along its edge, same direction as from/to
     edgeFrom: number;
-    // true when the edge part coordinate runs opposite to the face part coordinate
+    // True when the edge part coordinate runs opposite to the face part coordinate
     reversed: boolean;
 }
 
@@ -151,11 +151,11 @@ export interface HardwareLine
     qty: number;
     item: string;
     itemName: string;
-    // part or front the line belongs to, for the drawings
+    // Part or front the line belongs to, for the drawings
     target: string | null;
     note: string | null;
     purpose: Purpose;
-    // the other item hardware joining two of them goes into
+    // The other item hardware joining two of them goes into
     partner?: string;
 }
 
@@ -168,22 +168,22 @@ export interface Build
     fronts: Map<string, FrontPanel[]>;
     layouts: Map<string, ResolvedLayout>;
     errors: string[];
-    // buildable, but away from a rule worth keeping
+    // Buildable, but away from a rule worth keeping
     warnings: string[];
-    // what the hardware chosen admits, told the user without being a fault
+    // What the hardware chosen admits, told the user without being a fault
     infos: string[];
-    // point loads at mid span in N, a rail centre support hanging from a shelf
+    // Point loads at mid span in N, a rail centre support hanging from a shelf
     midLoads: Map<string, number>;
-    // tube lengths to cut, packed into bars over the whole project once every item is built
+    // Tube lengths to cut, packed into bars over the whole project once every item is built
     railCuts: { item: string; itemName: string; length: number }[];
     // hardware as volumes, for the 3D view, the clash checks and the drawings
     fitted: Fitted[];
     motions: Motion[];
-    // bar handles as the front view draws them : the bar from end to end, in the plane of the façades of its carcass
+    // Bar handles as the front view draws them : the bar from end to end, in the plane of the façades of its carcass
     handles: { item: string; front: string; ref: string; x0: number; y0: number; x1: number; y1: number }[];
-    // pictures pasted on cell backs, in the frame of their wall : lower left corner, the face it lies on, its size
+    // Pictures pasted on cell backs, in the frame of their wall : lower left corner, the face it lies on, its size
     prints: { item: string; cell: string; file: string; x: number; y: number; z: number; w: number; h: number }[];
-    // socket holes as the front views draw them, in the frame of their carcass : a hole in a shelf seen edge on
+    // Socket holes as the front views draw them, in the frame of their carcass : a hole in a shelf seen edge on
     outlets: { item: string; id: string; shape: "round" | "rect"; x: number; y: number; w: number; h: number;
                edgeOn: boolean; hidden: boolean }[];
 }
@@ -203,7 +203,7 @@ export interface Motion
     parts: string[];
     fitted: string[];
     rides: string[];
-    // the hardware that sets the movement, quoted in the message of a clash, and what to do then
+    // The hardware that sets the movement, quoted in the message of a clash, and what to do then
     source: string;
     remedy: string;
 }
@@ -222,8 +222,8 @@ export interface Fitted
     centre: Vec3;
     axes: [Vec3, Vec3, Vec3];
     half: Vec3;
-    // the part it is let into, never counted as clashing with it
+    // The part it is let into, never counted as clashing with it
     host: string | null;
-    // inside a closed carcass : drawn in 3D only when the hardware is asked for
+    // Inside a closed carcass : drawn in 3D only when the hardware is asked for
     hidden: boolean;
 }

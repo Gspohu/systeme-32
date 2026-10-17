@@ -41,7 +41,7 @@ describe("shelf thickness", () =>
         })!;
         expect(shelf.h).toBe(22);
         expect(upright.w).toBe(19);
-        // the cell above start on the upper face of the 22 mm shelf
+        // The cell above start on the upper face of the 22 mm shelf
         expect(upright.y).toBe(19 + 700 + 22);
         expect(lay.nodes.get((c.root as SplitNode).children[0]!.id)!.walls.top).toBe(22);
     });

@@ -11,10 +11,10 @@ import { carrierOf } from "./devices";
 import { hangerWallChecks } from "./wall_load"; 
 import { AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, BLUM_HANGER_PAIR_LOAD, CAMAR_807_LOAD } from "../data/hardware";
 
-// a carcass set by hand on another sit within a millimetre of its top
+// A carcass set by hand on another sit within a millimetre of its top
 const TOL = 1;
 
-// a weight in kg and the room x, z it stands over
+// A weight in kg and the room x, z it stands over
 export interface PointLoad
 {
     kg: number;
@@ -167,7 +167,7 @@ export function footLoadChecks(p: Project, b: Build, own: Map<string, number>): 
                     + `porte ${BLUM_HANGER_PAIR_LOAD} kg (Blum p. 586). Alléger le meuble ou le poser au sol.`);
             }
         }
-        // the hangers hold, hten the wall behind them has to
+        // The hangers hold, hten the wall behind them has to
         if (c.base.type === "wall")
         {
             for (const k of hangerWallChecks(c, total, p.settings))

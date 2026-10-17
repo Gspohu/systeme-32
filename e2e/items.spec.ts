@@ -71,7 +71,7 @@ test.describe("views", () =>
         await openBlank(page);
         const canvas = page.locator(".viewer3d canvas");
         await expect(canvas).toBeVisible();
-        // the first frmae is drawn once two screenshots in a row agree
+        // The first frmae is drawn once two screenshots in a row agree
         let empty = await canvas.screenshot();
         await expect.poll(async () =>
         {

@@ -1,7 +1,7 @@
 // Masses, sliding leaves, shelf pins and base : hardware lines and drilling, the joints live in joints.ts
 
 import type { Carcass, Settings } from "./model";
-import type { ResolvedLayout } from "./layout";
+import { frontSetback, type ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
 import { sideFace, type FaceRef } from "./locate";
 import { byId } from "./edit";
@@ -21,7 +21,7 @@ import { metHole } from "./drilling";
 // Workshop conventions, stated in the drawings as such
 const PIN_SPARE_HOLES = 3;
 
-// holes of a hinge plate a shelf pin may land in, on the side the hinges are fixed to
+// Holes of a hinge plate a shelf pin may land in, on the side the hinges are fixed to
 const PLATE_HOLES = new Set<Purpose>(["plate-dowel", "plate-screw"]);
 
 
@@ -29,7 +29,7 @@ export function partMass(p: Part, check: boolean): number
 {
     const m = MATERIALS[p.material];
     const rho = m === undefined ? 700 : check ? m.densityCheck : m.density;
-    // the real outline, a quarter disc or a panel under a slope weighs less than its blank, less its openings
+    // The real outline, a quarter disc or a panel under a slope weighs less than its blank, less its openings
     let area = polygonArea(tessellate(p.outline));
     for (const c of p.cutouts ?? [])
     {
@@ -103,7 +103,7 @@ export function fitSliding(c: Carcass, lay: ResolvedLayout, s: Settings, b: Buil
             b.errors.push(`${c.name} : les vantaux couvrent toute la voie de ${Math.round(track)} mm `
                 + "et ne peuvent plus coulisser (une seule voie en applique).");
         }
-        // laid from the left on their single track : opening pushes them all right into the free length
+        // Laid from the left on their single track : opening pushes them all right into the free length
         for (const lp of leaves)
         {
             b.motions.push({
@@ -136,7 +136,7 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             const ref = GLASS_SUPPORTS[shelf.thickness];
             sup = ref === undefined ? undefined : { ref, label: "", kgFor4: Infinity };
         }
-        // the support the user chose, or the first one carrying the shelf
+        // The support the user chose, or the first one carrying the shelf
         const asked = SHELF_SUPPORTS.find((x) =>
         {
             return x.ref === c.pins;
@@ -167,7 +167,7 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
         const node = { id: d.split, kind: "cell" as const, parent: null, x: d.x, y: d.y, w: d.w, h: d.h,
                       left: "outer" as const, right: "outer" as const, bottom: "outer" as const,
                       top: "outer" as const, walls: { left: c.thickness, right: c.thickness, bottom: d.h, top: d.h } };
-        // within a millimetre of the line (whole mm heights against a line on half mm) the pins go in its holes
+        // Within a millimetre of the line (whole mm heights against a line on half mm) the pins go in its holes
         // an older project may hold a shelf typed off it : its pins stay under it and the line is told
         const line = holeLine(c, s, nearestHole(c, s, d.y - PIN_BELOW_SHELF));
         const onLine = s.grid > 0 && Math.abs(line + PIN_BELOW_SHELF - d.y) <= 1;
@@ -177,7 +177,9 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             b.warnings.push(`${c.name}, ${shelf.label.toLowerCase()} : à ${Math.round(d.y)} mm, hors des trous du `
                 + `système 32. La déplacer à ${Math.round(line + PIN_BELOW_SHELF)} mm pour qu'elle repose sur la série.`);
         }
-        const rows = [37, c.depth - lay.zBack - 37];
+        // The front row 37 in from the front of the wall it is drilled in, and kept as far behind the front of a
+        // shelf standing back as it is behind one at the setback of the settings
+        const sb = frontSetback(d, s.shelfFrontSetback);
         for (const side of ["left", "right"] as const)
         {
             const face = sideFace(c, lay, b, node, side);
@@ -185,6 +187,15 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             {
                 continue;
             }
+            const frontRow = Math.max(face.vOrigin + 37, sb + 37 - s.shelfFrontSetback);
+            const backRow = c.depth - lay.zBack - 37;
+            if (frontRow >= backRow)
+            {
+                b.errors.push(`${c.name}, ${shelf.label.toLowerCase()} : en retrait de ${sb} mm, ses taquets avant `
+                    + "passeraient derrière ceux du fond. Réduire le retrait.");
+                break;
+            }
+            const rows = [frontRow - face.vOrigin, backRow - face.vOrigin];
             let k = -PIN_SPARE_HOLES;
             while (k <= PIN_SPARE_HOLES)
             {
@@ -216,7 +227,7 @@ function drillPinHole(face: FaceRef, u: number, v: number, k: number, supportRef
     const move = "La monter ou la descendre d'un cran de la série.";
     if (k === 0 && met !== undefined && PLATE_HOLES.has(met.purpose))
     {
-        // the hole is a hinge plate's : the shelf cannot rest there
+        // The hole is a hinge plate's : the shelf cannot rest there
         b.warnings.push(`${who} : son taquet tombe dans un trou d'embase de charnière. ${move}`);
     }
     else if (k === 0 && met !== undefined && met.purpose === "adapter-screw")
@@ -280,7 +291,7 @@ export function fitModularRows(c: Carcass, lay: ResolvedLayout, s: Settings, b: 
             continue;
         }
         const ys: number[] = [];
-        // every hole of the line inside the cell, while a shelf resting on it still fits under the cell top
+        // Every hole of the line inside the cell, while a shelf resting on it still fits under the cell top
         let n = Math.ceil((nb.y + 5 / 2 - c.thickness / 2) / s.grid);
         while (holeLine(c, s, n) + PIN_BELOW_SHELF + shelf <= nb.y + nb.h)
         {
@@ -368,7 +379,7 @@ export function fitBase(c: Carcass, b: Build): void
         b.fitted.push(...feetFitted(c, foot.ref));
         if (c.base.type === "plinth")
         {
-            // the front row carries the front plinth, the front and back feet of a side its return
+            // The front row carries the front plinth, the front and back feet of a side its return
             const returns = (c.base.returns ?? []).length;
             b.hardware.push({ ref: "637.38.054", qty: perRow + 2 * returns, item: c.id, itemName: c.name, target: null,
                              note: returns > 0 ? `${perRow} en façade, 2 par retour` : null, purpose: "plinth-clip" });

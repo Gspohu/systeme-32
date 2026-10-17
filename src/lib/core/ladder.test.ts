@@ -5,7 +5,7 @@ import { analyse } from "./analysis";
 import { roomBox } from "./room";
 import type { Item, Project } from "./model";
 
-// a library in Riquewihr : a 2400 rail at 2000, the ladder bought with it
+// A library in Riquewihr : a 2400 rail at 2000, the ladder bought with it
 function library(o: Partial<Item> = {}): Project
 {
     const p = addItem(newProject("bibliothèque"), newLadder({ name: "Échelle", x: 200 }));

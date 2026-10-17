@@ -14,7 +14,7 @@
     }));
 
 
-    // one slider moved, the two others kept where the screen is
+    // One slider moved, the two others kept where the screen is
     function move(key: "cx" | "z" | "yaw", value: number): void
     {
         if (pose !== null)

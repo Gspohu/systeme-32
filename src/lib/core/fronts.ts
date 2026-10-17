@@ -23,9 +23,9 @@ export interface FrontPanel
     front: string;
     node: string;
     role: "door" | "drawer" | "leaf" | "flap" | "panel";
-    // rank inside its own front, a double door has leaves 0 and 1
+    // Rank inside its own front, a double door has leaves 0 and 1
     index: number;
-    // rank among the fronts of the same kind on the carcass, the name the drawings give it
+    // Rank among the fronts of the same kind on the carcass, the name the drawings give it
     number: number;
     rect: Rect;
     // z of the back face of the panel, from the back of the carcass box
@@ -34,7 +34,7 @@ export interface FrontPanel
     decor: string;
     hinge: "left" | "right" | null;
     hingeKind: HingeKind | null;
-    // overlay on the hinge side, used to derive the cup distance TB
+    // Overlay on the hinge side, used to derive the cup distance TB
     hingeOverlay: number;
 }
 
@@ -62,7 +62,7 @@ function edgeOffset(boundary: "outer" | "divider", t: number, s: Settings, mount
 
 export function frontOuterRect(nb: NodeBox, s: Settings, mount: Front["mount"]): Rect
 {
-    // a thicker shelf need half of its own thickness covered, not half of the sides
+    // A thicker shelf need half of its own thickness covered, not half of the sides
     const l = edgeOffset(nb.left, nb.walls.left, s, mount);
     const r = edgeOffset(nb.right, nb.walls.right, s, mount);
     const b = edgeOffset(nb.bottom, nb.walls.bottom, s, mount);
@@ -183,7 +183,7 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings, walls:
         }
         else
         {
-            // one track overlay : leaves side by side from the left, each leafWdith wide
+            // One track overlay : leaves side by side from the left, each leafWdith wide
             const n = Math.max(1, Math.round(spec.leaves));
             let i = 0;
             while (i < n)
@@ -196,7 +196,7 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings, walls:
             }
         }
     }
-    // numbered per kind in reading order, top row first then left to right : "porte 3" is the third one seen
+    // Numbered per kind in reading order, top row first then left to right : "porte 3" is the third one seen
     const order = [...out].sort((p, q) =>
     {
         return Math.round(q.rect.y + q.rect.h) - Math.round(p.rect.y + p.rect.h) || p.rect.x - q.rect.x;

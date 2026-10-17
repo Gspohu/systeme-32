@@ -177,7 +177,7 @@ function content(page: Page): string
         }
         else
         {
-            // same em size as the SVG font-size, the width is the half-em estimate of display.ts
+            // Same em size as the SVG font-size, the width is the half-em estimate of display.ts
             // TODO : anchored text should use the Helvetica AFM widths, centred labels drift on long words
             const font = shape.bold === true ? "/F2" : "/F1";
             const size = shape.size * PT;
@@ -199,7 +199,7 @@ function content(page: Page): string
 }
 
 
-// each character stay below 0x100 (strings use octal escapes) : character offsets are byte offsets
+// Each character stay below 0x100 (strings use octal escapes) : character offsets are byte offsets
 export function pagesToPdf(pages: Page[], title: string): Uint8Array
 {
     const objects: string[] = [];
@@ -225,7 +225,7 @@ export function pagesToPdf(pages: Page[], title: string): Uint8Array
     objects[catalogueObj - 1] = `<< /Type /Catalog /Pages ${pagesObj} 0 R >>`;
     objects[pagesObj - 1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${kids.length} >>`;
     const info = add(`<< /Title ${pdfString(title)} /Producer (systeme-32) >>`);
-    // the comment line after the header only tells readers the file is binary, any bytes above 127 do
+    // The comment line after the header only tells readers the file is binary, any bytes above 127 do
     let out = `%PDF-1.4\n%${String.fromCharCode(0xe2, 0xe3, 0xcf, 0xd3)}\n`;
     const offsets: number[] = [];
     objects.forEach((body, i) =>

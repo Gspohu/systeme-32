@@ -2,7 +2,7 @@
 
 import type { Carcass, Settings } from "./model";
 
-// a shelf pin centre stands this far under the shelf it carries
+// A shelf pin centre stands this far under the shelf it carries
 export const PIN_BELOW_SHELF = 4;
 
 

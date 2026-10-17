@@ -7,7 +7,7 @@ import { analyse } from "./analysis";
 import { partToDxf } from "./drawing/dxf";
 import type { Carcass, Project, SplitNode } from "./model";
 
-// the alarm niche of the entrance at Colmar : a clel lined inside, its back opened around the box
+// The alarm niche of the entrance at Colmar : a clel lined inside, its back opened around the box
 function niche(): Project
 {
     return addItem(newProject("Colmar"), newCarcass({ name: "Niche", width: 600, height: 560, depth: 300 }));
@@ -19,7 +19,7 @@ function carcass(p: Project): Carcass
 }
 
 
-// the niche split in two columns by a mid panel
+// The niche split in two columns by a mid panel
 function halves(): Project
 {
     const p = niche();
@@ -52,7 +52,7 @@ describe("a lining over a hole", () =>
         expect(lining).toHaveLength(1);
         expect(lining[0]!.cutouts).toHaveLength(1);
         expect(lining[0]!.notes.join()).toContain("Même découpe que");
-        // the workshop reads it on its DXF, the layer the back already had
+        // The workshop reads it on its DXF, the layer the back already had
         expect(partToDxf(lining[0]!, "#100-001")).toContain("DECOUPE");
     });
 
@@ -79,7 +79,7 @@ describe("a lining over a hole", () =>
         const c = carcass(p);
         p = addOutlet(p, c.id, c.root.id);
         p = updateOutlet(p, c.id, carcass(p).outlets[0]!.id, { w: 260, h: 330, dy: -199 });
-        // the 600 x 560 niche in 19 mm boards : a 562 x 522 cell
+        // The 600 x 560 niche in 19 mm boards : a 562 x 522 cell
         expect(analyse(p).checks.map((k) =>
         {
             return k.message;

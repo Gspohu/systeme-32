@@ -6,7 +6,7 @@ import { footReactions } from "./foot_loads";
 import { dresser } from "./templates";
 import type { Project } from "./model";
 
-// two rows of two feet, 1000 apart in x and 400 in z
+// Two rows of two feet, 1000 apart in x and 400 in z
 const FOUR = [{ x: 0, z: 0 }, { x: 1000, z: 0 }, { x: 0, z: 400 }, { x: 1000, z: 400 }];
 
 
@@ -89,7 +89,7 @@ describe("what a carcass carries", () =>
                                     source: "mesuré", x, y: 600, z: 75 });
             return busiest(addItem(base(), amp), "Bahut d'Ensisheim");
         };
-        // at an end the same amp give its nearest feet more than in the middel
+        // At an end the same amp give its nearest feet more than in the middel
         expect(at(0)).toBeGreaterThan(at(650) + 10);
     });
 

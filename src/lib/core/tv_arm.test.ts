@@ -7,7 +7,7 @@ import { armChecks, armPath, reachable, screenSpots, spotClashes, spotFor } from
 import { migrate, packProject, unpackProject, validateProject } from "./io/project_file";
 import type { Project, Screen, ScreenArm } from "./model";
 
-// the set of Gilles at Haguenau on its wall arm, the figures of the template
+// The set of Gilles at Haguenau on its wall arm, the figures of the template
 function withArm(screen: Partial<Screen> = {}, arm: Partial<ScreenArm> = {}): Project
 {
     const p = tvWall();
@@ -68,7 +68,7 @@ describe("a screen on a wall arm", () =>
     it("takes the screen out square to the wall before sliding it, clear of the book column a straight line hit", () =>
     {
         const p = tvWall();
-        // a fifth of the straight line from put away to swung out, the way the first 3D slider took it
+        // A fifth of the straight line from put away to swung out, the way the first 3D slider took it
         const diagonal = { label: "", cx: 1077.6, bottom: 664, z: 114, yaw: 0 };
         expect(spotClashes(p, diagonal).map((h) =>
         {
@@ -84,7 +84,7 @@ describe("a screen on a wall arm", () =>
 
     it("says when only the way out runs into something, both ends being clear", () =>
     {
-        // a box of Haguenau hung 100 off the wall in front of the stored set, the swung one far right of it and in
+        // A box of Haguenau hung 100 off the wall in front of the stored set, the swung one far right of it and in
         // front of the amplifier
         const box = newDevice({ name: "Boîtier", x: 1000, y: 700, z: 100, width: 200, height: 100, depth: 50, massKg: 1,
                                 source: "essai" });
@@ -131,7 +131,7 @@ describe("a screen on a wall arm", () =>
 
     it("finds a carcass in the way only where the screen is swung out", () =>
     {
-        // a 150 deep column of Haguenau right of the left one, the swung screen 220 off the wall cleras it
+        // A 150 deep column of Haguenau right of the left one, the swung screen 220 off the wall cleras it
         const column = newCarcass({ name: "Claustra", width: 250, height: 1260, depth: 150, x: 450, y: 600 });
         const p = addItem(tvWall(), column);
         expect(analyse(p).checks.filter((k) =>

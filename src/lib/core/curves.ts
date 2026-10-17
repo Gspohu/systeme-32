@@ -12,7 +12,7 @@ import { FLEX_MIN_RADIUS } from "../data/materials";
 // Workshop conventions : one former every 400 mm of height, solid profiles only for small radii
 const FORMER_SPACING = 400;
 const SOLID_MAX_RADIUS = 100;
-// an open end's upright, narrow enough for a single connector at each end (two would clash under 2 x 37)
+// An open end's upright, narrow enough for a single connector at each end (two would clash under 2 x 37)
 const POST_WIDTH = 60;
 const POST_SETBACK = 15;
 
@@ -244,7 +244,7 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
     const lead = a * Math.cos(phi) + h * Math.sin(phi);
     const reach = outer - POST_SETBACK;
     let rho = -lead + Math.sqrt((lead * lead) - (a * a + h * h - reach * reach));
-    // it stands on the floor board too : drawn in when that one is cut smaller, its corners as far inside it
+    // It stands on the floor board too : drawn in when that one is cut smaller, its corners as far inside it
     const floor = floorOutline(c, side);
     if (floor !== null)
     {
@@ -316,7 +316,7 @@ export function buildEnds(c: Carcass, b: Build): void
                 ],
             };
         const toe = endToe(c, end);
-        // a floor board cut smaller starts at its own front corner : the blank of the cut list is where the CNC sets 0
+        // A floor board cut smaller starts at its own front corner : the blank of the cut list is where the CNC sets 0
         const kept = floorOutline(c, side);
         const reach = kept === null ? null : bounds(tessellate(kept));
         const floorShift = reach === null ? 0 : reach.minY;
@@ -389,14 +389,14 @@ export function buildEnds(c: Carcass, b: Build): void
                 p.notes.push("Posée au sol, sous le niveau de la joue");
                 continue;
             }
-            // shaped panels butt the outer face of the side with their straight edge
+            // Shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
                            face: "B", lineAxis: "u", line: lv.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
                            reversed: false });
         }
         if (post !== null)
         {
-            // one lenght of upright between each pair of boards, standing on the one below and under the next :
+            // One lenght of upright between each pair of boards, standing on the one below and under the next :
             // the low panel, the shelves bottom up, the top panel
             const boards = [levels[0]!, ...levels.slice(2), levels[1]!].map((lv) =>
             {
@@ -419,7 +419,7 @@ export function buildEnds(c: Carcass, b: Build): void
                 b.parts.push(piece);
                 const span = { lineAxis: "v" as const, line: post.v, from: post.u - post.w / 2, to: post.u + post.w / 2,
                                edgeFrom: 0, reversed: side === "left" };
-                // the floor board's own frame starts floorShift further back
+                // The floor board's own frame starts floorShift further back
                 const below = n === 1 ? { ...span, line: post.v - floorShift } : span;
                 b.joints.push({ edgePart: piece.id, edge: "u0", facePart: low.id, face: "A", ...below },
                               { edgePart: piece.id, edge: "u1", facePart: high.id, face: "B", ...span });
@@ -435,7 +435,7 @@ export function buildEnds(c: Carcass, b: Build): void
             }
             else
             {
-                // behind the shaped panels, in the plane of the carcass back, from the side out to the skin
+                // Behind the shaped panels, in the plane of the carcass back, from the side out to the skin
                 const back = newPart({
                     ...base, id: `${c.id}/end/${side}/back`, label: `${title}, fond`, role: "back", length: tall,
                     width: outer, thickness: c.back.thickness, decor: c.backDecor, edges: [],

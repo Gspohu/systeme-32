@@ -83,14 +83,14 @@ export const MOVENTO = {
     screwAxisAboveLower: 38,
     bottomAboveLower: 28.5,
     topBelowUpper: 7,
-    // screw positions on the carcass side, from the front edge
+    // Screw positions on the carcass side, from the front edge
     frontHoles: [28, 37, 69],  
     // Blum CAD model of the 760H4800S (files 42061081 and 42306320, 2025-03-21) : each of these holes is followed by
     // two more of the profile, 9 and 18 mm further back. A runer whose screws would meet the other face takes
     // the second ones
     alternateStep760: 18,
     alternateKnown760: [28, 37, 69, 261, 293],   
-    // rear holes, 37 + offset, by nominal lenght group
+    // Rear holes, 37 + offset, by nominal lenght group
     rearOffsets760: [
         { upTo: 270, offsets: [160] },
         { upTo: 350, offsets: [224] },
@@ -124,14 +124,14 @@ export const HK_TOP = {
     minHeight: 205,
     maxHeight: 600,
     maxWidth: 1800,
-    // for two mechanisms, a third one needs a centre upright
+    // For two mechanisms, a third one needs a centre upright
     maxKg: 18,
-    // the housing, 30 wide against each side, runs 187 back from the front edge and down to 173 under the panel above
+    // The housing, 30 wide against each side, runs 187 back from the front edge and down to 173 under the panel above
     housingWidth: 30,
     minInnerHeight: 173,
     minInnerDepth: 187,
     maxTopOverlay: 25.4,
-    // bracket screws on the front, from the underside of the panel above and in from the inner side face
+    // Bracket screws on the front, from the underside of the panel above and in from the inner side face
     bracketFirst: 62,
     bracketPitch: 32,
     bracketScrews: 4,
@@ -174,7 +174,7 @@ export const CONCEALED_SHELF_SUPPORT = {
     wallScrews: 2,
     orderMultiple: 4,
     maxSpacing: 700,
-    // most load spread over the shelf for its depth, kg/m2, nothing given past 300 deep
+    // Most load spread over the shelf for its depth, kg/m2, nothing given past 300 deep
     loads: [{ depth: 200, kgPerM2: 200 }, { depth: 250, kgPerM2: 140 }, { depth: 300, kgPerM2: 80 }],
 };
 
@@ -183,7 +183,7 @@ export const CONCEALED_SHELF_SUPPORT = {
 export const MINIFIX = {
     housingDiameter: 15,
     housingDepth: 14.5,
-    // axis at half the thickness of the board, B from the butting edge
+    // Axis at half the thickness of the board, B from the butting edge
     distanceB: 34,
     boltPilot: 5,
     boltDepth: 11,

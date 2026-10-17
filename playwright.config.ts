@@ -28,14 +28,14 @@ export default defineConfig({
             testIgnore: /tablet\.spec\.ts/,
         }, 
         {
-            // portrait tablet, under the 1100 px breakpoint of the tabbed layout
+            // Portrait tablet, under the 1100 px breakpoint of the tabbed layout
             name: "tablette",
             use: { viewport: { width: 820, height: 1180 }, hasTouch: true },
             testMatch: /(tablet|app)\.spec\.ts/,
         },
     ],
     webServer: {
-        // a fresh build every run : a preview left running serves a stale index after a rebuild
+        // A fresh build every run : a preview left running serves a stale index after a rebuild
         command: "npm run build && npx vite preview --port 4180 --strictPort --host 127.0.0.1",
         url: "http://127.0.0.1:4180",
         reuseExistingServer: false,

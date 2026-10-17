@@ -6,14 +6,14 @@ import type { Check } from "./check";
 import type { Vec3 } from "./geometry";
 import { toRoom } from "./room";
 
-// a touch is not a clash : boards laid face to face or a front on the edges of its carcass
+// A touch is not a clash : boards laid face to face or a front on the edges of its carcass
 const TOUCH = 1;
 // steps through a turn and along a slide, about every 10 deg of a door
 const TURN_STEPS = 11;
 const SLIDE_STEPS = 6;
-// a closed front this close to the hinge line of a door is Blum's gap F, checked with the hinges
+// A closed front this close to the hinge line of a door is Blum's gap F, checked with the hinges
 const HINGE_NEIGHBOUR = 6;
-// a door that opens square is usable, past that it falls short of its hinges
+// A door that opens square is usable, past that it falls short of its hinges
 const SQUARE = 90;
 const FRONT_ROLES: PartRole[] = ["door", "drawerFront", "leaf", "flap", "panel"];
 
@@ -74,7 +74,7 @@ function partBox(p: Part): Obb | null
 }
 
 
-// the box of the wall frame brought into the room, where items of two walls meet
+// The box of the wall frame brought into the room, where items of two walls meet
 function inRoom(b: Obb, wall: Wall, p: Project): Obb
 {
     const zero = toRoom(wall, p.room, [0, 0, 0]);
@@ -134,7 +134,7 @@ export function boxesClash(a: Obb, b: Obb): boolean
 }
 
 
-// distance from the hinge line of a turn to a box, along the plane square to that line
+// Distance from the hinge line of a turn to a box, along the plane square to that line
 function offHinge(m: Motion, b: Obb): number
 {
     const k = m.axis;
@@ -204,7 +204,7 @@ export function swingChecks(p: Project, b: Build): Check[]
     for (const m of b.motions)
     {
         const mine = new Set(movingOf(m));
-        // the neighbours of the hinge line, in the frame of the wall like the motion
+        // The neighbours of the hinge line, in the frame of the wall like the motion
         const spared = new Set<string>();
         for (const s of solids)
         {
@@ -230,7 +230,7 @@ export function swingChecks(p: Project, b: Build): Check[]
             hit = s === undefined ? null : { s, at: m.amount * k / steps };
             k++;
         }
-        // a door stopped past square still opens, it only fall short of what its hinges allow
+        // A door stopped past square still opens, it only fall short of what its hinges allow
         if (hit !== null && m.kind === "turn" && hit.at > SQUARE)
         {
             checks.push({ level: "warning", item: m.item, target: m.parts[0] ?? null,
@@ -245,7 +245,7 @@ export function swingChecks(p: Project, b: Build): Check[]
                           message: `${m.label} : en s'ouvrant (${m.source}), touche ${hit.s.label} ${where}. ${m.remedy}` });
         }
     }
-    // two fronts open at once : the leaves of one sliding front move together and are left out
+    // Two fronts open at once : the leaves of one sliding front move together and are left out
     const open = b.motions.map((m) =>
     {
         return pose(m, 1);

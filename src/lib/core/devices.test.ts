@@ -10,7 +10,7 @@ import { carrierOf } from "./devices";
 import type { Device, Project } from "./model";
 
 
-// a 600 x 800 x 450 cupboard on a 100 plinth, one cell inside 19 to 581 wide and 19 to 781 high
+// A 600 x 800 x 450 cupboard on a 100 plinth, one cell inside 19 to 581 wide and 19 to 781 high
 function cupboard(d: Partial<Device>): Project
 {
     const p = addItem(newProject("Sélestat"), newCarcass({ name: "Buffet de Sélestat", width: 600,
@@ -46,7 +46,7 @@ describe("appliances", () =>
 
     it("are refused when they stick out of every cell", () =>
     {
-        // the box stay inside the carcass, but over the left sied from 5
+        // The box stay inside the carcass, but over the left sied from 5
         expect(said(cupboard({ x: 5 }), "error")).toContain("Box ne tient dans aucune case de Buffet de Sélestat");
     });
 

@@ -4,13 +4,13 @@
 
 export interface HingeLinkage
 {
-    // pivots of the arm, fixed to the side
+    // Pivots of the arm, fixed to the side
     armA: [number, number];
     armB: [number, number];
-    // pivots of the cup, fixed to the door : armA links to cupC, armB to cupD
+    // Pivots of the cup, fixed to the door : armA links to cupC, armB to cupD
     cupC: [number, number];
     cupD: [number, number];
-    // back face of the door, 13 mm above the bottom of the cup
+    // Back face of the door, 13 mm above the bottom of the cup
     doorBack: number;
     openDeg: number;
     source: string;

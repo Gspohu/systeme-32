@@ -41,7 +41,7 @@ test.describe("tablet", () =>
         await addCarcass(page);
         await page.getByRole("button", { name: "Plans et listes", exact: true }).click();
         await expect(page.locator(".grid-sheets .sheet").first()).toBeVisible();
-        // nothing wider thna the screen but the tables, which scroll inside their container
+        // Nothing wider thna the screen but the tables, which scroll inside their container
         const overflow = await page.evaluate(() =>
         {
             return document.documentElement.scrollWidth - window.innerWidth;

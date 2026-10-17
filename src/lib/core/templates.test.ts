@@ -48,7 +48,7 @@ describe("the sketch templates", () =>
         const decors = new Set<string>();
         for (const q of analyse(dresser()).build.parts)
         {
-            // the solid oak cleats hidden behind the fillers are no decor
+            // The solid oak cleats hidden behind the fillers are no decor
             if (q.role !== "back" && q.role !== "cleat")
             {
                 decors.add(q.decor);
@@ -58,7 +58,7 @@ describe("the sketch templates", () =>
     });
 
 
-    // the TV wall keeps oak backs, cut from the oak 8 mm sheet its niche lining opens anyway
+    // The TV wall keeps oak backs, cut from the oak 8 mm sheet its niche lining opens anyway
     // TV : four doors, four drawers. Dresser : ten doors, three drawers
     for (const [make, doors, drawers] of [[tvWall, 4, 4], [dresser, 10, 3]] as const)
     {
@@ -80,7 +80,7 @@ describe("the sketch templates", () =>
             }
             for (const m of slides)
             {
-                // the front, two sides, two ends and the bottom of the box, out by the length of the runner
+                // The front, two sides, two ends and the bottom of the box, out by the length of the runner
                 expect(m.parts).toHaveLength(6);
                 expect(m.source).toContain(`sorties de ${m.amount} mm`);
             }
@@ -107,14 +107,14 @@ describe("the sketch templates", () =>
 
     it("fits the dresser with 24 unsprung hinges, a TIP-ON per door and three 480 runner pairs", () =>
     {
-        // nine short doors of two hinges, the 861 one of the left column three, the full height right one five
+        // Nine short doors of two hinges, the 861 one of the left column three, the full height right one five
         const hw = hardwareCount(dresser);
         expect((hw.get("70T3550.TL") ?? 0) + (hw.get("70T3650.TL") ?? 0)).toBe((8 * 2) + 3 + 5);
         expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(0);
-        // the 2253 rigth door is past the 1300 of the short unit
+        // The 2253 rigth door is past the 1300 of the short unit
         expect(hw.get("956.1004")).toBe(9);
         expect(hw.get("956A1004")).toBe(1);
-        // every door overlays its side : all 24 plates take their dowels in the holes of the line
+        // Every door overlays its side : all 24 plates take their dowels in the holes of the line
         expect(hw.get("174H7100E")).toBe(24);
         expect(hw.get("173H7100")).toBeUndefined();
         expect(hw.get("760H4800S")).toBe(3);
@@ -180,13 +180,13 @@ describe("the sketch templates", () =>
                 end.push(q);
             }
         }
-        // no skin left : the two end panels, one shaped shelf and the back closing the arc, no seat so no upright
+        // No skin left : the two end panels, one shaped shelf and the back closing the arc, no seat so no upright
         expect(end.map((q) =>
         {
             return q.label;
         }).sort()).toEqual(["Bout arrondi droit, flasque basse", "Bout arrondi droit, flasque haute",
                             "Bout arrondi droit, fond", "Bout arrondi droit, tablette 1"]);
-        // the low board on the floor beside the 100 plinth
+        // The low board on the floor beside the 100 plinth
         const low = end.find((q) =>
         {
             return q.label.endsWith("flasque basse");
@@ -196,7 +196,7 @@ describe("the sketch templates", () =>
         {
             return k.message.startsWith("Meuble bas, bout arrondi droit : assise");
         })).toBe(false);
-        // the cables go through the column's technical cell now, the base back stays whole : two 60 holes 100 left
+        // The cables go through the column's technical cell now, the base back stays whole : two 60 holes 100 left
         // and 120 right of the middle of that 155 cell, 19 + 155 / 2 up then 19 + 412 / 2 across, u up on that back
         const backOf = (id: string): Part =>
         {
@@ -208,7 +208,7 @@ describe("the sketch templates", () =>
             return o.segments[0];
         })).toMatchObject([{ kind: "arc", cx: 19 + 155 / 2, cy: 19 + 206 - 100 },
                            { kind: "arc", cx: 19 + 155 / 2, cy: 19 + 206 + 120 }]);
-        // four doors of two hinges, none of the small ones of the save lfet
+        // Four doors of two hinges, none of the small ones of the save lfet
         const hw = hardwareCount(tvWall);
         expect((hw.get("70T3550.TL") ?? 0) + (hw.get("70T3650.TL") ?? 0)).toBe(4 * 2);
         expect(hw.get("956.1004")).toBe(4);  
@@ -235,7 +235,7 @@ describe("the sketch templates", () =>
                     for (let j = i + 1; j < face.length; j++)  
                     {
                         const y = face[j]!;
-                        // a screw point is drawn Ø0 x 0 : counted as the Ø4 x 15 screw it takes, as metole does
+                        // A screw point is drawn Ø0 x 0 : counted as the Ø4 x 15 screw it takes, as metole does
                         const dx = x.diameter === 0 ? 4 : x.diameter; 
                         const dy = y.diameter === 0 ? 4 : y.diameter;
                         const near = Math.hypot(x.u - y.u, x.v - y.v) < (dx + dy) / 2 + 1;
@@ -331,7 +331,7 @@ describe("the sketch templates", () =>
         });
         expect(labels.sort()).toEqual(["Fileur droit 65", "Fileur gauche 65"]);
         expect(filler(dresser())).toEqual([]);
-        // the outer reveal brought down to 0.5 mm leaves less than Blum's 0.9 to the fillers
+        // The outer reveal brought down to 0.5 mm leaves less than Blum's 0.9 to the fillers
         const tight = filler(setSettings(dresser(), { edgeReveal: 0.5 }));
         expect(tight).toHaveLength(4);
         expect(tight[0]).toContain("0.5 mm jusqu'au fileur côté charnières, 0.9 mm mini");
@@ -373,7 +373,7 @@ describe("the sketch templates", () =>
                 return h.label;
             });
         };
-        // both ends and the bottom : 2 + 2 + 3 dowels in a 370 side
+        // Both ends and the bottom : 2 + 2 + 3 dowels in a 370 side
         expect(labels("Tiroir 1, côté gauche").filter((l) =>
         {
             return l.startsWith("Tourillon");
@@ -383,9 +383,14 @@ describe("the sketch templates", () =>
         {
             return l.startsWith("Vis 4 x 30");
         })).toHaveLength(6);
+        // The Oslo pull is screwed from inside through its tab : nothing to bore through the box end any more
         expect(end.filter((l) =>
         {
             return l.startsWith("Passage de la vis M4");
+        })).toHaveLength(0);
+        expect(labels("Façade de tiroir 1").filter((l) =>
+        {
+            return l.startsWith("Poignée Oslo 84335807");
         })).toHaveLength(2);
     });
 
@@ -411,7 +416,7 @@ describe("the sketch templates", () =>
         {
             return [h.face, h.w, h.diameter];
         })).toEqual([["v0", 7.5, 10]]);
-        // shared upright : the plate drilled 7.5 from the face would stand 0.5 from the door edge
+        // Shared upright : the plate drilled 7.5 from the face would stand 0.5 from the door edge
         expect(holesOf("Placards et tiroirs", "Montant 1").map((h) =>
         {
             return h.v;
@@ -452,7 +457,7 @@ describe("the sketch templates", () =>
                 return r.quantity;
             });
         };
-        // hinge plates 85.5 and 543 up and 37 from the front, runner screws : mirror images, one of each
+        // Hinge plates 85.5 and 543 up and 37 from the front, runner screws : mirror images, one of each
         expect([count("Placards et tiroirs", "Joue gauche"), count("Placards et tiroirs", "Joue droite")])
             .toEqual([[1], [1]]);
         // plates on the system 32 line, which runs unsymmetric in a 716 high carcass : turned upside down the left
@@ -472,10 +477,10 @@ describe("the sketch templates", () =>
         {
             return q.id === `${base.id}/plinth/right`;
         })!;
-        // in the plane of the right side, from the wall to the back of the front plinth set 50 back : 400 - 50 - 19
+        // In the plane of the right side, from the wall to the back of the front plinth set 50 back : 400 - 50 - 19
         expect(ret.frame!.o[0]).toBe(2600 - 19);
         expect(ret.length).toBe(331);
-        // five feet a row, the front plinth clipped on the front five, the return on the two right ones
+        // Five feet a row, the front plinth clipped on the front five, the return on the two right ones
         expect(hardwareCount(tvWall).get("637.38.054")).toBe(5 + 2);
         const right = Math.max(...footPlaces(base).map((f) =>
         {
@@ -511,13 +516,13 @@ describe("the sketch templates", () =>
                 return q.id.startsWith(`${base.id}/end/right/post`);
             }).length;
         };
-        // nobody sits on it as it comes : no upright, nothing to check, the low board held by the back of the arc
+        // Nobody sits on it as it comes : no upright, nothing to check, the low board held by the back of the arc
         expect(posts()).toBe(0);
         expect(said()).toEqual([]);
         end.seat = true;
         expect(posts()).toBe(2);
         expect(said().join()).toContain("info | Meuble bas, bout arrondi droit : assise vérifiée");
-        // sat on again but hanging above the floor : the upright stands on a board hung off the side
+        // Sat on again but hanging above the floor : the upright stands on a board hung off the side
         end.seat = true;
         end.floor = false;
         expect(said().join()).toContain("n'atteint pas le sol");

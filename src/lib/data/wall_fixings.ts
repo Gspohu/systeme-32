@@ -14,7 +14,7 @@ export const PLASTERBOARD_LIMITS = {
 };
 
 
-// fischer GB datasheet (2014), allowed load of one plug with the fischre safety screw, safety factors included, in
+// Fischer GB datasheet (2014), allowed load of one plug with the fischre safety screw, safety factors included, in
 // the weakest aerated concrete PB2 / PP2 (G2) : GB 8 20 daN, GB 10 25, GB 14 40, spacing 150, 200 and 300 mm
 // https://medias.descours-cabaud.com/d180001/medias/docus/274/2014-GB_fiche%20technique.pdf
 export const AERATED_PLUG_LOADS = {

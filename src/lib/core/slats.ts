@@ -65,13 +65,13 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
     const { xs, gap } = slatLayout(it);
     const slatCount = xs.length;
     const base = { item: it.id, itemName: it.name, decor: it.decor };
-    // a melamine or veneered strip shows its two long raw edges, solid wood and lacquer need no band
+    // A melamine or veneered strip shows its two long raw edges, solid wood and lacquer need no band
     const kind = materialOfDecor(decorById(it.decor)).kind;
     const banded = decorById(it.decor).id !== "MDF_LAQUE" && (kind === "melamine" || kind === "mdf");
     const edges: ("v0" | "v1")[] = banded ? ["v0", "v1"] : [];
     const gapNote = `${slatCount} lattes, jour réel ${gap.toFixed(1).replace(".", ",")} mm (demandé ${it.gap})`;
     const plug = wallPlug(s);
-    // the metal plug of a plasterboard wall carry its own screw
+    // The metal plug of a plasterboard wall carry its own screw
     const plasterboard = plug === "PLUG_HOLLOW_METAL"; 
     const line = (ref: string, qty: number, note: string | null, purpose: Purpose): void =>
     {
@@ -133,7 +133,7 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
     }
 
 
-    // divider : slats doweled into a floor and a ceiling rail, seen from both sides
+    // Divider : slats doweled into a floor and a ceiling rail, seen from both sides
     const inner = it.height - 2 * RAIL_THICKNESS;
     const screws = railScrews(xs, it.slatWidth, gap);
     const rails = [
@@ -184,7 +184,7 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         b.parts.push(slat);
     }
     line("DOWEL_8x35", 2 * slatCount, "collés, une latte par paire", "dowel");
-    // the floor and the ceiling are read off the wall type, a timber reinforceemnt stands behind the wall board only
+    // The floor and the ceiling are read off the wall type, a timber reinforceemnt stands behind the wall board only
     const railPlug = wallPlug(s.wallType === "reinforced" ? { ...s, wallType: "plasterboard" } : s)!;
     line("WALL_SCREW_5x70", railPlug === "PLUG_HOLLOW_METAL" ? 0 : 2 * screws.length, "lisses au sol et au plafond",  
          "wall-fixing");   

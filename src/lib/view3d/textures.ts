@@ -5,7 +5,7 @@ import type { Decor } from "../data/materials";
 
 
 const SIZE = 512;
-// one texture tile covers this may millimetres of panel
+// One texture tile covers this may millimetres of panel
 export const TILE_MM = 600;
 
 const cache = new Map<string, THREE.Texture>();
@@ -65,7 +65,7 @@ export function decorTexture(d: Decor): THREE.Texture | null
     const rand = rng(hash(d.id));
     pen.fillStyle = rgb(d.rgb);
     pen.fillRect(0, 0, SIZE, SIZE);
-    // long streaks of lighter and darker fibre, wavy along x
+    // Long streaks of lighter and darker fibre, wavy along x
     let k = 0;
     while (k < 220)
     {
@@ -93,7 +93,7 @@ export function decorTexture(d: Decor): THREE.Texture | null
         pen.stroke();
         k++;
     }
-    // a few dark checks, the look of the Halifax sample
+    // A few dark checks, the look of the Halifax sample
     let n = 0;
     while (n < 3)
     {
@@ -113,7 +113,7 @@ export function decorTexture(d: Decor): THREE.Texture | null
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.colorSpace = THREE.SRGBColorSpace;
-    // extrude UVs are in millimetres of the sahpe, one tile every TILE_MM
+    // Extrude UVs are in millimetres of the sahpe, one tile every TILE_MM
     tex.repeat.set(1 / TILE_MM, 1 / TILE_MM);
     tex.anisotropy = 4;
     cache.set(d.id, tex);

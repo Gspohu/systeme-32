@@ -77,7 +77,7 @@ export async function loadLocal(id: string): Promise<{ project: Project; texture
 {
     const d = await db();
     const rec = await d.get("projects", id) as Stored | undefined;
-    // a record saved by an older version goes through the same checks and migrations as a file
+    // A record saved by an older version goes through the same checks and migrations as a file
     return rec === undefined ? null : { project: validateProject(rec.project), textures: new Map(rec.textures) };
 }
 

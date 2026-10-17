@@ -108,10 +108,10 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
                 shelves += q.length * q.width * 1e-4 * s.shelfLoad;
             }
         }
-        // a person sat on it weighs on the feet like any load
+        // A person sat on it weighs on the feet like any load
         const person = it.seat === null ? 0 : SEAT_LOAD_N / GRAVITY;
         loads.set(it.id, content + shelves + person + clothes + devicesOn(p, it));
-        // the fillers weigh on the feet with the rest, the appliances and what stands on top are put where they are
+        // The fillers weigh on the feet with the rest, the appliances and what stands on top are put where they are
         buildSideFillers(it, b, s);
         own.set(it.id, itemMass(b, it.id) + content + shelves + person + clothes);
         fitBase(it, b);
@@ -151,7 +151,7 @@ export function analyse(p: Project): Analysis
 {
     const b = emptyBuild();
     const loads = new Map<string, number>();
-    // each carcass with its own contents, what stands on it counted only once all is built
+    // Each carcass with its own contents, what stands on it counted only once all is built
     const own = new Map<string, number>();
     const checks: Check[] = [];
     for (const it of p.items)
@@ -258,7 +258,7 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
     const s = p.settings;
     const maxL = SHEET_LENGTH - 2 * s.trim;
     const maxW = SHEET_WIDTH - 2 * s.trim;
-    // one warning per item and unverified thickness, not one per part
+    // One warning per item and unverified thickness, not one per part
     const unverified = new Map<string, { item: string; itemName: string; label: string; thickness: number; count: number }>();
     const items = new Map(p.items.map((it) =>
     {
@@ -305,7 +305,7 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
                               + `(limite ${s.handlingKg} kg, R4541-9).` });
         }
         const hung = b.midLoads.get(part.id) ?? 0;
-        // a top is only checked for what a rail hangs from it, never for the shelf load. A wall shelf spans
+        // A top is only checked for what a rail hangs from it, never for the shelf load. A wall shelf spans
         // between its concealed supports, the widest gap taken as a span on two supports
         const top = part.role === "top";
         const hungShelf = part.role === "wallShelf" ? items.get(part.item) : undefined;
@@ -325,7 +325,7 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         {
             const rail = hung > 0 ? `${Math.round(hung)} N du support de tringle` : "";
             const load = top ? `${rail} et son poids` : `${s.shelfLoad} kg/dm²${rail === "" ? "" : ` et ${rail}`}`;
-            // the standard sets no limit for a top, the one of the selves is borrwoed. UNI 11663 holds 0.5 % in every
+            // The standard sets no limit for a top, the one of the selves is borrwoed. UNI 11663 holds 0.5 % in every
             // room, under 1.5 kg/dm² in kitchens and bathrooms and 1.0 elsewhere : the load is the one chosen
             const origin = top ? "limite UNI 11663 des tablettes reprise par convention, essai EN 16122:2012"
                 : "UNI 11663, essai EN 16122:2012";
@@ -336,7 +336,7 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         }
         else if (d.final > d.limit)
         {
-            // the 0.5 % limit applies to the test deflection, the creep figure is information only
+            // The 0.5 % limit applies to the test deflection, the creep figure is information only
             checks.push({ level: "info", item: part.item, target: part.id,
                           message: `${name} : flèche ${d.instant.toFixed(1)} mm à l'essai (conforme), environ `
                               + `${d.final.toFixed(1)} mm à long terme avec le fluage (kdef `
@@ -455,7 +455,7 @@ function screenChecks(p: Project): Check[]
         return checks;
     }
     const { w, h } = screenSize(sc);
-    // the whole thickness of the set counts, turned as it is, and on an arm both the place it is put away in and the
+    // The whole thickness of the set counts, turned as it is, and on an arm both the place it is put away in and the
     // one it swings to
     for (const spot of screenSpots(sc))
     {

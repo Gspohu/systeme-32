@@ -24,7 +24,7 @@ export function openPose(m: Motion): Pose
     }
     const q = new THREE.Quaternion().setFromAxisAngle(axis, m.amount * Math.PI / 180);
     const p = new THREE.Vector3(...m.pivot).multiplyScalar(MM);
-    // a turn about a line through p maps x to q (x - p) + p : the group stands at p - q p
+    // A turn about a line through p maps x to q (x - p) + p : the group stands at p - q p
     const at = p.clone().sub(p.clone().applyQuaternion(q));
     return { quaternion: [q.x, q.y, q.z, q.w], position: [at.x, at.y, at.z] };
 }

@@ -11,7 +11,7 @@ import { dresser, tvWall } from "./templates";
 import { PURPOSES, type Purpose } from "./part_types";
 import type { Carcass, Item, Project } from "./model";
 
-// a zero width space between every letter : no literal matches the text any more, digits and words read the same
+// A zero width space betwee every letter : no literal matches the text any more, digits and words read the same
 const ZWSP = String.fromCharCode(0x200b);
 
 
@@ -76,6 +76,10 @@ function fixture(): Project[]
     out.push(setFront(inset.p, inset.c.id, rootOf(inset.p), { type: "door", hinge: "right" }, { mount: "inset" }));
     const drawers = one("Commode de Molsheim", { depth: 500 });
     out.push(setFront(drawers.p, drawers.c.id, rootOf(drawers.p), { type: "drawers", count: 3, loadKg: 10 }));
+    const barred = one("Commode de Barr", { depth: 500 }); 
+    out.push(setFront(barred.p, barred.c.id, rootOf(barred.p), { type: "drawers", count: 2, loadKg: 10 }, 
+                      { handle: "bar" })); 
+
 
     const lit = one("Vitrine de Thann", {});
     out.push(setLight(lit.p, lit.c.id, rootOf(lit.p), { kind: "strip", spots: 0, setback: 40, kelvin: 3000,
@@ -105,7 +109,7 @@ function fixture(): Project[]
 }
 
 
-// an adjustable shelf at 400 rests its pins in the holes of the middle hinge plate
+// An adjustable shelf at 400 rests its pins in the holse of the middle hinge plate
 function embase(): Project
 {
     const b = one("Buffet de Rouffach", { width: 600, depth: 500 });
@@ -259,7 +263,7 @@ describe("hardware purposes", () =>
 });
 
 
-// two push doors either side of an upright : its adapter screws sit off the 32 series, by the door tops
+// Two push doors either side of an upright : its adapter screws sit off the 32 series, by the door tops
 function buffet(shelfAt: number): Project
 {
     let p = addItem(newProject("Kaysersberg"), newCarcass({ name: "Buffet de Hunawihr", width: 1000, height: 620,

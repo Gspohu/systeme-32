@@ -34,7 +34,7 @@
     const analysis = $derived(app.outputs.analysis);
     const sel = $derived(app.selection);
 
-    // the printed pictures as object urls, given back when the set chagnes
+    // The printed pictures as object urls, given back when the set chagnes
     const printUrls = $derived.by(() => 
     {
         const urls = new Map<string, string>();   
@@ -89,7 +89,7 @@
         }
         return list;
     });
-    // the stretch of wall that stands : a side wall meets the back wall on the right seen from the left wall, on the
+    // The stretch of wall that stands : a side wall meets the back wall on the right seen from the left wall, on the
     // left seen from the right one, and runs only as far as its return in an alcove
     const wallSpan = $derived.by((): [number, number] =>
     {
@@ -103,7 +103,7 @@
     const WALLS: [Wall, string][] = [["left", "Gauche"], ["back", "Fond"], ["right", "Droit"]];
 
 
-    // world extent of the composition, the view frames it with a margin
+    // World extent of the composition, the view frames it with a margin
     const extent = $derived.by(() =>
     {
         let x0 = 0;
@@ -135,7 +135,7 @@
         return `${cx - w / 2} ${-(cy + h / 2)} ${w} ${h}`;
     });
 
-    // millimetres of the world per screen pixel : handles kee a finger size at any zoom
+    // Millimetres of the world per screen pixel : handles kee a finger size at any zoom
     const mmPerPx = $derived.by(() =>
     {
         const w = (extent.x1 - extent.x0) / zoom;
@@ -185,7 +185,7 @@
 
     function fill(decor: string, colour: string | null = null): string
     {
-        // a colour left over from a former lacquered decor is ignored, like in the parts
+        // A colour left over from a former lacquered decor is ignored, like in the parts
         if (colour !== null && decor === "MDF_LAQUE")
         {
             return colour;
@@ -195,7 +195,7 @@
     }
 
 
-    // world points to an svg list, y pointing down
+    // World points to an svg list, y pointing down
     function svgPoints(pts: [number, number][]): string
     {
         return pts.map(([x, y]) => { return `${x},${-y}`; }).join(" ");
@@ -623,7 +623,7 @@
         height: 100%;
     }
 
-    /* a row of its own above the drawing : laid over it, it hid the labels of the top items */
+    /* A row of its own above the drawing : laid over it, it hid the labels of the top items */
     .facade-tools
     {
         display: flex;
@@ -663,7 +663,7 @@
     }
 
 
-    /* the side walls and the ceiling of the room, and items of the next walls seen edge on */
+    /* The side walls and the ceiling of the room, and items of the next walls seen edge on */
     .room
     {
         stroke: var(--colour-border-hover);
@@ -672,7 +672,7 @@
         pointer-events: none;
     }
 
-    /* an appliance is not made : the ghost's dashes, open so a door in front still shows */
+    /* An appliance is not made : the ghost's dashes, open so a door in front still shows */
     .device
     {
         fill: none;
@@ -697,7 +697,7 @@
         opacity: 0.6;
     }
 
-    /* a socket hole, dashed behind a front or inside a shelf seen edge on */
+    /* A socket hole, dashed behind a front or inside a shelf seen edge on */
     .outlet
     {
         fill: none;
@@ -730,7 +730,7 @@
     }
 
 
-    /* the gaps between slats show the wall, the zone itself stays clickable */
+    /* The gaps between slats show the wall, the zone itself stays clickable */
     .slat-zone
     {
         fill: transparent;
@@ -756,7 +756,7 @@
     }
 
 
-    /* a seat : its cushion, or a mark on a bare top, nothing may be set there */
+    /* A seat : its cushion, or a mark on a bare top, nothing may be set there */
     .cushion
     {
         fill: var(--colour-accent-muted);
@@ -773,7 +773,7 @@
     }
 
 
-    /* a clothes rail and its centre support, a LED profile under its panel */
+    /* A clothes rail and its centre support, a LED profile under its panel */
     .rail
     {
         fill: var(--colour-text-secondary);
@@ -795,7 +795,7 @@
     }
 
 
-    /* not .divider : the design system gives that class height 0, which wins over the svg height attribute */
+    /* Not .divider : the design system gives that class height 0, which wins over the svg height attribute */
     .split-panel
     {
         cursor: grab;
@@ -857,7 +857,7 @@
         pointer-events: none;
     }
 
-    /* swung out on its arm : the same colour, finer dots, it is a place it goes to, not where it lives */
+    /* Swung out on its arm : the same colour, finer dots, it is a place it goes to, not where it lives */
     .screen.out
     {
         stroke-width: 4;

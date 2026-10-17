@@ -7,10 +7,10 @@ import { roomBox } from "./room";
 import { PLASTERBOARD_LIMITS } from "../data/wall_fixings";
 
 const G = 9.81;
-// steps of the way out checked against the furniture, enough for a 764 wide set to never jump a 19 mm board
+// Steps of the way out checked against the furniture, enough for a 764 wide set to never jump a 19 mm board
 const PATH_STEPS = 40;
 
-// where the arm holds the screen : the centre of the set in the front view, its front plane at the centre and how
+// Where the arm holds the screen : the centre of the set in the front view, its front plane at the centre and how
 // far it is turned in degrees, positive to face the right of the room
 export interface ScreenSpot
 {
@@ -107,7 +107,7 @@ export function spotSpan(sc: Screen, spot: ScreenSpot): [number, number]
 }
 
 
-// separating axis test of a turned rectangle against a box square to the walls, in plan
+// Separating axis test of a turned rectangle against a box square to the walls, in plan
 function overlaps(corners: Pt[], box: { x0: number; z0: number; x1: number; z1: number }): boolean
 {
     const boxCorners: Pt[] = [[box.x0, box.z0], [box.x1, box.z0], [box.x1, box.z1], [box.x0, box.z1]];
@@ -125,7 +125,7 @@ function overlaps(corners: Pt[], box: { x0: number; z0: number; x1: number; z1: 
         };
         const [a0, a1] = project(corners);
         const [b0, b1] = project(boxCorners);
-        // half a millimetre of play : touching faces are not a clash
+        // Half a millimetre of play : touching faces are not a clash
         const slack = 0.5 * Math.hypot(ax, az);
         if (a1 <= b0 + slack || b1 <= a0 + slack)
         {
@@ -245,7 +245,7 @@ export function armChecks(p: Project): Check[]
     {
         checks.push({ level, item: null, target: null, message });
     };
-    // a new arm starts with its sheet at zero : nothing is checked against figures nobody has read yet
+    // A new arm starts with its sheet at zero : nothing is checked against figures nobody has read yet
     if (arm.maxKg <= 0 || arm.reachMax <= 0 || arm.vesa.length === 0)
     {
         say("info", "Bras mural : fiche à saisir (charge, VESA acceptés, déport mini et maxi) depuis la notice du "
@@ -277,7 +277,7 @@ export function armChecks(p: Project): Check[]
             + "Prendre un bras qui l'accepte ou une plaque d'adaptation.");
     }
     const { h, d } = screenSize(sc);
-    // a full motion arm turns about its plate : its reach is read as the distance from the plate centre to the back
+    // A full motion arm turns about its plate : its reach is read as the distance from the plate centre to the back
     // of the screen in plan, which the maker gives straight out from the wall
     // TODO a two link arm cannot fold to its minimum at an angle, only straight out : read the drawing of the notice
     for (const spot of screenSpots(sc))
@@ -295,7 +295,7 @@ export function armChecks(p: Project): Check[]
                 + `${arm.reachMax}. Rapprocher la platine ou prendre un bras plus long.`);
         }
     }
-    // the two ends are checked with the furniture, the way between them here : the first clash is enough to say
+    // The two ends are checked with the furniture, the way between them here : the first clash is enough to say
     const way = armPath(sc);
     for (let i = 1; i < way.length - 1; i++)
     {
@@ -320,7 +320,7 @@ export function armChecks(p: Project): Check[]
     if (p.settings.wallType === "plasterboard" && sc.massKg !== null)
     {
         const load = sc.massKg * G / 10;
-        // the weight hangs at the middle of the screen thickness, furthest out when the screen is swung
+        // The weight hangs at the middle of the screen thickness, furthest out when the screen is swung
         const lever = Math.max(...screenSpots(sc).map((s) =>
         {
             return Math.hypot(s.cx - arm.x, s.z - d / 2);

@@ -1,5 +1,5 @@
 import { addCarcass, cells, centreOf, check, checkLines, drop, errorCount, expect, expectToast, field, openBlank,
-    outputsTab, selectItem, setField, test, toClient, dragBetween } from "./helpers";
+    openTemplate, outputsTab, selectItem, setField, test, toClient, dragBetween } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // The front outline of the first carcass, world millimetres with y pointing down
@@ -77,7 +77,7 @@ test.describe("inspector", () =>
     {
         await check(page, "Dessus en pente").check();
         await setField(page, "Joue basse (mm)", "500");
-        // the roof line reaches the outer face 19 x 300 / 562 under the low side head : 489.86
+        // The roof line reaches the outer face 19 x 300 / 562 under the low side head : 489.86
         await expect(body(page)).toHaveAttribute("points", /^0,0 600,0 600,-800 581,-800 0,-489\.857\d*$/);
         await expect(page.locator(".inspector-body p.muted", { hasText: "de pente" })).toHaveText("28,1° de pente");
         await page.locator(".inspector-body .segmented-item", { hasText: "Bas à droite" }).click();
@@ -93,7 +93,7 @@ test.describe("inspector", () =>
         const before = await edges.count();
         const left = page.locator(".inspector-body .section-title", { hasText: "Côté gauche" });
         await left.locator("xpath=following-sibling::div[1]").getByRole("button", { name: "Arrondi" }).click();
-        // the orunded end is drawn left of the box, at negative x
+        // The orunded end is drawn left of the box, at negative x
         await expect(edges).toHaveCount(before + 1);
         await expect(edges.last()).toHaveAttribute("x", /^-\d/);
         expect(await errorCount(page)).toBe(0);
@@ -115,10 +115,10 @@ test.describe("inspector", () =>
         await page.locator(".inspector-body").getByRole("checkbox", { name: "Ouvert", exact: true }).check();
         await setField(page, "Tablettes", "3");
         expect(await errorCount(page)).toBe(0);
-        // the front view draws the open end board by board, no batten skin left over it
+        // The front view draws the open end board by board, no batten skin left over it
         await expect(page.locator(".end-board")).toHaveCount(5);
         await outputsTab(page, "Débit");
-        // one outline, two workpieces : the end panels meet the top and bottom joints from the other face of the
+        // One outline, two workpieces : the end panels meet the top and bottom joints from the other face of the
         // side, their connectors stand 32 off, the three shelves keep theirs
         const panels = page.locator(".tab-content tbody tr", { hasText: "Bout arrondi gauche, flasque basse" });
         await expect(panels.locator("td").nth(2)).toHaveText("2");
@@ -153,7 +153,7 @@ test.describe("inspector", () =>
         await cells(page).first().click();
         await page.getByRole("button", { name: "Zone parente" }).click();
         await field(page, "Façade").selectOption("door");
-        // the dor covers both cells : a click in the left one selects the whole zone
+        // The dor covers both cells : a click in the left one selects the whole zone
         await cells(page).first().click({ force: true });  
         await field(page, "Façade").selectOption("drawers");
         await expectToast(page, /cette zone en a une\. Retirer la façade qui couvre plusieurs cases/);
@@ -167,7 +167,7 @@ test.describe("inspector", () =>
         const original = await field(page, "Nom").inputValue();
         await page.getByRole("button", { name: "Dupliquer" }).click();
         await expect(page.locator(".facade .grip")).toHaveCount(2);
-        // the copy is the one selected, renaming it next leaves the original alone
+        // The copy is the one selected, renaming it next leaves the original alone
         await expect(field(page, "Nom")).toHaveValue(`${original} (copie)`);
         await page.getByRole("button", { name: "Supprimer" }).click();
         await expect(page.locator(".facade .grip")).toHaveCount(1);
@@ -189,7 +189,7 @@ test.describe("dividers", () =>
     {
         const shelf = page.locator(".facade .split-panel").first();
         await setField(page, "Position (mm)", "300");
-        // a typed position is kept to the mm, only a dragged shelf snaps on the grid
+        // A typed position is kept to the mm, only a dragged shelf snaps on the grid
         await expect(field(page, "Position (mm)")).toHaveValue("300");
         const y0 = Number(await shelf.getAttribute("y"));
         const from = await centreOf(shelf);
@@ -279,5 +279,21 @@ test.describe("dividers", () =>
         await page.locator(".inspector-body .btn-danger").first().click();
         await expect(page.locator(".facade .split-panel")).toHaveCount(0);
         await expect(cells(page)).toHaveCount(1);
+    });
+});
+
+
+test.describe("inspector on the dresser", () =>
+{
+    test("adds a shelf behind the single door of the right column", async ({ page }) =>
+    {
+        await openTemplate(page, "Vaisselier bibliothèque");
+        const shelves = page.locator(".facade .split-panel");
+        const before = await shelves.count();
+        // The door of the right column : 680 wide from x 2265, 2256 high on its 100 plinth
+        const door = await toClient(page, 65 + 2200 + 340, 100 + 2256 / 2);
+        await page.mouse.click(door.x, door.y);
+        await page.getByRole("button", { name: "+ Étagère" }).click();
+        await expect(shelves).toHaveCount(before + 1);
     });
 });

@@ -8,7 +8,7 @@ import { polygonArea, tessellate } from "./geometry";
 import type { Carcass, Item, Project, WallShelf } from "./model";
 import type { Part } from "./parts";
 
-// a bedroom in Mulhouse, 2500 under the ceiling : a wardrobe on a 100 plinth
+// A bedroom in Mulhouse, 2500 under the ceiling : a wardrobe on a 100 plinth
 function wardrobe(o: Partial<Carcass> = {}): Project
 {
     return addItem(newProject("chambre"), newCarcass({ name: "Armoire", width: 800, height: 2000, depth: 600, y: 100,
@@ -108,7 +108,7 @@ describe("desk tops", () =>
 
     it("rounds the front corners of the board and refuses impossible radii", () =>
     {
-        // a quarter of a 100 disc taken from its square corner
+        // A quarter of a 100 disc taken from its square corner
         const area = polygonArea(tessellate(shelfOutline(1200, 600, 0, 100), 1));
         expect(area).toBeCloseTo(1200 * 600 - (100 * 100 - Math.PI * 100 * 100 / 4), -1);
         const p = office(300);

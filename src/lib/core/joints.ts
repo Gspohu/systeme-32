@@ -55,18 +55,31 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
             }
             continue;
         }
-        // one connector on each 37 row, those between on the system 32 grid counted from the front one
+        // One connector on each 37 row, those between on the system 32 grid counted from the front one. The line
+        // is the face part's : a piece standing back starts its joint further in, its first connector goes to
+        // the next hole of that line
         const even = spread(len, s.connectorInset, 256);
-        const positions = !onGrid || s.grid <= 0 || even.length <= 2 ? even : [...new Set([even[0]!,
-            ...even.slice(1, -1).map((x) =>
+        const toLine = (x: number, up: boolean): number =>
         {
-            return s.connectorInset + Math.round((x - s.connectorInset) / s.grid) * s.grid;
-        }), even[even.length - 1]!])];
+            const k = (joint.from + x - s.connectorInset) / s.grid;
+            return s.connectorInset + (up ? Math.ceil(k - 1e-9) : Math.round(k)) * s.grid - joint.from;
+        };
+        let positions = even;
+        if (onGrid && s.grid > 0 && even.length > 0)
+        {
+            const inner = even.length <= 2 ? [] : even.slice(1, -1).map((x) =>
+            {
+                return toLine(x, false);
+            });
+            const moved = toLine(even[0]!, true);
+            const first = joint.from > 0 && moved <= len - s.connectorInset ? moved : even[0]!;
+            positions = [...new Set([first, ...inner, ...even.slice(1).slice(-1)])];
+        }
         let k = 0;
         while (k < positions.length)
         {
             const endConnector = s.joinery === "minifix" && (k === 0 || k === positions.length - 1);
-            // the first of pos, then a 32 grid step either side, where the connector meets no hole already drilled
+            // The first of pos, then a 32 grid step either side, where the connector meets no hole already drilled
             const free = (q: number): boolean =>
             {
                 const g = onFace(q);
@@ -78,7 +91,7 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                 }
                 return !meets(fpart, joint.face, g.u, g.v, 8, s.dowelFaceDepth);
             };
-            // a Minifix housing need 5 mm of board beside it, a short joint falls back on half steps
+            // A Minifix housing need 5 mm of board beside it, a short joint falls back on half steps
             const clear = endConnector ? MINIFIX.housingDiameter / 2 + 5 : JOINT_END_CLEAR;
             const within = (d: number): number | null =>
             {
@@ -90,7 +103,7 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                 return q !== null;
             };
             const grid = [0, 32, -32, 64, -64, 96, -96].map(within).filter(placed);
-            // half steps only when no place on the grid is free, a narrow piece like the upright of a seat
+            // Half steps only when no place on the grid is free, a narrow piece like the upright of a seat
             const half = [16, -16].map(within).filter(placed);
             const pos = grid.find(free) ?? half.find(free) ?? positions[k]!;
             if (!free(pos))

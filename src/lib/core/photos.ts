@@ -3,9 +3,9 @@
 import type { Project } from "./model";
 
 export const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
-// a photo taken of a whole door covers about this much, the user corrects it for a small sample
+// A photo taken of a whole door covers about this much, the user corrects it for a small sample
 export const PHOTO_DEFAULT_TILE = 600;
-// archiv names are made here, a loaded flie naming anything else is refused
+// Archiv names are made here, a loaded flie naming anything else is refused
 export const PHOTO_FILE_RE = /^[A-Za-z0-9_-]{1,64}\.(?:png|jpg|webp)$/;
 
 
@@ -92,7 +92,7 @@ export function usedPhotos(p: Project, all: Map<string, Uint8Array>): Map<string
     {
         return t.file;
     });
-    // ech picture printed on a back (papier peint collé) travel in the same folder
+    // Ech picture printed on a back (papier peint collé) travel in the same folder
     for (const it of p.items)
     {
         if (it.kind === "carcass")

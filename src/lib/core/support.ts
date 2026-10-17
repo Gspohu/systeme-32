@@ -19,7 +19,7 @@ export function touches(a: Solid, b: Solid): boolean
 }
 
 
-// the solid below carry the one above : its top meets that bottom over a real piece of floor plan
+// The solid below carry the one above : its top meets that bottom over a real piece of floor plan
 export function carries(below: Solid, above: Solid, level: number): boolean
 {
     return Math.abs(below.max[1] - level) <= CLASH_TOL && Math.abs(above.min[1] - level) <= CLASH_TOL
@@ -94,7 +94,7 @@ export function unsupported(project: Project, all: Solid[]): Unsupported[]
         {
             return Math.abs(s.min[1] - level) <= CLASH_TOL;
         });
-        // each bottom face must sit on the top of a sloid of another item, a mere brush of an edge does not hold
+        // Each bottom face must sit on the top of a sloid of another item, a mere brush of an edge does not hold
         const resting = bottoms.some((m) =>
         {
             return others.some((o) =>

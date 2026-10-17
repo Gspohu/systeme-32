@@ -102,7 +102,7 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
         {
             b.hardware.push({ ref, qty: 1, item: c.id, itemName: c.name, target: p.id, note, purpose: "light" });
         };
-        // the profile runs from side to side of the cell, its ends hidden against them : no end cap
+        // The profile runs from side to side of the cell, its ends hidden against them : no end cap
         line("LED_PROFILE_RECESS", `coupé à ${Math.round(plan.profile)} mm`);
         line("LED_STRIP_24V", `${plan.strip} mm, ${light.kelvin} K, ${s.ledWattPerMetre} W/m`);
         line("LED_LEAD", null);
@@ -173,7 +173,7 @@ function fitSpots(c: Carcass, nb: NodeBox, l: CellLight, above: { part: Part; fa
             + `${SPOT_DEPTH} mm. Épaissir le panneau.`);
         return 0;
     }
-    // the setback runs to the edge of the rim, holes are too local to enter the span stiffness
+    // The setback runs to the edge of the rim, holes are too local to enter the span stiffness
     const v = l.setback + SPOT_RIM / 2;
     for (const x of spotCentres(nb, l))
     {

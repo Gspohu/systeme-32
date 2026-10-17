@@ -5,7 +5,7 @@ export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell
 import type { PriceEntry } from "../data/prices";
 export type { PriceEntry } from "../data/prices"; 
 
-export const SCHEMA_VERSION = 10;  
+export const SCHEMA_VERSION = 11;  
 
 
 export type Id = string;
@@ -15,21 +15,21 @@ export type Joinery = "minifix" | "dowel" | "clamex";
 
 export interface Settings 
 {
-    // snapping pitch for dividers and fronts, 32 is the European obring system
+    // Snapping pitch for dividers and fronts, 32 is the European obring system
     grid: number;
     // gap between two neighbouring fronts
     frontGap: number;
-    // reveal left around the outer edge of an overlay front
+    // Reveal left around the outer edge of an overlay front
     edgeReveal: number;
-    // saw kerf and trimming of the raw sheet edges, for the nesting
+    // Saw kerf and trimming of the raw sheet edges, for the nesting
     kerf: number;
     trim: number;
-    // weight one person may carry (Code du travail R4541-9)
+    // Weight one person may carry (Code du travail R4541-9)
     handlingKg: number;
-    // shelf test load kg/dm2 (UNI 11663 via EN 16122:2012) : 1.0 for other use, 1.5 in a kitchen or bathroom
+    // Shelf test load kg/dm2 (UNI 11663 via EN 16122:2012) : 1.0 for other use, 1.5 in a kitchen or bathroom
     shelfLoad: number;
     joinery: Joinery;
-    // workshop conventions, not taken from a manufacturer document
+    // Workshop conventions, not taken from a manufacturer document
     connectorInset: number;
     dowelFaceDepth: number;
     dowelEdgeDepth: number;
@@ -39,17 +39,17 @@ export interface Settings
     hingeEdgeDistance: number;
     // hinge cup distance TB (Blum 3..7)
     hingeTb: number;
-    // what the anti-tip brackets are screwed into, it picks the wall plug
+    // What the anti-tip brackets are screwed into, it picks the wall plug
     wallType: WallType;
-    // the 24 V strip bought, its power and the pitch it may be cut at
+    // The 24 V strip bought, its power and the pitch it may be cut at
     ledWattPerMetre: number;
     ledCutPitch: number;
-    // power of one round spot
+    // Power of one round spot
     spotWatt: number;
-    // hours of the workshop and of fitting on site, typed by whoever quotes them : null until then
+    // Hours of the workshop and of fitting on site, typed by whoever quotes them : null until then
     makeHours: number | null;
     fitHours: number | null;
-    // the people of the title block (ISO 7200:2004 : creator, approval person, legal owner) and whom it is made for
+    // The people of the title block (ISO 7200:2004 : creator, approval person, legal owner) and whom it is made for
     creator: string;
     approver: string;
     owner: string; 
@@ -57,7 +57,7 @@ export interface Settings
     site: string;
 }
 
-// a reinforced partition has a timber cross piece fixed to its studs ebhind the board, the screws go into it
+// A reinforced partition has a timber cross piece fixed to its studs ebhind the board, the screws go into it
 export type WallType = "solid" | "aerated" | "plasterboard" | "reinforced";
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -102,13 +102,16 @@ export interface SplitNode
     id: Id;
     // "h" stacks children bottom to top with horizontal panels, "v" lays them left to right with uprights
     axis: "h" | "v";
-    // lower or left face of each divider, measured from the start of the node inner space
+    // Lower or left face of each divider, measured from the start of the node inner space
     cuts: number[];
     dividers: DividerKind[];
-    // own finish of each divider, null takes the carcass decor
+    // Own finish of each divider, null takes the carcass decor
     finishes: (Finish | null)[];
-    // own thickness of each shelf, null takes the shelf thickness of the carcass, an upright never has one
+    // Own thickness of each shelf, null takes the shelf thickness of the carcass, an upright never has one
     thicknesses: (number | null)[];
+    // How far each divider stands back from the front edge of the carcass in mm, null keeps it flush (an adjustable
+    // shelf then takes the setback of the settings)
+    setbacks: (number | null)[];
     children: LayoutNode[];
 }
 
@@ -130,6 +133,8 @@ export interface CellNode
 export type LayoutNode = SplitNode | CellNode;
 
 export type Opening = "handle" | "push";
+// "edge" sits astride the edge of the front and is screwed from behind, "bar" stands on two feet off its face
+export type HandleKind = "edge" | "bar";
 
 export interface DoorFront
 {
@@ -147,11 +152,11 @@ export interface DrawerFront
 {
     type: "drawers";
     count: number;
-    // relative heights of each front, bottom to top, equal when absent
+    // Relative heights of each front, bottom to top, equal when absent
     ratios?: number[];
-    // drawers fitted with a cutlery insert, bottom to top
+    // Drawers fitted with a cutlery insert, bottom to top
     cutlery?: boolean[];
-    // expectd load per drawer (kg), drives the runner and TIP-ON choice
+    // Expectd load per drawer (kg), drives the runner and TIP-ON choice
     loadKg: number;
     // MOVENTO series asked by the user, the lightest one carrying the load when absent
     runner?: "760H" | "766H";
@@ -181,7 +186,7 @@ export interface PanelFront
 {
     type: "panel";
     cutout: "none" | "arch" | "round";
-    // border of board kept around the opening
+    // Border of board kept around the opening
     margin: number;
 }
 
@@ -195,9 +200,10 @@ export interface Front
     node: Id;
     spec: FrontSpec;
     opening: Opening;
+    handle: HandleKind;
     mount: "overlay" | "inset";
     decor: string | null;
-    // lacquer colour when the decor is a free colour, with its RAL or NCS name
+    // Lacquer colour when the decor is a free colour, with its RAL or NCS name
     colour: string | null;
     colourName: string | null;
 }
@@ -207,17 +213,17 @@ export interface Lining
     id: Id;
     cell: Id;
     decor: string;
-    // lacquer colour of a lacquered MDF lining, else null
+    // Lacquer colour of a lacquered MDF lining, else null
     colour: string | null;
     thickness: number;
     faces: { back: boolean; left: boolean; right: boolean; top: boolean; bottom: boolean };
 }
 
 export type Base =
-    // a return closes a side under the carcass, in the plane of its side panel
+    // A return closes a side under the carcass, in the plane of its side panel
     | { type: "plinth"; height: number; setback: number; grills?: number; returns?: ("left" | "right")[] }
     | { type: "feet"; height: number }
-    // hung on a pair of Blum 48N0510 by default, or on Camar 807 base cabinet hangers for a heavier one
+    // Hung on a pair of Blum 48N0510 by default, or on Camar 807 base cabinet hangers for a heavier one
     | { type: "wall"; hanger?: "blum" | "camar" }
     | { type: "floor" };
 
@@ -240,14 +246,14 @@ export interface Battens
 }
 
 
-// a quarter round is open at the back between the side and its skin, `back` closes it like the carcass back
+// A quarter round is open at the back between the side and its skin, `back` closes it like the carcass back
 export type End =
     | { type: "square" }
     | { type: "rounded"; radius: number; sweep: 90 | 180; technique: CurveTechnique; flexThickness: 6 |
        9; battens: Battens; decor: string; back?: boolean;
-       // an open end has no skin : shaped shelves in the reach of the arc, evenly spread between the end panels
+       // An open end has no skin : shaped shelves in the reach of the arc, evenly spread between the end panels
        open?: boolean; shelves?: number; 
-       // the low end panel laid on the floor past the base. Sat on, an upright halfway roudn the arc carries it
+       // The low end panel laid on the floor past the base. Sat on, an upright halfway roudn the arc carries it
        floor?: boolean; seat?: boolean };  
 
 
@@ -276,18 +282,18 @@ export interface Carcass
     fronts: Front[];
     linings: Lining[];
     fixToWall: boolean;
-    // the top is sat on : nothing may stand on it and it must carry a person
+    // The top is sat on : nothing may stand on it and it must carry a person
     seat: Seat | null;
     // top following a roof slope : `height` is then the high side, `slope.height` the low one
     slope: Slope | null;
     rails: HangingRail[];
     lights: CellLight[];
-    // strip closing the gap from the top to the ceiling, in the plane of the fronts
+    // Strip closing the gap from the top to the ceiling, in the plane of the fronts
     ceilingFiller: boolean;
-    // strips closing the gap to a wall on either side, their width in mm, 0 for none
+    // Strips closing the gap to a wall on either side, their width in mm, 0 for none
     sideFillers?: { left: number; right: number };
     shoeRacks: ShoeRack[];
-    // cells drilled over their whole hieght on the 32 mm grid, for shelves moved later
+    // Cells drilled over their whole hieght on the 32 mm grid, for shelves moved later
     modularCells: Id[];
     outlets: Outlet[];
     // Häfele reference of the shelf supports the user chose, the first one carrying each shelf when absent
@@ -315,7 +321,7 @@ export interface RoundCorner
     id: Id;
     name: string;
     wall: Wall;
-    // centre of the arcs in the front view, and back plane of the part
+    // Centre of the arcs in the front view, and back plane of the part
     cx: number;
     cy: number;
     z: number;
@@ -345,7 +351,7 @@ export interface WallShelf
     // TODO no concealed bracket is sourced yet, the least thickness it needs is unknown
     thickness: number;
     decor: string;
-    // a desk top is checked for its height and the room left for the legs
+    // A desk top is checked for its height and the room left for the legs
     purpose: "shelf" | "desk";
     // radius of the two front corners, 0 for a square one
     corners: { left: number; right: number };
@@ -380,10 +386,10 @@ export interface SlatWall
     z: number;
     width: number;
     height: number;
-    // face seen from the room, and depth away from the wall or through the divider
+    // Face seen from the room, and depth away from the wall or through the divider
     slatWidth: number;
     slatDepth: number;
-    // wished gap, the real one spreads the slats over the whole width
+    // Wished gap, the real one spreads the slats over the whole width
     gap: number;
     decor: string;
 }
@@ -423,9 +429,9 @@ export interface Device
     height: number;
     depth: number;
     massKg: number;
-    // where the sizes and the mass come from, a maker's sheet or a measure, said on the drawings
+    // Where the sizes and the mass come from, a maker's sheet or a measure, said on the drawings
     source: string;
-    // what it is, for the 3D : a plain block when none is told
+    // What it is, for the 3D : a plain block when none is told
     look?: "amplifier";
 }
 
@@ -440,9 +446,9 @@ export interface Room
     width: number;
     depth: number;
     height: number;
-    // an alcove : each side wall stops that far from the back wall, the room opens out beyond
+    // An alcove : each side wall stops that far from the back wall, the room opens out beyond
     returns?: { left: number; right: number };
-    // what stands on the awlls before any furniture : bought nothing of, drwn and checked against
+    // What stands on the awlls before any furniture : bought nothing of, drwn and checked against
     obstacles: Obstacle[];  
 } 
 
@@ -461,7 +467,7 @@ export interface Obstacle
     width: number;
     height: number;
     depth: number;
-    // a radiator : the room its notice asks on every side, null until it is read
+    // A radiator : the room its notice asks on every side, null until it is read
     clearance: number | null;  
 }
 
@@ -470,15 +476,15 @@ export interface Screen
     diagonalInch: number;
     aspectW: number;
     aspectH: number;
-    // centre of the screen in the front view, and its front plane : where it stands, or is put away on its arm
+    // Centre of the screen in the front view, and its front plane : where it stands, or is put away on its arm
     cx: number;
     bottom: number;
     z: number;
     wallMounted: boolean;
-    // the set as measured, its bezel and thickness included : null leaves the panel worked out from the diagonal
+    // The set as measured, its bezel and thickness included : null leaves the panel worked out from the diagonal
     frame: { w: number; h: number; d: number } | null;
     massKg: number | null;
-    // hole spacing of its back, width then height in mm
+    // Hole spacing of its back, width then height in mm
     vesa: [number, number] | null;
     source: string;
     arm: ScreenArm | null;
@@ -490,15 +496,15 @@ export interface ScreenArm
     model: string;
     maxKg: number;
     vesa: [number, number][];
-    // distance from the wall to the back of the screen, folded flat then stretched out
+    // Distance from the wall to the back of the screen, folded flat then stretched out
     reachMin: number;
     reachMax: number;
     plateW: number;
     plateH: number;
-    // centre of the plate on the back wall
+    // Centre of the plate on the back wall
     x: number;
     y: number;
-    // the screen swung out to be watched : its centre in the front view, its front plane and how far it is turned
+    // The screen swung out to be watched : its centre in the front view, its front plane and how far it is turned
     // in degrees, positive to face the right of the room. Null when only stored
     out: { cx: number; z: number; yaw?: number } | null;
     source: string;
@@ -516,10 +522,10 @@ export interface Project
     items: Item[];
     screen: Screen | null;
     prices: Record<string, PriceEntry>;
-    // user images packed in the archive, keyed by decor id
+    // User images packed in the archive, keyed by decor id
     textures: Record<string, UserTexture>;
     room: Room;
-    // the issues of the drawings, oldest first : their index A, B, C... without I and O (ISO 7200:2004 5.1.4)
+    // The issues of the drawings, oldest first : their index A, B, C... without I and O (ISO 7200:2004 5.1.4)
     // dated and explained
     revisions: Revision[]; 
 }
@@ -530,11 +536,11 @@ export interface Revision
     index: string;
     date: string;
     reason: string;
-    // the content print at issue, the title block tells an issued set from one changed since
+    // The content print at issue, the title block tells an issued set from one changed since
     content: string;
 }
 
-// a room of 4 x 4 m under a 2.50 m ceiling until the real one is measured (convention)
+// A room of 4 x 4 m under a 2.50 m ceiling until the real one is measured (convention)
 export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500, obstacles: [] };
 
 

@@ -24,7 +24,7 @@ function wordsOf(texts: Text[]): string[]
 }
 
 
-// the box a fiure need on the sheet, a vertical one turned a quarter
+// The box a fiure need on the sheet, a vertical one turned a quarter
 function extent(t: Text): [number, number, number, number]
 {
     const w = textWidth(t.t, t.size);
@@ -53,7 +53,7 @@ function overlapping(texts: Text[]): string[]
 
 describe("chains of dimensions", () =>
 {
-    // the right of the TV compositon at 1:20 : 600 of low unit, 19, 31 and 14 up to the column, 286 to the screen
+    // The right of the TV compositon at 1:20 : 600 of low unit, 19, 31 and 14 up to the column, 286 to the screen
     for (const dir of ["v", "h"] as const)
     {
         it(`never prints a figure over another, ${dir === "v" ? "standing" : "lying"}`, () =>

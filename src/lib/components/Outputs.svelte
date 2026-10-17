@@ -23,14 +23,14 @@
 
     const TABS = ["Plans", "Montage", "Débit", "Quincaillerie", "Calepinage", "PBS", "Chiffrage", "Réglages"];
     let tab = $state(0);
-    // the open tab by its name : a tab added in the row moves no other one
+    // The open tab by its name : a tab added in the row moves no other one
     const current = $derived(TABS[tab]);
     let zoomed = $state<number | null>(null);
 
 
     const project = $derived(app.project);
     const out = $derived(app.outputs);
-    // the drawing set is only bilt while one of its tabs is open
+    // The drawing set is only bilt while one of its tabs is open
     const pages = $derived(current === "Plans" || current === "Calepinage" ? drawingSet(project, out) : []);
     const sequences = $derived(current === "Montage" ? assemblySequences(project, out.analysis, out.bom) : []);
     const nestPages = $derived.by(() =>
@@ -60,7 +60,7 @@
         return { onSheets, offSheet };
     });
     const base = $derived(slug(project.name) || "projet");
-    // the content print runs over the whole project : only while the settings are open
+    // The content print runs over the whole project : only while the settings are open
     const issue = $derived(current === "Réglages" ? issueState(project) : { status: "" });
     let reason = $state("");
 
@@ -92,7 +92,7 @@
     }
 
 
-    // a new arm : its plate behind the screen, its sheet at zero until the notice is read
+    // A new arm : its plate behind the screen, its sheet at zero until the notice is read
     function arm(p: Partial<ScreenArm> | null): void
     {
         const sc = project.screen;
@@ -318,7 +318,7 @@
                                         {
                                             const v = str(e);
                                             const today = new Date().toISOString().slice(0, 10);
-                                            // a roll or a box keeps its size, a board its other sizes, when the price is
+                                            // A roll or a box keeps its size, a board its other sizes, when the price is
                                             // typed again
                                             app.apply(setPrice, l.key, v === "" ? null : { value: Number(v),
                                                 unit: l.unit,
@@ -705,14 +705,14 @@
     }
 
 
-    /* the design sytem table never wraps : the long psots would push the total off the screen */
+    /* The design sytem table never wraps : the long psots would push the total off the screen */
     .cost-table td:first-child
     {
         white-space: normal;
     }
 
 
-    /* under the tablet breakpoint each line becomes a card, its post as a title and every value labelled */  
+    /* Under the tablet breakpoint each line becomes a card, its post as a title and every value labelled */  
     @media (max-width: 1100px)
     {
         .cost-table thead
@@ -720,7 +720,7 @@
             display: none;
         }
 
-        /* a table keeps its own width even in cards : held to the screen, the text wraps */ 
+        /* A table keeps its own width even in cards : held to the screen, the text wraps */ 
         .cost-table,
         .cost-table tbody
         {

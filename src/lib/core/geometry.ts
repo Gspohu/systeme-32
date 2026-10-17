@@ -97,7 +97,7 @@ export function tessellate(o: Outline, stepDeg = 6): [number, number][]
                 pts.push([s.cx + r * Math.cos(a), s.cy + r * Math.sin(a)]);
                 i++;
             }
-            // keep the exact end point
+            // Keep the exact end point
             pts[pts.length - 1] = [s.x, s.y];
         }
         px = s.x;
@@ -141,7 +141,7 @@ export function insidePolygon(poly: [number, number][], x: number, y: number, to
         j = i;
         i++;
     }
-    // most points fall outside : the distances to the edges are only worth it for the others
+    // Most points fall outside : the distances to the edges are only worth it for the others
     if (!inside || tol <= 0)
     {
         return inside;

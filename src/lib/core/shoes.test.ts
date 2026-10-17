@@ -6,7 +6,7 @@ import { validateProject } from "./io/project_file";
 import { DIAM } from "./text";
 import type { Carcass, Project } from "./model";
 
-// an entrance in Saverne : a low carcass for shoes, 800 high
+// An entrance in Saverne : a low carcass for shoes, 800 high
 function entrance(width: number, levels: number): Project
 {
     const p = addItem(newProject("entrée"), newCarcass({ name: "Meuble à chaussures", width, height: 800, depth: 400 }));

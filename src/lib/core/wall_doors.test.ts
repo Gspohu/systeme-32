@@ -5,7 +5,7 @@ import { analyse } from "./analysis";
 import type { Carcass, Project } from "./model";
 
 
-// a column of Colmar against the left wall of its room, or that far rfom it
+// A column of Colmar against the left wall of its room, or that far rfom it
 function column(x: number, door: { type: "door"; hinge: "left" | "right" } | { type: "doubleDoor" }): Project
 {
     let p = addItem(newProject("Colmar"), newCarcass({ name: "Colonne de Colmar", width: 600, height: 1800,
@@ -44,7 +44,7 @@ describe("doors hinged against a wall", () =>
         const p = column(0, { type: "door", hinge: "right" });
         const door = analyse(p).build.fronts.get(p.items[0]!.id)![0]!;
         expect(door.hingeOverlay).toBeCloseTo(17.5);
-        // aaginst the wall the edge still hold the usual reveal from the outer face of the side
+        // Aaginst the wall the edge still hold the usual reveal from the outer face of the side
         expect(door.rect.x).toBeCloseTo(1.5);
     });
 

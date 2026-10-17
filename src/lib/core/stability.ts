@@ -21,15 +21,15 @@ export interface Stability
 {
     items: string[];
     name: string;
-    // hung on the wall or fixed to it : what follows tells what the fixing saves it from
+    // Hung on the wall or fixed to it : what follows tells what the fixing saves it from
     held: boolean;
     massKg: number;
     // centre of mass in room millimetres
     centre: [number, number, number];
     stands: boolean;
-    // how far the centre lies inside its supports, negative outside, and towards which side it is nearest the edge
+    // How far the centre lies inside its supports, negative outside, and towards which side it is nearest the edge
     margin: number;
-    // floor tilt that makes it fall, degrees, and towards which side
+    // Floor tilt that makes it fall, degrees, and towards which side
     tiltDeg: number;
     towards: string;
     // carpet test, null without drawers
@@ -108,7 +108,7 @@ function bodies(project: Project, all: Solid[]): Item[][]
         {
             const a = all[i]!;
             const b = all[j]!;
-            // a round corner joins what it touches, a box joins what it stands on
+            // A round corner joins what it touches, a box joins what it stands on
             if (a.item !== b.item && touches(a, b)
                 && (carries(a, b, b.min[1]) || carries(b, a, a.min[1]) || corner.has(a.item) || corner.has(b.item)))
             {
@@ -192,7 +192,7 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
             continue;
         }
         const centre: [number, number, number] = [c[0] / massKg, c[1] / massKg, c[2] / massKg];
-        // what touches the floor : round foot plates, else the floor face of the parts lying on it
+        // What touches the floor : round foot plates, else the floor face of the parts lying on it
         const contact: [number, number][] = [];
         for (const s of all)
         {
@@ -227,12 +227,12 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
             const q = toWall(first.wall, project.room, [d[0], 0, d[1]]);
             return [q[0] - o[0], 0, q[2] - o[2]];
         };
-        // a body backed against its wall cannot fall backwards : the wall stop it
+        // A body backed against its wall cannot fall backwards : the wall stop it
         const backed = body.some((it) =>
         {
             return it.kind === "carcass" && it.z <= CLASH_TOL;
         });
-        // signed distance to each edge, the ring running counter clockwise : positive inside
+        // Signed distance to each edge, the ring running counter clockwise : positive inside
         let margin = Infinity;
         let open = Infinity;
         let towards = "";
@@ -277,7 +277,7 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
                 {
                     continue;
                 }
-                // the load stands at the top of the carcass, the highest a drawer edge can be
+                // The load stands at the top of the carcass, the highest a drawer edge can be
                 // TODO ASTM loads each drawer in turn at its own heigth, the top is the worst case taken for all
                 const zL = it.z + it.depth + topDrawerExtension(it);
                 const yL = it.y + it.height;

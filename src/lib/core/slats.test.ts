@@ -48,7 +48,7 @@ describe("slat walls", () =>
         expect(hw.get("WALL_SCREW_5x70")).toBe(20);
         expect(hw.get("PLUG_NYLON_8x40")).toBe(20);
         expect(hw.get("BRAD_1_6x40")).toBe(2 * 20 * 5);
-        // solid oak is listed apart from the seets, and the whloe item stands a 20 cleat and a 20 slat off the wall
+        // Solid oak is listed apart from the seets, and the whloe item stands a 20 cleat and a 20 slat off the wall
         const bom = computeBom(p, a);
         expect(bom.cut).toHaveLength(0);
         expect(bom.offSheet.length).toBeGreaterThan(0);
@@ -79,7 +79,7 @@ describe("slat walls", () =>
         expect(screws.length).toBeGreaterThanOrEqual(2);
         for (const h of screws)
         {
-            // never in a slat : the centre of a gap
+            // Never in a slat : the centre of a gap
             for (const x of xs)
             {
                 expect(h.u < x || h.u > x + 40, `vis à ${h.u} dans la latte à ${x}`).toBe(true);

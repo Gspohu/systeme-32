@@ -16,7 +16,7 @@ function modular(): { p: Project; c: Carcass }
 }
 
 
-// pin holes only : each Minifix bolt need a 5 mm pilot hole on the same rows, top and bottom
+// Pin holes only : each Minifix bolt need a 5 mm pilot hole on the same rows, top and bottom
 function seriesOn(p: Project, c: Carcass, side: "L" | "R")
 {
     return analyse(p).build.parts.find((q) =>

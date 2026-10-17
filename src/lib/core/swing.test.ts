@@ -29,7 +29,7 @@ describe("fronts swept through their opening", () =>
                     half: [10, 10, 10] as [number, number, number] };
         expect(boxesClash(a, { ...a, centre: [20, 0, 0] })).toBe(false);
         expect(boxesClash(a, { ...a, centre: [15, 0, 0] })).toBe(true);
-        // turned 45 deg about y, its corner reaches 14.1 from its centre
+        // Turned 45 deg about y, its corner reaches 14.1 from its centre
         const door: Motion = { item: "k", front: "f", label: "Porte", kind: "turn", pivot: [0, 0, 0], axis: Y,
                                amount: 45, parts: [], fitted: [], rides: [], source: "", remedy: "" };
         expect(boxesClash(carried(a, door, 1), { ...a, centre: [23, 0, 0] })).toBe(true);
@@ -39,7 +39,7 @@ describe("fronts swept through their opening", () =>
 
     it("lets a door open square past a deeper column, then stops it there short of its 110 deg", () =>
     {
-        // a 400 deep cupboard in Riquewihr hinged on its left against a 600 deep column : the panel stays right
+        // A 400 deep cupboard in Riquewihr hinged on its left against a 600 deep column : the panel stays right
         // of its hinge line up to 90 deg and only then meets the side of the column
         const column = newCarcass({ name: "Colonne", width: 600, height: 800, depth: 600, x: 0 });
         const box = newCarcass({ name: "Placard", width: 600, height: 800, depth: 400, x: 600 });
@@ -57,7 +57,7 @@ describe("fronts swept through their opening", () =>
 
     it("refuses a door that meets a carcass standing in front of it before it opens square", () =>
     {
-        // an island 300 in front of the cupboard : the free edge of the 597 door reaches it near 30 deg
+        // An island 300 in front of the cupboard : the free edge of the 597 door reaches it near 30 deg
         const box = newCarcass({ name: "Placard", width: 600, height: 800, depth: 400, x: 600 });
         const island = newCarcass({ name: "Îlot", width: 600, height: 800, depth: 400, x: 600, z: 700 });
         let p = addItem(addItem(newProject("Riquewihr"), box), island);
@@ -78,13 +78,13 @@ describe("fronts swept through their opening", () =>
         const base = p.items[0] as Carcass;
         const door = base.fronts.at(-1)!;
         expect(opening(p)).toEqual([]);
-        // the hinges of the parents' save, on the left : the door swings over the drawers pulled out
+        // The hinges of the parents' save, on the left : the door swings over the drawers pulled out
         const before = setFront(p, base.id, door.node, { type: "door", hinge: "left" }, { opening: "push" });
         const said = opening(before);
         expect(said).toHaveLength(2);
         for (const s of said)
         {
-            // drawers numbered top row first : the right hand column holds 2 and 4
+            // Drawers numbered top row first : the right hand column holds 2 and 4
             const pair = /^warning \| Meuble bas, tiroir [24] et meuble bas, porte \d se heurtent/;
             expect(s).toMatch(pair);
         }

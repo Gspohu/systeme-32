@@ -12,7 +12,7 @@ export const OBSTACLE_LABELS: Record<ObstacleKind, string> = {
 };
 
 
-// starting values, the radiator and the skirting measuerd at the entrance in Colmar : edited to the real ones
+// Starting values, the radiator and the skirting measuerd at the entrance in Colmar : edited to the real ones
 export const OBSTACLE_DEFAULTS: Record<ObstacleKind, Omit<Obstacle, "id" | "name" | "kind" | "wall">> = {
     radiator: { x: 0, y: 150, width: 500, height: 600, depth: 120, clearance: null },
     box: { x: 0, y: 1350, width: 120, height: 180, depth: 40, clearance: null },
@@ -20,7 +20,7 @@ export const OBSTACLE_DEFAULTS: Record<ObstacleKind, Omit<Obstacle, "id" | "name
 };
 
 
-// in the frame of its wall : x along it, y up from the floor, z out of the wall
+// In the frame of its wall : x along it, y up from the floor, z out of the wall
 export function obstacleBox(o: Obstacle): Box3
 {
     return { min: [o.x, o.y, 0], max: [o.x + o.width, o.y + o.height, o.depth] };
@@ -103,7 +103,7 @@ export function obstacleChecks(p: Project, b: Build): Check[]
                     + "des joues." });
                 continue;
             }
-            // a box let in through a cut-out of the back meets nothing : the volume of a cut board leaves its hole out
+            // A box let in through a cut-out of the back meets nothing : the volume of a cut board leaves its hole out
             const labels = [...new Set(hit.map((s) =>
             {
                 return s.label;

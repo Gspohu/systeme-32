@@ -6,7 +6,7 @@ import type { Check } from "./check";
 import { MATERIALS, SOLID_STOCK } from "../data/materials";
 
 
-// the saw kerf and the trimming of the workshop settings, the ones the nesting of the sheets reads
+// The saw kerf and the trimming of the workshop settings, the ones the nesting of the sheets reads
 export type Cut = Pick<Settings, "kerf" | "trim">;
 
 export interface Stock
@@ -28,7 +28,7 @@ export function stockOf(decor: string, thickness: number): Stock | null
 }
 
 
-// the longest piece one board gives in one lenght, both ends squared
+// The longest piece one board gives in one lenght, both ends squared
 export function usableLength(s: Stock, cut: Cut): number
 {
     return s.length - 2 * cut.trim;
@@ -69,7 +69,7 @@ export function boardsFor(pieces: Piece[], s: Stock, cut: Cut): { boards: number
     for (const [w, lengths] of byWidth)
     {
         const perBoard = Math.floor((s.width + cut.kerf) / (w + cut.kerf));
-        // what is left on each strip already started
+        // What is left on each strip already started
         const strips: number[] = [];
         for (const l of [...lengths].sort((a, b) =>  
         {
@@ -95,7 +95,7 @@ export function boardsFor(pieces: Piece[], s: Stock, cut: Cut): { boards: number
 }
 
 
-// a solid part no board on sale gives in one lenght : said before nayone goes buying
+// A solid part no board on sale gives in one lenght : said before nayone goes buying
 export function stockChecks(b: Build, cut: Cut): Check[]
 {
     const checks: Check[] = [];

@@ -52,7 +52,7 @@ export function itemExtent(it: Item): Extent
             x0: it.x - Math.max(endReach(it, "left"), sideFiller(it, "left")),
             y0: it.y - baseHeight(it),
             x1: it.x + it.width + Math.max(endReach(it, "right"), sideFiller(it, "right")),
-            // a cushin on a seat need room above the top
+            // A cushin on a seat need room above the top
             y1: it.y + it.height + (it.seat === null ? 0 : it.seat.cushion),
         };
     }
@@ -69,7 +69,7 @@ export function itemExtent(it: Item): Extent
     }
     if (it.kind === "ladder")
     {
-        // the rail only : the ladder hangs in front of the shelves and its foot depends on its slope
+        // The rail only : the ladder hangs in front of the shelves and its foot depends on its slope
         return { x0: it.x, y0: it.y - it.railDiameter / 2, x1: it.x + it.width, y1: it.y + it.railDiameter / 2 };
     }
     return { x0: it.x, y0: it.y, x1: it.x + it.width, y1: it.y + it.height };

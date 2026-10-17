@@ -93,7 +93,7 @@ export function cornerChecks(p: Project, b: Build): Check[]
                           message: `${it.name} sort de la pièce (${r.width} x ${r.depth} x ${r.height} mm). Mesurer la `
                               + "pièce dans Réglages ou déplacer le meuble." });
         }
-        // on a side wall of an alcove, past its return there is no wall left to fix to
+        // On a side wall of an alcove, past its return there is no wall left to fix to
         else if (it.wall !== "back" && box.max[2] > sideWallDepth(r, it.wall) + 0.5)
         {
             checks.push({ level: "warning", item: it.id, target: null,
@@ -128,7 +128,7 @@ export function cornerChecks(p: Project, b: Build): Check[]
                     continue;
                 }
                 covered = true;
-                // shortest move along the wall that clears it, a filler of that width
+                // Shortest move along the wall that clears it, a filler of that width
                 const shift = Math.min(blocker.box.max[0] - slab.min[0], slab.max[0] - blocker.box.min[0]);
                 checks.push({ level: "error", item: c.id, target: fp.front,
                               message: `${label} traverse ${blocker.name} (${WALL_LABELS[wall].toLowerCase()}). Décaler l'un `
@@ -142,7 +142,7 @@ export function cornerChecks(p: Project, b: Build): Check[]
             if (fp.role === "door" && fp.hinge !== null)
             {
                 const hx = fp.hinge === "left" ? slab.min[0] : slab.max[0];
-                // square to the carcass the door stands on its hinge line, its thickness on the hinge side
+                // Square to the carcass the door stands on its hinge line, its thickness on the hinge side
                 const t = fp.thickness;
                 const edge: Box3 = {
                     min: [fp.hinge === "left" ? hx - t : hx, slab.min[1], z0],
@@ -162,7 +162,7 @@ export function cornerChecks(p: Project, b: Build): Check[]
                 const gap = fp.hingeKind === "full" ? wallGap(c, r, fp.hinge) : null;
                 if (gap !== null)
                 {
-                    // the front cornr of the hinge edge comes nearest to the wall early in the opening
+                    // The front cornr of the hinge edge comes nearest to the wall early in the opening
                     const clear = gap + c.thickness - doorSweep(fp.hingeOverlay, fp.thickness).reach;
                     if (clear < HINGE_SIDE_ADJUST) 
                     { 
@@ -177,7 +177,7 @@ export function cornerChecks(p: Project, b: Build): Check[]
             }
             else if (fp.role === "drawer")
             {
-                // a full extension runner brings the drawer out by about the depth of the carcass
+                // A full extension runner brings the drawer out by about the depth of the carcass
                 const pull: Box3 = { min: [slab.min[0], slab.min[1], z0], max: [slab.max[0], slab.max[1],
                     z0 + c.depth] };
                 const hit = others.find((o) =>

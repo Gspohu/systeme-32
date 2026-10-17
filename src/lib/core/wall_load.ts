@@ -6,7 +6,7 @@ import { GRAVITY } from "../data/rules";
 import { AERATED_PLUG_LOADS, PLASTERBOARD_LIMITS } from "../data/wall_fixings";
 
 
-// the plug the wall material takes, none when the screw goes into the timber reinforcement of a partitino
+// The plug the wall material takes, none when the screw goes into the timber reinforcement of a partitino
 export function wallPlug(s: Settings): string | null
 {
     if (s.wallType === "plasterboard")
@@ -54,7 +54,7 @@ export function hangerWallChecks(c: Carcass, totalKg: number, s: Settings): { le
     }
     if (s.wallType === "aerated")
     {
-        // the weakest class unless the wall is known better : the plug count each hanger plate needs
+        // The weakest class unless the wall is known better : the plug count each hanger plate needs
         const best = AERATED_PLUG_LOADS.plugs[AERATED_PLUG_LOADS.plugs.length - 1]!;
         const n = Math.ceil(daN / best.weakest);
         out.push({ level: n > 1 ? "warning" : "info", message: `${c.name} : ${each} dans du béton cellulaire, une `

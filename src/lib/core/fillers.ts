@@ -10,7 +10,7 @@ import { CLEAT_WIDTH } from "./ceiling";
 import { buttedLengths, type Cut } from "./solid_stock";
 
 
-// workshop conventions : a strip closes 150 mm at most, past that a carcass or a shelf. A cleat screwed every 400
+// Workshop conventions : a strip closes 150 mm at most, past that a carcass or a shelf. A cleat screwed every 400
 const FILLER_MAX = 150;
 const CLEAT_SCREW_PITCH = 400;
 
@@ -40,7 +40,7 @@ export function buildSideFillers(c: Carcass, b: Build, cut: Cut): void
             continue;
         }
         const left = side === "left";
-        // standing in the plane of the fronts, u up, v across : the edge against the wall is scribed, never banded
+        // Standing in the plane of the fronts, u up, v across : the edge against the wall is scribed, never banded
         const strip = newPart({
             item: c.id, itemName: c.name, thickness: t, decor: front?.decor ?? c.decor, colour: front?.colour ?? null,
             id: `${c.id}/side-filler/${side}`, label: `Fileur ${where}`, role: "filler", length: c.height, width: w,
@@ -55,7 +55,7 @@ export function buildSideFillers(c: Carcass, b: Build, cut: Cut): void
         }
         else
         {
-            // solid wood against the outer face of the sied, behind the strip, glued to it, in lengths butted end
+            // Solid wood against the outer face of the sied, behind the strip, glued to it, in lengths butted end
             // to end when no board on sale gives it whole
             const lengths = buttedLengths(c.height, "CHENE_MASSIF", CLEAT_THICKNESS, cut);
             const many = lengths.length > 1;
@@ -80,7 +80,7 @@ export function buildSideFillers(c: Carcass, b: Build, cut: Cut): void
                              itemName: c.name, target: null, note: `tasseau du fileur ${where} sur la joue`,
                              purpose: "cleat-screw" });
         }
-        // the plinth carried on under the strip, a length cut from the same board
+        // The plinth carried on under the strip, a length cut from the same board
         if (c.base.type === "plinth")
         {
             const y0 = c.y - c.base.height + PLINTH_FOOT_GAP;

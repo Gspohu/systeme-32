@@ -1,7 +1,7 @@
 import { addCarcass, expect, openBlank, test } from "./helpers";
 import type { Locator, Page } from "@playwright/test";
 
-// dargs the middle of a handle by dx, dy and lets it go
+// Dargs the midlde of a handle by dx, dy and lets it go
 async function pull(page: Page, handle: Locator, dx: number, dy: number): Promise<void>
 {
     const b = (await handle.boundingBox())!;
@@ -72,7 +72,7 @@ test.describe("pane sizes", () =>
         {
             return Math.round(await width(palette) - before);
         }).toBe(16);
-        // pulled far past its least width, it stops there
+        // Pulled far past its least width, it stops there
         await pull(page, handle, -500, 0);
         expect(await width(palette)).toBe(96);
     });

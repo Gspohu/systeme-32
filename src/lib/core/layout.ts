@@ -43,6 +43,7 @@ export interface DividerBox extends Rect
     axis: "h" | "v";
     kind: DividerKind;
     finish: Finish | null;
+    setback: number | null;
 }
 
 
@@ -85,6 +86,18 @@ export function dividerThickness(c: Carcass, axis: "h" | "v", own: number | null
         return c.thickness;
     }
     return own ?? c.shelfThickness ?? c.thickness;
+}
+
+
+// The setback a divider is built with : its own, else flush, else the settings one for a shelf on pins
+export function frontSetback(d: { axis: "h" | "v"; kind: DividerKind; setback: number | null },
+    shelfFrontSetback: number): number
+{
+    if (d.setback !== null)
+    {
+        return d.setback;
+    }
+    return d.axis === "h" && d.kind === "adjustable" ? shelfFrontSetback : 0;
 }
 
 
@@ -193,12 +206,13 @@ function childSpans(node: SplitNode, r: Rect, thick: number[], out: ResolvedLayo
         }
         spans.push({ start: cursor, end: start });
         const finish = node.finishes[k] ?? null;
+        const setback = node.setbacks[k] ?? null;
         const t = thick[k]!;
         const d: DividerBox = node.axis === "h"
-            ? { id: `${node.id}:${k}`, split: node.id, index: k, axis: "h", kind: node.dividers[k] ?? "fixed", 
-               finish, x: r.x, y: start, w: r.w, h: t }
-            : { id: `${node.id}:${k}`, split: node.id, index: k, axis: "v", kind: "fixed", finish, x: start, y: r.y,
-               w: t, h: r.h };
+            ? { id: `${node.id}:${k}`, split: node.id, index: k, axis: "h", kind: node.dividers[k] ?? "fixed",
+               finish, setback, x: r.x, y: start, w: r.w, h: t }
+            : { id: `${node.id}:${k}`, split: node.id, index: k, axis: "v", kind: "fixed", finish, setback, x: start,
+               y: r.y, w: t, h: r.h };
         out.dividers.push(d);
         cursor = start + t;   
         k++;

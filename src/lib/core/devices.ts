@@ -5,7 +5,7 @@ import type { Build } from "./part_types";
 import type { Check } from "./check";
 import { boxesMeet, roomBox, wallBox, type Box3 } from "./room";
 
-// an appliance set by hand sits within a millimetre of where it is drawn
+// An appliance set by hand sits within a millimetre of where it is drawn
 const TOL = 1;
 
 
@@ -36,7 +36,7 @@ function within(a: Box3, b: Box3): boolean
 }
 
 
-// a box of the same wall right under the appliance, its top at the appliance's foot, across it in x and z
+// A box of the same wall right under the appliance, its top at the appliance's foot, across it in x and z
 function under(d: Device, b: Box3): boolean
 {
     return Math.abs(b.max[1] - d.y) <= TOL && b.min[0] < d.x + d.width && b.max[0] > d.x && b.min[2] < d.z + d.depth

@@ -13,11 +13,11 @@ import { GRAVITY } from "../data/rules";
 // Häfele U.K. TCH Design 2017 p. 2.48 : the centre support 802.02.250 drops 66 mm to the bottom of its Ø 31 ring
 export const RAIL_DROP = 66 - 31 / 2;
 export const RAIL_D = 25;
-// thinnest Ø 25 wall of the same catalogue, p. 2.49 (801.12.523)
+// Thinnest Ø 25 wall of the same catalogue, p. 2.49 (801.12.523)
 export const RAIL_WALL = 0.6;
 // EN 16122:2012 6.3.1, clothes rail supports loaded one hour (CATAS comparison table, RISE report 7F003676B)
 export const RAIL_LOAD_KG_PER_DM = 4;
-// the grade of the tube is not published : a welded precision tube of E195, the lowest usual grade, whose name
+// The grade of the tube is not published : a welded precision tube of E195, the lowest usual grade, whose name
 // gives its minimum yield on the finished tube (Helens, a tube maker)
 // https://www.helens.se/fileadmin/user_upload/produktprogram-tekniskinfo/helens-welded-precision-steel-tubes-en.pdf
 export const STEEL_FY = 195;
@@ -35,14 +35,14 @@ export const LIFT = {
     lowered: 642,
     reach: 365,
     maxKg: 10,
-    // by internal width, the ranges overlap and the first that fits is taken
+    // By internal width, the ranges overlap and the first that fits is taken
     models: [
         { min: 440, max: 610, ref: "805.20.326" },
         { min: 600, max: 1000, ref: "805.20.352" },
         { min: 770, max: 1200, ref: "805.20.356" },
     ],
 };
-// workshop conventions : 1 mm of play at each end of a tube or a profile, 3 mm of kerf per tube cut
+// Workshop conventions : 1 mm of play at each end of a tube or a profile, 3 mm of kerf per tube cut
 export const FIT_PLAY = 1;
 export const TUBE_KERF = 3;
 
@@ -50,7 +50,7 @@ export const TUBE_KERF = 3;
 export interface RailPlan   
 {
     cell: NodeBox;
-    // tube lenght, axis height from the bottom of the box, axis depth from the front edge of the sides
+    // Tube lenght, axis height from the bottom of the box, axis depth from the front edge of the sides
     length: number;
     axisY: number;
     axisV: number;
@@ -64,7 +64,7 @@ export interface RailCheck
 {
     span: number;
     stress: number;
-    // what the centre support hangs on the panel above, N
+    // What the centre support hangs on the panel above, N
     reaction: number;
 }
 
@@ -86,7 +86,7 @@ export function railPlan(c: Carcass, lay: ResolvedLayout, r: HangingRail): RailP
     const usableDepth = c.depth - lay.zBack;
     if (r.kind === "lift")
     {
-        // the rail at rest on its pivot, the lift carries it without a centre support
+        // The rail at rest on its pivot, the lift carries it without a centre support
         const pivot = ceiling - LIFT.pivotDrop;
         return { cell: nb, length, axisY: pivot, axisV: usableDepth - LIFT.pivotFromBack, centre: false,
                  clear: pivot - RAIL_D / 2 - nb.y, usableDepth };

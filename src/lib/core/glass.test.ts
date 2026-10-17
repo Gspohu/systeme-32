@@ -6,7 +6,7 @@ import { computeOutputs } from "./outputs";
 import type { Carcass, Project } from "./model";
 import type { Part } from "./parts";
 
-// a display cabinet in Obernai : one adjustable shelf half way up, then turned to glass
+// A display cabinet in Obernai : one adjustable shelf half way up, then turned to glass
 function cabinet(decor: string): Project
 {
     let p = addItem(newProject("vitrine"), newCarcass({ name: "Vitrine", width: 600, height: 800, depth: 400 }));

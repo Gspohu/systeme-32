@@ -4,7 +4,7 @@
 import type { Vec3 } from "./geometry";
 import { CLASH_TOL, type Solid } from "./solids";
 
-// points tried per axis in the space two boxes share : for two straight boards that space is the overlap itself
+// Points tried per axis in the space two boxes share : for two straight boards that space is the overlap itself
 // only a curved shape need the grid
 const GRID = 6;
 
@@ -22,12 +22,12 @@ export interface Clash
 {
     a: Solid;
     b: Solid;
-    // a point found inside both, room millimetres
+    // A point found inside both, room millimetres
     at: Vec3;
 }
 
 
-// a point of the space both boxes share that lies inside both true shapes
+// A point of the space both boxes share that lies inside both true shapes
 function sharedPoint(a: Solid, b: Solid): Vec3 | null
 {
     const [first, second] = b.cheap && !a.cheap ? [b, a] : [a, b];
@@ -79,7 +79,7 @@ export function clashes(all: Solid[]): Clash[]
         const a = all[i]!;
         while (j < all.length)
         {
-            // the battens of one batch and a skin with its flat run are one part, laid out not to cross
+            // The battens of one batch and a skin with its flat run are one part, laid out not to cross
             const other = all[j]!;
             const samePart = a.part !== null && a.part === other.part;
             if (samePart || (other.host !== null && other.host === a.part) || (a.host !== null && a.host === other.part))

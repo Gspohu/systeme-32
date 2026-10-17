@@ -3,14 +3,14 @@
 
 export interface PriceEntry
 {
-    // euros excluding VAT : per unit for hardware, per m2 for boards, per metre for edges, per hour of work
+    // Euros excluding VAT : per unit for hardware, per m2 for boards, per metre for edges, per hour of work
     value: number;
     unit: "u" | "m2" | "m" | "h";
     source: string | null;
     date: string | null;
-    // quantity sold together, in the unit of the price : a roll of 50 m, a box of 300 screws. Bought whole
+    // Quantity sold together, in the unit of the price : a roll of 50 m, a box of 300 screws. Bought whole
     pack?: number;
-    // a board also sold in other sizes than 2800 x 2070, each at its own price per m2 excluding VAT : the nesting
+    // A board also sold in other sizes than 2800 x 2070, each at its own price per m2 excluding VAT : the nesting
     // buys the cheapest one thta holds the parts
     formats?: { length: number; width: number; value: number; source: string | null }[];
 }
@@ -81,7 +81,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:SNOW_WHITE_8685:8": entry(ht(22.98), "m2", `${JHS}, réf. 1001137234, 22,98 EUR TTC/m2 (133,22 le panneau `
                                      + "2800 x 2070), en stock", READ_ON_2),
     "board:U604_ST9:19": entry(perSheet(101.3), "m2", "Houdard, 101,30 EUR HT le panneau 2800 x 2070, en stock"),
-    // by the whole board, its format in SOLID_STOCK
+    // By the whole board, its format in SOLID_STOCK
     "board:CHENE_MASSIF:20": entry(ht(29.9), "u", "Brico Dépôt, planche rabotée chêne massif 2000 x 140 x 20, "
                                    + "réf. 3663602861539, 29,90 EUR TTC la pièce", "2026-10-08"),
 
@@ -99,7 +99,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
     "hw:70T3550.TL": entry(fromGbp(1.33), "u", "Interfit (UK), 1,33 GBP HT la charnière sans ressort", READ_ON_2),
     "hw:70T3650.TL": entry(fromGbp(1.61), "u", "Interfit (UK), 1,61 GBP HT la charnière sans ressort", READ_ON_2),
-    // sold as a set with its strike plaet, black or white at the same price
+    // Sold as a set with its strike plaet, black or white at the same price
     "hw:956.1004": entry(fromGbp(3.60), "u", "Interfit (UK), 3,60 GBP HT le jeu 956.1004 B.SET avec contreplaque",   
                          READ_ON_2),
     "hw:956A1004": entry(fromGbp(4.51), "u", "Interfit (UK), 4,51 GBP HT le jeu 956A1004 W.SET avec contreplaque",
@@ -110,13 +110,13 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:48N0510.03": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:609.1500": entry(fromGbp(2.66 / 100), "u", "Interfit (UK), 2,66 GBP HT le sachet de 100", READ_ON, 100),
     "hw:637.76.352": entry(fromGbp(0.99), "u", "Interfit (UK), pied AXILO 80 mm à 0,99 GBP HT"),
-    // no public price in France nor the UK : Polish zloty at the ECB rate of 7 October 2026, 4.3825
+    // No public price in France nor the UK : Polish zloty at the ECB rate of 7 October 2026, 4.3825
     "hw:637.76.353": entry(Math.round(2.1 / 4.3825 * 1000) / 1000, "u",
                            "Intar (Pologne), pied AXILO 100 mm à 2,10 zł HT, "
                            + "réf. TAMNS-403425, livraison en France non vérifiée", "2026-10-07"),
     "hw:283.33.910": entry(fromGbp(2.68 / 1.2), "u", "Swansea Timber (UK), 2,68 GBP TTC la fixation, en stock",
                            READ_ON_2),
-    // sold one by one in Spain : the 21 % of the Spanish VAT comes off, not the French 20
+    // Sold one by one in Spain : the 21 % of the Spanish VAT comes off, not the French 20
     "hw:637.76.333": entry(Math.round(0.67 / 1.21 * 1000) / 1000, "u",
                            "Monastil (Espagne), 0,67 EUR TTC l'embase avec 21 % de TVA, en stock", READ_ON_2),
 
@@ -127,12 +127,14 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                            + "même goujon B34 brut"),
     "hw:282.24.727": entry(fromUsd(0.22), "u", "Home Decor Hardware (US), 0,22 USD HT le taquet"),
     "hw:637.38.054": entry(fromUsd(0.77), "u", "Home Decor Hardware (US), 0,77 USD HT le clip"),
-    // the list price, the 20 % off shown on 2 October left out
+    // The list price, the 20 % off shown on 2 October left out
     ...handlePrices([["100.45.120", 1.5], ["100.45.121", 1.57], ["100.45.122", 1.73], ["100.45.123", 1.97],
                      ["100.45.124", 2.25], ["100.45.125", 2.41], ["100.45.126", 2.76], ["100.45.127", 2.91],
                      ["100.45.128", 3.15]]),
+    "hw:84335807": entry(ht(4.99), "u", "Leroy Merlin et ADS Bricolage, poignée Oslo 128 laiton brossé à 4,99 EUR TTC, "
+                         + "vis fournies", "2026-10-17"),
 
-    // generic LED parts read at Ledkia, one of each per lit cell : a 2 m profile, a 5 m reel, one lead
+    // Generic LED parts read at Ledkia, one of each per lit cell : a 2 m profile, a 5 m reel, one lead
     "hw:LED_PROFILE_RECESS": entry(ht(6.99), "u", "Estimation : Ledkia, profilé encastré Lithos H12 2 m avec diffuseur "
                                   + "à 6,99 EUR TTC, son corps à vérifier contre la rainure 18 x 8,5", READ_ON_2),
     "hw:LED_STRIP_24V": entry(ht(6.49), "u", "Ledkia, ruban 24 V 8 mm coupe 5 cm, 12 W/m, bobine de 5 m à 6,49 EUR TTC",
@@ -154,7 +156,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:WALL_SCREW_5x50": entry(ht(34.9 / 500), "u", "Brico Dépôt, boîte de 500 vis fischer 5 x 50 à 34,90 EUR TTC",
                                 READ_ON, 500),
 
-    // no workshop seen publishes its sawing and banding apart from the board : Houdard, SM Bois, Leroy Merlin
+    // No workshop seen publishes its sawing and banding apart from the board : Houdard, SM Bois, Leroy Merlin
     // Design ADF, Fouchard, tosize and Mauris quote them or fold them into a price per m2
     // TODO a merchant's own scale, or a quote from the cabinet maker, should replace this one
     "service:cut": entry(4, "u", "Indicatif, source non vérifiée : usinage.services, 4 EUR le trait de scie compté "

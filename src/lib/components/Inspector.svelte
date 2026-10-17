@@ -5,8 +5,8 @@
     import PrintPicker from "./PrintPicker.svelte";  
     import { slatLayout } from "../core/slats";
     import {
-        removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, mergeFronts, splitFront, splitCell,
-        removeDivider,
+        removeItem, duplicateItem, updateItem, setFront, removeFront, updateFront, mergeFronts, splitFront, splitZone,
+        removeDivider, NICHE_SETBACK, setDividerSetback,
         moveDivider, setDividerKind, setDividerFinish, setDividerThickness, distributeEvenly, setCellSize, setLining,
         setRail, setLight, setEnd,
         setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet, toSliding, toDoor,
@@ -73,7 +73,7 @@
         return null;
     });
 
-    // hardware chosen for the panels of the selected front
+    // Hardware chosen for the panels of the selected front
     const frontHardware = $derived.by(() =>
     {
         const build = app.outputs.analysis.build;
@@ -135,7 +135,7 @@
         return null;
     }
 
-    // whether the zone now has the front asked
+    // Whether the zone now has the front asked
     function setKind(kind: FrontKind): boolean
     {
         if (carcass === null || nodeId === null)
@@ -158,11 +158,12 @@
         const spec = specFor(kind, "left");
         if (spec !== null)
         {
-            // the derived node reads null once the command has replaced the selected front
+            // The derived node reads null once the command has replaced the selected front
             const node = nodeId;
             const cid = carcass.id;
             const keep = existing === null ? {} : { decor: existing.decor, colour: existing.colour,
                                                    colourName: existing.colourName, opening: existing.opening,
+                                                   handle: existing.handle,
                                                    mount: kind === "lift" ? "overlay" as const : existing.mount };
             if (app.apply(setFront, cid, node, spec, keep))
             {
@@ -188,13 +189,12 @@
 
     function splitMiddle(axis: "h" | "v", kind: "fixed" | "adjustable"): void 
     {
-        if (carcass === null || nodeBox === null || nodeBox.kind !== "cell")
+        if (carcass === null || nodeBox === null)
         {
-            app.notify("Choisir une case sans séparation pour la recouper.", "warning");
+            app.notify("Choisir une case ou une zone à recouper.", "warning");
             return;
         }
-        const middle = axis === "h" ? nodeBox.y + nodeBox.h / 2 : nodeBox.x + nodeBox.w / 2;
-        app.apply(splitCell, carcass.id, nodeBox.id, axis, middle - carcass.thickness / 2, kind);
+        app.apply(splitZone, carcass.id, nodeBox.id, axis, kind);
     }
 
 
@@ -278,7 +278,7 @@
     ];
 
     const panelDecors: typeof DECORS = [];
-    // slats also come in solid owod, never cut out of a sheet, and an adjustable shelf may be glass
+    // Slats also come in solid owod, never cut out of a sheet, and an adjustable shelf may be glass
     const slatDecors: typeof DECORS = [];
     const shelfDecors: typeof DECORS = [];
     for (const d of DECORS)
@@ -322,7 +322,7 @@
         const f = entered.field;
         if (app.refusals !== entered.refusals)
         {
-            // reading value first makes a number field commit what its editor holds, a blind write
+            // Reading value first makes a number field commit what its editor holds, a blind write
             // was overwritten by the pending "-5" on GitHub runners
             if (f.value !== entered.value)
             {
@@ -376,6 +376,19 @@
                                                      "adjustable")}>Réglable</button>
                     </div>
                 {/if}
+                {@const setback = sp.setbacks[sel.index] ?? null}
+                <label class="form-check" title="Recule la pièce derrière le devant du caisson, pour une petite niche">
+                    <input type="checkbox" checked={setback !== null}
+                        onchange={(e) => app.apply(setDividerSetback, carcass.id, sp.id, sel.index,
+                                                   checked(e) ? NICHE_SETBACK : null)} />
+                    En retrait
+                </label>
+                {#if setback !== null}
+                    <label class="field"><span class="label">Retrait (mm)</span>
+                        <input class="input" type="number" min="0" step="1" value={setback}
+                            onchange={(e) => app.apply(setDividerSetback, carcass.id, sp.id, sel.index, num(e))} />
+                    </label>
+                {/if}
                 {@const finish = sp.finishes[sel.index] ?? null}
                 <label class="field"><span class="label">Décor</span>
                     <select class="select" value={finish?.decor ?? ""}
@@ -383,7 +396,8 @@
                                                    str(e) === "" ? null : { decor: str(e),
                                                        colour: finish?.colour ?? null })}>
                         <option value="">Comme le caisson</option>
-                        {#each sp.axis === "h" && sp.dividers[sel.index] === "adjustable" ? shelfDecors : panelDecors as d}
+                        {#each sp.axis === "h" &&
+                         sp.dividers[sel.index] === "adjustable" ? shelfDecors : panelDecors as d}
                             <option value={d.id}>{d.ref} {d.label}</option>
                         {/each}
                     </select>
@@ -426,7 +440,7 @@
                     onchange={(e) => 
                     {
                         const el = e.currentTarget;  
-                        // refused, the list shows again the front the zone still has
+                        // Refused, the list shows again the front the zone still has
                         if (!setKind(el.value as FrontKind))
                         {
                             el.value = nodeFront === null ? "none" : nodeFront.spec.type;   
@@ -455,7 +469,7 @@
                         onclick={() => (app.selection = { kind: "node", item: carcass.id,
                                                          node: parentId })}>Zone parente</button>
                 {/if}
-                {#if nodeBox.kind === "cell"}
+                {#if nodeFront === null || nodeFront.spec.type !== "drawers"}
                     <button class="btn btn-secondary" onclick={() => splitMiddle("h", "fixed")}>+ Tablette</button>
                     <button class="btn btn-secondary" onclick={() => splitMiddle("h", "adjustable")}>+ Étagère</button>
                     <button class="btn btn-secondary" onclick={() => splitMiddle("v", "fixed")}>+ Montant</button>
@@ -710,6 +724,14 @@
                     <button class="segmented-item" class:active={front.opening === "push"}
                         onclick={() => frontPatch({ opening: "push" })}>Pression</button>
                 </div>
+                {#if front.opening === "handle" && front.spec.type !== "lift"}
+                    <div class="segmented" title="Oslo laiton brossé sur le chant, ou barre inox sur la face">
+                        <button class="segmented-item" class:active={front.handle === "edge"}
+                            onclick={() => frontPatch({ handle: "edge" })}>Oslo</button>
+                        <button class="segmented-item" class:active={front.handle === "bar"}
+                            onclick={() => frontPatch({ handle: "bar" })}>Barre</button>
+                    </div>
+                {/if}
             {/if}
             {#if front.spec.type === "lift" && front.opening === "handle"}
                 {@const spec = front.spec}
@@ -1210,7 +1232,7 @@
             <div class="row">
                 <button class="btn btn-secondary" onclick={() => 
                 {
-                    // the copy is selected : renaming or moving the original next was the mistaek it invited
+                    // The copy is selected : renaming or moving the original next was the mistaek it invited
                     if (app.apply(duplicateItem, item.id, item.kind === "corner" ? item.outerRadius + 100 : item.width +  
                                   100))  
                     {

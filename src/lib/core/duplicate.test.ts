@@ -6,7 +6,7 @@ import { analyse } from "./analysis";
 import type { Carcass, Project } from "./model";
 
 
-// the vacuum column of the etnrance at Colmar, its back drilled for the charger socket
+// The vacuum column of the etnrance at Colmar, its back drilled for the charger socket
 function column(): Project
 {
     let p = addItem(newProject("Colmar"), newCarcass({ name: "Colonne aspirateur", width: 400, height: 1800,
@@ -36,7 +36,7 @@ describe("a duplicated carcass", () =>
         expect(b!.outlets[0]!.id).not.toBe(a!.outlets[0]!.id);
         expect(b!.prints[0]!.cell).toBe(b!.root.id);
         expect(b!.modularCells).toEqual([b!.root.id]);
-        // the copy drills its own back for its socket, as the original does
+        // The copy drills its own back for its socket, as the original does
         const backs = analyse(q).build.parts.filter((x) =>
         {
             return x.role === "back" && x.cutouts.length > 0;

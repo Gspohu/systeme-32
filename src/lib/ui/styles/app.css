@@ -19,13 +19,13 @@ body
     grid-template-columns: minmax(0, 1fr);
 }
 
-/* the static shell of app.html, painted before the scripts run and gone once the application is mounted */
+/* The static shell of app.html, painted before the scripts run and gone once the application is mounted */
 body:has(.app) .boot
 {
     display: none;
 }
 
-/* a line of controls that wraps on a narrow screen */
+/* A line of controls that wraps on a narrow screen */
 .bar
 {
     display: flex;
@@ -46,7 +46,7 @@ body:has(.app) .boot
     flex: 1;
 }
 
-/* the design system inputs are full width by default, the toolbar keeps them to their content */
+/* The design system inputs are full width by default, the toolbar keeps them to their content */
 .toolbar .input,
 .toolbar .select
 {
@@ -60,7 +60,7 @@ body:has(.app) .boot
     max-width: 22rem;
 }
 
-/* on a phone the project name is the title, the brand leaves it the room */
+/* On a phone the project name is the title, the brand leaves it the room */
 @media (max-width: 600px)
 {
     .toolbar > strong
@@ -69,13 +69,13 @@ body:has(.app) .boot
     }
 }
 
-/* a select is as wide as its longest option, the template names pushed undo and redo to a second line */
+/* A select is as wide as its longest option, the template names pushed undo and redo to a second line */
 .toolbar .select
 {
     max-width: 12rem;
 }
 
-/* the sizes dragged by the user come in as variables, the stylesheet ones are their fallbacks */
+/* The sizes dragged by the user come in as variables, the stylesheet ones are their fallbacks */
 .workspace
 {
     display: grid;
@@ -222,7 +222,7 @@ body:has(.app) .boot
     overflow-x: auto;
 }
 
-/* the four tabs share the width : at their design system size the last one left a phone screen */
+/* The four tabs share the width : at their design system size the last one left a phone screen */
 .narrow .tabs .tab
 {
     flex: 1 1 0;
@@ -242,7 +242,7 @@ body:has(.app) .boot
     grid-template-rows: minmax(0, 1fr);
 }
 
-/* the named areas of the wide grid do not exist here, placing a pane in one would spawn implicit tracks */
+/* The named areas of the wide grid do not exist here, placing a pane in one would spawn implicit tracks */
 .narrow-body > .pane
 {
     grid-area: auto;

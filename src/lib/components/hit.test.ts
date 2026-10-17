@@ -4,7 +4,6 @@ import { itemContains } from "./hit";
 
 describe("hit testing", () =>
 {
-    console.log("gros chien\n\n");
     it("stops at the rounded end that gets built, not at the radius typed in", () =>
     {
         // 500 deep with the 8 mm applied back : a 600 radius qurater is built at 492

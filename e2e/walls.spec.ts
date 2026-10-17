@@ -76,7 +76,7 @@ test.describe("walls", () =>
         await expect(right).toHaveValue("610");
         await left.fill("");
         await left.press("Tab");
-        // the left wall now runs the whole depth, the right one still stops at its return
+        // The left wall now runs the whole depth, the right one still stops at its return
         await expect(left).toHaveValue("");
         await expect(right).toHaveValue("610");
         await right.fill("");

@@ -12,7 +12,7 @@ export interface Hit
     y: number;
     item: Item | null;
     carcass: Carcass | null;
-    // deepest cell under the point and the chain of its ancestors, innermost first
+    // Deepest cell under the point and the chain of its ancestors, innermost first
     cell: NodeBox | null;
     chain: NodeBox[];
     local: [number, number];
@@ -42,7 +42,7 @@ export function itemContains(it: Item, x: number, y: number): boolean
 export function hitTest(p: Project, a: Analysis, x: number, y: number, wall: Wall): Hit
 {
     const out: Hit = { x, y, item: null, carcass: null, cell: null, chain: [], local: [x, y] };
-    // later items are drawn on top and win the hit, only those of the wall on screen
+    // Later items are drawn on top and win the hit, only those of the wall on screen
     let k = p.items.length - 1;
     while (k >= 0)
     {
@@ -74,7 +74,7 @@ export function hitTest(p: Project, a: Analysis, x: number, y: number, wall: Wal
                 hits.push(n);
             }
         }
-        // parnts always contain their children : sort by area, smallest first
+        // Parnts always contain their children : sort by area, smallest first
         hits.sort((m, n) =>
         {
             return m.w * m.h - n.w * n.h;

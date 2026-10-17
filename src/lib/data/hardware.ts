@@ -176,7 +176,8 @@ add({ id: "PLUG_NYLON_8x40", family: "D60", label: `Cheville nylon universelle $
      brand: "", ref: "Générique", source: ANTI_TIP });
 add({ id: "PLUG_AERATED", family: "D60", label: "Cheville hélicoïdale pour béton cellulaire", brand: "",
      ref: "Générique", source: ANTI_TIP });
-add({ id: "PLUG_HOLLOW_METAL", family: "D60", label: "Cheville métallique à expansion pour plaque de plâtre, vis fournie",
+add({ id: "PLUG_HOLLOW_METAL", family: "D60",
+     label: "Cheville métallique à expansion pour plaque de plâtre, vis fournie",
      brand: "", ref: "Générique", source: ANTI_TIP });
 
 // Clothes rails, Häfele U.K. TCH Design 2017 : the tube is left generic, the check takes the thinnest Ø 25
@@ -352,6 +353,15 @@ for (const h of BAR_HANDLES)
          + `${h.length}, vis M4 x 25 fournies`, brand: "Häfele", ref: h.ref,
          source: "Häfele, désignation reprise par Home Decor Hardware (US), fiche de la référence lue le 2 octobre 2026" });
 }
+
+
+// INSPIRE Oslo edge pull at Leroy Merlin, EAN 3276007446920 : figures off its ADS Bricolage page, 17 Oct 2026
+// It sits astride the edge of the front, screwed from inside throught the tab it drops behind it
+export const EDGE_PULL = { ref: "84335807", length: 180, centres: 128, depth: 44, height: 18, massG: 35, screw: 16 };
+add({ id: EDGE_PULL.ref, family: "D51", label: `Poignée Oslo aluminium laiton brossé, entraxe ${EDGE_PULL.centres}, `
+     + `longueur ${EDGE_PULL.length}, posée sur le chant, vis de ${EDGE_PULL.screw} fournies`, brand: "INSPIRE",
+     ref: EDGE_PULL.ref, source: "Leroy Merlin, cotes de la fiche ADS Bricolage de l'EAN 3276007446920 lue le "
+         + "17 octobre 2026" });
 
 
 add({ id: "283.33.910", family: "D70", label: `Fixation invisible d'étagère à platine vissée, broche ${DIAM}12 x 112`,

@@ -46,7 +46,7 @@ describe("socket holes", () =>
         const { p, c, lower } = tvUnit();
         const back = partOf(addOutlet(p, c.id, lower), `${c.id}/back`);
         expect(back.cutouts.length).toBe(1);
-        // the back runs u up and v across : centre 211 high and 300 across
+        // The back runs u up and v across : centre 211 high and 300 across
         expect(back.cutouts[0]!.start).toEqual([171, 260]);
         expect(back.cutouts[0]!.segments[1]).toEqual({ kind: "line", x: 251, y: 340 });
     });
@@ -118,7 +118,7 @@ describe("socket holes", () =>
     it("shows a shelf hole edge on, over the thickness of the shelf, and none of a refused one", () =>
     {
         const { p, c, lower } = tvUnit();
-        // the 60 hole in the shelf above the lower cell : 19 thick, its underside at 403
+        // The 60 hole in the shelf above the lower cell : 19 thick, its underside at 403
         const shelf = analyse(holed(p, c, lower, { panel: "above", shape: "round", w: 60 })).build.outlets;
         expect(shelf).toMatchObject([{ shape: "rect", x: 270, y: 403, w: 60, h: 19, edgeOn: true }]);
         expect(analyse(holed(p, c, lower, { dx: 300 })).build.outlets).toEqual([]);

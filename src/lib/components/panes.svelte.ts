@@ -11,7 +11,7 @@ function load(): Record<PaneSize, number | null>
     const sizes: Record<PaneSize, number | null> = { palette: null, side: null, checks: null, viewer: null };
     try
     {
-        // whatever the browser kept is read as unknown, only a positive finite number is taken
+        // Whatever the browser kept is read as unknown, only a positive finite number is taken
         const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? "{}");
         for (const k of SIZES)
         {
@@ -21,7 +21,7 @@ function load(): Record<PaneSize, number | null>
     }
     catch
     {
-        // private window or blocked storage : the stylesheet sizes stay
+        // Private window or blocked storage : the stylesheet sizes stay
     }
     return sizes;
 }
@@ -38,6 +38,6 @@ export function savePanes(): void
     }
     catch
     {
-        // nothing kept, the sizes still hold until the page is closed
+        // Nothing kept, the sizes still hold until the page is closed
     }
 }

@@ -7,9 +7,9 @@ type Pt = [number, number];
 
 export interface DoorSweep
 {
-    // farthest the hinge edge goes past the inner face of the side, towards the wall, over the whole opening
+    // Farthest the hinge edge goes past the inner face of the side, towards the wall, over the whole opening
     reach: number;
-    // how far the door still stay inside the carcass at full opening, the protrusion Blum publishes
+    // How far the door still stay inside the carcass at full opening, the protrusion Blum publishes
     inward: number;
 }
 
@@ -39,7 +39,7 @@ export function doorSweep(overlay: number, thickness: number, h: HingeLinkage = 
     let inward = 0;
     for (let i = 0; i <= h.openDeg * 4; i++)
     {
-        // the door turns towards the room, clockwies in this rfame
+        // The door turns towards the room, clockwies in this rfame
         const t = -i / 4 * Math.PI / 180;
         const r = turn(cd, t);
         const miss = (a: number): number =>

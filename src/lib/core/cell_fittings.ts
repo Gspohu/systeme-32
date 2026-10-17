@@ -53,6 +53,6 @@ export interface CellLight
     spots: number;
     setback: number;
     kelvin: 2700 | 3000 | 4000;
-    // dimmed and switched from a phone through a Wi-Fi controller on the driver output
+    // Dimmed and switched from a phone through a Wi-Fi controller on the driver output
     wifi?: boolean;
 }

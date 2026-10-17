@@ -9,7 +9,7 @@ import { dresser, tvWall } from "../templates";
 import { newDevice } from "../factory";
 
 
-// every xref entry must piont at the "n 0 obj" line it announces, byte for byte
+// Every xref entry must piont at the "n 0 obj" line it announces, byte for byte
 function checkXref(pdf: Uint8Array): void
 {
     const text = strFromU8(pdf, true);
@@ -90,7 +90,7 @@ describe("workshop archive", () =>
         {
             const p = make();
             const pages = drawingSet(p, computeOutputs(p));
-            // the title block draws itself last : what it adds is left out of the search
+            // The title block draws itself last : what it adds is left out of the search
             const probe = new Canvas();
             frameAndTitle(probe, { owner: "", creator: "", approver: "", project: "", title: "", status: "",
                                    identification: "", revision: "", date: "", index: 1, count: 1, scale: "",
@@ -212,7 +212,7 @@ describe("cover", () =>
 
     it("never drops a source without saying so, however many items the cover lists", () =>
     {
-        // up to the 35 items the PBS takes at its first level
+        // Up to the 35 items the PBS takes at its first level
         const most = 35 - dresser().items.length;
         for (const extra of [0, Math.floor(most / 2), most])
         {
@@ -238,7 +238,7 @@ describe("title block", () =>
     it("is 180 wide and holds its longest fields inside their own cells", () =>
     {
         const c = new Canvas();
-        // every field at or past the lenght ISO 7200:2004 tables 1 to 3 recommend : nothing may be cut short
+        // Every field at or past the lenght ISO 7200:2004 tables 1 to 3 recommend : nothing may be cut short
         frameAndTitle(c, { owner: "Ébénisterie Schaller de Wissembourg SARL", creator: "Marie-Odile Schaller",
                            approver: "Jean-Baptiste Kieffer", project: "Vaisselier de la salle à manger, côté fenêtre",
                            title: "Pièces A12 et A13, Chêne plaqué sur aggloméré 19 mm, chants L1 L2 l1 l2 / Blanc "
@@ -248,9 +248,9 @@ describe("title block", () =>
         // ISO 7200:2004 § 6
         expect(TITLE_BLOCK_W).toBe(180);
         const [bx, by] = [A3.w - MARGIN - TITLE_BLOCK_W, A3.h - MARGIN - TITLE_BLOCK_H];
-        // the sheet frame comes first, the block is everything after it
+        // The sheet frame comes first, the block is everything after it
         const block = c.prims.slice(1);
-        // a wall of the figure 1 layout may close one row only, a text crosses it only within its hegiht
+        // A wall of the figure 1 layout may close one row only, a text crosses it only within its hegiht
         const walls = block.filter((q) =>
         {
             return q.k === "line" && q.x1 === q.x2 && q.x1 > bx + 0.1;
@@ -258,7 +258,7 @@ describe("title block", () =>
         {
             return extent(q);
         });
-        // and a label stacked over its value in a 7 mm row must not run into the row under or over it
+        // And a label stacked over its value in a 7 mm row must not run into the row under or over it
         const floors = block.filter((q) =>
         {
             return q.k === "line" && q.y1 === q.y2 && q.s === "thin";
@@ -283,7 +283,7 @@ describe("title block", () =>
             }
         }
         expect(walls.length).toBe(6);
-        // and none of the fields a reader goes by is cut short to fit its cell
+        // And none of the fields a reader goes by is cut short to fit its cell
         const printed = block.flatMap((q) =>
         {
             return q.k === "text" ? [q.t] : [];

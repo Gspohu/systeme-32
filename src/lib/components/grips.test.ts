@@ -5,7 +5,7 @@ import { GRIP_GAP, GRIP_H, GRIP_ROW, gripLabel, layoutGrips, type GripSpot } fro
 type Spec = { id: string; name: string; mid: number; top: number; width: number };
 
 
-// the grip's box in the world, as the front view draws it
+// The grip's box in the world, as the front view draws it
 function boxOf(s: Spec, g: GripSpot, u: number): { x0: number; x1: number; y0: number; y1: number }
 {
     const x = s.mid + g.dx * u;
@@ -28,7 +28,7 @@ function apart(specs: Spec[], u: number): boolean
 }
 
 
-// the TV wall on a phone, 3 mm a pixel : the column, the base, the amplifier and the two boxes of the technical cell
+// The TV wall on a phone, 3 mm a pixel : the column, the base, the amplifier and the two boxes of the technical cell
 const TV: Spec[] = [
     { id: "col", name: "Colonne gauche", mid: 225, top: 2430, width: 450 },
     { id: "base", name: "Meuble bas", mid: 1300, top: 600, width: 2600 },
@@ -51,7 +51,7 @@ describe("grips over the front view", () =>
 
     it("slide a wide item's grip along its own top, with no leader, before a smaller one would move", () =>
     {
-        // a lamp stood in the middle of the base : its grip and the base's fall on the same spot
+        // A lamp stood in the middle of the base : its grip and the base's fall on the same spot
         const crowded = [...TV, { id: "lamp", name: "Lampe de Soultz", mid: 1300, top: 600, width: 120 }];
         const g = layoutGrips(crowded, 3);
         expect([g.get("lamp")!.dx, g.get("lamp")!.lift, g.get("lamp")!.leader]).toEqual([0, 0, false]);
@@ -71,7 +71,7 @@ describe("grips over the front view", () =>
 
     it("keep a moved grip inside the view, or over its item when the view has no room left", () =>
     {
-        // the phone view of the TV wall, 5 mm a pixel, a little wider than the furniture
+        // The phone view of the TV wall, 5 mm a pixel, a little wider than the furniture
         const view = { x0: -100, x1: 2900, y0: -100, y1: 3000 };
         const g = layoutGrips(TV, 5, view);
         for (const s of TV)

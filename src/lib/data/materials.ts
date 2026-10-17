@@ -159,7 +159,7 @@ export const GLASS: BoardMaterial = {
     modulus: 70000,
     strength: 45,
     kdef: 0,
-    // a timber load-duration factor, it has no meaning for glass
+    // A timber load-duration factor, it has no meaning for glass
     kmod: 1,
     thicknesses: [5, 6],
     source: "AGC Planibel TDS 01/2023 (EN 572-1, épaisseurs EN 572-2)",
@@ -188,7 +188,7 @@ export interface Decor
     brand: string;
     ref: string;
     material: string;
-    // true when the decor has a grain that forbids rotating the part on the sheet
+    // True when the decor has a grain that forbids rotating the part on the sheet
     grain: boolean;
     rgb: [number, number, number];
     rgbDark?: [number, number, number];
@@ -197,7 +197,7 @@ export interface Decor
     references?: string;
     url?: string;
     edge?: string;
-    // a product sold in one thickness only, a glass shelf, whatever the carcass is made of
+    // A product sold in one thickness only, a glass shelf, whatever the carcass is made of
     thickness?: number;
 }
 
@@ -207,7 +207,7 @@ export const SHEET_LENGTH = 2800;
 export const SHEET_WIDTH = 2070;
 
 
-// the same Decospan oak veneer on its MDF and its chipboard cores
+// The same Decospan oak veneer on its MDF and its chipboard cores
 const OAK_VENEER = {
     grain: true,
     rgb: [178, 154, 125] as [number, number, number],
@@ -245,7 +245,7 @@ export const DECORS: Decor[] = [
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/U604_9?country=FR",
         edge: "Chant ABS U604 ST9 23x0,8 (Jean Hue Socoda)",
     },
-    // asked by Thomas D. at Colmar for a softer green and a lighter oak, read on egger.com on 2026-10-08 : the colours
+    // Asked by Thomas D. at Colmar for a softer green and a lighter oak, read on egger.com on 2026-10-08 : the colours
     // are the mean of Egger's decor picture, no French merchant price found yet
     {
         id: "U638_ST9",
@@ -300,7 +300,7 @@ export const DECORS: Decor[] = [
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/W1000_9?country=FR",
     },
     {
-        // the cheap white of the backs : 8 mm in stock where the W1000 is not, its maker not named by the merchant
+        // The cheap white of the backs : 8 mm in stock where the W1000 is not, its maker not named by the merchant
         id: "SNOW_WHITE_8685",
         label: "Blanc basique",
         brand: "Jean Hue & Socoda",
@@ -325,7 +325,7 @@ export const DECORS: Decor[] = [
         rgbLight: [200, 178, 151],
         colourSource: "Couleur d'affichage reprise du H1180, pas une mesure de chêne massif",
     },
-    // shelves only, on the Häfele glass supports of their thickness
+    // Shelves only, on the Häfele glass supports of their thickness
     {
         id: "VERRE_5",
         label: "Verre trempé clair 5 mm",

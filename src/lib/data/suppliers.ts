@@ -6,7 +6,7 @@ export interface Supplier
     name: string;
     country: string | null;
     eu: boolean | null;
-    // how the country is known
+    // How the country is known
     why: string;
 }
 

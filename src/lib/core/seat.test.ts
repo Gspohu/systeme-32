@@ -7,7 +7,7 @@ import { checkSeat, seatSpans } from "./seat";
 import { validateProject } from "./io/project_file";
 import type { Carcass, Item, Project } from "./model";
 
-// an entrance bench : 1200 wide, 450 high, 400 deep, 19 mm partilceboard, applied 8 mm back
+// An entrance bench : 1200 wide, 450 high, 400 deep, 19 mm partilceboard, applied 8 mm back
 function bench(cuts: number[], cushion = 50): Carcass
 {
     const cells = [cell()];
@@ -30,7 +30,7 @@ function projectOf(...items: Item[]): Project
     return p;
 }
 
-// a check of taht level, it need its message to hold the text or match the pattern
+// A check of taht level, it need its message to hold the text or match the pattern
 function flagged(level: string, text: string | RegExp)
 {
     const message = typeof text === "string" ? expect.stringContaining(text) : expect.stringMatching(text);
@@ -71,7 +71,7 @@ describe("seats", () =>
         const a = analyse(p);
         expect(a.checks).toContainEqual(flagged("info", "assise vérifiée"));
         expect(a.checks).not.toContainEqual(flagged("error", ""));
-        // the same bench without the seat : the difference is the person alone, 1600 N
+        // The same bench without the seat : the difference is the person alone, 1600 N
         const loaded = (q: Project): number =>
         {
             for (const k of analyse(q).checks)
@@ -103,7 +103,7 @@ describe("seats", () =>
 
     it("refuses a seat that tips when someone sits on its edge, unless it is fixed to the wall", () =>
     {
-        // a tall narrow box turned into a seat : 1300 N on the front edge tips it voer the front feet
+        // A tall narrow box turned into a seat : 1300 N on the front edge tips it voer the front feet
         const tall = newCarcass({ name: "Haut", width: 600, height: 900, depth: 300, fixToWall: false,
                                  seat: { cushion: 0 } });
         const loose = analyse(projectOf(tall)).checks;

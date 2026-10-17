@@ -11,7 +11,7 @@ describe("costing with the dated public prices", () =>
         it(`prices every line of ${make.name} bought, the sawing and banding included`, () =>
         {
             const cost = computeOutputs(make()).cost;
-            // the parcels and the hours have no public price : listed, never counted as zero
+            // The parcels and the hours have no public price : listed, never counted as zero
             expect(cost.missing.map((l) =>
             {
                 return l.key;
@@ -59,7 +59,7 @@ describe("costing with the dated public prices", () =>
 
     it("totals the lines as shown, each to the cent, and exports them with their sources", () =>
     {
-        // the dresser showed 2 495,85 for lines smuming to 2 495,86
+        // The dresser showed 2 495,85 for lines smuming to 2 495,86
         const cost = computeOutputs(dresser()).cost;
         const cents = cost.lines.reduce((s, l) =>
         {
@@ -114,7 +114,7 @@ describe("costing with the dated public prices", () =>
         expect(oak.qty).toBeLessThan(50);
         expect(oak.bought).toBe(50);
         expect(oak.total).toBeCloseTo(oak.price!.value * 50, 2);
-        // each hinge stay a single unit : what is neeed is what is bought
+        // Each hinge stay a single unit : what is neeed is what is bought
         const hinge = lines.find((l) =>
         {
             return l.key === "hw:70T3550.TL";

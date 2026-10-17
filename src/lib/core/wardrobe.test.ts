@@ -9,7 +9,7 @@ import { validateProject } from "./io/project_file";
 import type { Carcass, Project } from "./model";
 import { MATERIALS } from "../data/materials";
 
-// a wardrobe in Mulhouse : 1000 inside, 2000 high, 600 deep with an 8 mm applied abck
+// A wardrobe in Mulhouse : 1000 inside, 2000 high, 600 deep with an 8 mm applied abck
 function wardrobe(o: Partial<Carcass> = {}): Carcass
 {
     return newCarcass({ name: "Armoire", width: 1038, height: 2000, depth: 600, ...o });
@@ -83,7 +83,7 @@ describe("clothes rails", () =>
         {
             const hole = partById(a.build.parts, `${c.id}/side/${side}`).holes
                 .find((h) => { return h.label.startsWith("Axe de tringle"); })!;
-            // under the top at 1975, 50.5 lower, in the middle of 592 usble
+            // Under the top at 1975, 50.5 lower, in the middle of 592 usble
             expect(hole.u).toBeCloseTo(1924.5, 9);
             expect(hole.v).toBe(296);
         }
@@ -119,7 +119,7 @@ describe("clothes rails", () =>
         const q = setRail(setRail(p, c.id, c.root.kind === "split" ? c.root.children[1]!.id : c.root.id, false),
                           c.id, low, true);
         expect(errorsOf(q).join("\n")).toContain("support central");
-        // nothing is marked for a rail that is refused
+        // Nothing is marked for a rail that is refused
         expect(partById(analyse(q).build.parts, `${c.id}/side/L`).holes).not.toContainEqual(labelled("Axe de tringle"));
     });
 
@@ -205,7 +205,7 @@ describe("cell lights", () =>
         expect(hardwareOf(a.build.hardware, "LED_STRIP_24V")?.note).toBe("900 mm, 3000 K, 14.4 W/m");
         expect(hardwareOf(a.build.hardware, "LED_DRIVER_24V")?.note)
             .toBe("17 W mini pour 13.0 W de LED (1 éclairage(s), charge à 80 %)");
-        // the profile ends butt the sides of the cell, hidden : no end cap, and no Wi-Fi controller unasked
+        // The profile ends butt the sides of the cell, hidden : no end cap, and no Wi-Fi controller unasked
         expect(hardwareOf(a.build.hardware, "LED_END_CAPS")).toBeUndefined();
         expect(hardwareOf(a.build.hardware, "SHELLY_PLUS_RGBW_PM")).toBeUndefined();
     });
@@ -240,7 +240,7 @@ describe("cell lights", () =>
         const a = analyse(p);
         expect(errorsOf(p)).toEqual([]);
         const top = partById(a.build.parts, `${c.id}/top`);
-        // centres a third of the 1000 inside apart, 40 + 65 / 2 from the front edge
+        // Centres a third of the 1000 inside apart, 40 + 65 / 2 from the front edge
         const expected = [1000 / 6, 500, 5000 / 6];
         let pockets = 0;
         let leads = 0;
@@ -273,7 +273,7 @@ describe("cell lights", () =>
     {
         let p = addItem(newProject("essai"), wardrobe());
         const c = p.items[0] as Carcass;
-        // the cell hold 15 rims of 65 in its 1000 mm
+        // The cell hold 15 rims of 65 in its 1000 mm
         expect(errorsOf(setLight(p, c.id, c.root.id, { kind: "spots", spots: 16, setback: 40, kelvin: 3000 })).join())
             .toContain("En poser 15 au plus");
         p = setLight(p, c.id, c.root.id, { kind: "spots", spots: 7, setback: 40, kelvin: 3000 });

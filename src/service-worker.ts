@@ -19,7 +19,7 @@ async function install(): Promise<void>
 }
 
 
-// old versions go as soon as this one takes over
+// Old versions go as soon as this one takes over
 async function activate(): Promise<void>
 {
     const stale: Promise<boolean>[] = [];
@@ -70,7 +70,7 @@ sw.addEventListener("fetch", (event) =>
             const res = await fetch(event.request);
             if (res.ok)
             {
-                // a full quota must not go unheard, the answer still reaches the page
+                // A full quota must not go unheard, the answer still reaches the page
                 event.waitUntil(cache.put(event.request, res.clone()).catch((e: unknown) =>
                 {
                     console.warn("systeme-32 : mise en cache impossible", e);
@@ -80,7 +80,7 @@ sw.addEventListener("fetch", (event) =>
         }
         catch
         {
-            // navigation while offline : the app shell answers every rotue
+            // Navigation while offline : the app shell answers every rotue
             const shell = await cache.match(new URL("./", sw.registration.scope).href);
             return shell ?? new Response("Hors ligne et page absente du cache.", { status: 503 });
         }

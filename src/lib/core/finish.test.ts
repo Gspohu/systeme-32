@@ -62,7 +62,7 @@ describe("finish per element", () =>
         let q = splitCell(p, c.id, c.root.id, "h", 800); 
         const root = (q.items[0] as Carcass).root as SplitNode;
         q = setDividerFinish(q, c.id, root.id, 0, { decor: "U604_ST9", colour: null });
-        // a new hself in the lower cell joins the same split, before the rgeen one
+        // A new hself in the lower cell joins the same split, before the rgeen one
         q = splitCell(q, c.id, root.children[0]!.id, "h", 300);
         expect(decorsOf(q)).toEqual(["W1000_ST9", "U604_ST9"]);
         q = removeDivider(q, c.id, root.id, 0);

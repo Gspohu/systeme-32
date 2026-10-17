@@ -1,7 +1,7 @@
 // Where each item's grip sits over the front view : above its item, or moved aside onto the nearest free spot when
 // it would cover another one, the big items keeping theirs
 
-// a grip is 28 px high, a row 32 apart, set 6 px over the top of its item
+// A grip is 28 px high, a row 32 apart, set 6 px over the top of its item
 export const GRIP_H = 28;
 export const GRIP_ROW = 32;
 export const GRIP_GAP = 6;
@@ -14,15 +14,15 @@ export interface GripSpot
 {
     text: string;
     px: number;
-    // pixels aside and rows up from right over its item
+    // Pixels aside and rows up from right over its item
     dx: number;
     lift: number;
-    // off its item's top : a dotted line leads down to it
+    // Off its item's top : a dotted line leads down to it
     leader: boolean;
 }
 
 
-// cut past 28 characters : at 18, Placards et tiroirs lost its last letter, the grips are moved aside anyway
+// Cut past 28 characters : at 18, Placards et tiroirs lost its last letter, the grips are moved aside anyway
 const GRIP_CHARS = 28;
 
 
@@ -30,7 +30,7 @@ export function gripLabel(name: string): { text: string; px: number }
 {
     const px = Math.max(90, Math.min(name.length, GRIP_CHARS) * 8 + 20);
     const fits = Math.min(GRIP_CHARS, Math.floor((px - 20) / 8)); 
-    // the three dots counted in hwat the grip holds
+    // The three dots counted in hwat the grip holds
     return { text: name.length > fits ? `${name.slice(0, Math.max(1, fits - 3))}...` : name, px };
 }
 
@@ -52,7 +52,7 @@ export function layoutGrips(items: { id: string; name: string; mid: number; top:
         const step = (label.px + 8) / 2;
         const along = (g.width / 2) / u;
         const spots: [number, number][] = [];
-        // first along its own top, a quarter grip at a time, the middle first
+        // First along its own top, a quarter grip at a time, the middle first
         for (let k = 0; k * step / 2 <= along; k++)
         {
             spots.push([k * step / 2, 0]);
@@ -72,7 +72,7 @@ export function layoutGrips(items: { id: string; name: string; mid: number; top:
                 }
             }
         }
-        // then the nearest first : a row up weighs like half a grip aside
+        // Then the nearest first : a row up weighs like half a grip aside
         aside.sort((a, b) =>
         {
             return Math.hypot(a[0] / step, a[1]) - Math.hypot(b[0] / step, b[1]) || b[0] - a[0];
@@ -101,7 +101,7 @@ export function layoutGrips(items: { id: string; name: string; mid: number; top:
                 break;
             }
         }
-        // no free spot left : it stay right over its item
+        // No free spot left : it stay right over its item
         if (!found)
         {
             const y0 = g.top + GRIP_GAP * u;

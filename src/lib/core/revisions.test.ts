@@ -7,7 +7,7 @@ import { drawingSet } from "./io/workshop";
 import { computeOutputs } from "./outputs";
 import type { Project } from "./model";
 
-// the sideboard of Gaëlle at Sélestat, drawn by her joiner of Obernai
+// The sideboard of Gaëlle at Sélestat, drawn by her joiner of Obernai
 function sideboard(): Project
 {
     const p = addItem(newProject("Buffet de Sélestat"), newCarcass({ name: "Buffet", width: 1200, height: 800,
@@ -27,7 +27,7 @@ describe("revision index", () =>
         expect(first).toBe("ABCDEFGHJKLMNPQRSTUVWXYZ");
         expect(nextRevisionIndex(24)).toBe("AA");
         expect(nextRevisionIndex(25)).toBe("AB");
-        // two characters hold 24 + 24 x 24 issues, the lenght table 1 recommends
+        // Two characters hold 24 + 24 x 24 issues, the lenght table 1 recommends
         expect(nextRevisionIndex(24 + 24 * 24 - 1)).toBe("ZZ");
     });
 });
@@ -124,7 +124,7 @@ describe("title block", () =>
         {
             expect(words(0)).toContain(field);
         }
-        // the cover lists the issue, a workpiece sheet its board and edges in the supplementary title
+        // The cover lists the issue, a workpiece sheet its board and edges in the supplementary title
         expect(words(0)).toContain("Première émission");
         const piece = pages.findIndex((g) =>
         {

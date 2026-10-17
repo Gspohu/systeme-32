@@ -2,7 +2,7 @@ import { addCarcass, download, expect, expectToast, openBlank, outputsTab, selec
 import { strFromU8 } from "fflate";
 import type { Locator, Page } from "@playwright/test";
 
-// the smallest valid PNG, one pixel
+// The smallest valid PNG, one pixel
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
                         "base64");
 
@@ -81,7 +81,7 @@ test.describe("files", () =>
         await name.fill("Penderie de Haguenau");
         await name.press("Tab");
         await addCarcass(page);
-        // the autosave waits one second after the last change : the stored copy itself is awaited
+        // The autosave waits one second after the last change : the stored copy itself is awaited
         await expect.poll(() =>
         {
             return storedItems(page, "Penderie de Haguenau");
@@ -91,7 +91,7 @@ test.describe("files", () =>
         await expect(name).toHaveValue("Penderie de Haguenau");
         await page.getByRole("button", { name: "Mes projets" }).click();
         const dialog = page.getByRole("dialog", { name: "Mes projets" });
-        // an overlay left without .active by the design system is transparent and lets clicks through
+        // An overlay left without .active by the design system is transparent and lets clicks through
         await expect(page.locator(".modal-overlay")).toHaveCSS("opacity", "1");
         await dialog.getByRole("button", { name: "Fermer" }).click();
         await expect(dialog).toHaveCount(0);
@@ -112,7 +112,7 @@ test.describe("files", () =>
         await name.fill("Banc de Riquewihr");
         await name.press("Tab");
         await addCarcass(page);
-        // closed within the second the autosave waits : the page hiding saevs at once
+        // Closed within the second the autosave waits : the page hiding saevs at once
         const context = page.context();
         await page.close({ runBeforeUnload: true });
         const again = await context.newPage();
@@ -132,7 +132,7 @@ test.describe("files", () =>
         const dialog = page.getByRole("dialog", { name: "Mes projets" });
         await expect(dialog.getByText("Aucun projet enregistré ici.")).toBeVisible(); 
         await dialog.getByRole("button", { name: "Fermer" }).click();
-        // changed, a setting will do, it is saved, and the next one of that template gets a number
+        // Changed, a setting will do, it is saved, and the next one of that template gets a number
         await outputsTab(page, "Réglages");
         const kerf = page.locator(".field", { hasText: "Trait de scie" }).locator("input");
         await kerf.fill("5");

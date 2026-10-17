@@ -11,7 +11,7 @@ import { NEW_DRAWERS, NEW_LIFT, NEW_SHOE_RACK_LEVELS, dropCarcass, newDesk, newD
     newRoundEnd, newSliding } from "../core/presets";
 
 
-// dropped and moved items land on this step, in mm
+// Dropped and moved items land on this step, in mm
 export const PLACE_STEP = 10;
 
 
@@ -20,7 +20,7 @@ export interface Tool
     id: string;
     label: string;
     hint: string;
-    // svg path data drawn in a 24 x 24 box with the current colour
+    // Svg path data drawn in a 24 x 24 box with the current colour
     icon: string;
 }
 
@@ -177,7 +177,7 @@ export function dropTool(p: Project, tool: string, hit: Hit, wall: Wall = "back"
             return addItem(p, centred(newWallShelf({ wall }), hit.x, hit.y));
         case "desk":
         {
-            // the desk stay at its height whatever the drop height
+            // The desk stay at its height whatever the drop height
             const desk = newDesk(wall);
             return addItem(p, { ...centred(desk, hit.x, 0), y: desk.y });
         }
@@ -187,7 +187,7 @@ export function dropTool(p: Project, tool: string, hit: Hit, wall: Wall = "back"
             return addItem(p, centred(b, hit.x, hit.y - b.height / 2));
         }
         case "ladder":
-            // the rali at the drop height, starting where the finger is
+            // The rali at the drop height, starting where the finger is
             return addItem(p, newLadder({ x: snap(hit.x, PLACE_STEP), y: snap(hit.y, PLACE_STEP), wall }));
         case "slats-wall":
         {

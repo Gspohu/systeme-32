@@ -90,13 +90,13 @@ export function tool(page: Page, label: string): Locator
 // Drops a palette tool and returns the message the app answered with
 export async function drop(page: Page, label: string, to: Point): Promise<string>
 {
-    // older messages expire on their own and would shift any index : close them first
+    // Older messages expire on their own and would shift any index : close them first
     const old = page.locator(".toast-container .alert-dismiss");
     while ((await old.count()) > 0)
     {
         await old.first().click();
     }
-    // the palette scrolls once its tools outgrow the screen, as a hand would scroll it
+    // The palette scrolls once its tools outgrow the screen, as a hand would scroll it
     await tool(page, label).scrollIntoViewIfNeeded();
     await dragBetween(page, await centreOf(tool(page, label)), to);
     const toast = page.locator(".toast-container .alert").first();

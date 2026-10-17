@@ -7,7 +7,7 @@ import type { Carcass, LiftFront, Project } from "./model";
 import type { Hole, Part } from "./parts";
 import { X, neg } from "./geometry";
 
-// a wall cabinet over a desk in Colmar : 800 x 400 x 350, W1000 particleboard (700 kg/m3 for the checks)
+// A wall cabinet over a desk in Colmar : 800 x 400 x 350, W1000 particleboard (700 kg/m3 for the checks)
 function cabinet(o: Partial<Carcass> = {}): Carcass
 {
     return newCarcass({ name: "Haut", width: 800, height: 400, depth: 350, y: 1500, base: { type: "wall" }, ...o });
@@ -49,7 +49,7 @@ function errorsOf(p: Project): string[]
 }
 
 
-// every hardware line as "ref xqty", and the note of the first line with that ref
+// Every hardware line as "ref xqty", and the note of the first line with that ref
 function refsOf(a: Analysis): string[]
 {
     const out: string[] = [];
@@ -131,7 +131,7 @@ describe("AVENTOS HK top flaps", () =>
             vMin = Math.min(vMin, h.v);
             vMax = Math.max(vMax, h.v);
         }
-        // underside of the top at 381, front from 1.5 : 62 lower is 317.5 up the flap, 12.5 inside each side
+        // Underside of the top at 381, front from 1.5 : 62 lower is 317.5 up the flap, 12.5 inside each side
         expect(uMin).toBeCloseTo(30, 9);
         expect(uMax).toBeCloseTo(767, 9);
         expect(vMax).toBeCloseTo(317.5, 9);
@@ -144,7 +144,7 @@ describe("AVENTOS HK top flaps", () =>
     {
         expect(said(analyse(withFlap(cabinet())), "warning", "poignée")).toBe(true);
         const a = analyse(withFlap(cabinet(), { type: "lift", handleKg: 0.5 }));
-        // the flap weigh its panel plus twice the handle : LF 2067 sits in both 930-2800
+        // The flap weigh its panel plus twice the handle : LF 2067 sits in both 930-2800
         // and 1730-5200 ranges and the stronger set is taken
         const kg = 0.797 * 0.397 * 0.019 * 700 + 1;
         expect(noteOf(a, "22K2700"))
@@ -185,7 +185,7 @@ describe("AVENTOS HK top flaps", () =>
         const p0 = withFlap(cabinet());
         const c = p0.items[0] as Carcass;
         expect(errorsOf(updateFront(p0, c.id, c.fronts[0]!.id, { mount: "inset" })).join()).toContain("en applique");
-        // shelf 81 under the top of a 562 cell, then 231, narrow enough for the shelf itself to pass
+        // Shelf 81 under the top of a 562 cell, then 231, narrow enough for the shelf itself to pass
         const tall = addItem(newProject("essai"), cabinet({ width: 600, height: 600 }));
         const k = tall.items[0] as Carcass;
         const high = splitCell(tall, k.id, k.root.id, "h", 562 - 100, "adjustable");
@@ -202,7 +202,7 @@ describe("AVENTOS HK top flaps", () =>
     it("finds what the open flap would hit in front of the cabinet", () =>
     {
         const p = withFlap(cabinet());
-        // the top face is at 1900, the open flap rises 115 above it and reaches 369 + 397 frmo the wall
+        // The top face is at 1900, the open flap rises 115 above it and reaches 369 + 397 frmo the wall
         // the shelves stand as obstacles only : what is told of their own fixing is left out
         const flapErrors = (q: Project): string[] =>
         {

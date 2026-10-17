@@ -7,7 +7,7 @@ import { resolveLayout } from "./layout";
 import type { Carcass, SplitNode } from "./model";
 
 
-// how far a carcass height sits from the line 9.5 + 32k of a 19 mm carcass
+// How far a carcass height sits from the line 9.5 + 32k of a 19 mm carcass
 function offLine(y: number): number
 {
     const r = ((y - 9.5) % 32 + 32) % 32;
@@ -17,7 +17,7 @@ function offLine(y: number): number
 
 describe("system 32 line", () =>
 {
-    // the dresser has ifxed shelves only, the TV wall carry the pins
+    // The dresser has ifxed shelves only, the TV wall carry the pins
     for (const make of [tvWall])
     {
         it(`puts every pin hole of ${make.name} on the line of its carcass`, () =>
@@ -39,7 +39,7 @@ describe("system 32 line", () =>
                 {
                     if (h.diameter === 5 && /^(Taquet|Réglage|Série)/.test(h.label))
                     {
-                        // carcass height of the hole : the frame of a side or upright runs u up
+                        // Carcass height of the hole : the frame of a side or upright runs u up
                         const y = q.frame.o[1] + h.u * q.frame.u[1] - c.y;
                         expect(offLine(y)).toBeLessThan(0.01);
                         seen++;
@@ -134,7 +134,7 @@ describe("system 32 line", () =>
         {
             return k.message.includes("hors des trous");
         })).toEqual([]);
-        // a fixed shelf typed anywhere stays there, made adjustable it moves onto the line
+        // A fixed shelf typed anywhere stays there, made adjustable it moves onto the line
         const fixed = setDividerKind(moveDivider(setDividerKind(typed, c.id, root.id, 0, "fixed"), c.id, root.id, 0, 611,
                                                  true), c.id, root.id, 0, "fixed");
         expect(underside(fixed)).toBe(611);

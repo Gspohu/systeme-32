@@ -72,7 +72,7 @@ export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, o
         return;
     }
     const box = itemExtent(it);
-    // an appliance is not made : dashed, behind a door or out in the open
+    // An appliance is not made : dashed, behind a door or out in the open
     canvas.rect(pageX(box.x0), pageY(box.y1), (box.x1 - box.x0) / scale, (box.y1 - box.y0) / scale,
                 it.kind === "device" ? "dashed" : "normal");
     if (it.kind === "box")
@@ -108,7 +108,7 @@ interface CarcassView
 }
 
 
-// layers drawn in this order, each later one over the ones before
+// Layers drawn in this order, each later one over the ones before
 function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, pageY: ToPage, a: Analysis,
                      withFronts: boolean): void
 {
@@ -122,7 +122,7 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
 }
 
 
-// carcass points to the page
+// Carcass points to the page
 function onPage(v: CarcassView, pts: [number, number][]): [number, number][]
 {
     return pts.map(([x, y]): [number, number] => { return [v.pageX(v.k.x + x), v.pageY(v.k.y + y)]; });
@@ -146,7 +146,7 @@ function drawShell(v: CarcassView): void
     {
         canvas.poly(at(frontOutline(k)), true, "normal");
     }
-    // the filler as the analysis built it, up to the ceiling of the room
+    // The filler as the analysis built it, up to the ceiling of the room
     const filler = a.build.parts.find((q) =>
     {
         return q.id === `${k.id}/filler`;
@@ -180,7 +180,7 @@ function drawShell(v: CarcassView): void
 }
 
 
-// the feet behind a plinth are hidden lines, the runner spaces only show where no front covers them
+// The feet behind a plinth are hidden lines, the runner spaces only show where no front covers them
 function drawHardware(v: CarcassView): void
 {
     const { canvas, k, scale, pageX, pageY, a, withFronts } = v;
@@ -219,7 +219,7 @@ function drawEnds(v: CarcassView): void
             const floorReach = floor === null ? reach : bounds(tessellate(floor)).maxX;
             for (const lv of openEndLevels(k, end))
             {
-                // the floor board as far out as its own outline goes, the side it butts never moving
+                // The floor board as far out as its own outline goes, the side it butts never moving
                 const w = lv < 0 ? floorReach : reach;
                 const left = side === "right" ? x : k.x - w;
                 canvas.rect(pageX(left), pageY(k.y + lv + t), w / scale, t / scale, "thin");
@@ -245,7 +245,7 @@ function drawEnds(v: CarcassView): void
 }
 
 
-// inner panels show where no front covers them, with the rails and the lights of their cells
+// Inner panels show where no front covers them, with the rails and the lights of their cells
 function drawInside(v: CarcassView): void
 {
     const { canvas, k, scale, pageX, pageY, a } = v;
@@ -266,7 +266,7 @@ function drawInside(v: CarcassView): void
     }
     for (const d of a.build.layouts.get(k.id)?.dividers ?? [])
     {
-        // an upright reaching a sloped top ends in its bevel
+        // An upright reaching a sloped top ends in its bevel
         if (k.slope !== null && d.axis === "v" && d.y + d.h >= k.height - 2 * t)
         {
             const x1 = d.x + d.w;
@@ -323,7 +323,7 @@ function drawFronts(v: CarcassView): void
         canvas.rect(x0, y0, x1 - x0, y1 - y0, "thick", "#ffffff");
         if (fp.role === "door")
         {
-            // the lines leave the opening side corners and meet in the middle of the hinge side
+            // The lines leave the opening side corners and meet in the middle of the hinge side
             const hingeX = fp.hinge === "left" ? x0 : x1;
             const openX = fp.hinge === "left" ? x1 : x0;
             canvas.poly([[openX, y0], [hingeX, midY], [openX, y1]], false, "thin");
@@ -334,7 +334,7 @@ function drawFronts(v: CarcassView): void
         }
         else if (fp.role === "panel")
         {
-            // a fixed panel has no handle, only its opening when it has one
+            // A fixed panel has no handle, only its opening when it has one
             const spec = k.fronts.find((f) =>
             {
                 return f.id === fp.front;
@@ -362,7 +362,7 @@ function drawFronts(v: CarcassView): void
 }
 
 
-// socket holes, as hidden lines behind a façade drawn on this sheet or inside a shelf
+// Socket holes, as hidden lines behind a façade drawn on this sheet or inside a shelf
 function drawOutlets(v: CarcassView): void
 {
     const { canvas, k, scale, pageX, pageY, a, withFronts } = v;
@@ -399,10 +399,10 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     const where = wall === "back" ? "vue de face" : WALL_LABELS[wall].toLowerCase();
     heading(canvas, `Composition, ${where}`);
     const all = projectExtent(items);
-    // in an alcove the back wall shows its returns and its ceiling raound the items
+    // In an alcove the back wall shows its returns and its ceiling raound the items
     const r = p.room;
     const niche = wall === "back" && r.returns !== undefined;
-    // the radiators, boxes and skirtings of this wall widen the view to show them
+    // The radiators, boxes and skirtings of this wall widen the view to show them
     const obstacles = r.obstacles.filter((o) =>
     {
         return o.wall === wall;
@@ -439,7 +439,7 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     canvas.dimH(ox + all.x0 / scale, ox + all.x1 / scale, floorY + 2, floorY + 10, `${Math.round(all.x1 - all.x0)}`);
     canvas.dimV(oy - all.y1 / scale, floorY, ox + frame.x0 / scale - 2, ox + frame.x0 / scale - 10,
                 `${Math.round(all.y1 - all.y0)}`);
-    // the levels on the right : floor, underside and top of each item, and the ceiling of an alcove
+    // The levels on the right : floor, underside and top of each item, and the ceiling of an alcove
     const right = ox + frame.x1 / scale;
     chain(canvas, [0, ...items.flatMap((it) =>
     {
@@ -459,15 +459,15 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
             canvas.rect(ox + (a.x - a.plateW / 2) / scale, oy - (a.y + a.plateH / 2) / scale, a.plateW / scale,
                         a.plateH / scale, "thin");
         }
-        // put away in dashes, swung out on its arm in hidden line, named so the two are never mistaken
+        // Put away in dashes, swung out on its arm in hidden line, named so the two are never mistaken
         for (const spot of screenSpots(sc))
         {
             const out = spot.label === "sorti";
-            // a turned set covers its own width and part of its thickness along the wall
+            // A turned set covers its own width and part of its thickness along the wall
             const [x0, x1] = spotSpan(sc, spot);
             canvas.rect(ox + x0 / scale, oy - (spot.bottom + h) / scale, (x1 - x0) / scale, h / scale,
                         out ? "hidden" : "dashed");
-            // on an arm the two outlines and the plate overlap : short names over the outlines, the swung one a line
+            // On an arm the two outlines and the plate overlap : short names over the outlines, the swung one a line
             // higher, both centred on their own outline
             if (spot.label === "")
             {
@@ -481,7 +481,7 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
             }
         }
     }
-    // a name wider htan its item becomes a numbered mark, read in the legend over the title block
+    // A name wider htan its item becomes a numbered mark, read in the legend over the title block
     const marks: string[] = [];
     for (const it of items)
     {

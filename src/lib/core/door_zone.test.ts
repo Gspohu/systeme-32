@@ -4,7 +4,7 @@ import { newCarcass, newProject } from "./factory";
 import { analyse } from "./analysis";
 import type { Carcass, Project, SplitNode } from "./model";
 
-// a shelf put in first, then a door on each cell : what the carcass hold after atking a door off to add the shelf
+// A shelf put in first, then a door on each cell : what the carcass hold after atking a door off to add the shelf
 function twoDoors(): { p: Project; c: Carcass }
 {
     let p = addItem(newProject("Haguenau"), newCarcass({ name: "Armoire de Haguenau", width: 600, height: 1600,

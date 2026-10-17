@@ -13,7 +13,7 @@ function motion(o: Partial<Motion>): Motion
 }
 
 
-// where a point of a closed façade lands once the group of its pose is applied, in mm
+// Where a point of a closed façade lands once the group of its pose is applied, in mm
 function moved(m: Motion, at: Vec3): number[]
 {
     const pose = openPose(m);
@@ -29,7 +29,7 @@ describe("fronts opened in 3D", () =>
 {
     it("swings a left hinged door out about its hinge line, its free edge ending in front of it", () =>
     {
-        // hinge line at x 100, z 400 : the far edge of a 600 door ocmes 600 out at a right angle
+        // Hinge line at x 100, z 400 : the far edge of a 600 door ocmes 600 out at a right angle
         const door = motion({ pivot: [100, 0, 400], amount: 90 });
         expect(moved(door, [700, 300, 400])).toEqual([100, 300, 1000]);
         expect(moved(door, [100, 50, 400])).toEqual([100, 50, 400]);

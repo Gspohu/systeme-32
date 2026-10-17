@@ -11,7 +11,7 @@ import { CONNECTING_SCREW_HEAD, CONNECTING_SCREW_HOLE, CONNECTING_SCREWS } from 
 import { DIAM } from "./text";
 
 const LINKED: PartRole[] = ["top", "bottom", "side"];
-// workshop convention : 50 in from the edges of the shared area, no more than 800 apart
+// Workshop convention : 50 in from the edges of the shared area, no more than 800 apart
 const LINK_INSET = 50;
 const LINK_MAX = 800;
 
@@ -105,7 +105,7 @@ function link(a: Part, c: Part, b: Build, out: { item: string; message: string }
     {
         return;
     }
-    // along the normal of a : a spans its thickness from its face A, c its own the way its normal runs
+    // Along the normal of a : a spans its thickness from its face A, c its own the way its normal runs
     const sa = dot(fa.o, fa.n);
     const sc = dot(fc.o, fa.n);
     const [lo, hi] = [Math.min(sc, sc + align * c.thickness), Math.max(sc, sc + align * c.thickness)];
@@ -128,7 +128,7 @@ function link(a: Part, c: Part, b: Build, out: { item: string; message: string }
     {
         return [dot(from(q.frame!.o, pt), q.frame!.u), dot(from(q.frame!.o, pt), q.frame!.v)];
     };
-    // the corners of c in the frame of a, the shared area clipped to a
+    // The corners of c in the frame of a, the shared area clipped to a
     const us: number[] = [];
     const vs: number[] = [];
     for (const [u, v] of [[0, 0], [c.length, 0], [0, c.width], [c.length, c.width]] as const)
@@ -154,7 +154,7 @@ function link(a: Part, c: Part, b: Build, out: { item: string; message: string }
     }
     const aInner = aTouch === "A" ? "B" : "A";
     const cInner = cTouch === "A" ? "B" : "A";
-    // a head on the inner face, 2 mm into each carcass
+    // A head on the inner face, 2 mm into each carcass
     const free = (u: number, v: number): boolean =>
     {
         const [uc, vc] = local(c, at(fa, u, v, 0));

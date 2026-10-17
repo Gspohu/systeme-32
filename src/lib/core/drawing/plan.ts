@@ -24,7 +24,7 @@ export function roomPlan(p: Project): Draft
     });
     const left = sideWallDepth(room, "left");
     const right = sideWallDepth(room, "right");
-    // an alcove is drawn as deep as it and the items reach, the room past it is not measured
+    // An alcove is drawn as deep as it and the items reach, the room past it is not measured
     let shown = room.depth;
     if (room.returns !== undefined)
     {
@@ -34,7 +34,7 @@ export function roomPlan(p: Project): Draft
         }));
         shown = Math.min(room.depth, shown + 400);
     }
-    // the plan on the left, its legend in the right hand column
+    // The plan on the left, its legend in the right hand column
     const boxW = A3.w - 2 * MARGIN - 60 - LEGEND_W;
     const boxH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 60;
     const scale = pickScale(room.width, shown, boxW, boxH);
@@ -59,14 +59,14 @@ export function roomPlan(p: Project): Draft
     }
     else
     {
-        // the returns end, the room opens out
+        // The returns end, the room opens out
         canvas.line(pageX(0), pageZ(left), pageX(0) - 4, pageZ(left), "thick");
         canvas.line(pageX(room.width), pageZ(right), pageX(room.width) + 4, pageZ(right), "thick");
         canvas.dimV(pageZ(0), pageZ(left), pageX(0) - 6, pageX(0) - 14, `${left}`);
         canvas.dimV(pageZ(0), pageZ(right), pageX(room.width) + 6, pageX(room.width) + 14, `${right}`);
     }
     canvas.dimH(pageX(0), pageX(room.width), pageZ(0) - 2, pageZ(0) - 10, `${room.width}`);
-    // what stands on the walls, seen from above against its wall
+    // What stands on the walls, seen from above against its wall
     for (const o of room.obstacles)
     {
         const b = boxToRoom(o.wall, room, obstacleBox(o));
@@ -75,7 +75,7 @@ export function roomPlan(p: Project): Draft
         canvas.text(pageX((b.min[0] + b.max[0]) / 2), pageZ(b.max[2]) + 3, `${OBSTACLE_LABELS[o.kind]} ${o.name}`, 1.6,
                     "middle");
     }
-    // footprints overlap once items stand on or hang over others : open outlines, a mark at the front left corner
+    // Footprints overlap once items stand on or hang over others : open outlines, a mark at the front left corner
     // of each, the items sharing a corner sharing its mark, and the names in the legend
     const corners = new Map<string, { x: number; z: number; marks: number[] }>();
     const legend: string[][] = [];
@@ -94,7 +94,7 @@ export function roomPlan(p: Project): Draft
     }
     table(canvas, A3.w - MARGIN - LEGEND_W, MARGIN + 30, [12, 70, 34, 34],
           ["Repère", "Meuble", "Emprise", "Dessous à"], legend, 2.4, 4.5);
-    // a chain along the back wall under the deepest of its items, one down each side wall beside its items
+    // A chain along the back wall under the deepest of its items, one down each side wall beside its items
     const back = boxes.filter((x) =>
     {
         return x.it.wall === "back";
@@ -155,7 +155,7 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
         const label = `${x - xs[i]!}`;
         return { p: Math.min(p, q), q: Math.max(p, q), label, fits: textWidth(label, size) + 1 <= Math.abs(q - p) };
     });
-    // a figure longer than its segment steps away frm the line, outwards, to the first level where it overlaps
+    // A figure longer than its segment steps away frm the line, outwards, to the first level where it overlaps
     // no other figure : still facing its own segment
     const taken: [number, number][][] = [];
     const place = (s: (typeof segs)[number]): number =>
@@ -174,7 +174,7 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
         return level;
     };
     const levels = new Map<(typeof segs)[number], number>();
-    // the figures that fit between their arrows first, the ones pushed outside take the levels left
+    // The figures that fit between their arrows first, the ones pushed outside take the levels left
     const fitting = segs.filter((x) =>
     {
         return x.fits;

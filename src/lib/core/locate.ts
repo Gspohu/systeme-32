@@ -11,8 +11,10 @@ export interface FaceRef
 {
     part: Part;
     face: "A" | "B";
-    // local carcass y of the part u origin, to convert heights into part u
+    // Local carcass y of the part u origin, to convert heights into part u
     uOrigin: number;
+    // Depth of the part v origin behind the front edge of the carcass, an upright standing back starts there
+    vOrigin: number;
 } 
 
 
@@ -23,9 +25,9 @@ export function sideFace(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox,
     if (outer)
     {
         const p = byId(b.parts, `${c.id}/side/${side === "left" ? "L" : "R"}`);
-        return p === undefined ? null : { part: p, face: "A", uOrigin: 0 };
+        return p === undefined ? null : { part: p, face: "A", uOrigin: 0, vOrigin: 0 };
     }
-    // an upright bounding the node on that side and spanning its whole height
+    // An upright bounding the node on that side and spanning its whole height
     const edge = side === "left" ? nb.x : nb.x + nb.w;
     for (const q of lay.dividers)
     {
@@ -35,7 +37,8 @@ export function sideFace(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox,
             continue;
         }
         const p = byId(b.parts, `${c.id}/div/${q.id}`);
-        return p === undefined ? null : { part: p, face: side === "left" ? "B" : "A", uOrigin: q.y };
+        return p === undefined ? null : { part: p, face: side === "left" ? "B" : "A", uOrigin: q.y,
+                                          vOrigin: q.setback ?? 0 };
     }
     return null;
 }

@@ -9,7 +9,7 @@ import type { Item, Project } from "./model";
 import type { Purpose } from "./part_types";
 import { toRoom, toWall } from "./room";
 
-// contact is not a clash : boards but against each other and a Häfele foot plate sits on the floor
+// Contact is not a clash : boards but against each other and a Häfele foot plate sits on the floor
 export const CLASH_TOL = 0.5;
 
 
@@ -20,15 +20,15 @@ export interface Solid
     label: string;
     min: Vec3;
     max: Vec3;
-    // the point lies inside, deeper than `tol` from every face
+    // The point lies inside, deeper than `tol` from every face
     holds: (p: Vec3, tol: number) => boolean;
-    // a box : three dot products, asked before a board outline
+    // A box : three dot products, asked before a board outline
     cheap: boolean;
-    // the part this hardware is let into, never a clash with it
+    // The part this hardware is let into, never a clash with it
     host: string | null;
-    // the part this volume belongs to, several for battens on an arc, none for hardware
+    // The part this volume belongs to, several for battens on an arc, none for hardware
     part: string | null;
-    // what a piece of hardware is there for, null for a board
+    // What a piece of hardware is there for, null for a board
     purpose: Purpose | null;
 }
 
@@ -63,7 +63,7 @@ function boxOf(points: Vec3[]): { min: Vec3; max: Vec3 }
 }
 
 
-// a box turned in the horizontal or vertical plane : half sizes along its own three directions
+// A box turned in the horizontal or vertical plane : half sizes along its own three directions
 function orientedBox(centre: Vec3, axes: [Vec3, Vec3, Vec3], half: Vec3): (q: Vec3, tol: number) => boolean
 {
     return (q, tol) =>
@@ -72,7 +72,7 @@ function orientedBox(centre: Vec3, axes: [Vec3, Vec3, Vec3], half: Vec3): (q: Ve
         let k = 0;
         while (k < 3)
         {
-            // writen as the passing side : a NaN coordinate counts as outside, never inside
+            // Writen as the passing side : a NaN coordinate counts as outside, never inside
             if (!(Math.abs(dot(d, axes[k]!)) < half[k]! - tol))
             {
                 return false;
@@ -116,7 +116,7 @@ interface Shape
 }
 
 
-// directions of the arc plane and of the cylinder axis
+// Directions of the arc plane and of the cylinder axis
 function curveAxes(c: CurveShape): { rad: (ang: number) => Vec3; tan: (ang: number) => Vec3; axis: Vec3 }
 {
     if (c.axis === "y")
@@ -161,7 +161,7 @@ function withinSweep(a: number, a0: number, a1: number, slack: number): boolean
 }
 
 
-// a skin on its arc, and the flat run that continue it
+// A skin on its arc, and the flat run that continue it
 function shellShapes(c: CurveShape): Shape[]
 {
     const ax = curveAxes(c);
@@ -208,7 +208,7 @@ function shellShapes(c: CurveShape): Shape[]
 }
 
 
-// battens spread along the arc then the flat run, as meshes.ts lays them
+// Battens spread along the arc then the flat run, as meshes.ts lays them
 function battenShapes(p: Part, c: CurveShape): Shape[]
 {
     const ax = curveAxes(c);
@@ -294,7 +294,7 @@ function partShapes(p: Part): Shape[]
 }
 
 
-// a shape built in the frame of its wall, carried into the room
+// A shape built in the frame of its wall, carried into the room
 function placed(it: Item, project: Project, key: string, label: string, s: Shape, host: string | null,
                 part: string | null, purpose: Purpose | null): Solid
 {
@@ -314,7 +314,7 @@ function placed(it: Item, project: Project, key: string, label: string, s: Shape
 }
 
 
-// a piece of hardware : a box, or a cylinder tested on its radius
+// A piece of hardware : a box, or a cylinder tested on its radius
 function fittedShape(f: Fitted): Shape  
 {
     const points = corners(f.centre, f.axes, f.half);

@@ -79,14 +79,14 @@ function magnet(it: Item, x: number, y: number): [number, number]
     }
     for (const o of app.project.items)
     {
-        // only what stands against the same wall, and has a top to stand on
+        // Only what stands against the same wall, and has a top to stand on
         if (o.id === it.id || o.kind === "corner" || o.kind === "ladder" || o.wall !== it.wall)
         {
             continue;
         }
         const top = o.kind === "wallShelf" ? o.y + o.thickness : o.y + o.height;
         const overlapX = x < o.x + o.width && x + width > o.x;
-        // a seat never pulls anything onto itself
+        // A seat never pulls anything onto itself
         const seat = o.kind === "carcass" && o.seat !== null;
         if (overlapX && !seat && Math.abs(y - top) <= MAGNET)
         {

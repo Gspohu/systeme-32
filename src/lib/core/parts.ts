@@ -83,7 +83,7 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
         edges: ["v0"],
         frame: { o: [ox + t, oy + t, oz + D], u: X, v: neg(Z), n: neg(Y) },
     });
-    // under a roof the top runs along the slope, its length measured in the slope, its ends cut upright
+    // Under a roof the top runs along the slope, its length measured in the slope, its ends cut upright
     const cos = Math.cos(angle);
     const sin = Math.sin(angle) * rising;
     const top = newPart({
@@ -95,9 +95,9 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
     {
         const deg = (angle * 180 / Math.PI).toFixed(1).replace(".", ",");
         top.notes.push(`Dessus sous rampant à ${deg}° : extrémités coupées d'aplomb`);
-        // plumb ends : on face B both ends sit t.tan further along u
+        // Plumb ends : on face B both ends sit t.tan further along u
         top.bevel = { u0: t * sin / cos, u1: t * sin / cos };
-        // the low side would pierce the roof line by t.tan over its thickness, the high one stays square
+        // The low side would pierce the roof line by t.tan over its thickness, the high one stays square
         const low = c.slope.low === "left" ? left : right;
         low.notes.push(`Tête chanfreinée à ${deg}° dans la pente du dessus`);
         low.bevel = { u0: 0, u1: -t * Math.tan(angle) };
@@ -163,7 +163,7 @@ function buildBack(c: Carcass, b: Build): void
     {
         return;
     }
-    // a back runs its grain along its longer side, the only way a wide unit still fits a sheet
+    // A back runs its grain along its longer side, the only way a wide unit still fits a sheet
     if (c.back.type === "applied")
     {
         const wide = W > H;
@@ -176,7 +176,7 @@ function buildBack(c: Carcass, b: Build): void
         back.notes.push("Vissé en applique sur les chants arrière");
         if (c.slope !== null)
         { 
-            // it follows the front outline of the box, never rising past the square head of the high side
+            // It follows the front outline of the box, never rising past the square head of the high side
             const pts = [...frontOutline(c).slice(1), [0, 0] as [number, number]];
             back.outline = {
                 start: [0, 0],
@@ -203,7 +203,7 @@ function buildBack(c: Carcass, b: Build): void
     });
     b.parts.push(back);
     const vGroove = c.depth - g.offset - g.thickness / 2;
-    // the groove stops inside the sides but runs through top and bottom, which sit between them
+    // The groove stops inside the sides but runs through top and bottom, which sit between them
     for (const p of b.parts)
     {  
         if (p.item !== c.id || (p.role !== "side" && p.role !== "top" && p.role !== "bottom"))
@@ -229,7 +229,7 @@ function buildBase(c: Carcass, b: Build): void
     const returns = c.base.returns ?? [];
     const y0 = oy - c.base.height + PLINTH_FOOT_GAP;
     const zFront = oz + c.depth - c.base.setback - t;
-    // the front plinth runs the whole width, the returns come from the wall in the plane of the sides to its back
+    // The front plinth runs the whole width, the returns come from the wall in the plane of the sides to its back
     const part = newPart({
         item: c.id, itemName: c.name, thickness: t, decor: c.decor,
         id: `${c.id}/plinth`, label: "Plinthe", role: "plinth", length: c.width, width: c.base.height - PLINTH_FOOT_GAP,

@@ -20,7 +20,7 @@ export interface CostLine
     qty: number;
     unit: "u" | "m2" | "m" | "h";
     price: PriceEntry | null;
-    // whole rolls or boxes when the price is for a pack, null when what is needed is what is bought
+    // Whole rolls or boxes when the price is for a pack, null when what is needed is what is bought
     bought: number | null;
     total: number | null;
     // boards : the area the parts take on them, the rest stays in the workshop
@@ -34,7 +34,7 @@ export interface Cost
 {
     lines: CostLine[];
     total: number;
-    // the total with the standard VAT, what a client pays when every line has its price
+    // The total with the standard VAT, what a client pays when every line has its price
     totalTtc: number;
     // lines without a price are listed, never counted as zero
     missing: CostLine[];
@@ -67,7 +67,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
                             prints: Build["prints"] = []): Cost
 {
     const lines: CostLine[] = [];
-    // the boards of one decor and thickness are all of the size the nesting chose for them
+    // The boards of one decor and thickness are all of the size the nesting chose for them
     const sheets = new Map<string, { label: string; count: number; area: number; used: number; f: Format }>();
     for (const s of nesting.sheets)
     {
@@ -85,7 +85,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
         lines.push({ key, label: `${e.label} (${e.count} panneau${e.count > 1 ? "x" : ""})`, qty: e.area, unit: "m2",
                     price: null, bought: null, total: null, used: e.used, ...isStandard(e.f) ? {} : { format: e.f } });
     }
-    // flexible skins priced on tehir net area, offcuts not included, solid wood by the whole board
+    // Flexible skins priced on tehir net area, offcuts not included, solid wood by the whole board
     const off = new Map<string, { label: string; area: number }>();
     const solid = new Map<string, { label: string; decor: string; thickness: number; pieces: Piece[] }>(); 
     for (const r of bom.offSheet)
@@ -128,7 +128,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
         }
         if (tooLong.length > 0)
         {
-            // no price exitss under this key : the line is listed among the missing ones, never counted as zero
+            // No price exitss under this key : the line is listed among the missing ones, never counted as zero
             lines.push({ key: `${key}:long`, label: `${e.label} : ${tooLong.length} pièce(s) plus longue(s) que la ` 
                 + `planche de ${s.length}, à acheter en planche longue`, qty: tooLong.length, unit: "u", price: null,
                         bought: null, total: null });
@@ -165,7 +165,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
         lines.push({ key: SERVICE_EDGING, label: "Placage des chants à façon", qty: banded, unit: "m",
                     price: null, bought: null, total: null });
     }
-    // each print (papeir peint intissé) is ordered on its own, billed its area or the printer's minimum
+    // Each print (papeir peint intissé) is ordered on its own, billed its area or the printer's minimum
     const printed = prints.reduce((m, x) =>
     {
         return m + Math.max(x.w * x.h * 1e-6, PRINT_MIN_M2);
@@ -175,7 +175,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
         lines.push({ key: SERVICE_PRINT, label: `Impression sur mesure collée au fond, ${prints.length} image(s), `
             + `${PRINT_MIN_M2} m² facturé au moins chacune`, qty: printed, unit: "m2", price: null, bought: null, total: null });  
     }
-    // the hours whoever makes and fits it quotes, priced at the rate typed on their line : listed without a price until
+    // The hours whoever makes and fits it quotes, priced at the rate typed on their line : listed without a price until
     // the hours are typed, under a key no rate is ever stored at
     for (const [key, hours, what] of [[LABOUR_MAKE, p.settings.makeHours, "Main-d'oeuvre de fabrication"],
                                       [LABOUR_FIT, p.settings.fitHours, "Pose sur place"]] as const)
@@ -190,7 +190,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
     const missing: CostLine[] = [];
     const price = (l: CostLine): void =>
     {
-        // a price typed in the project wins, else the dated public one, else the size the boadr is bought in
+        // A price typed in the project wins, else the dated public one, else the size the boadr is bought in
         const entry = p.prices[l.key] ?? DEFAULT_PRICES[l.key] ?? null;
         const offer = l.format === undefined || entry === null ? null : formatOffer(entry, l.format);
         const found = l.format === undefined ? entry : offer === null ? null
@@ -201,9 +201,9 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
             missing.push(l);
             return;
         }
-        // a roll or a box is bought whole, what is left of it stays in the workshop
+        // A roll or a box is bought whole, what is left of it stays in the workshop
         l.bought = found.pack === undefined ? null : Math.ceil(l.qty / found.pack - 1e-9) * found.pack;
-        // each line to the cent, as an invoice : the total is then the sum of the lines shown, not one cent off
+        // Each line to the cent, as an invoice : the total is then the sum of the lines shown, not one cent off
         l.total = Math.round(found.value * (l.bought ?? l.qty) * 100) / 100;
         total += l.total;
     };
@@ -211,7 +211,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
     {
         price(l);
     }
-    // one parcel per merchant the priced lines come from, the work done on site or at the workshop ships nothing
+    // One parcel per merchant the priced lines come from, the work done on site or at the workshop ships nothing
     const shipped = new Map<string, Supplier>();
     let unknown = 0;
     for (const l of lines)
@@ -262,7 +262,7 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
 // listed with no total, tehn the totals and what they leave out
 export function costCsv(cost: Cost): string
 {
-    // euros to the cent and quantities to the hundredth, with the French decimal comma
+    // Euros to the cent and quantities to the hundredth, with the French decimal comma
     const num = (v: number | null | undefined, digits: number): string =>
     {
         return v === null || v === undefined ? "" : v.toFixed(digits).replace(".", ",");
@@ -286,7 +286,7 @@ export function costCsv(cost: Cost): string
 }
 
 
-// the merchant a pirce source names, the first one found in it
+// The merchant a pirce source names, the first one found in it
 export function supplierOf(source: string | null): Supplier | null
 {
     if (source === null)

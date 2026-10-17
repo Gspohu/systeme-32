@@ -6,7 +6,7 @@ import type { Build } from "./parts";
 import { tessellate, type Outline } from "./geometry";
 import { byId } from "./edit";
 
-// border kept around a new opening, a starting value to adjust (convention)
+// Border kept around a new opening, a starting value to adjust (convention)
 export const PANEL_MARGIN = 60;
 
 
@@ -30,7 +30,7 @@ export function openingOutline(spec: PanelFront, w: number, h: number): Outline 
             { kind: "arc", x: cu, y: cv + r, cx: cu, cy: cv, ccw: true },
         ] };
     }
-    // a half circle as wide as the opening ovre straight sides, it needs at least its radius of height
+    // A half circle as wide as the opening ovre straight sides, it needs at least its radius of height
     const r = across / 2;
     if (up < r)
     {

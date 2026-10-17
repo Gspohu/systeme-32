@@ -58,7 +58,7 @@ describe("assembly sequences", () =>
         };
         expect(of("Niche")).toContain("4 vis de liaison 267.07.903 : Colonne gauche et Niche");
         expect(of("Colonne gauche")).not.toContain("Niche, 38 mm");
-        // seven hinges, their plates pushed into the line before the box stands
+        // Seven hinges, their plates pushed into the line before the box stands
         expect(of("Colonne gauche")).toContain("7 embases 174H7100E enfoncées dans les trous de la série");
         expect(of("Placards et tiroirs")).toContain("30 x Blum 609.1500 Vis agglo Ø3,5 x 15, coulisses vissées");
     });
@@ -66,7 +66,7 @@ describe("assembly sequences", () =>
 
     it("screws the heavy 766H runners on the panels before the box stands, like the 760H", () =>
     {
-        // the TV base is too shallow for the shortest 766H (NL 450), the dresser drawers take 766H4500S
+        // The TV base is too shallow for the shortest 766H (NL 450), the dresser drawers take 766H4500S
         const p = dresser();
         let drawers = 0;
         for (const it of p.items)
@@ -130,7 +130,7 @@ describe("assembly sequences", () =>
     it("puts the Minifix housings in the faces, and an open rounded end out of flat shaped panels", () =>
     {
         const all = sequences(tvWall).map(text).join("\n"); 
-        // dowels do go into the edges, the housnigs do not
+        // Dowels do go into the edges, the housnigs do not
         expect(all).toContain("posés dans les faces, flèche vers le chant");
         expect(all).not.toContain("dans leurs chants");
         expect(all).toContain("boîtiers Minifix dans leurs faces");

@@ -17,7 +17,7 @@ export function assemblySheets(sequences: Sequence[]): Draft[]
     canvases.push(canvas);
     let col = 0;
     let y = TOP;
-    // a block stay whole, moved to the next column or sheet when it would rcoss the bottom
+    // A block stay whole, moved to the next column or sheet when it would rcoss the bottom
     const put = (text: string, size: number, bold: boolean, indent: number, after: number): void =>
     {
         const lines = wrap(text, size, COL_W - indent - 4);

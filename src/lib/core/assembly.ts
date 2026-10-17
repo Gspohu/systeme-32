@@ -21,7 +21,7 @@ export interface Sequence
     steps: Step[];
 }
 
-// workshop convention : a square carcass shows equal diagonals within a millimetre
+// Workshop convention : a square carcass shows equal diagonals within a millimetre
 const SQUARE_TOLERANCE = 1;
 const CARCASS = new Set(["side", "top", "bottom", "vdivider", "hdivider"]);
 const BOX = new Set(["boxSide", "boxEnd", "boxBottom"]);
@@ -31,7 +31,7 @@ const BOX = new Set(["boxSide", "boxEnd", "boxBottom"]);
 // TODO an L of two walls goes up wall after wall by name, nothing yet weighs which corner carcass must stand first
 export function assemblyOrder(p: Project): Item[]
 {
-    // an appliance is set in place by its owner, nothing to assemble
+    // An appliance is set in place by its owner, nothing to assemble
     return p.items.filter((it) =>
     {
         return it.kind !== "device";
@@ -51,7 +51,7 @@ export function assemblySequences(p: Project, a: Analysis, bom: Bom): Sequence[]
     {
         return [it.id, i];
     }));
-    // what joins two items is set when the second of them goes up
+    // What joins two items is set when the second of them goes up
     const later = (h: HardwareLine): string =>
     {
         const other = h.partner ?? h.item;
@@ -148,7 +148,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return [];
     }
-    // every part a step names is marked too, the rest listed at the end
+    // Every part a step names is marked too, the rest listed at the end
     const named = new Set<Part>();
     const of = (pred: (q: Part) => boolean): Part[] =>
     {
@@ -163,7 +163,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return q.id.startsWith(`${id}/end/`);
     };
-    // every line a step takes is marked, what none took is listed at the end : nothing left out
+    // Every line a step takes is marked, what none took is listed at the end : nothing left out
     const used = new Set<HardwareLine>();
     const pick = (pred: (h: HardwareLine) => boolean): HardwareLine[] =>
     {
@@ -181,7 +181,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
             return purposes.includes(h.purpose);
         };
     };
-    // the reference the sentences quote, read off the line itself
+    // The reference the sentences quote, read off the line itself
     const refOf = (purpose: Purpose): string =>
     {
         return lines.find(serving(purpose))?.ref ?? "?";
@@ -196,9 +196,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     });
     const steps: Step[] = [partsStep(bom, parts)];
 
-    // flat on the bench, before anything stands : what goes into the panels
+    // Flat on the bench, before anything stands : what goes into the panels
     const prep: string[] = [];
-    // counted from the holes they go in, their lines mix the box and the drawers
+    // Counted from the holes they go in, their lines mix the box and the drawers
     pick(serving("minifix-housing", "minifix-bolt", "dowel", "system-plate"));
     const housings = holes(shell, "minifix-housing");
     if (housings > 0)
@@ -223,7 +223,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     }));
     steps.push({ title: "Préparer les panneaux", lines: prep });
 
-    // standing the shell : bottom, sides, the inside panels, then the top
+    // Standing the shell : bottom, sides, the inside panels, then the top
     const shellDowels = holes(shell, "dowel");
     const uprights = shell.filter((q) =>
     {
@@ -267,11 +267,11 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         })] });
     }
 
-    // a rounded end comes on its side once the box is square, its boards joined to the side
+    // A rounded end comes on its side once the box is square, its boards joined to the side
     const end = of(onEnd);
     if (end.length > 0)
     {
-        // their bolts are in the face of the isde, counted with the panels. An open end has no bent skin
+        // Their bolts are in the face of the isde, counted with the panels. An open end has no bent skin
         const carcass = p.items.find((it) => 
         {
             return it.id === id;
@@ -304,7 +304,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
             }))] });
     }
 
-    // the base goes under while the carcass still lies down
+    // The base goes under while the carcass still lies down
     steps.push({ title: "Socle", lines: listed(pick(serving("foot", "foot-mount"))).map((t) =>
     {
         return `${t}, sous le dessous`;
@@ -346,7 +346,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     }
     steps.push({ title: "Mise en place", lines: place });
 
-    // drawers : box, runners, then the front set and screwed from inside
+    // Drawers : box, runners, then the front set and screwed from inside
     if (boxes.length > 0)
     {
         steps.push({ title: "Tiroirs", lines: [
@@ -356,7 +356,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         ] });
     }
 
-    // doors and flaps : hinges clipped on, set, opened by hand or by pressure
+    // Doors and flaps : hinges clipped on, set, opened by hand or by pressure
     // the plates screwed on inset doors and the cup screws belong to the doors, the EXPANDO plates went in earlier
     const fronts = of((q) =>
     {
@@ -371,7 +371,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     }
     steps.push(doorStep);
 
-    // the inside last : pins and shelves, rails, light
+    // The inside last : pins and shelves, rails, light
     const loose = of((q) =>
     {
         return q.role === "shelf";

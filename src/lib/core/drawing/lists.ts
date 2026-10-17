@@ -66,7 +66,7 @@ export function hardwareSheets(bom: Bom): Draft[]
         const canvas = new Canvas();
         heading(canvas, `Quincaillerie${pageSuffix(i, pages.length)}`);
         const y = table(canvas, MARGIN + 5, TABLE_TOP, cols, header, chunk, 2.1, 4.2);
-        // the edge metres close the last hardware page, or take one of their own when it is full
+        // The edge metres close the last hardware page, or take one of their own when it is full
         if (i === pages.length - 1)
         {
             let at = y + 6;
@@ -92,7 +92,7 @@ export function hardwareSheets(bom: Bom): Draft[]
 export function nestingSheets(nesting: NestResult): Draft[]
 {
     const out: Draft[] = [];
-    // three panels a sheet : the fourth place, bottom right, is the title block's
+    // Three panels a sheet : the fourth place, bottom right, is the title block's
     const perPage = 3;
     const scale = 20;
     let i = 0;
@@ -111,7 +111,7 @@ export function nestingSheets(nesting: NestResult): Draft[]
             canvas.rect(x0, y0, sheet.length / scale, sheet.width / scale, "normal");
             const trim = sheet.trim / scale;
             canvas.rect(x0 + trim, y0 + trim, sheet.length / scale - 2 * trim, sheet.width / scale - 2 * trim, "dashed");
-            // a piece too small for its code gets a number, the legend under the panel match it to the code
+            // A piece too small for its code gets a number, the legend under the panel match it to the code
             const legend: string[] = [];
             for (const pl of sheet.placements)
             {

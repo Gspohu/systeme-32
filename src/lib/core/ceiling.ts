@@ -8,7 +8,7 @@ import { X, Y, Z, neg } from "./geometry";
 import { buttedLengths, type Cut } from "./solid_stock";
 
 
-// the slat cleats of the same project, 40 x 20
+// The slat cleats of the same project, 40 x 20
 export const CLEAT_WIDTH = 40;
 
 
@@ -37,7 +37,7 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): 
         return;
     }
     const t = c.thickness;
-    // in the plane of the overlay façades, in their decor whne there are some
+    // In the plane of the overlay façades, in their decor whne there are some
     const front = c.fronts[0];
     const strip = newPart({
         item: c.id, itemName: c.name, thickness: t, decor: front?.decor ?? c.decor, colour: front?.colour ?? null,
@@ -47,7 +47,7 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): 
     });
     strip.notes.push(`Hauteur théorique ${Math.round(gap)} mm : plafond rarement droit, ajuster sur place`);
     b.parts.push(strip);
-    // solid wood like the slat cleats, a 20 mm melamine board does not exist. In lengths butted end to end when
+    // Solid wood like the slat cleats, a 20 mm melamine board does not exist. In lengths butted end to end when
     // no board on sale gives it whole
     const lengths = buttedLengths(c.width - 2 * t, "CHENE_MASSIF", CLEAT_THICKNESS, cut);
     const many = lengths.length > 1;
@@ -63,7 +63,7 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): 
                          id: `${c.id}/filler-cleat${many ? `/${k + 1}` : ""}`,
                          label: `Tasseau du fileur${many ? `, morceau ${k + 1}/${lengths.length}` : ""}`,
                          role: "cleat" as const, length: l, edges: [], width: CLEAT_WIDTH, thickness: CLEAT_THICKNESS };
-        // standing behind the strip, or laid flat on the top when the gap is lower than the cleat is wdie
+        // Standing behind the strip, or laid flat on the top when the gap is lower than the cleat is wdie
         b.parts.push(newPart({ ...common, frame: gap >= CLEAT_WIDTH
             ? { o: [x, c.y + c.height, c.z + c.depth - CLEAT_THICKNESS], u: X, v: Y, n: Z }
             : { o: [x, c.y + c.height + CLEAT_THICKNESS, c.z + c.depth], u: X, v: neg(Z), n: neg(Y) } }));
@@ -86,7 +86,7 @@ export function ceilingChecks(p: Project): Check[]
         {
             continue;
         }
-        // assembled lying on its back, it is raised about its bottom front edge
+        // Assembled lying on its back, it is raised about its bottom front edge
         const swing = Math.hypot(c.height, c.depth);
         if (swing > h)
         {

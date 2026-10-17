@@ -121,7 +121,7 @@ describe("layout and commands", () =>
         {
             expect(spec.leaves).toBe(1);
             expect(spec.leafWidth).toBeLessThan(600);
-            // opened, the leaf runs right over the free length of its track, the width of the box less its own
+            // Opened, the leaf runs right over the free length of its track, the width of the box less its own
             const runs = analyse(r).build.motions;
             expect(runs).toHaveLength(1);
             expect(runs[0]).toMatchObject({ kind: "slide", axis: [1, 0, 0], amount: c.width - spec.leafWidth });
@@ -180,7 +180,7 @@ describe("Blum and Hettich rules", () =>
     {
         const c = newCarcass({ width: 600, height: 800, depth: 500 });
         c.fronts.push({ id: "f", node: c.root.id, spec: { type: "door", hinge: "left" }, opening: "handle",
-                       mount: "overlay", decor: null, colour: null, colourName: null });
+                       handle: "edge", mount: "overlay", decor: null, colour: null, colourName: null });
         const fp = frontPanels(c, resolveLayout(c), DEFAULT_SETTINGS)[0]!;
         expect(fp.hingeKind).toBe("full");
         expect(cupDistance(fp)).toBeCloseTo(6.5, 6);
@@ -202,7 +202,7 @@ describe("Blum and Hettich rules", () =>
 
     it("says which runner series lacks depth, and when the load is past every MOVENTO", () =>
     {
-        // the TV base gives 392 mm : too shallow for the shortest 766H (NL 450), the 40 kg series fits
+        // The TV base gives 392 mm : too shallow for the shortest 766H (NL 450), the 40 kg series fits
         const errorsWith = (runner: "760H" | "766H" | undefined, loadKg: number): string =>
         {
             const p = tvWall();
@@ -323,7 +323,7 @@ describe("rounded ends", () =>
         {
             return k.level === "error";
         })).toEqual([]);
-        // a half round need no back, its skin close it all round
+        // A half round need no back, its skin close it all round
         const half = analyse(addItem(newProject("Obernai"), { ...c, ends: { left: { type: "square" },
                                                                           right: { ...quarter(true), sweep: 180 } } }));
         expect(half.build.parts.some((q) =>
@@ -390,7 +390,7 @@ describe("anti-tip fixing", () =>
         const lines = computeOutputs(priced).cost.lines;
         const bracket = lines.find((l) => { return l.label.includes("Équerre anti-basculement"); })!;
         const screw = lines.find((l) => { return l.label.includes("Vis aggloméré 4 x 16"); })!;
-        // the price typed in wins over the default one, the screw keeps its own default
+        // The price typed in wins over the default one, the screw keeps its own default
         expect(bracket.total).toBeCloseTo(2.4, 9);
         expect(screw.price!.source).toContain("vis fischer 4 x 16");
     }); 
@@ -461,7 +461,7 @@ describe("nesting", () =>
             for (let i = 0; i < pl.length; i++)
             {
                 const a = pl[i]!;
-                // a placement has exactly the size of its part, rotated or not
+                // A placement has exactly the size of its part, rotated or not
                 const part = byCode.get(a.code)!;
                 const size = a.rotated ? [part.width, part.length] : [part.length, part.width];
                 expect([a.w, a.h]).toEqual(size);

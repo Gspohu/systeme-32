@@ -26,7 +26,7 @@ test.describe("ceiling and desk", () =>
 
     test("drops a desk top at the EN 527-1 height and rounds a corner", async ({ page }) =>
     {
-        // inside the frame of the view, the top then overlaps the carcass, which this test leaves aside
+        // Inside the frame of the view, the top then overlaps the carcass, which this test leaves aside
         expect(await drop(page, "Plan de bureau", await toClient(page, 1200, 900))).toBe("Ajouté : Plan de bureau");
         const lines = (await checkLines(page)).join("\n");
         expect(lines).toContain("appuis non vérifiés");

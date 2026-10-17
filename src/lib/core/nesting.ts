@@ -114,7 +114,7 @@ class MaxRects
                 next.push(f);
                 continue;
             }
-            // split the free rectangle into the up to four maximal pieces around the placed one
+            // Split the free rectangle into the up to four maximal pieces around the placed one
             if (r.x > f.x)
             {
                 next.push({ x: f.x, y: f.y, w: r.x - f.x, h: f.h });
@@ -132,7 +132,7 @@ class MaxRects
                 next.push({ x: f.x, y: r.y + r.h, w: f.w, h: f.y + f.h - (r.y + r.h) });
             }  
         }
-        // drop free rcetangles contained in another one, keeping the first of two equal ones
+        // Drop free rcetangles contained in another one, keeping the first of two equal ones
         const kept: Free[] = [];
         let i = 0;
         while (i < next.length)
@@ -174,18 +174,18 @@ export interface Format
 export const STANDARD_FORMAT: Format = { length: SHEET_LENGTH, width: SHEET_WIDTH };
 
 
-// the size of the boards bought for each decor and thickness, the stadard one unless told otherwise
+// The size of the boards bought for each decor and thickness, the stadard one unless told otherwise
 export function nest(rows: CutRow[], s: Settings, formatOf: (decor: string, thickness: number) => Format = () => 
 {
     return STANDARD_FORMAT;
 }): NestResult
 {
-    // boards in the order the list first need them, which is the order of the sheets
+    // Boards in the order the list first need them, which is the order of the sheets
     const byBoard = new Map<string, { decor: string; thickness: number; pieces: Piece[] }>();
     const all: { key: string; piece: Piece }[] = [];
     for (const r of rows)
     {
-        // glass comes cut to size from the glazier, never out of a board
+        // Glass comes cut to size from the glazier, never out of a board
         if (MATERIALS[decorById(r.decor).material]?.kind === "glass")
         {
             continue;
@@ -203,7 +203,7 @@ export function nest(rows: CutRow[], s: Settings, formatOf: (decor: string, thic
             k++;
         }
     }
-    // biggest first, the usual order for MaxRects, sorted once and stable within each board
+    // Biggest first, the usual order for MaxRects, sorted once and stable within each board
     all.sort((a, b) =>
     {
         const p = a.piece;
@@ -224,7 +224,7 @@ export function nest(rows: CutRow[], s: Settings, formatOf: (decor: string, thic
         const bins: MaxRects[] = [];
         for (const pc of g.pieces)
         {
-            // each piece reesrves its kerf on the right and top, the bin gets one kerf back
+            // Each piece reesrves its kerf on the right and top, the bin gets one kerf back
             const pw = pc.w + s.kerf;
             const ph = pc.h + s.kerf;
             let done = false;

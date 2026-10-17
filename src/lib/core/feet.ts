@@ -13,7 +13,7 @@ export const AXILO_SHAFT_D = 30;
 export const AXILO_PLATE_D = 78;
 export const AXILO_PLATE_H = 8;
 
-// distance of a foot axis from the sides and the back, conveniton
+// Distance of a foot axis from the sides and the back, conveniton
 export const FOOT_INSET = 50;
 export const FOOT_MAX_SPACING = 800;
 
@@ -68,7 +68,7 @@ export function feetPerRow(c: Carcass): number
 
 export interface FootPlace
 {
-    // axis in the frame of the wall, bottom of the plate on the floor under the carcass
+    // Axis in the frame of the wall, bottom of the plate on the floor under the carcass
     x: number;
     z: number;
     floor: number;
@@ -76,7 +76,7 @@ export interface FootPlace
 }
 
 
-// plate, shaft and top section of every foot, as the 3D view, the clash checks and the drawings take them
+// Plate, shaft and top section of every foot, as the 3D view, the clash checks and the drawings take them
 export function feetFitted(c: Carcass, ref: string): Fitted[]
 {
     const out: Fitted[] = [];
@@ -112,7 +112,7 @@ export function footPlaces(c: Carcass): FootPlace[]
     {
         const left = sideFootInset(c, "left");
         const x = c.x + left + (c.width - left - sideFootInset(c, "right")) * i / (n - 1);
-        // the back row stands under the bottom panel, which stops at an applied back
+        // The back row stands under the bottom panel, which stops at an applied back
         for (const z of [c.z + c.depth - frontFootInset(c), c.z + c.depth - usableDepth(c) + FOOT_INSET])
         {
             out.push({ x, z, floor: c.y - h, height: h });

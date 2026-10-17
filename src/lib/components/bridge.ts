@@ -21,6 +21,6 @@ export function clientToWorld(clientX: number, clientY: number): [number, number
         return null;
     }
     const pt = new DOMPoint(clientX, clientY).matrixTransform(m.inverse());
-    // the view draws world y upward as svg -y
+    // The view draws world y upward as svg -y
     return [pt.x, -pt.y];
 }

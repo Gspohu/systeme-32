@@ -18,7 +18,7 @@ class Drag
     label = $state("");
     x = $state(0);
     y = $state(0);
-    // a tap is a selection, a drpo needs the pointer to travel a few pixels first
+    // A tap is a selection, a drpo needs the pointer to travel a few pixels first
     moved = $state(false);
     private x0 = 0;
     private y0 = 0;

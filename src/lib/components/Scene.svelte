@@ -16,15 +16,16 @@
     import type { Purpose } from "../core/part_types";
     import { decorTexture } from "../view3d/textures";
     import { decorById } from "../data/materials";
+    import { EDGE_PULL } from "../data/hardware";
     import { photoMime } from "../core/photos";
 
 
     const build = $derived(app.outputs.analysis.build);
 
-    // every part holds its own lacquer colour, fronts, dividers and linings alike
+    // Every part holds its own lacquer colour, fronts, dividers and linings alike
     const specs = $derived(partMeshes(build.parts));
 
-    // what each part and each fixed piece of hardware moves with : all the motions to know what a click opens
+    // What each part and each fixed piece of hardware moves with : all the motions to know what a click opens
     // the open ones to pose the meshes
     const anyMotion = $derived(movers(build.motions, build.fitted, () =>
     {
@@ -41,7 +42,7 @@
     }
     interactivity();
 
-    // meshes stay in the frame of their wall, a group per item turns them into the room
+    // Meshes stay in the frame of their wall, a group per item turns them into the room
     const byItem = $derived.by(() =>
     {
         const m = new Map<string, MeshSpec[]>();
@@ -60,7 +61,7 @@
         return { rotation: [0, pl.angle, 0], position: [pl.origin[0] * MM, pl.origin[1] * MM, pl.origin[2] * MM] };
     }
 
-    // geometries of a previous build are freed as soon as a new one replces them
+    // Geometries of a previous build are freed as soon as a new one replces them
     $effect(() =>
     {
         const current = specs;
@@ -121,7 +122,7 @@
     $effect(() =>
     {
         const wanted = new Set<string>();
-        // the decor photos and the pictures printed on cell backs, decoded the same way
+        // The decor photos and the pictures printed on cell backs, decoded the same way
         const files = [...Object.values(app.project.textures).map((t) => { return t.file; }),
                        ...build.prints.map((x) => { return x.file; })];
         for (const file of files)
@@ -163,7 +164,7 @@
         const user = colour === null ? app.project.textures[decor] : undefined;
         const photo = user === undefined ? undefined : photos.get(user.file);
         const tag = user === undefined || photo === undefined ? "" : `${photo.version}@${user.tileMm}`;
-        // boards turn see-through while the hardware inside is shown
+        // Boards turn see-through while the hardware inside is shown
         const see = app.showHardware;
         const key = `${decor}|${colour ?? ""}|${tag}|${see}`;
         const hit = materials.get(key);
@@ -175,7 +176,7 @@
         let map = colour === null ? decorTexture(d) : null;
         if (user !== undefined && photo !== undefined) 
         {
-            // extrude UVs are in millimetres of the shape : one photo every tileMm, like the procedural tiles
+            // Extrude UVs are in millimetres of the shape : one photo every tileMm, like the procedural tiles
             map = photo.tex;
             map.repeat.set(1 / user.tileMm, 1 / user.tileMm);
         }
@@ -194,9 +195,9 @@
         return m;
     }
 
-    // the screen where the arm slider puts it, the arm from its plate, and the ring the arm can reach
+    // The screen where the arm slider puts it, the arm from its plate, and the ring the arm can reach
     const pose = $derived(app.project.screen === null ? null : spotFor(app.project.screen, app.armSpot));
-    // the set turns red as long as it is in something, the names are given in the toggles
+    // The set turns red as long as it is in something, the names are given in the toggles
     const clashing = $derived(pose !== null && spotClashes(app.project, pose).length > 0);
     const screenGeo = $derived(app.project.screen === null || pose === null ? null
         : screenMesh(app.project.screen, pose));
@@ -219,7 +220,7 @@
             }
         };
     });
-    // the colours of the appliances themselves : a block in the black of the screen, an amplifier in black tolex
+    // The colours of the appliances themselves : a block in the black of the screen, an amplifier in black tolex
     // with its grille cloth and brass plate
     const deviceMats: Record<DeviceSkin, Record<"block" | "amplifier", THREE.MeshStandardMaterial>> = {
         body: { block: screenMat, amplifier: new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.85 }) },
@@ -260,7 +261,7 @@
     });
 
 
-    // the fabric is not chosen yet : a plain neutral cushion
+    // The fabric is not chosen yet : a plain neutral cushion
     const cushions = $derived.by(() =>
     {
         const list: { key: string; wall: Wall; geometry: THREE.BufferGeometry }[] = [];
@@ -283,15 +284,17 @@
         {
             return [it.id, it.wall];
         }));
-        const list: { key: string; wall: Wall; hidden: boolean; purpose: Purpose | null;
+        const list: { key: string; wall: Wall; hidden: boolean; purpose: Purpose | null; brass: boolean;
                       geometry: THREE.BufferGeometry }[] = [];
-        const purposes = new Map(build.fitted.map((f) =>
+        const byKey = new Map(build.fitted.map((f) =>
         {
-            return [f.key, f.purpose];
+            return [f.key, f];
         }));
         for (const m of fittedMeshes(build.fitted))
         {
-            list.push({ ...m, wall: walls.get(m.item) ?? "back", purpose: purposes.get(m.key) ?? null });
+            const f = byKey.get(m.key);
+            list.push({ ...m, wall: walls.get(m.item) ?? "back", purpose: f?.purpose ?? null,
+                        brass: f?.ref === EDGE_PULL.ref });
         }
         return list;
     });
@@ -319,7 +322,7 @@
         };
     });
 
-    // rails and LED profiles follow the layouts of the analysis
+    // Rails and LED profiles follow the layouts of the analysis
     const fittings = $derived.by(() =>
     {
         const list: (FittingMesh & { wall: Wall })[] = [];
@@ -344,7 +347,7 @@
         return list;
     });
     const tubeMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.8, roughness: 0.3 });
-    // a plain warm white, not a rendering of the colour temperature chosen
+    // A plain warm white, not a rendering of the colour temperature chosen
     const ledMat = new THREE.MeshStandardMaterial({ color: 0xfff4e0, emissive: 0xfff4e0, emissiveIntensity: 0.8 });
     $effect(() =>
     {
@@ -358,7 +361,7 @@
         };
     });
 
-    // with the LEDs on, each strip or spot casts its light down from its own face, at its colour temperature
+    // With the LEDs on, each strip or spot casts its light down from its own face, at its colour temperature
     RectAreaLightUniformsLib.init();
     const ledLights = $derived.by(() =>
     {
@@ -380,7 +383,7 @@
         }
         return list;
     });
-    // a printed picture : a sheet stretched once over the back of its cell, a hair in front of it, lit like a board
+    // A printed picture : a sheet stretched once over the back of its cell, a hair in front of it, lit like a board
     const prints = $derived.by(() =>
     {
         const walls = new Map(app.project.items.map((it) =>
@@ -429,9 +432,9 @@
         return m;  
     }
 
-    // the room dimmed to a fifth, the way a lit niche is looked at in the evening
+    // The room dimmed to a fifth, the way a lit niche is looked at in the evening
     const dim = $derived(app.ledsOn ? 0.2 : 1);
-    // a rendering exposure set by eye against the lights of this scene, which are not photometric either : a real
+    // A rendering exposure set by eye against the lights of this scene, which are not photometric either : a real
     // strip of 1400 lm/m behind 18 mm of diffuser is near 25 000 cd/m2 and would only burn the picture white
     const LED_NITS = 14;
     $effect(() =>
@@ -465,7 +468,7 @@
                  section: css.getPropertyValue("--colour-text-secondary").trim() || "#a5988a" };
     });
 
-    // the walls and the ceiling only show the room : one face each, towards the inside, gone once the camera is out
+    // The walls and the ceiling only show the room : one face each, towards the inside, gone once the camera is out
     const sideWalls = $derived(new Set(app.project.items.map((it) =>
     {
         return it.wall;
@@ -587,7 +590,7 @@
         {@const pose = poseOf(f.key)}
         <T.Group rotation={pl.rotation} position={pl.position}>
             <T.Group quaternion={pose.quaternion} position={pose.position}>
-                <T.Mesh geometry={f.geometry} material={hardwareMat(f.purpose)} />
+                <T.Mesh geometry={f.geometry} material={f.brass ? deviceMats.brass.amplifier : hardwareMat(f.purpose)} />
             </T.Group>
         </T.Group>
     {/if}

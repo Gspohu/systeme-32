@@ -8,7 +8,7 @@ import { emptyBuild } from "./parts";
 import type { Hole, Part } from "./parts";
 
 
-// a 19 mm side of a plain carcass in Haguenau, each test need its holes swapped for the ones unedr test
+// A 19 mm side of a plain carcass in Haguenau, each test need its holes swapped for the ones unedr test
 function side(holes: Hole[]): Part
 {
     const p = addItem(newProject("cellier"), newCarcass({ name: "Colonne", width: 450, height: 900, depth: 400 }));

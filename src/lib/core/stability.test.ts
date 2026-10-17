@@ -56,14 +56,14 @@ describe("gravity on what stands on the floor", () =>
 
     it("finds the tilt of a plain box from its centre of mass, as a hand would", () =>
     {
-        // away from the wall, free to fall any way, on its own bottom, narow enough to go over sideways
+        // Away from the wall, free to fall any way, on its own bottom, narow enough to go over sideways
         const c = newCarcass({ name: "Armoire", width: 400, height: 2000, depth: 600, y: 0, z: 300,
                                base: { type: "floor" }, fixToWall: false });
         const [s] = bodies(project(c));
         const expected = Math.atan2(200 - Math.abs(s!.centre[0] - 200), s!.centre[1]) * 180 / Math.PI;
         expect(s!.towards).toMatch(/gauche|droite/);
         expect(s!.tiltDeg).toBeCloseTo(expected, 1);
-        // a centre of mass near mid height : atan(200 / 1000) is 11.3 degrees
+        // A centre of mass near mid height : atan(200 / 1000) is 11.3 degrees
         expect(s!.tiltDeg).toBeGreaterThan(10);
         expect(s!.tiltDeg).toBeLessThan(13);
     });

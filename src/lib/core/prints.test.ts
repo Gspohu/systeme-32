@@ -17,7 +17,7 @@ function withPanorama(): { p: Project; niche: Carcass; cell: string }
         return it.name === "Niche";
     }) as Carcass;
     const cell = (niche.root as SplitNode).children[1]!.id;
-    // the command hand back a new project, the niche is looked up again in it
+    // The command hand back a new project, the niche is looked up again in it
     const p = setPrint(base, niche.id, cell, "montagnes.png");
     const placed = p.items.find((it) =>
     {
@@ -48,7 +48,7 @@ describe("pictures printed on the back of a cell", () =>
     {
         const { p, niche } = withPanorama();
         const side = (niche.root as SplitNode).children[0] as SplitNode;
-        // a second, small picture in a side cell : its 0.04 m2 is billed as 1
+        // A second, small picture in a side cell : its 0.04 m2 is billed as 1
         const both = setPrint(p, niche.id, side.children[0]!.id, "carlin.jpg");
         const line = computeOutputs(both).cost.lines.find((l) =>
         {

@@ -25,7 +25,7 @@ export function fitPrints(c: Carcass, lay: ResolvedLayout, b: Build): void
                 + "l'impression.");
             continue;
         }
-        // on the back lniing when the cell has one, else on the back itself
+        // On the back lniing when the cell has one, else on the back itself
         const lining = c.linings.find((l) =>
         {
             return l.cell === print.cell && l.faces.back;

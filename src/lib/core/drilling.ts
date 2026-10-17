@@ -3,7 +3,7 @@
 import type { Hole, Part, Purpose } from "./part_types";
 
 
-// drillings laid out to open into each othe : the lead of a spot comes out of its housing
+// Drillings laid out to open into each othe : the lead of a spot comes out of its housing
 const JOINED: [Purpose, Purpose][] = [["spot", "light-lead"]];
 
 
@@ -32,7 +32,7 @@ export function metHole(p: Part, face: "A" | "B", u: number, v: number, diameter
 }
 
 
-// every pair of face drillings of the part that meet, whatever placed them
+// Every pair of face drillings of the part that meet, whatever placed them
 export function crossedHoles(p: Part): [Hole, Hole][]  
 {
     const pairs: [Hole, Hole][] = [];

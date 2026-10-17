@@ -4,7 +4,7 @@ import type { Project } from "./model";
 import type { Check } from "./check";
 
 
-// letters A to Z without I and O, read as 1 and 0, then AA, AB... (5.1.4)
+// Letters A to Z without I and O, read as 1 and 0, then AA, AB... (5.1.4)
 const INDEX_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 

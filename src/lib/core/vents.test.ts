@@ -6,7 +6,7 @@ import { partToDxf } from "./drawing/dxf";
 import type { Project } from "./model";
 import type { Part } from "./parts";
 
-// a TV unit in Wissembourg over a fireplace insert : 1800 wide on a 100 plinth, grill to let the air in
+// A TV unit in Wissembourg over a fireplace insert : 1800 wide on a 100 plinth, grill to let the air in
 function unit(grills: number, height = 100): Project
 {
     return addItem(newProject("salon"), newCarcass({ name: "Meuble TV", width: 1800, height: 500, depth: 450, y: height,
@@ -61,7 +61,7 @@ describe("plinth ventilation grills", () =>
 
     it("refuses grills that do not fit the plinth", () =>
     {
-        // a 60 plinth leaevs 53 of board, under the 65 rim
+        // A 60 plinth leaevs 53 of board, under the 65 rim
         expect(errors(unit(1, 60))).toContain("ne tiennent pas sur une plinthe de 1800 x 53");
         // 3 x 458 fit in 1800, 4 x 458 = 1832 do not
         expect(errors(unit(3))).toBe("");

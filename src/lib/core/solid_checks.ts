@@ -28,7 +28,7 @@ export function solidChecks(p: Project, b: Build): Check[]
     for (const c of clashes(all))
     {
         const across = c.a.item !== c.b.item;
-        // the item check handle two boxes crossing already, a round corner is left out there
+        // The item check handle two boxes crossing already, a round corner is left out there
         if (across && kinds.get(c.a.item) !== "corner" && kinds.get(c.b.item) !== "corner")
         {
             continue;

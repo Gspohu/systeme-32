@@ -55,7 +55,7 @@ describe("hardware in the 3D view", () =>
         {
             return f.ref.startsWith("760H");
         });
-        // three drawers : each one need a runer per side
+        // Three drawers : each one need a runer per side
         expect(runners.length).toBe(6);
         for (const r of runners)
         {

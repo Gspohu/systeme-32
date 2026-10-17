@@ -12,8 +12,8 @@ import { CommandError, byId, edit, withoutId } from "./edit";
 
 
 export { CommandError } from "./edit";
-export { splitCell, removeDivider, moveDivider, setDividerKind, setDividerFinish, setDividerThickness, distributeEvenly,
-         setCellSize }
+export { splitCell, splitZone, removeDivider, moveDivider, setDividerKind, setDividerFinish, setDividerThickness,
+         setDividerSetback, distributeEvenly, setCellSize, NICHE_SETBACK }
     from "./layout_commands";
 export { setFront, removeFront, updateFront, moveFront, mergeFronts, splitFront, toSliding, toDoor, setLining, setRail,
          setLight, setPrint, setEnd, setShoeRack, setModularCell, addOutlet, updateOutlet, removeOutlet } 
@@ -83,7 +83,7 @@ export function duplicateItem(p: Project, id: string, dx: number): Project
         }
         if (copy.kind === "carcass")
         {
-            // fresh ids in the tree, the fronts and linings follow thir nodes
+            // Fresh ids in the tree, the fronts and linings follow thir nodes
             const renamed = new Map<string, string>();
             const renew = (n: LayoutNode): void =>
             {
@@ -121,7 +121,7 @@ export function duplicateItem(p: Project, id: string, dx: number): Project
                 s.id = newId("h");
                 s.cell = renamed.get(s.cell) ?? s.cell;
             }
-            // the socket holes, the prints and the cells dirlled full height follow their cells too
+            // The socket holes, the prints and the cells dirlled full height follow their cells too
             for (const o of copy.outlets)
             {
                 o.id = newId("o");
@@ -146,7 +146,7 @@ export function setSettings(p: Project, patch: Partial<Settings>): Project
 {
     for (const [key, value] of Object.entries(patch))
     {
-        // a pitch or a power of zero would divide by zero further on
+        // A pitch or a power of zero would divide by zero further on
         const strict = key === "grid" || key === "ledCutPitch" || key === "ledWattPerMetre" || key === "spotWatt";
         if (typeof value === "number" && (!Number.isFinite(value) || value < 0 || (strict && value === 0)))
         {

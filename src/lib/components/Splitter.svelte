@@ -3,7 +3,7 @@
     // A double click gives the stylesheet size back
     let { axis, size = $bindable(), target, bounds, grows = 1, label, place, onrelease }: {
         axis: "x" | "y";
-        // grid area and edge of the pane, the handle being a child of the grid that lays the panes out
+        // Grid area and edge of the pane, the handle being a child of the grid that lays the panes out
         place: string;
         size: number | null;
         target: HTMLElement | undefined;

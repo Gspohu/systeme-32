@@ -18,7 +18,7 @@ import { hardware } from "../../data/hardware";
 
 type ToPage = (value: number) => number;
 
-// page millimetres between two views, room for their titles and dimensions
+// Page millimetres between two views, room for their titles and dimensions
 const VIEW_GAP = 28;
 
 
@@ -30,7 +30,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const reachLeft = endReach(k, "left");
     const reachRight = endReach(k, "right");
     const fullHeight = k.height + bh;
-    // a tall item lines front, cut and side up on one row with the plan under the front, a wide and low one stacks
+    // A tall item lines front, cut and side up on one row with the plan under the front, a wide and low one stacks
     // the cut under the front with the side beside it : whichever reads at the larger scale
     const wide = k.width + reachLeft + reachRight;
     const availW = A3.w - 2 * MARGIN - 20;
@@ -56,7 +56,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     }) ?? last;
     const stacked = inStack < inRow;
     const scale = stacked ? inStack : inRow;
-    // page point of the left face of the box and of the floor under it, the item kept in its own coordinates
+    // Page point of the left face of the box and of the floor under it, the item kept in its own coordinates
     const fx = MARGIN + 20 + reachLeft / scale;
     const fy = MARGIN + 38 + fullHeight / scale;
     const topY = fy - fullHeight / scale;
@@ -69,7 +69,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     }
     else
     {
-        // each side dimensioned on its own, the low one would read as the full height otherwise
+        // Each side dimensioned on its own, the low one would read as the full height otherwise
         const sides = sideHeights(k);
         const xr = fx + (k.width + reachRight) / scale;
         canvas.dimV(fy - (sides.left + bh) / scale, fy, fx - reachLeft / scale - 1, fx - reachLeft / scale - 8,
@@ -100,7 +100,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const lay = a.build.layouts.get(k.id);
     if (lay !== undefined && k.root.kind === "split" && k.root.axis === "v")
     {
-        // chain of the inner widths of the first level of columns
+        // Chain of the inner widths of the first level of columns
         const edges = [k.thickness];
         for (const d of lay.dividers)
         {
@@ -118,7 +118,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
             i += 2;
         }
     }
-    // the inside the fronts hide : panels, runner spaces, and the height of every cell
+    // The inside the fronts hide : panels, runner spaces, and the height of every cell
     // TODO the hinges are drawn nowhere on these views, their arm and plate are not modelled yet
     const cutX = stacked ? fx : fx + (k.width + reachRight) / scale + VIEW_GAP + reachLeft / scale;
     const cutY = stacked ? fy + VIEW_GAP + fullHeight / scale : fy;
@@ -148,7 +148,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         canvas.rect(front - k.thickness / scale, fy - (bh - PLINTH_FOOT_GAP) / scale, k.thickness / scale,
                     (bh - PLINTH_FOOT_GAP) / scale, "thin");
     }
-    // seen from the side the feet stand in the open, the runner spaces behind the side panel
+    // Seen from the side the feet stand in the open, the runner spaces behind the side panel
     for (const f of a.build.fitted)
     {
         if (f.item !== k.id || f.host !== null)
@@ -160,7 +160,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
                     (e.max[2] - e.min[2]) / scale, (e.max[1] - e.min[1]) / scale, f.hidden ? "dashed" : "thin");
     }
     canvas.dimH(sideX, sideX + k.depth / scale, fy + 1, fy + 8, `${k.depth}`);
-    // the base : its height on the front edge, and how far a plinth stands back from the front
+    // The base : its height on the front edge, and how far a plinth stands back from the front
     const sideFront = sideX + k.depth / scale;
     if (bh > 0)
     {
@@ -171,7 +171,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         canvas.dimH(sideFront - k.base.setback / scale, sideFront, fy + 1, fy + 14, `${k.base.setback}`, 1.8);
     }
 
-    // the tables take the free column on the right, else the space under the cut
+    // The tables take the free column on the right, else the space under the cut
     const rightX = sideX + k.depth / scale + VIEW_GAP;
     const onRight = A3.w - MARGIN - rightX >= 150;
     let listX = cutX;
@@ -253,7 +253,7 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
         return [`${h.brand} ${h.ref}`.trim(), `${count}`, h.label];
     });
     const cols = [34, 10, Math.max(60, A3.w - MARGIN - 50 - listX)];
-    // what the room left does not hold is named, never dropped
+    // What the room left does not hold is named, never dropped
     const pages = paginateTable(rows, cols, 2.5, 4.5, bottom - listY - 12);
     const end = table(canvas, listX + 3, listY + 6, cols, ["Référence", "Qté", "Article"], pages[0]!, 2.5, 4.5);
     if (pages.length > 1)
@@ -296,19 +296,19 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
             arc.push([planX(xFace + dir * r * Math.cos(ang)), planY(k.depth - r + r * Math.sin(ang))]);
             j++;
         }
-        // the straight run of a quarter round stops against the applied back, like the skin that gets built
+        // The straight run of a quarter round stops against the applied back, like the skin that gets built
         if (end.sweep === 90 && usable > r)
         {
             arc.unshift([planX(xFace + dir * r), planY(k.depth - usable)]);
         }
-        // a quarter round closes on the side along its back, a half round comes back to the side by itself
+        // A quarter round closes on the side along its back, a half round comes back to the side by itself
         if (end.sweep === 90)   
         {
             arc.unshift([planX(xFace), arc[0]![1]]);
         } 
         canvas.poly(arc, false, "normal");
         canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2), `R ${Math.round(r)}`, 2, "middle");
-        // the floor board under the others, from the plinth line : only its curve, the rest runs on the lines drawn
+        // The floor board under the others, from the plinth line : only its curve, the rest runs on the lines drawn
         const floor = floorOutline(k, side);
         if (floor !== null)
         {
@@ -326,11 +326,11 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
             {
                 return [planX(xFace + dir * u), planY(k.depth - v)];
             }), false, "hidden");
-            // over the radius, towards the back : under it the two curves close in on the front
+            // Over the radius, towards the back : under it the two curves close in on the front
             canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2) - 6, end.sweep === 180
                 ? `R ${Math.round(r - endToe(k, end))} au sol` : "au sol", 1.8, "middle");
         }
-        // the upright of a seat end, its centre from the side face and from the front
+        // The upright of a seat end, its centre from the side face and from the front
         const post = endPost(k, side);
         if (post !== null)
         {

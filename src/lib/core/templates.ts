@@ -3,13 +3,14 @@
 import type { Carcass, Lining, Project } from "./model";
 import { cell, newCarcass, newDevice, newFront, newId, newProject, newWallShelf, split,
         DEFAULT_BATTENS } from "./factory";
+import { NICHE_SETBACK } from "./layout_commands";
 
 const OAK = "H1180_ST37";
 const GREEN = "U604_ST9";
-// the dresser backs in the cheapest white sold in 8 mm, 153 EUR HT saved. The TV wall keeps oak ones : its niche
+// The dresser backs in the cheapest white sold in 8 mm, 153 EUR HT saved. The TV wall keeps oak ones : its niche
 // lining needs an oak 8 mm sheet anyway, and the backs come out of it
 const BACK = "SNOW_WHITE_8685";
-// every cupboard door of both pieces opens to a push, TIP-ON, the drawers ekep their handles
+// Every cupboard door of both pieces opens to a push, TIP-ON, the drawers ekep their handles
 const PUSH_DOOR = { decor: GREEN, opening: "push" as const };
 
 
@@ -33,19 +34,19 @@ export function tvWall(): Project
 {
     const project = newProject("Composition TV et bibliothèque");
 
-    // four columns of 627 : a door before an adjustable shelf, two pairs of drawers, a door again
+    // Four columns of 627 : a door before an adjustable shelf, two pairs of drawers, a door again
     // adjustable shelves rest on the system 32 line, 9.5 + 32k from the bottom : 5 mm under the parents' save
     const leftDoor = split("h", [219], [cell(), cell()], ["adjustable"]);
     const drawersA = cell();
     const drawersB = cell();
     const rightDoor = split("h", [219], [cell(), cell()], ["adjustable"]);
-    // the quarter round end left open, not sat on unless asked : its low board on the floor held by the back of the
+    // The quarter round end left open, not sat on unless asked : its low board on the floor held by the back of the
     // end, one shaped shelf between
     const baseUnit = newCarcass({
         name: "Meuble bas",
         width: 2600, height: 500, depth: 400, x: 0, y: 100, z: 0,
         decor: OAK, backDecor: OAK,
-        // a return on the right hides the feet from the open quarter round
+        // A return on the right hides the feet from the open quarter round
         base: { type: "plinth", height: 100, setback: 50, returns: ["right"] },
         root: split("v", [627, 1272, 1917], [leftDoor, drawersA, drawersB, rightDoor]),
         ends: {
@@ -58,12 +59,12 @@ export function tvWall(): Project
         newFront(leftDoor.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(drawersA.id, { type: "drawers", count: 2, loadKg: 15 }, { decor: GREEN }),
         newFront(drawersB.id, { type: "drawers", count: 2, loadKg: 15 }, { decor: GREEN }),
-        // hinged on the right, it swings towards the quarter round and clears the drawers pulled out beside it
+        // Hinged on the right, it swings towards the quarter round and clears the drawers pulled out beside it
         newFront(rightDoor.id, { type: "door", hinge: "right" }, PUSH_DOOR),
     );
 
 
-    // the column on the base : a door over three cells of adjustable shelves, an open lined niche, a door again
+    // The column on the base : a door over three cells of adjustable shelves, an open lined niche, a door again
     // The lowest cell is the technical one, the box in it
     const technical = cell();
     const lower = split("h", [155, 347], [technical, cell(), cell()], ["adjustable", "adjustable"]);
@@ -81,7 +82,7 @@ export function tvWall(): Project
     );
     column.linings.push(lining(niche.id, OAK, true));
 
-    // Gilles' open column against it, from his sketch of 2026-10-08 : 250 wide (his 200 to 300), 150 deep for a book
+    // Gilles' open column against it, from his sketch of 2026-10-08 : 250 wide (his 200 to 300), 150 deep, a book
     // up under the lower wall shelf that caps it, no back. Two bays of 96.5 behind a middle upright, the shelves of
     // the right one half a pitch above the left : 281 clear takes a large format of 240
     const bookLeft = split("v", [96.5], [split("h", [280, 580, 880], [cell(), cell(), cell(), cell()]),
@@ -92,7 +93,7 @@ export function tvWall(): Project
         decor: OAK, backDecor: OAK, base: { type: "floor" }, back: { type: "none" },
         root: bookLeft,
     });
-    // two through the back for the mains and the fibre, the first behind the box, and one through the right side
+    // Two through the back for the mains and the fibre, the first behind the box, and one through the right side
     // opening behind the amplifier, 85 off its back
     for (const dx of [-100, 120])
     {
@@ -102,21 +103,21 @@ export function tvWall(): Project
     column.outlets.push({ id: newId("o"), cell: technical.id, panel: "right", shape: "round", w: 60, h: 60, dx: -50,
                           dy: 0 });
 
-    // their 38 mm oak shelves in the Decospan 39, the nearets board sold, on the chipboard core priced
+    // Their 38 mm oak shelves in the Decospan 39, the nearets board sold, on the chipboard core priced
     const shelves = [[1860, 1600], [2230, 800]].map(([y, width]) =>
     {
         return newWallShelf({ x: 450, y, width, depth: 250, thickness: 39, decor: "CHENE_PLAQUE_AGGLO",
                               corners: { left: 0, right: 50 } });
     });
 
-    // their amplifier stood on its side, flush with the front : its bass port is at the back. Moved right of the
+    // Their amplifier stood on its side, flush with the front : its bass port is at the back. Moved right of the
     // stored screen once the screen went on an arm, 30 clear, its old place taken by Gilles' column
     const amplifier = newDevice({
         name: "Ampli Marshall Stanmore", x: 1530, y: 600, z: 215, width: 185, height: 350, depth: 185, massKg: 5.1,
         source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé sur le flanc",
         look: "amplifier",
     });
-    // the two boxes of their mini 4K side by side on the floor of the technical cell, each before its back hole
+    // The two boxes of their mini 4K side by side on the floor of the technical cell, each before its back hole
     // 60 clear behind for the plugs
     const server = newDevice({
         name: "Freebox Server mini 4K", x: 30, y: 619, z: 60, width: 180, height: 45, depth: 190, massKg: 0.66,
@@ -127,7 +128,7 @@ export function tvWall(): Project
         source: "155 x 31 x 118 mm (test Génération NT), 0,34 kg estimés, à peser",
     });
     project.items.push(baseUnit, column, books, ...shelves, amplifier, server, player);
-    // their set, read off its back label, on a wall arm : put away right of a 250 column (the width Gilles weighs
+    // Their set, read off its back label, on a wall arm : put away right of a 250 column (the width Gilles weighs
     // between 200 and 300), swung out over it to face the middle of their 1880 sofa set against the left wall
     project.screen = {
         diagonalInch: 32, aspectW: 16, aspectH: 9, cx: 1112, bottom: 664, z: 80, wallMounted: false,
@@ -159,7 +160,7 @@ export function dresser(): Project
                             base: standing ? { type: "floor" } : { type: "plinth", height: 100, setback: 50 } });
     };
 
-    // the left column cut at two heights, the right one behind a single full height door over its two shelves
+    // The left column cut at two heights, the right one behind a single full height door over its two shelves
     const left = [cell(), cell(), cell()];
     const kl = box("Colonne gauche", 0, 100, 600, 2256, split("h", [636, 1500], left), false);
     const rightRoot = split("h", [776, 1666], [cell(), cell(), cell()]);
@@ -169,12 +170,12 @@ export function dresser(): Project
         kl.fronts.push(newFront(c.id, { type: "door", hinge: "left" }, PUSH_DOOR)); 
     }
     kr.fronts.push(newFront(rightRoot.id, { type: "door", hinge: "right" }, PUSH_DOOR));
-    // an 80 mm hole for the mains in the back of the middle cell, its centre 100 in from the left and the bottom
+    // An 80 mm hole for the mains in the back of the middle cell, its centre 100 in from the left and the bottom
     kl.outlets.push({ id: newId("o"), cell: left[1]!.id, panel: "back", shape: "round", w: 80, h: 80,
                       dx: -((600 - 2 * 19) / 2 - 100), dy: -((1500 - 636 - 19) / 2 - 100) });
 
 
-    // three full height bays, each a cupboard under a 171 high drawer : the uprights carry the shelves
+    // Three full height bays, each a cupboard under a 171 high drawer : the uprights carry the shelves
     const doors = [cell(), cell(), cell()];
     const drawers = [cell(), cell(), cell()];
     const bays = [0, 1, 2].map((k) =>
@@ -192,19 +193,23 @@ export function dresser(): Project
         low.fronts.push(newFront(c.id, { type: "drawers", count: 1, loadKg: 10 }, { decor: GREEN }));
     }
 
-    // the niche : two narrow columns of small shelves around a 1084 wide opening, close to their 1100 x 600 box
+    // The niche : two narrow columns of small shelves around a 1084 wide opening, close to their 1100 x 600 box
+    // Their shelves and the uprights parting them from the opening stand back, the opening keeps its full depth
     const sideShelves = (): ReturnType<typeof split> =>
     {
-        return split("h", [201, 421], [cell(), cell(), cell()]);
+        const s = split("h", [201, 421], [cell(), cell(), cell()]);
+        s.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
+        return s;
     };
     const opening = cell();
-    const niche = box("Niche", 600, 960, 1600, 680, split("v", [220, 1323], [sideShelves(), opening,
-        sideShelves()]), true);
-    // a LED strip let into the underside of its top, lighting the opening, switched and dimmed over Wi-Fi
+    const nicheRoot = split("v", [220, 1323], [sideShelves(), opening, sideShelves()]);
+    nicheRoot.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
+    const niche = box("Niche", 600, 960, 1600, 680, nicheRoot, true);
+    // A LED strip let into the underside of its top, lighting the opening, switched and dimmed over Wi-Fi
     niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
                         wifi: true });
 
-    // the top row parted like the bays under it : its doors line up with theirs acros the niche
+    // The top row parted like the bays under it : its doors line up with theirs acros the niche
     const top = [cell(), cell(), cell()];
     const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [512, 1040], top), true);
     high.fronts.push(
@@ -214,14 +219,14 @@ export function dresser(): Project
     );
 
     project.items.push(kl, low, niche, high, kr);
-    // their alcove as measured : 3010 wide, 2440 under the ceiling, returns 660 on the left and 610 on the right
+    // Their alcove as measured : 3010 wide, 2440 under the ceiling, returns 660 on the left and 610 on the right
     // the 2880 of the piece centred in it
     project.room = { ...project.room, width: 3010, height: 2440, returns: { left: 660, right: 610 } };
     for (const k of [kl, low, niche, high, kr])
     {
         k.x += (3010 - 2880) / 2;
     }
-    // the two 65 mm gaps to the returns closed by fillers in the front decor, scribed on site
+    // The two 65 mm gaps to the returns closed by fillers in the front decor, scribed on site
     kl.sideFillers = { left: 65, right: 0 };
     kr.sideFillers = { left: 0, right: 65 };
     return project;

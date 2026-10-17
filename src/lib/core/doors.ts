@@ -22,7 +22,7 @@ import { at, neg, Y, type Frame, type Vec3 } from "./geometry";
 // Workshop conventions, stated in the drawings as such
 const PLATE_CLEARANCE = 25;
 const TIPON_FROM_EDGE = 100;
-// a TIP-ON on an adapter whose screws would meet a drilling already there oges down by steps, 50 mm at most
+// A TIP-ON on an adapter whose screws would meet a drilling already there oges down by steps, 50 mm at most
 const TIPON_STEP = 10;
 const TIPON_SHIFT_MAX = 50;
 
@@ -138,7 +138,7 @@ function hingeOnLine(c: Carcass, s: Settings, fp: FrontPanel, y: number, blocked
 
 export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
 {
-    // the TIP-ON units come after every hinge of the carcass, to stay clear of the plates of the next door
+    // The TIP-ON units come after every hinge of the carcass, to stay clear of the plates of the next door
     const tipOns: (() => void)[] = [];
     for (const fp of b.fronts.get(c.id) ?? [])
     {
@@ -158,7 +158,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 + "l'abaque Blum (2500 mm, 22 kg). Diviser la porte.");
             continue;
         }
-        // on a short door the cups of two hinges run into each other, the plates are not dimensioned yet
+        // On a short door the cups of two hinges run into each other, the plates are not dimensioned yet
         const pitch = (fp.rect.h - 2 * s.hingeEdgeDistance) / Math.max(1, hingeTotal - 1);
         if (hingeTotal > 1 && pitch < CUP_DIAMETER)
         {
@@ -189,7 +189,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 + `${tb.toFixed(1)} et ${fp.thickness} mm d'épaisseur (Blum p. 75).`);
         }
         const hingeSide = fp.hinge!;
-        // a filler beside the hinges stands in the plane of the door : it needs the same gap F as a front
+        // A filler beside the hinges stands in the plane of the door : it needs the same gap F as a front
         const toFiller = hingeSide === "left" ? fp.rect.x : c.width - fp.rect.x - fp.rect.w;
         if (sideFiller(c, hingeSide) > 0 && gapMin !== null && toFiller < gapMin)
         {
@@ -213,7 +213,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
         {
             part.notes.push("Charnières décalées pour éviter une tablette fixe");
         }
-        // an overlay door has its plates on the 37 row of the line : plates with dowels in its holes, the hinges
+        // An overlay door has its plates on the 37 row of the line : plates with dowels in its holes, the hinges
         // moved onto its steps. An inset one stands deeper, off the row, its plates screwed where the hinges fall
         const onSystem = fp.hingeKind !== "inset" && s.grid === EXPANDO_PLATE.pitch;
         const ys = onSystem ? wanted.map((y) =>
@@ -346,7 +346,7 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         // drilled, the plate would hang past the door edge : the adapter plate brings the unit into the cell
         // TODO the adapter stands 14.5 into the cell and is no fitted solid yet, a shelf at its height clashes unseen
         const off = TIPON_ADAPTER.axisOffFace;
-        // the door opening against the other face of a mid panel has its TIP-ON or its hinge plate there
+        // The door opening against the other face of a mid panel has its TIP-ON or its hinge plate there
         let down = 0;  
         while (TIPON_ADAPTER.screws.some((v) =>
         {
@@ -396,7 +396,7 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         mount(face.part, face.face, y - face.uOrigin, `TIP-ON ${DIAM}10 x 50 mini`);
         return;
     }
-    // double doors meet in the middle : the unit fit into the front edge of the panel above
+    // Double doors meet in the middle : the unit fit into the front edge of the panel above
     let above: Part | undefined;
     for (const p of b.parts)
     {
@@ -414,7 +414,7 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
     {
         const xLocal = openSide === "left" ? fp.rect.x + TIPON_FROM_EDGE : fp.rect.x + fp.rect.w - TIPON_FROM_EDGE;
         const u = xLocal - (above.frame.o[0] - c.x);
-        // the face of the top looks down into the cell, a shelf turns its face B down
+        // The face of the top looks down into the cell, a shelf turns its face B down
         mount(above, above.role === "top" ? "A" : "B", u, `TIP-ON ${DIAM}10 x 50 mini dans le chant avant`);
     }
     else

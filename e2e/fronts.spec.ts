@@ -32,7 +32,7 @@ test.describe("fronts", () =>
     test("makes one door of the doors of a shelved carcass, and one per cell again", async ({ page }) =>
     {
         expect(await drop(page, "Tablette fixe", await centreOf(cells(page).first()))).toBe("Ajouté : Tablette fixe");
-        // one drop after the other : the second cell is found once the first door is on
+        // One drop after the other : the second cell is found once the first door is on
         await drop(page, "Porte", await centreOf(cells(page).first()));
         await drop(page, "Porte", await centreOf(cells(page).nth(1)));
         await expect(page.locator(".facade .front")).toHaveCount(2);

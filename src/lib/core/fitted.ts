@@ -4,7 +4,7 @@
 import { at, X, Y, Z, type Vec3 } from "./geometry";
 import type { Fitted, Part, Purpose } from "./part_types";
 
-// a hinge cup fit its 35 boring, a Minifix housign its 15 one : the volume is the hole itself
+// A hinge cup fit its 35 boring, a Minifix housign its 15 one : the volume is the hole itself
 const LET_IN: { purpose: Purpose; ref: string; label: string }[] = [
     { purpose: "hinge-cup", ref: "CLIP top", label: "cuvette de charnière" },
     { purpose: "minifix-housing", ref: "262.25.035", label: "boîtier Minifix" },
@@ -23,7 +23,7 @@ export function box(key: string, item: string, ref: string, label: string, purpo
 }
 
 
-// an upright cylinder standing on `bottom`
+// An upright cylinder standing on `bottom`
 export function post(key: string, item: string, ref: string, label: string, purpose: Purpose, x: number, z: number,
                      bottom: number, height: number, diameter: number, hidden: boolean): Fitted
 {
@@ -36,7 +36,7 @@ export function post(key: string, item: string, ref: string, label: string, purp
 }
 
 
-// the box around a piece of hardware in the frame of its wall, what the drawings project
+// The box around a piece of hardware in the frame of its wall, what the drawings project
 export function fittedExtent(f: Fitted): { min: Vec3; max: Vec3 }
 {
     const min: Vec3 = [Infinity, Infinity, Infinity];

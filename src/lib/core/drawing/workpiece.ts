@@ -25,7 +25,7 @@ const DEFAULT_ORIGIN = "u selon la longueur, v selon la largeur, origine au coin
 
 const BOX_W = 185;
 const BOX_H = 120;
-// a part alone on its sheet
+// A part alone on its sheet
 const WIDE_W = 390;
 const WIDE_H = 150;
 
@@ -45,7 +45,7 @@ function originText(part: Part): string
 {
     if (UPRIGHT.has(part.role))
     {
-        // the quarter turn keeps the view from face A : v then runs from right to left
+        // The quarter turn keeps the view from face A : v then runs from right to left
         return "u depuis le bas, v depuis la gauche vue de face, dessin vu de l'intérieur (face A) : v de droite à gauche";
     }
     return ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN;
@@ -150,7 +150,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     const scale = pickScale(spanX, spanY, boxW - 20, boxH - 20);
     const ox = x0 + 12;
     const oy = y0 + 24 + spanY / scale;
-    // lying, u to the right and v up. Standing, u up and v to the left. Both seen from face A
+    // Lying, u to the right and v up. Standing, u up and v to the left. Both seen from face A
     const P = (u: number, v: number): [number, number] =>
     {
         return upright ? [ox + (maxV - v) / scale, oy - u / scale] : [ox + u / scale, oy - v / scale];
@@ -228,7 +228,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
                 canvas.circle(x, y, Math.max(0.5, h.diameter / 2 / scale), h.face === "A" ? "normal" : "dashed");
             }
         }
-        // an edge hole is a short stroke going into the part as deep as the hole
+        // An edge hole is a short stroke going into the part as deep as the hole
         else if (h.face === "u0" || h.face === "u1")
         {
             seg(h.u, h.v, h.u + (h.face === "u0" ? h.depth : -h.depth), h.v, "centre");
@@ -240,7 +240,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     }
     if (part.grain)
     {
-        // the arrow along u, set off 4 mm of paper towards v
+        // The arrow along u, set off 4 mm of paper towards v
         const [nx, ny] = D(0, 1);
         const [g0x, g0y] = P(part.length * 0.35, part.width / 2);
         const [g1x, g1y] = P(part.length * 0.65, part.width / 2);
@@ -250,7 +250,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.arrowHead(g1x + 4 * nx, g1y + 4 * ny, -ax, -ay);
         canvas.text((g0x + g1x) / 2 + 5 * nx + 1, (g0y + g1y) / 2 + 5 * ny, "fil", 2, "middle");
     }
-    // a pocket in an edge is hidden from the face : its outline dashed, as deep as it goes in
+    // A pocket in an edge is hidden from the face : its outline dashed, as deep as it goes in
     for (const k of part.pockets ?? [])
     {
         const half = k.length / 2;
@@ -265,7 +265,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
             box(u0, k.at - half, u0 + k.depth, k.at + half, "dashed");
         }
     }
-    // every arc of the outline gets its radius, a leader from its centre to the middle of the arc
+    // Every arc of the outline gets its radius, a leader from its centre to the middle of the arc
     for (const a of outlineArcs(part))
     {
         const tipU = a.cu + a.r * Math.cos(a.mid);
@@ -275,7 +275,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         const [tx, ty] = P(a.cu + a.r * 0.55 * Math.cos(a.mid), a.cv + a.r * 0.55 * Math.sin(a.mid));
         canvas.text(tx, ty - 1, `R${round1(a.r)}`, 2.5, "middle");
     }
-    // the origin, then which way u and v run from it
+    // The origin, then which way u and v run from it
     const [zx, zy] = P(0, 0);
     canvas.circle(zx, zy, 1, "thin");
     canvas.text(zx + (upright ? 1.5 : -1.5), zy + 3, "0", 2, upright ? "start" : "end");
@@ -289,7 +289,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     const left = ox;
     const right = ox + spanX / scale;
     canvas.dimH(left, right, oy + 1, oy + 7, `${Math.round(spanX * 10) / 10}`);
-    // standing, the height is dimensioned on the right, clear of the u arrow at the origin
+    // Standing, the height is dimensioned on the right, clear of the u arrow at the origin
     const dimAt = upright ? right : left;
     const away = upright ? 1 : -1;
     canvas.dimV(oy - spanY / scale, oy, dimAt + away, dimAt + (upright ? 12 : 6) * away,
@@ -355,7 +355,7 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
                 }
             }
         }
-        // the hardware lies against one face of the part, never away from it
+        // The hardware lies against one face of the part, never away from it
         if (w1 < -1 || w0 > part.thickness + 1)
         {
             continue;
@@ -371,7 +371,7 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
         const [a, b] = P(u0, v0);
         const [c, d] = P(u1, v1);
         canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), "dashed");
-        // the reference reads along the long side of the footprint, or above it when even that is too short
+        // The reference reads along the long side of the footprint, or above it when even that is too short
         const tall = Math.abs(d - b) > Math.abs(c - a);
         if (textWidth(f.ref, 1.8) > Math.max(Math.abs(d - b), Math.abs(c - a)) - 1)
         {

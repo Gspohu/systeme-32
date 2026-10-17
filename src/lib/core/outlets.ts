@@ -8,11 +8,11 @@ import { byId } from "./edit";
 import { panelAbove, panelBelow, sideFace } from "./locate";
 import { DIAM } from "./text";
 
-// a starting value, the socket or the grommet bought give the real size (convention)
+// A starting value, the socket or the grommet bought give the real size (convention)
 export const OUTLET_DEFAULT: Omit<Outlet, "id" | "cell"> = { panel: "back", shape: "rect", w: 80, h: 80, dx: 0, dy: 0 };
 
 
-// a point of the room in the frame of the part : u and v of a flat board
+// A point of the room in the frame of the part : u and v of a flat board
 function onPart(p: Part, q: Vec3): [number, number]
 {
     const f = p.frame!;
@@ -62,7 +62,7 @@ function liningsOver(c: Carcass, board: Part, near: Vec3, far: Vec3, b: Build): 
         }
         const g = q.frame;
         const parallel = Math.abs(Math.abs(g.n[0] * f.n[0] + g.n[1] * f.n[1] + g.n[2] * f.n[2]) - 1) < 1e-9;
-        // the gap between the two boards, whichever side of the board the lining stands on
+        // The gap between the two boards, whichever side of the board the lining stands on
         const gap = along(g.o, f.n, f.o);
         const against = gap > -q.thickness - 0.01 && gap < board.thickness + q.thickness + 0.01;
         const [a, z] = [onPart(q, near), onPart(q, far)];
@@ -87,7 +87,7 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
         const where = `${c.name}, trou de prise`;
         const h = hole.shape === "round" ? hole.w : hole.h;
         const side = hole.panel === "left" || hole.panel === "right";
-        // across the cell on the back and on a shelf, frontwards on a side
+        // Across the cell on the back and on a shelf, frontwards on a side
         const cx = side ? (hole.panel === "left" ? nb.x : nb.x + nb.w) : nb.x + nb.w / 2 + hole.dx;
         let part: Part | undefined;
         let near: Vec3;
@@ -136,7 +136,7 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         if (!inside)
         {
-            // the two sizes of the cell the hole lies across, a side seen across its depth, a shelf from above
+            // The two sizes of the cell the hole lies across, a side seen across its depth, a shelf from above
             const deep = Math.round(lay.zFront - lay.zBack);
             const cell = hole.panel === "back" ? `${Math.round(nb.w)} x ${Math.round(nb.h)} mm`
                 : side ? `${deep} de profondeur x ${Math.round(nb.h)} de haut` : `${Math.round(nb.w)} x ${deep} de profondeur`;
@@ -145,13 +145,13 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             continue;
         }
         part.cutouts.push(holeOutline(hole.shape, onPart(part, near), onPart(part, far)));
-        // a lining ladi against that board, in this ecll or the next one, takes the same hole or it blocks it
+        // A lining ladi against that board, in this ecll or the next one, takes the same hole or it blocks it
         for (const lining of liningsOver(c, part, near, far, b))
         {
             lining.cutouts.push(holeOutline(hole.shape, onPart(lining, near), onPart(lining, far)));
             lining.notes.push(`Même découpe que ${part.label.toLowerCase()}, d'après le DXF`);
         }
-        // seen from the front : the back hole as cut, a shelf or a side one edge on over the thickness of its board
+        // Seen from the front : the back hole as cut, a shelf or a side one edge on over the thickness of its board
         const f = part.frame;
         const edgeOn = hole.panel !== "back";
         const x = side ? Math.min(f.o[0], f.o[0] + f.n[0] * part.thickness) - c.x : cx - hole.w / 2;

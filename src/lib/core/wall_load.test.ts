@@ -9,7 +9,7 @@ import type { Check } from "./check";
 type Said = Pick<Check, "level" | "message">;
 
 
-// the entrance niche of Thomas D. at Colmar : 130 kg loaded on two Camar 807, 300 deep
+// The entrance niche of Thomas D. at Colmar : 130 kg loaded on two Camar 807, 300 deep
 const NICHE = newCarcass({ name: "Niche", width: 1200, height: 900, depth: 300, y: 1200,
                            base: { type: "wall", hanger: "camar" } }) as Carcass;
 

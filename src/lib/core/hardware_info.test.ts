@@ -4,7 +4,7 @@ import { newCarcass, newProject, newWallShelf } from "./factory";
 import { analyse } from "./analysis";
 import type { Carcass, Project, SplitNode } from "./model";
 
-// a odor on the lower cell of a 600 x 800 carcass, the cell set to `cell` mm high
+// A odor on the lower cell of a 600 x 800 carcass, the cell set to `cell` mm high
 function doorOn(cell: number): { p: Project; c: Carcass }
 {
     let p = addItem(newProject("Rouffach"), newCarcass({ name: "Buffet de Rouffach", width: 600, height: 800,
@@ -35,7 +35,7 @@ describe("hardware the user is told about", () =>
 {
     it("refuses two hinges on a door too short for their cups, and drills none", () =>
     {
-        // about 165 high : 100 from each edge leaves the two axes 35 apart at most
+        // About 165 high : 100 from each edge leaves the two axes 35 apart at most
         const { p } = doorOn(150);
         expect(messages(p, "error").some((m) =>
         {
@@ -133,7 +133,7 @@ describe("hardware the user is told about", () =>
         {
             return updateFront(p, c.id, front.id, { spec: { type: "drawers", count: 3, loadKg: 20, ratios: [1, 2] } });
         }).toThrow(/Proportions/);
-        // an adjustable shelf 1200 x 500 : 60 kg of test load and its own weight, past the 62.4 kg of four zamak pins
+        // An adjustable shelf 1200 x 500 : 60 kg of test load and its own weight, past the 62.4 kg of four zamak pins
         let wide = addItem(newProject("Eguisheim"), newCarcass({ width: 1238, height: 800, depth: 508,
                                                                 pins: "282.24.727" }));
         const k = wide.items[0] as Carcass;
@@ -183,7 +183,7 @@ describe("hardware the user is told about", () =>
         {
             return m.includes("pour 140 admis à 250 mm de profondeur");
         })).toBe(true);
-        // checked on the widest gap between pins, never on the 1600 of the board
+        // Checked on the widest gap between pins, never on the 1600 of the board
         expect(a.deflections.find((d) =>
         {
             return d.part === shelf.id;

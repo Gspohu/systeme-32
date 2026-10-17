@@ -7,7 +7,7 @@ import { tvWall } from "./templates";
 import type { Carcass, Outlet, Project } from "./model";
 import type { Part } from "./part_types";
 
-// a 800 x 600 x 400 cupboard of Colmar, an upright parting it at 400
+// A 800 x 600 x 400 cupboard of Colmar, an upright parting it at 400
 function cupboard(hole: Partial<Outlet>): { p: Project; c: Carcass }
 {
     const a = cell();
@@ -34,7 +34,7 @@ describe("a cable hole through the side of a cell", () =>
         const column = p.items.find((it): it is Carcass => { return it.name === "Colonne gauche"; })!;
         const side = a.build.parts.find((q) => { return q.id === `${column.id}/side/R`; })!;
         expect(side.cutouts.length).toBe(1);
-        // the middle of the 155 cell over the 19 bottom, 196 from the front : 104 off the wall, the amplifier's
+        // The middle of the 155 cell over the 19 bottom, 196 from the front : 104 off the wall, the amplifier's
         // back at 215
         const [u, v] = centreOf(side);
         expect(u).toBeCloseTo(19 + 155 / 2, 6);

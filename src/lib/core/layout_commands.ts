@@ -3,7 +3,11 @@
 import type { Carcass, CellNode, DividerKind, Finish, Front, Project, SplitNode } from "./model";
 import { shelfOnPins } from "./grid";
 import { cell, newId } from "./factory";
-import { MIN_CELL, dividerThickness, findNode, findParent, resolveLayout, snap } from "./layout";
+import { MIN_CELL, dividerThickness, findNode, findParent, resolveLayout, snap, subtreeIds,
+         type NodeBox } from "./layout";
+
+// The setback offered to the shelves and uprights of a small niche set into a larger one
+export const NICHE_SETBACK = 100;
 import { CommandError, carcassOf, edit, prune, replaceNode } from "./edit";
 
 
@@ -41,7 +45,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
         const start = axis === "h" ? nb.y : nb.x;
         const length = axis === "h" ? nb.h : nb.w;
         const origin = axis === "h" ? lay.inner.y : lay.inner.x;
-        // the lower face of the divider snaps on the grid counted rfom the carcass inner origin, an adjustable shelf
+        // The lower face of the divider snaps on the grid counted rfom the carcass inner origin, an adjustable shelf
         // on the pins of the line
         const snapped = origin + snap(pos - origin, q.settings.grid);
         const local = Math.round((axis === "h" && kind === "adjustable" ? onPins(q, c, snapped) : snapped) - start);
@@ -66,7 +70,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
                 c.linings.push({ ...structuredClone(l), id: newId("l"), cell: fresh.id });
             }
         }
-        // rails and lights hang under the panel above : an upright give each half its own, a shelf hands
+        // Rails and lights hang under the panel above : an upright give each half its own, a shelf hands
         // htem up to the upper half, which is always the fresh one
         for (const r of [...c.rails])
         {
@@ -90,7 +94,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
                 c.lights.push({ ...l, id: newId("e"), cell: fresh.id });
             }
         }
-        // shoe racks stand on the floor of the cell : a shelf leaves them in the lower half, the original one
+        // Shoe racks stand on the floor of the cell : a shelf leaves them in the lower half, the original one
         for (const s of [...c.shoeRacks])
         {
             if (s.cell === cellId && axis === "v")
@@ -102,7 +106,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
         {
             c.modularCells.push(fresh.id);
         }
-        // a cut in the parent's own direction joins its list, unless a front must keep covering the whole cell
+        // A cut in the parent's own direction joins its list, unless a front must keep covering the whole cell
         if (parent !== null && parent.axis === axis && onCell.length === 0)
         {
             const k = parent.children.indexOf(findNode(parent, cellId)!);
@@ -111,14 +115,15 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
             parent.dividers.splice(k, 0, kind);
             parent.finishes.splice(k, 0, null);
             parent.thicknesses.splice(k, 0, null);
+            parent.setbacks.splice(k, 0, null);
             parent.children.splice(k + 1, 0, fresh);
         }
         else
         {
             const kept: CellNode = { kind: "cell", id: cellId };
-            const sp: SplitNode = { kind: "split", id: newId("s"), axis, cuts: [local],
-                                   dividers: [kind], finishes: [null], thicknesses: [null], children: [kept, fresh] };
-            // the cell keeps its id and its lining, a front moves up to cover both halves
+            const sp: SplitNode = { kind: "split", id: newId("s"), axis, cuts: [local], dividers: [kind],
+                                   finishes: [null], thicknesses: [null], setbacks: [null], children: [kept, fresh] };
+            // The cell keeps its id and its lining, a front moves up to cover both halves
             c.root = replaceNode(c.root, cellId, sp);
             for (const f of onCell)
             {
@@ -126,6 +131,40 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
             }
         }
     });
+}
+
+
+// A zone already parted gets its new divider in the middle of its largest cell, the one a front covering
+// several cells leaves no other way to reach
+export function splitZone(p: Project, carcassId: string, nodeId: string, axis: "h" | "v",
+    kind: DividerKind = "fixed"): Project
+{
+    const c = carcassOf(p, carcassId);
+    const lay = resolveLayout(c);
+    const zone = findNode(c.root, nodeId);
+    if (zone === null)
+    {
+        throw new CommandError("Zone introuvable.");
+    }
+    let best: NodeBox | null = null;
+    for (const id of subtreeIds(zone))
+    {
+        const nb = lay.nodes.get(id);
+        const size = (n: NodeBox): number =>
+        {
+            return axis === "h" ? n.h : n.w;
+        };
+        if (nb !== undefined && nb.kind === "cell" && (best === null || size(nb) > size(best) + 0.5))
+        {
+            best = nb;
+        }
+    }
+    if (best === null)
+    {
+        throw new CommandError("Aucune case à recouper dans cette zone.");
+    }
+    const middle = axis === "h" ? best.y + best.h / 2 : best.x + best.w / 2;
+    return splitCell(p, carcassId, best.id, axis, middle - c.thickness / 2, kind);
 }
 
 
@@ -149,10 +188,11 @@ export function removeDivider(p: Project, carcassId: string, splitId: string, in
         sp.dividers.splice(index, 1);
         sp.finishes.splice(index, 1);
         sp.thicknesses.splice(index, 1);
+        sp.setbacks.splice(index, 1);
         sp.children.splice(index + 1, 1);
         if (sp.children.length === 1)
         {
-            // a split left with one child collapses into it, and its front follows
+            // A split left with one child collapses into it, and its front follows
             const only = sp.children[0]!;
             c.root = replaceNode(c.root, sp.id, only);
             for (const f of frontsOn(c.fronts, sp.id))
@@ -196,7 +236,7 @@ export function moveDivider(p: Project, carcassId: string, splitId: string, inde
             throw new CommandError(`Déplacement impossible : ${MIN_CELL} mm mini par case.`);
         }
         sp.cuts[index] = local;
-        // nested splits inside the neighbours keep their own minimum sizes
+        // Nested splits inside the neighbours keep their own minimum sizes
         const errors = resolveLayout(c).errors;
         if (errors.length > 0)
         {
@@ -302,7 +342,7 @@ export function setDividerKind(p: Project, carcassId: string, splitId: string, i
         sp.dividers[index] = kind;
         if (kind === "adjustable")
         {
-            // made adjustable, the shelf moves onto the pins of the line nearest to it
+            // Made adjustable, the shelf moves onto the pins of the line nearest to it
             const nb = resolveLayout(c).nodes.get(splitId)!;
             sp.cuts[index] = Math.round(onPins(q, c, nb.y + sp.cuts[index]!) - nb.y);
             const errors = resolveLayout(c).errors;
@@ -338,6 +378,29 @@ export function setDividerFinish(p: Project, carcassId: string, splitId: string,
 }
 
 
+// How far one shelf or upright stands back from the front, the small niches of a dresser at NICHE_SETBACK
+// null puts it back flush, or at the setback of the settings for a shelf on pins
+export function setDividerSetback(p: Project, carcassId: string, splitId: string, index: number,
+    setback: number | null): Project
+{
+    return edit(p, (q) =>
+    {
+        const c = carcassOf(q, carcassId);
+        const sp = findNode(c.root, splitId);
+        if (sp === null || sp.kind !== "split" || index < 0 || index >= sp.cuts.length)
+        {
+            throw new CommandError("Séparation introuvable.");
+        }
+        const room = c.depth - resolveLayout(c).zBack - MIN_CELL;
+        if (setback !== null && (!Number.isFinite(setback) || setback < 0 || setback > room))
+        {
+            throw new CommandError(`Retrait illisible ou trop grand : de 0 à ${Math.floor(room)} mm dans ce caisson.`);
+        }
+        sp.setbacks[index] = setback === null ? null : Math.round(setback);
+    });
+}
+
+
 // Own thickness of one shelf, null gives it the shelf thickness of the carcass back
 export function setDividerThickness(p: Project, carcassId: string, splitId: string, index: number,
     thickness: number | null): Project
@@ -355,7 +418,7 @@ export function setDividerThickness(p: Project, carcassId: string, splitId: stri
             throw new CommandError("Un montant garde l'épaisseur des côtés du caisson.");
         }
         sp.thicknesses[index] = thickness;
-        // a thicker shelf eats into the cell above it
+        // A thicker shelf eats into the cell above it
         // TODO it is refused when that cell gets too small, pushing the shelves above up could be the beter answer
         const errors = resolveLayout(c).errors;
         if (errors.length > 0)

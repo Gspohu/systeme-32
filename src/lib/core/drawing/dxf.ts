@@ -100,7 +100,7 @@ export function partToDxf(p: Part, code: string): string
     const ents: Group[][] = [];
     const layers = new Set<string>(["CONTOUR", "TEXTE"]);
     contour("CONTOUR", p.outline, ents);
-    // openings get a layer of their own, the router takes them before the outer contour
+    // Openings get a layer of their own, the router takes them before the outer contour
     for (const c of p.cutouts)
     {
         layers.add("DECOUPE");
@@ -178,7 +178,7 @@ export function partToDxf(p: Part, code: string): string
             half, g.from, g.at + half, g.to];
         ents.push(line(l, x0, y0, x1, y0), line(l, x1, y0, x1, y1), line(l, x1, y1, x0, y1), line(l, x0, y1, x0, y0));
     }
-    // an edge pocket seen from face A : its length along the edge, as deep as it goes, its layer naming the edge
+    // An edge pocket seen from face A : its length along the edge, as deep as it goes, its layer naming the edge
     // its width and where it sits across the thickness
     for (const k of p.pockets ?? [])
     {

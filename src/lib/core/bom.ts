@@ -14,7 +14,7 @@ import { FAMILY_LABELS, HARDWARE, type Family } from "../data/hardware";
 export const EDGE_OVERLENGTH = 30;
 
 
-// lets a French spreadsheet detect UTF-8, built from its code point to keep the source ASCII
+// Lets a French spreadsheet detect UTF-8, built from its code point to keep the source ASCII
 export const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
 
 
@@ -37,7 +37,7 @@ export interface CutRow extends Pick<Part, "label" | "quantity" | "length" | "wi
 export interface HardwareRow
 {
     code: string;
-    // catalogue id, unique even where several generic articles share the reference Générique
+    // Catalogue id, unique even where several generic articles share the reference Générique
     id: string;
     ref: string;
     label: string;
@@ -114,7 +114,7 @@ const BASE36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 function itemCode(i: number): string
 {
-    // one base 36 digit per item, like Free-pbs level 1 (35 items at omst)
+    // One base 36 digit per item, like Free-pbs level 1 (35 items at omst)
     if (i < 1 || i > 35)
     {
         throw new Error(`Plus de 35 meubles dans le projet : le PBS limite le niveau 1 à 35 ensembles.`);
@@ -175,7 +175,7 @@ export function groupLabel(labels: string[]): string
             {
                 return /^\d+,?$/.test(x[i]!);
             });
-            // a number differing between them goes, a comma it carried stays on the word before
+            // A number differing between them goes, a comma it carried stays on the word before
             return same ? [w] : numbered ? [w.endsWith(",") ? "," : ""] 
                 : [null];
         });
@@ -278,7 +278,7 @@ function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { ro
                 comment: [FAMILY_LABELS[fam], ...e.notes].join(" ; "),
             }, now));
             const existing = hwRows.get(ref);
-            // the list shows the maker's reference, the key stays the catalogue id (Générique is shared)
+            // The list shows the maker's reference, the key stays the catalogue id (Générique is shared)
             const row = existing ?? { code, id: ref, ref: item.ref, label: item.label, brand: item.brand, family: fam,
                                      qty: 0,
                                      notes: [], source: item.source, url: item.url ?? null };
@@ -349,7 +349,7 @@ function cutRows(a: Analysis, codeOfPart: Map<string, string>): { cut: CutRow[];
             notes: [...notes],
             parts,
         };
-        // solid wood is never cut out of a sheet, a slat of MDF is
+        // Solid wood is never cut out of a sheet, a slat of MDF is
         if (first.role === "batten" || first.role === "skin" || MATERIALS[first.material]?.kind === "solid")
         {
             offSheet.push(row);
@@ -437,7 +437,7 @@ export function edgeNotation(edges: Edge[]): string
 }
 
 
-// a text cell quoted when it holds the separator, a quote or a line break
+// A text cell quoted when it holds the separator, a quote or a line break
 export function csvQuote(s: string): string
 {
     return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

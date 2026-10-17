@@ -7,7 +7,7 @@ import { insidePolygon, tessellate } from "./geometry";
 import { crossedHoles } from "./drilling";
 
 
-// the clearance metHole hold between two drillings
+// The clearance metHole hold between two drillings
 const CLEAR = 2;
 
 
@@ -30,7 +30,7 @@ function edgeDistance(poly: [number, number][], x: number, y: number): number
 }
 
 
-// the face holes a cut-out of the part runs into, a screw point counting as Ø4 like in metHole
+// The face holes a cut-out of the part runs into, a screw point counting as Ø4 like in metHole
 export function cutThrough(p: Part): Hole[]
 {
     const out: Hole[] = [];

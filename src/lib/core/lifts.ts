@@ -18,7 +18,7 @@ import { X, neg } from "./geometry";
 
 export interface FlapLoad
 {
-    // the front height stands for the cabinet height KH : an overlay flap covers its whole cell
+    // The front height stands for the cabinet height KH : an overlay flap covers its whole cell
     kh: number;
     kg: number;
     lf: number;
@@ -205,7 +205,7 @@ function fitFlapHardware(f: FlapSlot, faces: (FaceRef | null)[], load: FlapLoad,
     {
         part.notes.push("Poids de poignée non saisi : il compte deux fois dans le choix du mécanisme");
     }
-    // a flap is cut grain across : u runs along its width, v up its height
+    // A flap is cut grain across : u runs along its width, v up its height
     for (const side of ["left", "right"] as const)
     {
         const u = side === "left" ? nb.x - fp.rect.x + HK_TOP.bracketInset
@@ -238,7 +238,7 @@ function flapMotion(f: FlapSlot, mech: Mechanism, b: Build): void
     const push = front.opening === "push";
     const lift = flapClearance(fp, nb.walls.top);
     part.notes.push(`Ouvert, l'abattant monte à ${Math.round(lift)} mm au-dessus du panneau du haut (Blum p. 46)`);
-    // turned about its top edge, it ends in front of the carcass with its free edge raised FH x sin 17 deg
+    // Turned about its top edge, it ends in front of the carcass with its free edge raised FH x sin 17 deg
     const deg = push ? mech.pushDeg : mech.deg;
     b.motions.push({
         item: c.id, front: fp.id, label: name, kind: "turn",

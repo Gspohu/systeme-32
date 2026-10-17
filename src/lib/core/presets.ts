@@ -10,7 +10,7 @@ import { DESK_HEIGHT } from "./desk";
 import { restsOnSeat } from "./seat";
 import { itemsMeet } from "./room";
 
-// workshop conventions of a new carcass : on a plinth on the floor, on the top of what it is dropped onto
+// Workshop conventions of a new carcass : on a plinth on the floor, on the top of what it is dropped onto
 export const NEW_CARCASS = { width: 600, height: 800, depth: 500, plinth: 100, setback: 50 };
 export const NEW_DRAWERS: DrawerFront = { type: "drawers", count: 3, loadKg: 10 };
 export const NEW_LIFT: LiftFront = { type: "lift", handleKg: 0 };
@@ -66,12 +66,12 @@ export function dropCarcass(p: Project, x: number, y: number, wall: Wall, step: 
 
 export function newLight(kind: CellLight["kind"]): Omit<CellLight, "id" | "cell">
 {
-    // one centred spot, as in every niche of the reference photos
+    // One centred spot, as in every niche of the reference photos
     return { kind, spots: kind === "spots" ? 1 : 0, setback: 40, kelvin: 3000 };
 }
 
 
-// in the back decor : an 8 mm sheet the back has opened already, the cost counting whole sheets
+// In the back decor : an 8 mm sheet the back has opened already, the cost counting whole sheets
 export function newLining(c: Carcass): Omit<Lining, "id" | "cell">
 {
     return { decor: c.backDecor, colour: null, thickness: 8,
@@ -79,7 +79,7 @@ export function newLining(c: Carcass): Omit<Lining, "id" | "cell">
 }
 
 
-// one leaf over half the track, damped
+// One leaf over half the track, damped
 export function newSliding(c: Carcass, cellWidth: number): SlidingFront
 {
     return { type: "sliding", leaves: 1, leafWidth: Math.round((cellWidth + 2 * c.thickness) / 2), damped: true };
@@ -93,7 +93,7 @@ export function newRoundEnd(c: Carcass): End
 }
 
 
-// the top at the EN 527-1 height whatever the drop height, 1200 x 600 x 38 to start with (convention)
+// The top at the EN 527-1 height whatever the drop height, 1200 x 600 x 38 to start with (convention)
 export function newDesk(wall: Wall): WallShelf
 {
     const thickness = 38;
@@ -102,7 +102,7 @@ export function newDesk(wall: Wall): WallShelf
 }
 
 
-// a divider stands in the room, away from the wall the front view looks at, floor to ceiling
+// A divider stands in the room, away from the wall the front view looks at, floor to ceiling
 export function newDivider(wall: Wall): SlatWall
 {
     return newSlats({ name: "Claustra", mode: "divider", y: 0, z: 600, width: 1000, height: 2500, slatDepth: 60, gap: 40,

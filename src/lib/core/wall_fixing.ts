@@ -10,14 +10,14 @@ import { spread } from "./fittings";
 import { wallPlug } from "./wall_load";
 
 
-// one central up to 500 wide, else 100 to 150 from each end (Furnica guide)
+// One central up to 500 wide, else 100 to 150 from each end (Furnica guide)
 // no more than 800 apart and 20 from the back edge of the top (convention)
 // TODO the 800 and the 20 are workshop habits, no maker figure read for them yet
 const ANTI_TIP_SINGLE_MAX_WIDTH = 500;
 const ANTI_TIP_INSET = 120;
 const ANTI_TIP_MAX_SPACING = 800;
 const ANTI_TIP_FROM_BACK = 20;
-// the generic 40 x 40 x 40 steel bracket of 2 mm priced in data/prices.ts
+// The generic 40 x 40 x 40 steel bracket of 2 mm priced in data/prices.ts
 const ANTI_TIP_BRACKET_SIZE = 40;
 const ANTI_TIP_BRACKET_THICKNESS = 2;
 
@@ -33,7 +33,7 @@ export function antiTipPositions(width: number): number[]
 }
 
 
-// where a bracket lies, in the frame of the wall : on the highest point of the top under it, a sloped top
+// Where a bracket lies, in the frame of the wall : on the highest point of the top under it, a sloped top
 // gets a bracket bent to its angle
 function bracketBox(c: Carcass, x: number): Box3
 {
@@ -91,12 +91,12 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
     const S = ANTI_TIP_BRACKET_SIZE;
     for (const x of at)
     {
-        // measured along a sloped top
+        // Measured along a sloped top
         const u = (x - c.thickness) / Math.cos(topAngle(c));
         top.holes.push({ u, v: top.width - ANTI_TIP_FROM_BACK, diameter: 0, depth: 0, face: "B",
                          label: `Équerre anti-basculement : vis 4 x 16, à ${ANTI_TIP_FROM_BACK} mm du chant arrière (convention)`,
                          purpose: "anti-tip-screw" });
-        // one leg lying on the top from the wall, the other standing against the wall on it
+        // One leg lying on the top from the wall, the other standing against the wall on it
         const y = bracketBox(c, x).min[1];
         const key = `${c.id}/equerre-${Math.round(x)}`;
         const label = `${c.name} : équerre anti-basculement`;
@@ -118,7 +118,7 @@ export function fitWallFixing(c: Carcass, s: Settings, b: Build, items: Item[]):
     };
     line("ANTI_TIP_BRACKET", "sur le dessus, jamais dans le fond", "anti-tip");
     line("SCREW_4x16", null, "anti-tip-screw");
-    // the metal plug of a plasterboard wall hold its own screw, a timber reinforcement takes the screw alone
+    // The metal plug of a plasterboard wall hold its own screw, a timber reinforcement takes the screw alone
     const plug = wallPlug(s);
     if (plug !== "PLUG_HOLLOW_METAL")
     {

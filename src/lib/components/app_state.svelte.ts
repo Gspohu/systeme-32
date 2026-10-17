@@ -26,21 +26,21 @@ class AppState
     history = $state.raw<History>(historyOf(tvWall()));
     textures = $state.raw<Map<string, Uint8Array>>(new Map());
     selection = $state<Selection | null>(null);
-    // the wall the façade shows, where droped items land
+    // The wall the façade shows, where droped items land
     wall = $state<Wall>("back");
     toasts = $state<Toast[]>([]);
     storageOk = $state(true);
-    // bumped on every refused command : the inspector puts the stored value back in the field
+    // Bumped on every refused command : the inspector puts the stored value back in the field
     refusals = $state(0);
-    // the 3D view shows the hardware hidden inside the carcasses, the boards seen through
+    // The 3D view shows the hardware hidden inside the carcasses, the boards seen through
     showHardware = $state(false);
-    // the back wall, the ceiling and the side walls an item stands against
+    // The back wall, the ceiling and the side walls an item stands against
     showRoom = $state(true);
-    // the room dimmed and every LED strip or spot lighting what is undre it
+    // The room dimmed and every LED strip or spot lighting what is undre it
     ledsOn = $state(false);
-    // every front open in 3D, and the ones a click turned the other way from that
+    // Every front open in 3D, and the ones a click turned the other way from that
     frontsOpen = $state(false);
-    // where the 3D view puts the screen on its arm, null where it is put away, and the room its arm reaches
+    // Where the 3D view puts the screen on its arm, null where it is put away, and the room its arm reaches
     armSpot = $state<{ cx: number; z: number; yaw: number } | null>(null);
     showArmZone = $state(true);
     flipped = new SvelteSet<string>();
@@ -51,7 +51,7 @@ class AppState
     canUndo = $derived(this.history.past.length > 0);
     canRedo = $derived(this.history.future.length > 0);
 
-    // runs a comand on the present project, keeps it in the history, turns its refusal into a message
+    // Runs a comand on the present project, keeps it in the history, turns its refusal into a message
     apply<A extends unknown[]>(command: (p: Project, ...args: A) => Project, ...args: NoInfer<A>): boolean
     {
         try
@@ -100,7 +100,7 @@ class AppState
     }
 
 
-    // the box opens or shuts them all, a click on one front then turns it the other way
+    // The box opens or shuts them all, a click on one front then turns it the other way
     openFronts(open: boolean): void
     {
         this.frontsOpen = open;

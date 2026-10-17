@@ -89,7 +89,7 @@ export function slopeErrors(c: Carcass, lay: ResolvedLayout, panels: FrontPanel[
     {
         errors.push(`${c.name} : une assise ne peut pas être en pente. Retirer l'assise ou le rampant.`);
     }
-    // the roof keeps rising past the high side, a rounded end there still fits under it
+    // The roof keeps rising past the high side, a rounded end there still fits under it
     if (c.ends[c.slope.low].type === "rounded")
     {
         errors.push(`${c.name} : bout arrondi côté bas du rampant, il percerait la pente. Le passer en bout droit.`);

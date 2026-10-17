@@ -48,7 +48,7 @@ describe("dropping a carcass", () =>
         {
             return dropCarcass(p, 1200, 300, "back", 10);
         }).toThrow("chevaucherait un meuble");
-        // side by side is fine, and the analysis allow it too
+        // Side by side is fine, and the analysis allow it too
         const q = dropCarcass(p, 1600, 300, "back", 10);
         expect(analyse(q).checks.filter((k) =>
         {

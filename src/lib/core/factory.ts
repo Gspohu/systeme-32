@@ -30,7 +30,7 @@ export function split(axis: "h" | "v", cuts: number[], children: LayoutNode[], d
 {
     const kinds = dividers ?? new Array<DividerKind>(cuts.length).fill("fixed");
     return { kind: "split", id: newId("s"), axis, cuts, dividers: kinds, finishes: new Array(cuts.length).fill(null),
-             thicknesses: new Array(cuts.length).fill(null), children };
+             thicknesses: new Array(cuts.length).fill(null), setbacks: new Array(cuts.length).fill(null), children };
 }
 
 
@@ -74,7 +74,7 @@ export function newCarcass(o: Partial<Carcass> & { width: number; height: number
 
 export function newFront(node: string, spec: FrontSpec, o?: Partial<Front>): Front
 {
-    return { id: newId("f"), node, spec, opening: "handle", mount: "overlay", decor: null, colour: null,
+    return { id: newId("f"), node, spec, opening: "handle", handle: "edge", mount: "overlay", decor: null, colour: null,
             colourName: null, ...o };
 }
 
@@ -132,7 +132,7 @@ export function newLadder(o: Partial<LadderRail>): LadderRail
 }
 
 
-// sizes and mass are the appliance's own, never a default
+// Sizes and mass are the appliance's own, never a default
 export function newDevice(o: Partial<Device> & Pick<Device, "name" | "width" | "height" | "depth" | "massKg" |
     "source">): Device
 {

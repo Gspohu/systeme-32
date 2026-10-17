@@ -23,7 +23,7 @@ import { SHELF_TEST_LOADS } from "../../data/rules";
 export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResult): Page[] 
 {
     const drafts: Draft[] = [cover(p, a, bom), composition(p, a)];
-    // side walls add their compositions, the setting out from above comes with every project
+    // Side walls add their compositions, the setting out from above comes with every project
     const sides: Wall[] = [];
     for (const wall of ["left", "right"] as const)
     {
@@ -66,7 +66,7 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
 }
 
 
-// unique within the owner's files, ket to the 16 characters ISO 7200:2004 table 1 recommends (5.1.3)
+// Unique within the owner's files, ket to the 16 characters ISO 7200:2004 table 1 recommends (5.1.3)
 export function identificationOf(p: Project): string
 {
     return `S32-${p.id.replace(/^p-/, "").toUpperCase()}`.slice(0, 16);
@@ -125,7 +125,7 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         canvas.text(MARGIN + 5, cursorY, fit(whom, 3, 390), 3);
         cursorY += 5;
     }
-    // the issue history, the creator and approver of ISO 7200:2004 5.3.1 standing in the title block
+    // The issue history, the creator and approver of ISO 7200:2004 5.3.1 standing in the title block
     if (p.revisions.length > 0)
     {
         section("Révisions");
@@ -145,7 +145,7 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         }
     }
     section("Meubles");
-    // two columns of half a page : the sources at the foot need the height
+    // Two columns of half a page : the sources at the foot need the height
     const rows = Math.ceil(p.items.length / 2);
     p.items.forEach((it, k) =>
     {
@@ -216,7 +216,7 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     {
         sources.add(h.source);
     }
-    // the boards this set really uses, with the values the checks ran on
+    // The boards this set really uses, with the values the checks ran on
     const used = new Set<string>();
     for (const r of [...bom.cut, ...bom.offSheet])
     {
@@ -250,7 +250,7 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée "
         + `sous ${load} kg/dm²${use === undefined ? ", charge choisie hors catégorie" : `, ${use.label}`}`);
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
-    // every source printed, the lines closing up to 3.2 mm, and said when some still do not fit
+    // Every source printed, the lines closing up to 3.2 mm, and said when some still do not fit
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 4;
     const pitch = Math.max(3.2, Math.min(4, (bottom - cursorY) / sources.size));
     const fits = Math.max(0, Math.floor((bottom - cursorY) / pitch) + 1);

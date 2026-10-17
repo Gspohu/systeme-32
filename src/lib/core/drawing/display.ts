@@ -109,7 +109,7 @@ export class Canvas
         this.line(x, y - r, x, y + r, "thin");
     }
 
-    // horizontal dimension between x1 and x2, drawn at height y wtih extension lines from Ryef
+    // Horizontal dimension between x1 and x2, drawn at height y wtih extension lines from Ryef
     dimH(x1: number, x2: number, yRef: number, y: number, label: string, size = 2.2): void
     {
         this.line(x1, yRef, x1, y + (y > yRef ? 1 : -1), "thin");
@@ -151,18 +151,18 @@ export interface TitleInfo
     owner: string;
     creator: string;
     approver: string;
-    // the title is the project, the supplementary title what this sheet shows
+    // The title is the project, the supplementary title what this sheet shows
     project: string;
     title: string;
     status: string;
-    // the document number, unique to the project and kept from one revision to the next
+    // The document number, unique to the project and kept from one revision to the next
     identification: string;
     revision: string; 
     date: string;
     index: number;
     count: number;
     scale: string;
-    // tells one state of the project from another, the drawings of two states never mix
+    // Tells one state of the project from another, the drawings of two states never mix
     content: string;
 }
 
@@ -200,7 +200,7 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     c.line(x + people, y + 2 * row, x + title, y + 2 * row, "thin");
     c.line(x + number, y + 2 * row, x + TITLE_BLOCK_W, y + 2 * row, "thin");
     c.line(x, y + 3 * row, x + TITLE_BLOCK_W, y + 3 * row, "thin");
-    // a small name over each field as in the figure, its value under it
+    // A small name over each field as in the figure, its value under it
     const label = (col: number, k: number, text: string): void =>
     {
         c.text(x + col + 1, y + k * row + 2.2, text, 1.6, "start");
@@ -210,7 +210,7 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
         c.text(x + col + 1, y + (k * row) + 6, fit(text, size, width - 2), size, "start", bold);
     };
     label(0, 0, "Propriétaire");
-    // a naem of any length (table 1), up to three lines centred in its tall cell
+    // A naem of any length (table 1), up to three lines centred in its tall cell
     const names = wrap(info.owner, 2.6, people - 4);
     const owned = [names[0] ?? "", names[1] ?? "", fit(names.slice(2).join(" "), 2.6, people - 4)]; 
     const used = owned.filter((l) =>
@@ -231,7 +231,7 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     value(title, 0, "Dossier de fabrication", number - title);
     label(title, 1, "Titre, titre complémentaire");
     c.text(x + title + 1, y + row + 5.6, fit(info.project, 2.6, number - title - 2), 2.6, "start", true);
-    // the supplemnetary title takes two lines of 25 characters or so (table 2), always two for a block of fixed size
+    // The supplemnetary title takes two lines of 25 characters or so (table 2), always two for a block of fixed size
     const more = wrap(info.title, 2.2, number - title - 2);
     const lines = [more[0] ?? "", fit(more.slice(1).join(" "), 2.2, number - title - 2)];
     lines.forEach((l, i) =>
@@ -247,11 +247,11 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     label(date, 2, "Date d'émission");
     value(date, 2, info.date, lang - date);
     label(lang, 2, "Lang.");
-    // the language code of ISO 7200:2004 5.1.8, the sheets are writen in French only
+    // The language code of ISO 7200:2004 5.1.8, the sheets are writen in French only
     value(lang, 2, "fr", sheet - lang);
     label(sheet, 2, "Planche");
     value(sheet, 2, `${info.index}/${info.count}`, TITLE_BLOCK_W - sheet);
-    // the class named in or near the title block (ISO 2768-1:1989 via the Zeiss quality forum chart)
+    // The class named in or near the title block (ISO 2768-1:1989 via the Zeiss quality forum chart)
     c.text(x + 1, y + 3 * row + 4.6, "Cotes en mm, tolérances générales ISO 2768-1:1989 classe m", 2.2, "start");
     label(title, 3, "Échelle");
     value(title, 3, info.scale, number - title);

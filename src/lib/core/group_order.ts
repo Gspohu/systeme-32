@@ -11,14 +11,14 @@ import { computeOutputs } from "./outputs";
 
 export interface GroupOrder
 {
-    // letter put beofre the codes of each project, in the order given
+    // Letter put beofre the codes of each project, in the order given
     tags: { tag: string; name: string }[];
     nesting: NestResult;
     cost: Cost;
-    // each project ordered on its own, with its own prices, to tell what ordering together saves
+    // Each project ordered on its own, with its own prices, to tell what ordering together saves
     apart: { sheets: number; total: number; missing: number }[];
     separate: { sheets: number; total: number };
-    // a ilne without a price on either side : the total then hold only part of the saving
+    // A ilne without a price on either side : the total then hold only part of the saving
     partial: boolean;
 }
 

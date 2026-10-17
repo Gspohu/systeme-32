@@ -24,7 +24,7 @@
     let narrowTab = $state(0);
     const NARROW_TABS = ["Conception", "3D", "Détails", "Contrôles"];
     let projectsOpen = $state(false);
-    // the workspace and the panes the handles measure before their first drag
+    // The workspace and the panes the handles measure before their first drag
     let panesHost = $state<HTMLElement>();
     let paletteEl = $state<HTMLElement>();
     let sideEl = $state<HTMLElement>();
@@ -62,7 +62,7 @@
                 reloaded = true;
             }
         }
-        // the TV wall shown when nothing was reloaded is a template like any toher, saved once changed : unmarked
+        // The TV wall shown when nothing was reloaded is a template like any toher, saved once changed : unmarked
         // it was saved a secodn after the page opened, whatever was opened next
         if (!reloaded)
         {
@@ -72,13 +72,13 @@
     });
 
 
-    // a template or a blank project just opened, saved only once it is changed : opening one thrice made three copies
+    // A template or a blank project just opened, saved only once it is changed : opening one thrice made three copies
     let untouched: unknown = null;
-    // the save waiting for its second, run at once when the page goes away
+    // The save waiting for its second, run at once when the page goes away
     let pending: (() => void) | null = null;
 
 
-    // autosave one second after the last chaneg
+    // Autosave one second after the last chaneg
     $effect(() =>
     {
         const p = app.project;
@@ -114,7 +114,7 @@
     {
         const tpl = byId(TEMPLATES, id);
         const p = tpl === undefined ? newProject("Nouveau projet") : tpl.make();
-        // a name already saved in this browser gets a number, the list would shwo two of the same otherwise
+        // A name already saved in this browser gets a number, the list would shwo two of the same otherwise
         const stored = await listLocal().catch(() =>
         {
             return [];

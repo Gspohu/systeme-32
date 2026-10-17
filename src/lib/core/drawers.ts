@@ -219,7 +219,7 @@ function runnerFor(c: Carcass, lay: ResolvedLayout, front: Front, spec: DrawerFr
     }
     if (runner === null)
     {
-        // the shortest runner of the series that would carry the load, read off the catalogue list
+        // The shortest runner of the series that would carry the load, read off the catalogue list
         const series = spec.runner ?? (spec.loadKg <= MOVENTO.maxLoad760 ? "760H" : "766H");
         const shortest = (series === "760H" ? MOVENTO_760H : MOVENTO_766H)[0]!;
         const lighter = series === "766H" && spec.loadKg <= MOVENTO.maxLoad760;
@@ -266,7 +266,7 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
         frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS + BOX_THICKNESS, oz + zFront - BOX_THICKNESS],
                  u: X, v: neg(Z), n: neg(Y) },
     });
-    // rear hook hole in the back end of each side : 6 dia, 10 deep, 7 from the outer face, 11 up
+    // Rear hook hole in the back end of each side : 6 dia, 10 deep, 7 from the outer face, 11 up
     for (const sp of [sideL, sideR])
     {
         sp.holes.push({
@@ -285,7 +285,7 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
 }
 
 
-// the box glued on dowels into the inner faces of its sides : both ends, then the bottom on its line
+// The box glued on dowels into the inner faces of its sides : both ends, then the bottom on its line
 // 13 up. Front and back edges of the bottom stay free, two sides hold it
 function joinBox(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
 {
@@ -309,7 +309,7 @@ function joinBox(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
 }
 
 
-// the front set in place then screwed from inside the box, two rows clear of a handle at mid height
+// The front set in place then screwed from inside the box, two rows clear of a handle at mid height
 function screwFront(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
 {
     const { c, fp, hs, SKW } = d;
@@ -347,7 +347,7 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
         source: `coulisses ${runner.ref} sorties de ${runner.nl} mm`,
         remedy: "Déplacer ce qui gêne ou réduire la profondeur du tiroir.",
     });
-    // the space Blum reserves for each runner (p. 419) : 21 against the cell side, under the drawer side
+    // The space Blum reserves for each runner (p. 419) : 21 against the cell side, under the drawer side
     // over NL from the front of the box
     // TODO the runner profile itself is not dimensionned on p. 419, only the space it takes
     const zs: [number, number] = [oz + zFront - runner.nl, oz + zFront];
@@ -382,7 +382,7 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
         let set = offs;
         if (hits(offs))
         {
-            // a runner already screwed on the other face of a mid panel, at the asme heigth
+            // A runner already screwed on the other face of a mid panel, at the asme heigth
             const known = runner.series === "760H" && offs.every((o) =>
             {
                 return MOVENTO.alternateKnown760.includes(o);

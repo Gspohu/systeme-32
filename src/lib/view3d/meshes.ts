@@ -11,7 +11,7 @@ import type { ResolvedLayout } from "../core/layout";
 import { FIT_PLAY, RAIL_D, railPlan } from "../core/wardrobe";
 import { LED_GROOVE_W, SPOT_RIM, spotCentres } from "../core/lights";
 
-// scene unit is the metre
+// Scene unit is the metre
 export const MM = 0.001;
 
 
@@ -35,7 +35,7 @@ function shapeOf(p: Part): THREE.Shape
     {
         shape.lineTo(x, y);
     }
-    // an opening goes right through the extruded board
+    // An opening goes right through the extruded board
     for (const c of p.cutouts)
     {
         const hole = new THREE.Path();
@@ -55,7 +55,7 @@ function flatGeometry(p: Part): THREE.BufferGeometry
 {
     const f = p.frame!;
     const geo = new THREE.ExtrudeGeometry(shapeOf(p), { depth: p.thickness, bevelEnabled: false, curveSegments: 4 });
-    // a plumb cut or a chamfered head moves the ends of face B along u
+    // A plumb cut or a chamfered head moves the ends of face B along u
     if (p.bevel.u0 !== 0 || p.bevel.u1 !== 0)
     {
         const pos = geo.getAttribute("position");
@@ -79,7 +79,7 @@ function flatGeometry(p: Part): THREE.BufferGeometry
 }
 
 
-// annular sector in the plane normal to the xais, extruded along the axis
+// Annular sector in the plane normal to the xais, extruded along the axis
 function shellGeometry(c: CurveShape): THREE.BufferGeometry
 {
     const rOut = Math.abs(c.rOuter);
@@ -120,7 +120,7 @@ function placeOnAxis(geo: THREE.BufferGeometry, c: CurveShape): void
 }
 
 
-// flat run of a quarter rounded end : a box going towards -z from the arc end
+// Flat run of a quarter rounded end : a box going towards -z from the arc end
 function straightGeometry(c: CurveShape): THREE.BufferGeometry | null
 {
     if (c.straight <= 0 || c.axis !== "y")
@@ -135,7 +135,7 @@ function straightGeometry(c: CurveShape): THREE.BufferGeometry | null
 }
 
 
-// individual battens spread along the arc and the flat run
+// Individual battens spread along the arc and the flat run
 function battenGeometries(p: Part, c: CurveShape): THREE.BufferGeometry[]
 {
     const out: THREE.BufferGeometry[] = [];
@@ -151,7 +151,7 @@ function battenGeometries(p: Part, c: CurveShape): THREE.BufferGeometry[]
         if (s <= arc)
         {
             const a = battenAngle(c, s, arc);
-            // battens stand radially : thickness along the radius, width along the tangent
+            // Battens stand radially : thickness along the radius, width along the tangent
             const rot = new THREE.Matrix4();
             if (c.axis === "y")
             {
@@ -310,7 +310,7 @@ export function fittedMeshes(list: Fitted[]): { key: string; item: string; hidde
         }
         else
         {
-            // a three.js cylinder stands on y : y becomes the axis, a right handed basis keeps the faces outwards
+            // A three.js cylinder stands on y : y becomes the axis, a right handed basis keeps the faces outwards
             geo = new THREE.CylinderGeometry(f.half[0], f.half[0], 2 * f.half[2], 24);
             m.makeBasis(a, c, new THREE.Vector3().crossVectors(a, c));
         }
@@ -359,7 +359,7 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
         geometry.translate(...at);
         out.push({ skin, geometry });
     };
-    // built standing, then laid on its flank when it is taller than wide, its top turned to +x
+    // Built standing, then laid on its flank when it is taller than wide, its top turned to +x
     const onFlank = d.look === "amplifier" && d.height > d.width;
     const W = onFlank ? d.height : d.width;
     const H = onFlank ? d.width : d.height;
@@ -370,7 +370,7 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
     }
     else
     {
-        // the knobs inside the overall size, the cabinet lower by their height, the grille 1 mm proud of it
+        // The knobs inside the overall size, the cabinet lower by their height, the grille 1 mm proud of it
         const plate = Math.min(D * 0.25, 45);
         const knobH = plate * 0.3;
         const top = H - knobH - 1;
@@ -391,7 +391,7 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
     const place = new THREE.Matrix4();
     if (onFlank)
     {
-        // a quarter turn about z : the standing top at +x, its left end down on the floor of the appliance
+        // A quarter turn about z : the standing top at +x, its left end down on the floor of the appliance
         place.makeRotationZ(-Math.PI / 2).premultiply(new THREE.Matrix4().makeTranslation(0, W, 0));
     }
     place.premultiply(new THREE.Matrix4().makeTranslation(d.x, d.y, d.z));
@@ -407,7 +407,7 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
 export function screenMesh(sc: Screen,
     at: ScreenSpot = { label: "", cx: sc.cx, bottom: sc.bottom, z: sc.z, yaw: 0 }): THREE.BufferGeometry
 {
-    // a set of unknown thickness keeps the 40 mm it was always shown with, its front on the screen plane. It turns
+    // A set of unknown thickness keeps the 40 mm it was always shown with, its front on the screen plane. It turns
     // about the middle of its back, where the arm holds it, as screenFootprint does
     const { w, h, d } = screenSize(sc);
     const t = d > 0 ? d : 40;
@@ -459,7 +459,7 @@ export function armZoneMesh(sc: Screen): THREE.BufferGeometry | null
     shape.absarc(0, 0, arm.reachMin, Math.PI, 0, true);
     const tall = h > 0 ? h : arm.plateH;
     const geo = new THREE.ExtrudeGeometry(shape, { depth: tall, bevelEnabled: false, curveSegments: 48 });
-    // drawn along the wall and into the room, then stood up : the extrusion runs downwards from the top of the screen
+    // Drawn along the wall and into the room, then stood up : the extrusion runs downwards from the top of the screen
     geo.rotateX(Math.PI / 2);
     geo.translate(arm.x, arm.y + tall / 2, 0);
     geo.scale(MM, MM, MM);

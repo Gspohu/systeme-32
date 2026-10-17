@@ -11,9 +11,9 @@ export interface Deflection
 {
     part: string;
     span: number;
-    // instantaneous deflection under the test load plus self weight, mm
+    // Instantaneous deflection under the test load plus self weight, mm
     instant: number;
-    // long term deflection with creep, instant x (1 + kdef)
+    // Long term deflection with creep, instant x (1 + kdef)
     final: number;
     limit: number;
 }
@@ -33,7 +33,7 @@ export function shelfDeflection(p: Part, loadKgPerDm2: number, midN = 0): Deflec
     // line load in N/mm : kg/dm2 x width in dm gives kg per dm of span, 1 dm = 100 mm
     const qLoad = loadKgPerDm2 * (b / 100) * GRAVITY / 100;
     const qSelf = m.density * 1e-9 * b * t * GRAVITY;
-    // a groove along the span comes off the whole thickness : the grooved section hold what is left
+    // A groove along the span comes off the whole thickness : the grooved section hold what is left
     // its stiffness can only be higher
     let stiff = b;
     for (const g of p.grooves)
@@ -64,7 +64,7 @@ export function itemMass(b: Build, itemId: string): number
 }
 
 
-// full extension runners : an open drawer reaches the depth of its carcass past the front
+// Full extension runners : an open drawer reaches the depth of its carcass past the front
 export function topDrawerExtension(c: Carcass): number
 {
     for (const f of c.fronts)
@@ -82,10 +82,10 @@ export interface Tipping
 {
     item: string;
     massKg: number;
-    // vertical force at the lever point that tips the carcass over its front feet, in kg
+    // Vertical force at the lever point that tips the carcass over its front feet, in kg
     criticalKg: number;
     leverFrom: "tiroir ouvert" | "chant avant";
-    // horizontal pull at the top edge that tips it, in kg force
+    // Horizontal pull at the top edge that tips it, in kg force
     pullKg: number;
 }
 
@@ -123,7 +123,7 @@ export function tipping(c: Carcass, b: Build, frontFootInset: number, drawerExte
     {
         return null;
     }
-    // pull applied at the top edge, tipping about the front feet which stand on the floor
+    // Pull applied at the top edge, tipping about the front feet which stand on the floor
     const arm = c.height + baseHeightOf(c);
     return {
         item: c.id,

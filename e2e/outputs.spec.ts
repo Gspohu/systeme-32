@@ -70,7 +70,7 @@ test.describe("plans and lists", () =>
 
     test("packs the workshop folder : drawings, lists, PBS and one DXF per part", async ({ page }) =>
     {
-        // the whole folder is drawn in the page : about 30 s alone, twice that beside the rest of the suite
+        // The whole folder is drawn in the page : about 30 s alone, twice that beside the rest of the suite
         test.slow();
         await outputsTab(page, "Plans");
         const zip = await download(page, page.getByRole("button", { name: "Dossier atelier" }));
@@ -205,7 +205,7 @@ test.describe("plans and lists", () =>
     {
         await outputsTab(page, "Réglages");
         await page.getByLabel("Ajouter un obstacle mural").selectOption({ label: "Radiateur" });
-        // at its starting place, the left of the back wall, behind the dreser : the checks show in the design view
+        // At its starting place, the left of the back wall, behind the dreser : the checks show in the design view
         const design = page.getByRole("button", { name: "Conception", exact: true });
         await design.click();   
         expect((await checkLines(page)).join("\n")).toMatch(/Radiateur 1 \(500 x 600, 120 de saillie\) traverse/);
@@ -218,7 +218,7 @@ test.describe("plans and lists", () =>
 
     test("orders a project saved in this browser with the open one, and drops it again", async ({ page }) =>
     {
-        // the dresser renamed, a template is only saved once changed, then saved a second later
+        // The dresser renamed, a template is only saved once changed, then saved a second later
         await openTemplate(page, "Vaisselier bibliothèque");
         const name = page.getByLabel("Nom du projet");
         await name.fill("Vaisselier de Colmar");

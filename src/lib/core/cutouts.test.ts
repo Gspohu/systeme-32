@@ -9,7 +9,7 @@ import { polygonArea, tessellate } from "./geometry";
 import type { Carcass, PanelFront, Project } from "./model";
 import type { Part } from "./parts";
 
-// a nursery in Sélestat : 600 x 800 carcasses, overlay paels of 597 x 797 with a 60 border
+// A nursery in Sélestat : 600 x 800 carcasses, overlay paels of 597 x 797 with a 60 border
 function nursery(spec: PanelFront, o: Partial<Carcass> = {}): Project
 {
     const p = addItem(newProject("chambre"), newCarcass({ name: "Niche", width: 600, height: 800, depth: 400, ...o }));
@@ -60,7 +60,7 @@ describe("pierced fixed panels", () =>
         expect(part.cutouts.length).toBe(1);
         const opening = 477 * (797 - 60 - 238.5 - 60) + Math.PI * 238.5 ** 2 / 2;
         expect(polygonArea(tessellate(part.cutouts[0]!, 0.5))).toBeCloseTo(opening, -2);
-        // the mass shown takes 600 kg/m3 for W1000 particleboard, 700 is the figure of the checks
+        // The mass shown takes 600 kg/m3 for W1000 particleboard, 700 is the figure of the checks
         const solid = 597 * 797 * 19 * 1e-9 * 600;
         expect(partMass(part, false)).toBeCloseTo(solid - opening * 19 * 1e-9 * 600, 2);
         const dxf = partToDxf(part, "#100-005");

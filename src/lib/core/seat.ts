@@ -16,7 +16,7 @@ import { GRAVITY } from "../data/rules";
 // EN 16139:2013 level 1 seat static load, 10 times : report 5F013838C of SP Technical Research Institute
 // of Sweden (2015-09-17), non-domestic seating for adulst up to 110 kg
 export const SEAT_LOAD_N = 1600;
-// same report, seat front edge static load : someone sat on the very edge, the case that tips a bench
+// Same report, seat front edge static load : someone sat on the very edge, the case that tips a bench
 export const SEAT_EDGE_N = 1300;
 // EN 1995-1-1:2004 partial factor of a fundamental combination for particleboard, MDF and solid timber
 // (COFORD table D.1, Irish NA), 1.0 being for accidental ones only. It divides a characteristic value, the
@@ -26,9 +26,9 @@ export const GAMMA_M = 1.3;
 
 export interface SeatCheck
 {
-    // widest free span of the top between two supports reaching it, mm
+    // Widest free span of the top between two supports reaching it, mm
     span: number;
-    // bending stress under the load at mid span, and what the board may take, N/mm2
+    // Bending stress under the load at mid span, and what the board may take, N/mm2
     stress: number;
     allowed: number;
     kmod: number;
@@ -168,7 +168,7 @@ export function seatChecks(p: Project, b: Build): Check[]
             checks.push(...endSeatChecks(it, b));
         }
     }
-    // a push latch nuder a seat : the legs of whoever sits there open it
+    // A push latch nuder a seat : the legs of whoever sits there open it
     for (const it of p.items) 
     {
         const pushed = it.kind === "carcass" && it.seat !== null ? it.fronts.filter((f) =>

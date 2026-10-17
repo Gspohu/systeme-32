@@ -7,7 +7,7 @@ import { validateProject } from "./io/project_file";
 import type { Carcass, Project } from "./model";
 
 
-// the entrance of Thomas D. at Colmar : a radiator, a skirting and the alarm box on the back wall
+// The entrance of Thomas D. at Colmar : a radiator, a skirting and the alarm box on the back wall
 function room(c: Partial<Carcass> = {}): Project
 {
     return addItem(newProject("Colmar"), newCarcass({ name: "Banc", width: 600, height: 800,
@@ -38,7 +38,7 @@ describe("what stands on the walls", () =>
     it("refuses a carcass standing over a radiator, and warns of a skirting behind it", () =>
     {
         expect(said(withObstacle(room(), "radiator", { x: 1100, y: 150 }), "error")).toMatch(/Banc : Radiateur 1/);
-        // a 120 skirting stop against the sides standing on a 100 bsae, a 100 one passes under the carcass
+        // A 120 skirting stop against the sides standing on a 100 bsae, a 100 one passes under the carcass
         expect(said(withObstacle(room(), "skirting", { x: 0, width: 4000, height: 120 }), "warning"))
             .toMatch(/Banc : Plinthe murale 1 derrière, 15 mm de saillie/);
         expect(said(withObstacle(room(), "skirting", { x: 0, width: 4000 }), "warning")).not.toMatch(/Plinthe/);
@@ -47,7 +47,7 @@ describe("what stands on the walls", () =>
 
     it("checks the room a radiator's notice asks, and says when it is not typed", () =>
     {
-        // the bench ends at 1600, the radiator starts 100 further
+        // The bench ends at 1600, the radiator starts 100 further
         const near = withObstacle(room(), "radiator", { x: 1700, y: 150 });
         expect(said(near, "info")).toMatch(/dégagement de sa notice non saisi/);
         const id = near.room.obstacles[0]!.id;
@@ -65,7 +65,7 @@ describe("what stands on the walls", () =>
         const c = boxed.items[0] as Carcass;
         let cut = addOutlet(boxed, c.id, c.root.id);
         cut = updateOutlet(cut, c.id, (cut.items[0] as Carcass).outlets[0]!.id, { w: 200, h: 260, dy: -60 });
-        // the volume of a cut bak leaves its hole out : the box going through it meets nothing
+        // The volume of a cut bak leaves its hole out : the box going through it meets nothing
         expect(said(cut, "error")).not.toMatch(/Boîtier/);
     });
 

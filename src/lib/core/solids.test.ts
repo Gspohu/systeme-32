@@ -54,7 +54,7 @@ describe("solids of the 3D view", () =>
         {
             return s.label.endsWith("patin");
         });
-        // two rows of Häfele feet, 800 apart at most along a 1200 width
+        // Two rows of Häfele feet, 800 apart at most along a 1200 width
         expect(plates.length).toBe(6);
         for (const s of plates)
         {
@@ -79,7 +79,7 @@ describe("solids of the 3D view", () =>
 
     it("finds a carcass sunk into the floor", () =>
     {
-        // a plinth of 100 under a box left at floor level
+        // A plinth of 100 under a box left at floor level
         const r = report(project(newCarcass({ name: "Commode", width: 800, height: 700, depth: 450, y: 0 })));
         expect(r.under.some((s) =>
         {
@@ -112,7 +112,7 @@ describe("solids of the 3D view", () =>
         {
             return x.role === "side";
         })!;
-        // a 40 mm cube centred on the middle of a side panel
+        // A 40 mm cube centred on the middle of a side panel
         const mid = side.frame!;
         const centre: [number, number, number] = [
             mid.o[0] + mid.u[0] * side.length / 2 + mid.v[0] * side.width / 2,
@@ -130,7 +130,7 @@ describe("solids of the 3D view", () =>
         {
             return [c.a.key, c.b.key].sort().join(" ");
         })).toEqual([[side.id, "essai/cube"].sort().join(" ")]);
-        // without its host the cup sits in the door board like any foreign body
+        // Without its host the cup sits in the door board like any foreign body
         cup.host = null;
         expect(clashes(solids(p, b)).some((c) =>
         {

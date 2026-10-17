@@ -8,7 +8,7 @@ import { decorById, materialOfDecor } from "../data/materials";
 // Häfele plinth holder : plinth height = foot height minus 5 to 10 mm, 7 kpt
 export const PLINTH_FOOT_GAP = 7;
 
-// the cleat stock of slats, ceiling fillers and side fillers, 40 x 20 solid wood
+// The cleat stock of slats, ceiling fillers and side fillers, 40 x 20 solid wood
 export const CLEAT_THICKNESS = 20;
 
 
@@ -31,7 +31,7 @@ export function newPart(p: Omit<Part, "outline" | "cutouts" | "holes" | "grooves
         ...p,
         material: mat,
     };
-    // a lacquer colour left over from a former decor means nothing on this one
+    // A lacquer colour left over from a former decor means nothing on this one
     if (decor.id !== "MDF_LAQUE")
     {
         part.colour = null;

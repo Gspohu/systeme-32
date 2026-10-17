@@ -7,7 +7,7 @@ import { roomBox, toRoom, toWall } from "./room";
 import type { Carcass, DoorFront, Project } from "./model";
 import { validateProject } from "./io/project_file";
 
-// a corner wardrobe in Strasbourg : 600 on the back wall, 1000 on the left one, both 600 deep on a plinth
+// A corner wardrobe in Strasbourg : 600 on the back wall, 1000 on the left one, both 600 deep on a plinth
 function corner(backDoor: DoorFront | null, sideX: number): Project
 {
     let p = addItem(newProject("angle"), newCarcass({ name: "Fond", width: 600, height: 2000, depth: 600, y: 100 }));
@@ -16,7 +16,7 @@ function corner(backDoor: DoorFront | null, sideX: number): Project
     {
         p = setFront(p, back.id, back.root.id, backDoor);
     }
-    // facing the left wall the corner is on the right : 4000 of room depth, the side carcass ends at the corner
+    // Facing the left wall the corner is on the right : 4000 of room depth, the side carcass ends at the corner
     return addItem(p, newCarcass({ name: "Gauche", wall: "left", width: 1000, height: 2000, depth: 600, y: 100,
                                    x: sideX }));
 }
@@ -51,10 +51,10 @@ describe("walls and corners", () =>
 
     it("finds a carcass of the left wall pushed into one of the back wall", () =>
     {
-        // the left carcass runs from 3000 to 4000 along its wall : its last 600 sit on the back carcass
+        // The left carcass runs from 3000 to 4000 along its wall : its last 600 sit on the back carcass
         const p = corner(null, 3000);
         const [back, side] = p.items as Carcass[];
-        // the plinth takes the box down to the floor
+        // The plinth takes the box down to the floor
         expect(roomBox(side!, p.room)).toEqual({ min: [0, 0, 0], max: [600, 2100, 1000] });
         expect(messages(p, "error")).toContain(`${back!.name} et ${side!.name} se chevauchent`);
     });
@@ -79,7 +79,7 @@ describe("walls and corners", () =>
         const side = p.items[1] as Carcass;
         p = setFront(p, side.id, side.root.id, { type: "door", hinge: "right" });
         expect(messages(p, "warning")).toContain("Gauche, porte 1 heurte");
-        // hinged the other way the side door swings away from the corner
+        // Hinged the other way the side door swings away from the corner
         p = setFront(p, side.id, side.root.id, { type: "door", hinge: "left" });
         expect(messages(p, "warning")).not.toContain("heurte");
     });
@@ -114,12 +114,12 @@ describe("walls and corners", () =>
 
     it("stops the side walls of an alcove at their returns", () =>
     {
-        // the left carcass reaches 1000 from the back wall : a 660 return leaves 340 of it with nothing behind
+        // The left carcass reaches 1000 from the back wall : a 660 return leaves 340 of it with nothing behind
         const p = setReturn(corner(null, 3000), "left", 660);
         expect(p.room.returns).toEqual({ left: 660, right: 4000 });
         expect(messages(p, "warning")).toContain("Gauche dépasse le retour du mur gauche (660 mm depuis le fond)");
         expect(messages(setReturn(p, "left", 1000), "warning")).not.toContain("dépasse le retour");
-        // once neither wall is shorter than the room there is no alcove left
+        // Once neither wall is shorter than the room there is no alcove left
         expect(setReturn(p, "left", null).room).toEqual({ width: 4000, depth: 4000, height: 2500, obstacles: [] }); 
         expect(() =>
         {

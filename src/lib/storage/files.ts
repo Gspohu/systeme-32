@@ -10,7 +10,7 @@ export function downloadBytes(bytes: Uint8Array, name: string, mime: string): vo
     document.body.appendChild(a);
     a.click();   
     a.remove();
-    // give the browser time to start the download before releasing the blob
+    // Give the browser time to start the download before releasing the blob
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 

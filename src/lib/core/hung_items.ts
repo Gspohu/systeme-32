@@ -23,7 +23,7 @@ export function shelfSupportPositions(width: number): number[]
 }
 
 
-// the widest gap between two supports : the span its deflection is checked on
+// The widest gap between two supports : the span its deflection is checked on
 export function shelfSupportSpan(width: number): number
 {
     const xs = shelfSupportPositions(width);
@@ -58,11 +58,11 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     const mid = w.thickness / 2;
     xs.forEach((x, k) =>
     {
-        // an edge hole sits on its edge : v1 is the back one, at the full width of the board
+        // An edge hole sits on its edge : v1 is the back one, at the full width of the board
         part.holes.push({ u: x, v: part.width, diameter: H.pinDiameter, depth: H.pinDepth, face: "v1", w: mid,
                           label: `Fixation ${H.ref} : perçage ${DIAM}${H.pinDiameter} x ${H.pinDepth} pour la broche`,
                           purpose: "shelf-bracket", fixes: H.ref });
-        // one fitting : the pin runs on from the bottom of the plate pocket to the end of its hole
+        // One fitting : the pin runs on from the bottom of the plate pocket to the end of its hole
         const pin = box(`${w.id}/support${k}/broche`, w.id, H.ref, `${w.name}, broche ${k + 1}`, "shelf-bracket",
                         [w.x + x - H.pinDiameter / 2, w.y + mid - H.pinDiameter / 2, w.z + H.pocket.depth],
                         [w.x + x + H.pinDiameter / 2, w.y + mid + H.pinDiameter / 2, w.z + H.pinDepth], true);
@@ -94,7 +94,7 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     {
         line(plug, n * H.wallScrews, null, "wall-fixing"); 
     }
-    // the load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
+    // The load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
     const row = H.loads.find((r) =>
     {
         return w.depth <= r.depth + 0.01;

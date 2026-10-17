@@ -6,11 +6,11 @@ import { Canvas, MARGIN, fit, wrap } from "./display";
 export interface Draft
 {
     title: string;
-    // carride on to the supplementary title of the title block, the material of a workpiece sheet
+    // Carride on to the supplementary title of the title block, the material of a workpiece sheet
     supplement?: string;  
     scale: string;
     canvas: Canvas;
-    // what the screen picks some sheets by, never by their title
+    // What the screen picks some sheets by, never by their title
     kind?: "nesting";
 }
 
@@ -44,7 +44,7 @@ export function table(canvas: Canvas, x: number, y: number, cols: number[], head
     let rowY = y + rowH;
     for (const row of rows)
     {
-        // a cell too long for its column carries on below, the row grow as tall as its tallest cell
+        // A cell too long for its column carries on below, the row grow as tall as its tallest cell
         const cells = cellLines(row, cols, size);
         cx = x;
         cells.forEach((lines, k) =>
