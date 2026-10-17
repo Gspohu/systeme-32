@@ -125,7 +125,9 @@
         const wanted = new Set<string>();
         // The decor photos and the pictures printed on cell backs, decoded the same way
         const files = [...Object.values(app.project.textures).map((t) => { return t.file; }),
-                       ...build.prints.map((x) => { return x.file; })];
+                       ...build.prints.map((x) => { return x.file; }),
+                       ...app.project.room.wallPhoto === undefined ? [] : [app.project.room.wallPhoto.file],
+                       ...app.project.room.pictures.map((x) => { return x.file; })];
         for (const file of files)
         {
             wanted.add(file);
@@ -437,6 +439,33 @@
         };
     });
     const printMats = new Map<string, THREE.MeshStandardMaterial>();
+    const wallMats = new Map<string, THREE.MeshStandardMaterial>();
+
+
+    // The photo of the walls over a wall w x h mm : one motif every tileMm across, as high as the photo's own
+    // proportions make it, laid from the bottom left corner
+    function wallMaterial(w: number, h: number): THREE.MeshStandardMaterial | null
+    {
+        const wp = app.project.room.wallPhoto;
+        const photo = wp === undefined ? undefined : photos.get(wp.file);
+        if (wp === undefined || photo === undefined)
+        {
+            return null;
+        }
+        const key = `${wp.file}@${photo.version}@${wp.tileMm}@${w}x${h}`;
+        let m = wallMats.get(key);
+        if (m === undefined)
+        {
+            const img = photo.tex.image as { width: number; height: number };
+            const tileH = wp.tileMm * img.height / img.width;
+            const map = photo.tex.clone();
+            map.repeat.set(w / wp.tileMm, h / tileH);
+            map.needsUpdate = true;
+            m = new THREE.MeshStandardMaterial({ map, roughness: 0.9, side: THREE.FrontSide });
+            wallMats.set(key, m);
+        }
+        return m;
+    }
 
 
     function printMaterial(file: string): THREE.MeshStandardMaterial | null
@@ -498,6 +527,28 @@
 
     // The walls and the ceiling only show the room : one face each, towards the inside, gone once the camera is out
     const sideWalls = $derived(shownSideWalls(app.project));
+    // The back wall and the side ones standing, each a plane facing into the room, its length along the floor
+    const roomWalls = $derived.by(() =>
+    {
+        const r = app.project.room;
+        const list: { key: string; length: number; position: [number, number, number];
+                      rotation: [number, number, number] }[] = [
+            { key: "back", length: r.width, position: [r.width / 2 * MM, r.height / 2 * MM, 0], rotation: [0, 0, 0] },
+        ];
+        if (sideWalls.has("left"))
+        {
+            const d = sideWallDepth(r, "left");
+            list.push({ key: "left", length: d, position: [0, r.height / 2 * MM, d / 2 * MM],
+                        rotation: [0, Math.PI / 2, 0] });
+        }
+        if (sideWalls.has("right"))
+        {
+            const d = sideWallDepth(r, "right");
+            list.push({ key: "right", length: d, position: [r.width * MM, r.height / 2 * MM, d / 2 * MM],
+                        rotation: [0, -Math.PI / 2, 0] });
+        }
+        return list;
+    });
     const roomTint = $derived.by(() =>
     {
         void dark.current;
@@ -549,30 +600,25 @@
 
 {#if app.showRoom}
     {@const r = app.project.room}
-    <T.Mesh position={[r.width / 2 * MM, r.height / 2 * MM, 0]}>
-        <T.PlaneGeometry args={[r.width * MM, r.height * MM]} />
-        <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
-    </T.Mesh>
     <T.Mesh position={[r.width / 2 * MM, r.height * MM, r.depth / 2 * MM]} rotation={[Math.PI / 2, 0, 0]}>
         <T.PlaneGeometry args={[r.width * MM, r.depth * MM]} />
         <!-- facing down it gets none of the light from above : a flat colour, it only marks the room -->
         <T.MeshBasicMaterial color={roomTint.ceiling} side={THREE.FrontSide} />
     </T.Mesh>
     <!-- the returns of an alcove frame it whatever stands against them -->
-    {#if sideWalls.has("left")}
-        {@const d = sideWallDepth(r, "left")}
-        <T.Mesh position={[0, r.height / 2 * MM, d / 2 * MM]} rotation={[0, Math.PI / 2, 0]}>
-            <T.PlaneGeometry args={[d * MM, r.height * MM]} />
-            <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
-        </T.Mesh>
-    {/if}
-    {#if sideWalls.has("right")}
-        {@const d = sideWallDepth(r, "right")}
-        <T.Mesh position={[r.width * MM, r.height / 2 * MM, d / 2 * MM]} rotation={[0, -Math.PI / 2, 0]}>
-            <T.PlaneGeometry args={[d * MM, r.height * MM]} />
-            <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
-        </T.Mesh>
-    {/if}
+    {#each roomWalls as w (w.key)}
+        {@const photo = wallMaterial(w.length, r.height)}
+        {#if photo !== null}
+            <T.Mesh position={w.position} rotation={w.rotation} material={photo}>
+                <T.PlaneGeometry args={[w.length * MM, r.height * MM]} />
+            </T.Mesh>
+        {:else}
+            <T.Mesh position={w.position} rotation={w.rotation}>
+                <T.PlaneGeometry args={[w.length * MM, r.height * MM]} />
+                <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
+            </T.Mesh>
+        {/if}
+    {/each}
 {/if}
 
 {#each app.project.items as it (it.id)}
@@ -608,6 +654,20 @@
 {#each cushions as c (c.key)}
     {@const pl = placement(c.wall)}
     <T.Mesh geometry={c.geometry} material={cushionMat} rotation={pl.rotation} position={pl.position} />
+{/each}
+<!-- A photo hung on a wall : shown once like a printed cell back, a hair in front of its wall -->
+{#each app.project.room.pictures as x (x.id)}
+    {@const m = printMaterial(x.file)}
+    {@const img = photos.get(x.file)?.tex.image as { width: number; height: number } | undefined}
+    {#if m !== null && img !== undefined}
+        {@const h = x.width * img.height / img.width}
+        {@const pl = placement(x.wall)}
+        <T.Group rotation={pl.rotation} position={pl.position}>
+            <T.Mesh position={[(x.x + x.width / 2) * MM, (x.y + h / 2) * MM, MM]} material={m}>
+                <T.PlaneGeometry args={[x.width * MM, h * MM]} />
+            </T.Mesh>
+        </T.Group>
+    {/if}
 {/each}
 {#each sofaGeometries as s (s.key)}
     <T.Mesh geometry={s.geometry} material={cushionMat} />

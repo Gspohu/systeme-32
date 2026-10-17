@@ -240,7 +240,6 @@ test.describe("plans and lists", () =>
 
     test("orders a project from a file with the open one", async ({ page }) =>
     {
-        console.log("chien1");
         await openTemplate(page, "Vaisselier bibliothèque");
         const file = await download(page, page.getByRole("button", { name: "Enregistrer", exact: true }));
         await openTemplate(page, "Composition TV et bibliothèque");

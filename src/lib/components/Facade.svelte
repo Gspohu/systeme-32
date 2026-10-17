@@ -37,8 +37,8 @@
     // The printed pictures as object urls, given back when the set chagnes
     const printUrls = $derived.by(() => 
     {
-        const urls = new Map<string, string>();   
-        for (const x of analysis.build.prints)
+        const urls = new Map<string, string>();
+        for (const x of [...analysis.build.prints, ...project.room.pictures])
         {
             const bytes = app.textures.get(x.file);
             if (bytes !== undefined && !urls.has(x.file))
@@ -298,6 +298,15 @@
         <polyline points={`${wallSpan[0]},0 ${wallSpan[0]},${-project.room.height} ${wallSpan[1]},${-project.room.height} `
             + `${wallSpan[1]},0`}
             class="room" fill="none" />
+        <!-- A photo hung on this wall, behind the furniture : fitted to its width, its proportions kept, bottom
+             at its height -->
+        {#each project.room.pictures.filter((x) => { return x.wall === app.wall; }) as x (x.id)}
+            {@const href = printUrls.get(x.file)}
+            {#if href !== undefined}
+                <image {href} x={x.x} y={-(x.y + 4 * x.width)} width={x.width} height={4 * x.width}
+                    preserveAspectRatio="xMinYMax meet" class="print" />
+            {/if}
+        {/each}
         {#each ghosts as g (g.id)}
             <rect x={g.x0} y={-g.y1} width={g.x1 - g.x0} height={g.y1 -
                                                                  g.y0} class="ghost"><title>{g.name}</title></rect>

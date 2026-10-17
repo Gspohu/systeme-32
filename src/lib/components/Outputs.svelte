@@ -14,10 +14,13 @@
     import { isoDay, issueState, nextRevisionIndex } from "../core/revisions";
     import { OBSTACLE_LABELS } from "../core/obstacles";
     import { sideWallDepth } from "../core/room";
+    import { PHOTO_DEFAULT_TILE, PhotoError, checkPhoto, photoFile, type PhotoKind } from "../core/photos";
+    import { WALL_PHOTO, addPicture, pictureFile, removePicture, setWallPhoto,
+            updatePicture } from "../core/room_dressing";
     import { addLamp, addSofa, removeLamp, removeSofa, setSideWall, shownSideWalls, updateLamp,
              updateSofa } from "../core/room_dressing";
     import { assemblySequences } from "../core/assembly";
-    import { shareOrDownload } from "../storage/files";
+    import { pickFile, readFile, shareOrDownload } from "../storage/files";
     import { FAMILY_LABELS } from "../data/hardware";
     import { HANDLING_LIMITS, SHELF_TEST_LOADS } from "../data/rules";
     import type { Joinery, ObstacleKind, Screen, ScreenArm, Settings, Wall, WallType } from "../core/model";
@@ -31,6 +34,50 @@
 
 
     const project = $derived(app.project);
+
+
+    // The bytes checked for an image, then kept with the project like a decor photo, under the name `named` gives
+    async function importImage(named: (kind: PhotoKind) => string, use: (file: string) => void): Promise<void>
+    {
+        const f = await pickFile("image/png,image/jpeg,image/webp");
+        if (f === null)
+        {
+            return;
+        }
+        try
+        {
+            const bytes = await readFile(f);
+            const file = named(checkPhoto(bytes));
+            app.textures = new Map(app.textures).set(file, bytes);
+            use(file);
+        }
+        catch (e)
+        {
+            if (!(e instanceof PhotoError))
+            {
+                throw e;
+            }
+            app.notify(e.message, "warning");
+        }
+    }
+
+
+    function importWallPhoto(): void
+    {
+        void importImage((kind) => { return photoFile(WALL_PHOTO, kind); }, (file) =>
+        {
+            app.apply(setWallPhoto, { file, tileMm: project.room.wallPhoto?.tileMm ?? PHOTO_DEFAULT_TILE });
+        });
+    }
+
+
+    function importPicture(): void
+    {
+        void importImage(pictureFile, (file) =>
+        {
+            app.apply(addPicture, file, app.wall);
+        });
+    }
     const out = $derived(app.outputs);
     // The drawing set is only bilt while one of its tabs is open
     const pages = $derived(current === "Plans" || current === "Calepinage" ? drawingSet(project, out) : []);
@@ -473,6 +520,44 @@
                     </label>
                 {/each}
             </div>
+            <div class="row">
+                <button class="btn btn-secondary" title="Papier peint ou peinture, posé sur tous les murs de la vue 3D"
+                    onclick={importWallPhoto}>
+                    {project.room.wallPhoto === undefined ? "Photo des murs" : "Remplacer la photo des murs"}</button>
+                {#if project.room.wallPhoto !== undefined}
+                    <button class="btn btn-ghost" onclick={() => app.apply(setWallPhoto, null)}>Retirer</button>
+                {/if}
+            </div>
+            {#if project.room.wallPhoto !== undefined}
+                {@const wp = project.room.wallPhoto}
+                <label class="field" title="Largeur de mur que montre la photo, sa hauteur suit ses proportions">
+                    <span class="label">Largeur du motif (mm)</span>
+                    <input class="input" type="number" min="10" max="10000" step="10" value={wp.tileMm}
+                        onchange={(e) => app.apply(setWallPhoto, { ...wp, tileMm: num(e) })} />
+                </label>
+            {/if}
+            <button class="btn btn-secondary" title="Une photo posée comme un poster sur le mur affiché en vue de face"
+                onclick={importPicture}>+ Photo murale</button>
+            {#each project.room.pictures as x (x.id)}
+                <div class="row">
+                    <strong>{x.name}</strong>
+                    <button class="btn btn-ghost" onclick={() => app.apply(removePicture, x.id)}>Retirer</button>
+                </div>
+                <label class="field"><span class="label">Mur</span>
+                    <select class="select" value={x.wall} onchange={(e) => app.apply(updatePicture, x.id,
+                        { wall: str(e) as Wall })}>
+                        <option value="back">Fond</option>
+                        <option value="left">Gauche</option>
+                        <option value="right">Droite</option>
+                    </select>
+                </label>
+                {#each [["x", "Position X"], ["y", "Hauteur du bas"], ["width", "Largeur"]] as const as [key, label]}
+                    <label class="field"><span class="label">{label}</span>
+                        <input class="input" type="number" value={x[key]} onchange={(e) => app.apply(updatePicture,
+                            x.id, { [key]: num(e) })} />
+                    </label>
+                {/each}
+            {/each}
             <div class="row">
                 <button class="btn btn-secondary" onclick={() => app.apply(addSofa)}>+ Canapé</button>
                 <button class="btn btn-secondary" onclick={() => app.apply(addLamp)}>+ Lampe</button>
