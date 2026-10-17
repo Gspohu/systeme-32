@@ -31,7 +31,7 @@ describe("a screen on a wall arm", () =>
         expect(screenSpots(p.screen!).map((s) =>
         {
             return [s.label, s.cx];
-        })).toEqual([["rangé", 1112], ["sorti", 940]]);
+        })).toEqual([["rangé", 1162], ["sorti", 940]]);
         expect(armChecks(p)).toEqual([]);
         expect(analyse(p).checks.filter((k) =>
         {
@@ -69,7 +69,7 @@ describe("a screen on a wall arm", () =>
     {
         const p = tvWall();
         // A fifth of the straight line from put away to swung out, the way the first 3D slider took it
-        const diagonal = { label: "", cx: 1077.6, bottom: 664, z: 114, yaw: 0 };
+        const diagonal = { label: "", cx: 1117.6, bottom: 664, z: 114, yaw: 0 };
         expect(spotClashes(p, diagonal).map((h) =>
         {
             return h.name;
@@ -79,7 +79,7 @@ describe("a screen on a wall arm", () =>
         {
             return spotClashes(p, s).length === 0;
         })).toBe(true);
-        expect(way[40]).toMatchObject({ cx: 1112, z: 250 });
+        expect(way[40]).toMatchObject({ cx: 1162, z: 250 });
     });
 
     it("says when only the way out runs into something, both ends being clear", () =>
@@ -114,10 +114,10 @@ describe("a screen on a wall arm", () =>
     {
         const sc = tvWall().screen!;
         const far = reachable(sc, { cx: 3000, z: 2000, yaw: 120 });
-        expect(Math.hypot(far.cx - 1026, far.z - 30)).toBeCloseTo(393, 6);
+        expect(Math.hypot(far.cx - 1076, far.z - 30)).toBeCloseTo(393, 6);
         expect(far.yaw).toBe(90);
-        expect(reachable(sc, { cx: 1026, z: 10, yaw: 0 }).z).toBe(79);
-        expect(spotFor(sc, null)).toMatchObject({ cx: 1112, z: 80, yaw: 0 });
+        expect(reachable(sc, { cx: 1076, z: 10, yaw: 0 }).z).toBe(79);
+        expect(spotFor(sc, null)).toMatchObject({ cx: 1162, z: 80, yaw: 0 });
     });
 
     it("checks nothing on an arm whose sheet is still to read", () =>

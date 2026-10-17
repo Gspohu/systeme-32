@@ -4,6 +4,7 @@ import type { Carcass, LayoutNode, Lining, Project } from "./model";
 import { cell, newCarcass, newDevice, newFront, newId, newProject, newWallShelf, split,
         DEFAULT_BATTENS } from "./factory";
 import { NICHE_SETBACK } from "./layout_commands";
+import { SOFA_START } from "./room_dressing";
 
 const OAK = "H1180_ST37";
 const GREEN = "U604_ST9";
@@ -82,14 +83,13 @@ export function tvWall(): Project
     );
     column.linings.push(lining(niche.id, OAK, true));
 
-    // Gilles' open column against it, from his sketch of 2026-10-08 : 250 wide (his 200 to 300), 150 deep, a book
-    // up under the lower wall shelf that caps it, no back. Two bays of 96.5 behind a middle upright, the shelves of
-    // the right one half a pitch above the left : 281 clear takes a large format of 240
-    const bookLeft = split("v", [96.5], [split("h", [280, 580, 880], [cell(), cell(), cell(), cell()]),
+    // Gilles' open column against it, 300 x 150 since 2026-10-17, up under the lower wall shelf, no back. Bays of 122
+    // and 121 either side of his upright, the right shelves half a pitch higher : 281 clear takes a 240 book
+    const bookLeft = split("v", [122], [split("h", [280, 580, 880], [cell(), cell(), cell(), cell()]),
                                          split("h", [130, 430, 730, 1030], [cell(), cell(), cell(), cell(), cell()])]);
     const books = newCarcass({
         name: "Colonne à livres",
-        width: 250, height: 1260, depth: 150, x: 450, y: 600, z: 0,
+        width: 300, height: 1260, depth: 150, x: 450, y: 600, z: 0,
         decor: OAK, backDecor: OAK, base: { type: "floor" }, back: { type: "none" },
         root: bookLeft,
     });
@@ -110,11 +110,12 @@ export function tvWall(): Project
                               corners: { left: 0, right: 50 } });
     });
 
-    // Their amplifier stood on its side, flush with the front : its bass port is at the back. Moved right of the
+    // Their amplifier laid long since 2026-10-17, flush with the front : its bass port is at the
+    // back. Moved right of the
     // stored screen once the screen went on an arm, 30 clear, its old place taken by Gilles' column
     const amplifier = newDevice({
-        name: "Ampli Marshall Stanmore", x: 1530, y: 600, z: 215, width: 185, height: 350, depth: 185, massKg: 5.1,
-        source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé sur le flanc",
+        name: "Ampli Marshall Stanmore", x: 1580, y: 600, z: 215, width: 350, height: 185, depth: 185, massKg: 5.1,
+        source: "Marshall Stanmore 1re génération, 350 x 185 x 185 mm et 5,1 kg (fiche manua.ls), posé à plat",
         look: "amplifier",
     });
     // The two boxes of their mini 4K side by side on the floor of the technical cell, each before its back hole
@@ -128,21 +129,26 @@ export function tvWall(): Project
         source: "155 x 31 x 118 mm (test Génération NT), 0,34 kg estimés, à peser",
     });
     project.items.push(baseUnit, column, books, ...shelves, amplifier, server, player);
-    // Their set, read off its back label, on a wall arm : put away right of a 250 column (the width Gilles weighs
-    // between 200 and 300), swung out over it to face the middle of their 1880 sofa set against the left wall
+    // Their set, read off its back label, on a wall arm : put away 30 right of Gilles' 300 column, swung out over it
+    // to face the middle of their 1880 sofa
     project.screen = {
-        diagonalInch: 32, aspectW: 16, aspectH: 9, cx: 1112, bottom: 664, z: 80, wallMounted: false,
+        diagonalInch: 32, aspectW: 16, aspectH: 9, cx: 1162, bottom: 664, z: 80, wallMounted: false,
         frame: { w: 764, h: 463, d: 30 }, massKg: 7, vesa: [200, 200],
         source: "Samsung UE32D4000NW (étiquette du dos) : 763,6 x 463,1 x 29,9 mm et 7 kg sans pied, VESA 200 x 200 "
             + "(fiches tvsfaq et manua.ls, aucune fiche Samsung lue : mesurer l'écart des trous au dos)",
         arm: {
             model: "One For All WM 2251", maxKg: 30, vesa: [[75, 75], [100, 100], [200, 100], [200, 200]],
-            reachMin: 49, reachMax: 393, plateW: 240, plateH: 249, x: 1026, y: 896,
+            reachMin: 49, reachMax: 393, plateW: 240, plateH: 249, x: 1076, y: 896,
             out: { cx: 940, z: 250 },
             source: "fiche oneforall.com relevée le 2026-10-08 : 13 à 43 pouces, VESA 75 x 75 à 200 x 200, 30 kg, "
                 + "49 à 393 mm du mur, 180° ; platine prise à son encombrement de 24 x 24,9 cm",
         },
     };
+    // Their room : the left wall runs 3100 to the wall facing the set, their 1880 sofa backed against that one and
+    // centred on the swung out screen. Its depth and heights are the starting ones until measured
+    project.room = { ...project.room, depth: 3100, walls: ["left"],
+                     sofas: [{ id: newId("sofa"), name: "Canapé", ...SOFA_START, width: 1880, x: 940 - 1880 / 2,
+                               distance: 3100 }] };
     return project;
 }
 
