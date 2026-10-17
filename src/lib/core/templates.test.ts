@@ -529,14 +529,14 @@ describe("the sketch templates", () =>
     });
 
 
-    it("opens the niche of the parents' sketch over 1084 between its two shelf columns", () =>
+    it("opens the niche of the parents' sketch over 1086 between its two shelf columns", () =>
     {
         const niche = dresser().items.find((it) =>
         {
             return it.name === "Niche";
         }) as Carcass;
         const opening = (niche.root as SplitNode).children[1]!;
-        expect(resolveLayout(niche).nodes.get(opening.id)!.w).toBe(1084);
+        expect(resolveLayout(niche).nodes.get(opening.id)!.w).toBe(1086);
         expect(niche.fronts).toEqual([]);
     });
 
@@ -588,7 +588,7 @@ describe("the dresser with open columns", () =>
             expect((c.root as SplitNode).cuts.length).toBe(2);
         }
         const niche = named("Niche");
-        expect(niche.width).toBe(800);
+        expect(niche.width).toBe(802);
         expect(niche.root.kind).toBe("cell");
         expect(named("Placard haut").fronts.length).toBe(2);
         expect(named("Placard haut").y + named("Placard haut").height).toBe(top);
@@ -647,5 +647,34 @@ describe("the dresser with small niches", () =>
         {
             return e.includes("éclairage sous le caisson");
         })).toBe(true);
+    });
+});
+
+
+describe("the fronts of the dressers", () =>
+{
+    it("gives the three drawers and the cupboards under and over them one width of 531", () =>
+    {
+        for (const make of [dresser, smallNichesDresser, openDresser])
+        {
+            const p = make();
+            const a = analyse(p);
+            for (const name of ["Placards et tiroirs", "Placards hauts"])
+            {
+                const c = p.items.find((it) =>
+                {
+                    return it.kind === "carcass" && it.name === name;
+                });
+                if (c === undefined)
+                {
+                    continue;
+                }
+                // An outer front covers its side, a middle one half of each upright : unequal bays, equal fronts
+                expect(new Set((a.build.fronts.get(c.id) ?? []).map((f) =>
+                {
+                    return f.rect.w;
+                }))).toEqual(new Set([531]));
+            }
+        }
     });
 });

@@ -153,6 +153,13 @@ export function tvWall(): Project
 }
 
 
+// The middle of the dressers, 2 mm taken from the right column on 2026-10-17 : its fronts of 531 to the mm
+// An outer front covers its side, 25.5 more than its bay, a middle one half of each upright, 16 more : bays
+// of 505.5, 515 and 505.5 for the drawers and both rows of cupboards
+const DRESSER_MIDDLE = 1602;
+const DRESSER_BAYS = [505.5, 1039.5] as const;
+
+
 function dresserBox(name: string, x: number, y: number, width: number, height: number, root: LayoutNode,
     standing: boolean): Carcass
 {
@@ -173,7 +180,7 @@ function dresserFrame(name: string, upper: Carcass[]): Project
     const left = [cell(), cell(), cell()];
     const kl = box("Colonne gauche", 0, 100, 600, 2256, split("h", [636, 1500], left), false);
     const rightRoot = split("h", [776, 1666], [cell(), cell(), cell()]);
-    const kr = box("Colonne droite", 2200, 100, 680, 2256, rightRoot, false);
+    const kr = box("Colonne droite", 600 + DRESSER_MIDDLE, 100, 2280 - DRESSER_MIDDLE, 2256, rightRoot, false);
     for (const c of left)
     {
         kl.fronts.push(newFront(c.id, { type: "door", hinge: "left" }, PUSH_DOOR)); 
@@ -191,7 +198,7 @@ function dresserFrame(name: string, upper: Carcass[]): Project
     {
         return split("h", [632], [doors[k]!, drawers[k]!]);
     });
-    const low = box("Placards et tiroirs", 600, 100, 1600, 860, split("v", [512, 1040], bays), false);
+    const low = box("Placards et tiroirs", 600, 100, DRESSER_MIDDLE, 860, split("v", [...DRESSER_BAYS], bays), false);
     low.fronts.push(
         newFront(doors[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(doors[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
@@ -230,16 +237,17 @@ export function dresser(): Project
         return s;
     };
     const opening = cell();
-    const nicheRoot = split("v", [220, 1323], [sideShelves(), opening, sideShelves()]);
+    // Both side columns 220 inside, the opening between them takes what the middle gives
+    const nicheRoot = split("v", [220, DRESSER_MIDDLE - 38 - 220 - 19], [sideShelves(), opening, sideShelves()]);
     nicheRoot.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
-    const niche = box("Niche", 600, 960, 1600, 680, nicheRoot, true);
+    const niche = box("Niche", 600, 960, DRESSER_MIDDLE, 680, nicheRoot, true);
     // A LED strip let into the underside of its top, lighting the opening, switched and dimmed over Wi-Fi
     niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
                         wifi: true });
 
     // The top row parted like the bays under it : its doors line up with theirs acros the niche
     const top = [cell(), cell(), cell()];
-    const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [512, 1040], top), true);
+    const high = box("Placards hauts", 600, 1640, DRESSER_MIDDLE, 716, split("v", [...DRESSER_BAYS], top), true);
     high.fronts.push(
         newFront(top[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
@@ -262,7 +270,7 @@ export function smallNichesDresser(): Project
         return c;
     };
     const top = [cell(), cell(), cell()];
-    const high = box("Placards hauts", 600, 1640, 1600, 716, split("v", [512, 1040], top), true);
+    const high = box("Placards hauts", 600, 1640, DRESSER_MIDDLE, 716, split("v", [...DRESSER_BAYS], top), true);
     high.fronts.push(
         newFront(top[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
@@ -272,7 +280,7 @@ export function smallNichesDresser(): Project
     high.lights.push({ id: newId("li"), cell: top[1]!.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
                        wifi: true, under: true });
     return dresserFrame("Vaisselier petites niches", [triple("Petite niche gauche", 600), high,
-                                                      triple("Petite niche droite", 1950)]);
+                                                      triple("Petite niche droite", 600 + DRESSER_MIDDLE - 250)]);
 }
 
 
@@ -288,7 +296,7 @@ export function openDresser(): Project
         return box(name, x, 960, 400, 1396, split("h", [440, 899], [cell(), cell(), cell()]), true);
     };
     const opening = cell();
-    const niche = box("Niche", 1000, 960, 800, 760, opening, true);
+    const niche = box("Niche", 1000, 960, DRESSER_MIDDLE - 800, 760, opening, true);
     niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
                         wifi: true });
     // Two doors over the niche, a shelf behind each halfway up its 598
@@ -296,13 +304,14 @@ export function openDresser(): Project
     {
         return split("h", [289], [cell(), cell()]);
     });
-    const high = box("Placard haut", 1000, 1720, 800, 636, split("v", [371], halves), true);
+    const wide = DRESSER_MIDDLE - 800;
+    const high = box("Placard haut", 1000, 1720, wide, 636, split("v", [(wide - 38 - 19) / 2], halves), true);
     high.fronts.push(
         newFront(halves[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(halves[1]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
     );
     return dresserFrame("Vaisselier colonnes ouvertes", [column("Colonne ouverte gauche", 600), niche, high,
-                                                         column("Colonne ouverte droite", 1800)]);
+                                                         column("Colonne ouverte droite", 1000 + wide)]);
 }
 
 
