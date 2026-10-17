@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { ScreenSpot } from "../core/tv_arm";
 import { battenAngle, bevelU, type Fitted, type Part, type CurveShape } from "../core/parts";
-import type { Carcass, Device, LadderRail, Screen } from "../core/model";
+import type { Carcass, Device, LadderRail, Screen, Sofa } from "../core/model";
 import { tessellate } from "../core/geometry";
 import { screenSize } from "../core/extent";
 import type { ResolvedLayout } from "../core/layout";
@@ -322,6 +322,30 @@ export function fittedMeshes(list: Fitted[]): { key: string; item: string; hidde
         out.push({ key: f.key, item: f.item, hidden: f.hidden, geometry: geo });
     }
     return out;
+}
+
+
+// A sofa facing the back wall, in the frame of the room : a seat between two arms, the back against its far side
+// The parts are proportioned by eye, only the overall box is what was typed
+export function sofaMeshes(s: Sofa): THREE.BufferGeometry[]
+{
+    const arm = Math.min(150, s.width * 0.08);
+    const back = Math.min(200, s.depth * 0.25);
+    const armHeight = s.seat + (s.height - s.seat) / 2;
+    const front = s.distance - s.depth;
+    const block = (w: number, h: number, d: number, x: number, z: number): THREE.BufferGeometry =>
+    {
+        const g = new THREE.BoxGeometry(w, h, d);
+        g.translate(x, h / 2, z);
+        g.scale(MM, MM, MM);
+        return g;
+    };
+    return [
+        block(s.width - 2 * arm, s.seat, s.depth - back, s.x + s.width / 2, front + (s.depth - back) / 2),
+        block(s.width, s.height, back, s.x + s.width / 2, s.distance - back / 2),
+        block(arm, armHeight, s.depth - back, s.x + arm / 2, front + (s.depth - back) / 2),
+        block(arm, armHeight, s.depth - back, s.x + s.width - arm / 2, front + (s.depth - back) / 2),
+    ];
 }
 
 

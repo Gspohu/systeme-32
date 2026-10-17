@@ -14,6 +14,8 @@
     import { isoDay, issueState, nextRevisionIndex } from "../core/revisions";
     import { OBSTACLE_LABELS } from "../core/obstacles";
     import { sideWallDepth } from "../core/room";
+    import { addLamp, addSofa, removeLamp, removeSofa, setSideWall, shownSideWalls, updateLamp,
+             updateSofa } from "../core/room_dressing";
     import { assemblySequences } from "../core/assembly";
     import { shareOrDownload } from "../storage/files";
     import { FAMILY_LABELS } from "../data/hardware";
@@ -458,6 +460,48 @@
                                                        { clearance: str(e) === "" ? null : num(e) })} />
                     </label>
                 {/if}
+            {/each}
+            <div class="section-title">Mise en scène</div>
+            <div class="row" title="Montre un mur de côté même sans meuble contre lui">
+                {#each [["left", "Mur gauche"], ["right", "Mur droit"]] as const as [side, label] (side)}
+                    <label class="form-check">
+                        <input type="checkbox" checked={shownSideWalls(project).has(side)}
+                            disabled={project.items.some((it) => { return it.wall === side; })
+                                || project.room.returns !== undefined}
+                            onchange={(e) => app.apply(setSideWall, side, checked(e))} />
+                        {label}
+                    </label>
+                {/each}
+            </div>
+            <div class="row">
+                <button class="btn btn-secondary" onclick={() => app.apply(addSofa)}>+ Canapé</button>
+                <button class="btn btn-secondary" onclick={() => app.apply(addLamp)}>+ Lampe</button>
+            </div>
+            {#each project.room.sofas as so (so.id)}
+                <div class="row">
+                    <strong>{so.name}</strong>
+                    <button class="btn btn-ghost" onclick={() => app.apply(removeSofa, so.id)}>Retirer</button>
+                </div>
+                {#each [["x", "Position X"], ["distance", "Dos au mur du fond"], ["width", "Longueur"],
+                        ["depth", "Profondeur"], ["height", "Hauteur"], ["seat", "Assise"]] as const as [key, label]}
+                    <label class="field"><span class="label">{label}</span>
+                        <input class="input" type="number" value={so[key]} onchange={(e) => app.apply(updateSofa,
+                            so.id, { [key]: num(e) })} />
+                    </label>
+                {/each}
+            {/each}
+            {#each project.room.lamps as l (l.id)}
+                <div class="row">
+                    <strong>{l.name}</strong>
+                    <button class="btn btn-ghost" onclick={() => app.apply(removeLamp, l.id)}>Retirer</button>
+                </div>
+                {#each [["x", "Position X"], ["y", "Hauteur"], ["z", "Distance au fond"], ["lumens", "Flux (lm)"],
+                        ["kelvin", "Teinte (K)"]] as const as [key, label]}
+                    <label class="field"><span class="label">{label}</span>
+                        <input class="input" type="number" value={l[key]} onchange={(e) => app.apply(updateLamp,
+                            l.id, { [key]: num(e) })} />
+                    </label>
+                {/each}
             {/each}
             <label class="field" title="Puissance du ruban 24 V acheté"><span class="label">Ruban LED (W/m)</span>
                 <input class="input" type="number" min="1" step="0.1" value={s.ledWattPerMetre}

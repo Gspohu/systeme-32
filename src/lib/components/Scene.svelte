@@ -8,7 +8,8 @@
     import { app } from "./app_state.svelte";
     import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
     import { armMesh, armZoneMesh, cushionMesh, deviceMeshes, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes,
-             screenMesh, MM, type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
+             screenMesh, sofaMeshes, MM, type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
+    import { shownSideWalls } from "../core/room_dressing";
     import { spotClashes, spotFor } from "../core/tv_arm";
     import { kelvinColour } from "../view3d/kelvin";
     import { roomBox, sideWallDepth, wallPlacement } from "../core/room";
@@ -276,6 +277,33 @@
         return list;
     });
     const cushionMat = new THREE.MeshStandardMaterial({ color: 0x9a948c, roughness: 1 });
+    // The sofas of the room in the same neutral fabric, the lamps as small glowing balls where their light comes from
+    const sofaGeometries = $derived(app.project.room.sofas.flatMap((s) =>
+    {
+        return sofaMeshes(s).map((geometry, k) =>
+        {
+            return { key: `${s.id}/${k}`, geometry };
+        });
+    }));
+    $effect(() =>
+    {
+        const current = sofaGeometries;
+        return () =>
+        {
+            for (const g of current)
+            {
+                g.geometry.dispose();
+            }
+        };
+    });
+    const lampBulb = new THREE.SphereGeometry(40 * MM, 16, 12);
+    const lamps = $derived(app.project.room.lamps.map((l) =>
+    {
+        const [r, g, bl] = kelvinColour(l.kelvin);
+        // Candela of a bulb shining evenly all round, the unit three.js reads its point lights in
+        return { key: l.id, position: [l.x * MM, l.y * MM, l.z * MM] as [number, number, number],
+                 colour: new THREE.Color(r, g, bl), candela: l.lumens / (4 * Math.PI) };
+    }));
 
     // hardware of the build : the feet always, what hides inside the carcasses once asked for
     const hardware = $derived.by(() =>
@@ -469,10 +497,7 @@
     });
 
     // The walls and the ceiling only show the room : one face each, towards the inside, gone once the camera is out
-    const sideWalls = $derived(new Set(app.project.items.map((it) =>
-    {
-        return it.wall;
-    })));
+    const sideWalls = $derived(shownSideWalls(app.project));
     const roomTint = $derived.by(() =>
     {
         void dark.current;
@@ -534,14 +559,14 @@
         <T.MeshBasicMaterial color={roomTint.ceiling} side={THREE.FrontSide} />
     </T.Mesh>
     <!-- the returns of an alcove frame it whatever stands against them -->
-    {#if sideWalls.has("left") || r.returns !== undefined}
+    {#if sideWalls.has("left")}
         {@const d = sideWallDepth(r, "left")}
         <T.Mesh position={[0, r.height / 2 * MM, d / 2 * MM]} rotation={[0, Math.PI / 2, 0]}>
             <T.PlaneGeometry args={[d * MM, r.height * MM]} />
             <T.MeshStandardMaterial color={roomTint.wall} side={THREE.FrontSide} />
         </T.Mesh>
     {/if}
-    {#if sideWalls.has("right") || r.returns !== undefined}
+    {#if sideWalls.has("right")}
         {@const d = sideWallDepth(r, "right")}
         <T.Mesh position={[r.width * MM, r.height / 2 * MM, d / 2 * MM]} rotation={[0, -Math.PI / 2, 0]}>
             <T.PlaneGeometry args={[d * MM, r.height * MM]} />
@@ -583,6 +608,15 @@
 {#each cushions as c (c.key)}
     {@const pl = placement(c.wall)}
     <T.Mesh geometry={c.geometry} material={cushionMat} rotation={pl.rotation} position={pl.position} />
+{/each}
+{#each sofaGeometries as s (s.key)}
+    <T.Mesh geometry={s.geometry} material={cushionMat} />
+{/each}
+{#each lamps as l (l.key)}
+    <T.PointLight position={l.position} color={l.colour} intensity={l.candela} decay={2} distance={0} />
+    <T.Mesh geometry={lampBulb} position={l.position}>
+        <T.MeshBasicMaterial color={l.colour} />
+    </T.Mesh>
 {/each}
 {#each hardware as f (f.key)}
     {#if !f.hidden || app.showHardware}
