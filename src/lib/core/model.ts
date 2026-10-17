@@ -5,7 +5,7 @@ export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell
 import type { PriceEntry } from "../data/prices";
 export type { PriceEntry } from "../data/prices"; 
 
-export const SCHEMA_VERSION = 11;  
+export const SCHEMA_VERSION = 12;  
 
 
 export type Id = string;
@@ -449,8 +449,40 @@ export interface Room
     // An alcove : each side wall stops that far from the back wall, the room opens out beyond
     returns?: { left: number; right: number };
     // What stands on the awlls before any furniture : bought nothing of, drwn and checked against
-    obstacles: Obstacle[];  
-} 
+    obstacles: Obstacle[];
+    // Side walls shown although nothing stands against them
+    walls?: ("left" | "right")[];
+    // Seen in 3D only, to judge the piece in its room : neither made, priced nor checked
+    sofas: Sofa[];
+    lamps: Lamp[];
+}
+
+
+// Across the room facing the back wall, x its left end along that wall and `distance` from that wall to its back
+export interface Sofa
+{
+    id: Id;
+    name: string;
+    x: number;
+    distance: number;
+    width: number;
+    depth: number;
+    height: number;
+    seat: number;
+}
+
+
+// A light source set by hand in the room, x along the back wall, y up from the floor, z out from the back wall
+export interface Lamp
+{
+    id: Id;
+    name: string;
+    x: number;
+    y: number;
+    z: number;
+    lumens: number;
+    kelvin: number;
+}
 
 
 export type ObstacleKind = "radiator" | "box" | "skirting";
@@ -541,7 +573,7 @@ export interface Revision
 }
 
 // A room of 4 x 4 m under a 2.50 m ceiling until the real one is measured (convention)
-export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500, obstacles: [] };
+export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500, obstacles: [], sofas: [], lamps: [] };
 
 
 // A photo of a decor sample : its file in the archive and the panel width it shows, in mm

@@ -191,10 +191,10 @@ export function setReturn(p: Project, side: "left" | "right", value: number | nu
     }
     return edit(p, (q) =>
     {
-        const { width, depth, height, obstacles } = q.room;
-        const next = { ...q.room.returns ?? { left: depth, right: depth }, [side]: value ?? depth };
-        q.room = next.left < depth || next.right < depth ? { width, depth, height, obstacles, returns: next }
-            : { width, depth, height, obstacles };
+        const { returns, ...rest } = q.room;
+        const depth = rest.depth;
+        const next = { ...returns ?? { left: depth, right: depth }, [side]: value ?? depth };
+        q.room = next.left < depth || next.right < depth ? { ...rest, returns: next } : rest;
     });
 }
 

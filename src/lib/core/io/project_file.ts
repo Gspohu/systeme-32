@@ -107,6 +107,13 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
             }
         }
     }
+    if (version < 12 && typeof raw.room === "object" && raw.room !== null)
+    {
+        // The sofas and the lamps set in the room to judge the piece came with version 12
+        const room = raw.room as Record<string, unknown>;
+        room.sofas = room.sofas ?? [];
+        room.lamps = room.lamps ?? [];
+    }
     raw.schema = SCHEMA_VERSION;
     return raw;
 }
@@ -175,7 +182,7 @@ function toVersion4(raw: Record<string, unknown>): void
     // Round spots came next to the LED profile, every older light was a profile
     raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
     // It also knows the side walls and the room, every older item stood against the back wall
-    raw.room = raw.room ?? { ...DEFAULT_ROOM, obstacles: [] };
+    raw.room = raw.room ?? { ...DEFAULT_ROOM, obstacles: [], sofas: [], lamps: [] };
     for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; lights?: unknown;
         wall?: unknown; ceilingFiller?: unknown; purpose?: unknown; corners?: unknown }[])
     {
@@ -266,6 +273,27 @@ export function validateProject(raw: unknown): Project
                 "right"].includes(ob.wall as string)
             && size && (ob.clearance === null || (typeof ob.clearance === "number" && ob.clearance >= 0));
     }), "obstacles muraux mal décrits");
+    const numbers = (o: unknown, keys: string[]): boolean =>
+    {
+        const r = o as Record<string, unknown>;
+        return typeof r === "object" && r !== null && typeof r.id === "string" && typeof r.name === "string"
+            && keys.every((k) =>
+            {
+                return typeof r[k] === "number" && Number.isFinite(r[k]);
+            });
+    };
+    need(Array.isArray(room?.sofas) && (room!.sofas as unknown[]).every((s) =>
+    {
+        return numbers(s, ["x", "distance", "width", "depth", "height", "seat"]);
+    }), "canapés de la pièce mal décrits");
+    need(Array.isArray(room?.lamps) && (room!.lamps as unknown[]).every((l) =>
+    {
+        return numbers(l, ["x", "y", "z", "lumens", "kelvin"]);
+    }), "lampes de la pièce mal décrites");
+    need(room?.walls === undefined || (Array.isArray(room!.walls) && (room!.walls as unknown[]).every((w) =>
+    {
+        return w === "left" || w === "right";
+    })), "murs latéraux de la pièce mal décrits");
     need(Array.isArray(migrated.revisions) && (migrated.revisions as unknown[]).every((r) =>
     {
         const v = r as Record<string, unknown>;
