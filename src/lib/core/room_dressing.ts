@@ -1,6 +1,8 @@
 // What dresses the room to judge a piece in it : side walls, a sofa, lamps. Seen in 3D, never made nor priced
 
-import type { Lamp, Project, Sofa } from "./model";
+import type { Lamp, Project, Sofa, UserTexture, Wall, WallPicture } from "./model";
+import { photoFile, type PhotoKind } from "./photos";
+import { sideWallDepth } from "./room";
 import { newId } from "./factory";
 import { CommandError, edit } from "./edit";
 
@@ -40,6 +42,97 @@ export function setSideWall(p: Project, side: "left" | "right", shown: boolean):
             return w !== side;
         });
         q.room.walls = shown ? [...kept, side] : kept;
+    });
+}
+
+
+// The archive name of the walls' photo, apart from the decor ones
+export const WALL_PHOTO = "room_walls";
+
+
+// A photo laid over the walls, or none : its width on the wall from 10 mm to 10 m
+export function setWallPhoto(p: Project, photo: UserTexture | null): Project
+{
+    if (photo !== null && (!Number.isFinite(photo.tileMm) || photo.tileMm < 10 || photo.tileMm > 10000))
+    {
+        throw new CommandError(`Motif de ${photo.tileMm} mm de large : saisir la largeur de mur que montre la photo, `
+            + "de 10 à 10 000 mm.");
+    }
+    return edit(p, (q) =>
+    {
+        if (photo === null)
+        {
+            delete q.room.wallPhoto;
+        }
+        else
+        {
+            q.room.wallPhoto = { ...photo };
+        }
+    });
+}
+
+
+// A name of its own in the archive for each photo hung, the bytes of two never mixed up
+export function pictureFile(kind: PhotoKind): string
+{
+    return photoFile(newId("picture"), kind);
+}
+
+
+function checkPicture(x: WallPicture): void
+{
+    if (!Number.isFinite(x.width) || x.width < 10)
+    {
+        throw new CommandError(`Photo murale de ${x.width} mm de large : saisir sa largeur sur le mur, 10 mm au moins.`);
+    }
+    if (!Number.isFinite(x.x) || !Number.isFinite(x.y) || x.y < 0)
+    {
+        throw new CommandError("Position de la photo murale invalide : X le long du mur et hauteur du bas positive, en mm.");
+    }
+}
+
+
+// The photo just imported, 600 wide, centred along its wall with its bottom 1200 up
+export function addPicture(p: Project, file: string, wall: Wall): Project
+{
+    return edit(p, (q) =>
+    {
+        const length = wall === "back" ? q.room.width : sideWallDepth(q.room, wall);
+        const x: WallPicture = { id: newId("pic"), name: `Photo ${q.room.pictures.length + 1}`, file, wall,
+                                 x: (length - 600) / 2, y: 1200, width: 600 };
+        checkPicture(x);
+        q.room.pictures.push(x);
+    });
+}
+
+
+export function updatePicture(p: Project, id: string, patch: Partial<WallPicture>): Project
+{
+    return edit(p, (q) =>
+    {
+        const i = q.room.pictures.findIndex((x) =>
+        {
+            return x.id === id;
+        });
+        if (i < 0)
+        {
+            throw new CommandError("Photo murale introuvable.");
+        }
+        const next = { ...q.room.pictures[i]!, ...patch };
+        checkPicture(next);
+        q.room.pictures[i] = next;
+    });
+}
+
+
+export function removePicture(p: Project, id: string): Project
+{
+    return edit(p, (q) =>
+    {
+        q.room.pictures = q.room.pictures.filter((x) =>
+        {
+            return x.id !== id;
+        });
     });
 }
 

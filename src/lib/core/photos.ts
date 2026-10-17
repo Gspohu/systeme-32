@@ -92,6 +92,14 @@ export function usedPhotos(p: Project, all: Map<string, Uint8Array>): Map<string
     {
         return t.file;
     });
+    if (p.room.wallPhoto !== undefined)
+    {
+        files.push(p.room.wallPhoto.file);
+    }
+    files.push(...p.room.pictures.map((x) =>
+    {
+        return x.file;
+    }));
     // Ech picture printed on a back (papier peint collé) travel in the same folder
     for (const it of p.items)
     {

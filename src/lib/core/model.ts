@@ -5,7 +5,7 @@ export type { CellLight, CellPrint, HangingRail, Outlet, ShoeRack } from "./cell
 import type { PriceEntry } from "../data/prices";
 export type { PriceEntry } from "../data/prices"; 
 
-export const SCHEMA_VERSION = 12;  
+export const SCHEMA_VERSION = 13;  
 
 
 export type Id = string;
@@ -452,9 +452,26 @@ export interface Room
     obstacles: Obstacle[];
     // Side walls shown although nothing stands against them
     walls?: ("left" | "right")[];
+    // A photo of the wallpaper or the paint, laid over every wall of the room in the 3D view, tileMm wide
+    wallPhoto?: UserTexture;
     // Seen in 3D only, to judge the piece in its room : neither made, priced nor checked
     sofas: Sofa[];
     lamps: Lamp[];
+    pictures: WallPicture[];
+}
+
+
+// A photo hung on a wall like a poster : x of its left edge along that wall, y of its bottom from the floor, its
+// height the photo's own proportions to its width
+export interface WallPicture
+{
+    id: Id;
+    name: string;
+    file: string;
+    wall: Wall;
+    x: number;
+    y: number;
+    width: number;
 }
 
 
@@ -573,7 +590,8 @@ export interface Revision
 }
 
 // A room of 4 x 4 m under a 2.50 m ceiling until the real one is measured (convention)
-export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500, obstacles: [], sofas: [], lamps: [] };
+export const DEFAULT_ROOM: Room = { width: 4000, depth: 4000, height: 2500, obstacles: [], sofas: [], lamps: [],
+                                    pictures: [] };
 
 
 // A photo of a decor sample : its file in the archive and the panel width it shows, in mm

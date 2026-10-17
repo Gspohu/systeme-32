@@ -114,6 +114,12 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown>
         room.sofas = room.sofas ?? [];
         room.lamps = room.lamps ?? [];
     }
+    if (version < 13 && typeof raw.room === "object" && raw.room !== null)
+    {
+        // The photos hung on the walls came with version 13
+        const room = raw.room as Record<string, unknown>;
+        room.pictures = room.pictures ?? [];
+    }
     raw.schema = SCHEMA_VERSION;
     return raw;
 }
@@ -182,7 +188,7 @@ function toVersion4(raw: Record<string, unknown>): void
     // Round spots came next to the LED profile, every older light was a profile
     raw.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
     // It also knows the side walls and the room, every older item stood against the back wall
-    raw.room = raw.room ?? { ...DEFAULT_ROOM, obstacles: [], sofas: [], lamps: [] };
+    raw.room = raw.room ?? { ...DEFAULT_ROOM, obstacles: [], sofas: [], lamps: [], pictures: [] };
     for (const it of (Array.isArray(raw.items) ? raw.items : []) as { kind?: unknown; lights?: unknown;
         wall?: unknown; ceilingFiller?: unknown; purpose?: unknown; corners?: unknown }[])
     {
@@ -294,6 +300,16 @@ export function validateProject(raw: unknown): Project
     {
         return w === "left" || w === "right";
     })), "murs latéraux de la pièce mal décrits");
+    need(Array.isArray(room?.pictures) && (room!.pictures as unknown[]).every((x) =>
+    {
+        const pic = x as Record<string, unknown>;
+        return numbers(x, ["x", "y", "width"]) && typeof pic.file === "string" && PHOTO_FILE_RE.test(pic.file)
+            && ["back", "left", "right"].includes(pic.wall as string) && (pic.width as number) > 0;
+    }), "photos murales mal décrites");
+    const wallPhoto = room?.wallPhoto as Record<string, unknown> | undefined;
+    need(wallPhoto === undefined || (typeof wallPhoto === "object" && wallPhoto !== null
+        && typeof wallPhoto.file === "string" && PHOTO_FILE_RE.test(wallPhoto.file)
+        && typeof wallPhoto.tileMm === "number" && wallPhoto.tileMm > 0), "photo des murs mal décrite");
     need(Array.isArray(migrated.revisions) && (migrated.revisions as unknown[]).every((r) =>
     {
         const v = r as Record<string, unknown>;
