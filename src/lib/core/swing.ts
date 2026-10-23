@@ -217,18 +217,43 @@ export function stopAtWalls(p: Project, b: Build): void
             const box = boxes.get(id);
             return box === undefined ? [] : [box];
         });
-        let deg = 1;
-        while (deg <= m.amount)
+        // A door whose every corner stays further from the walls than the pivot is, whatever the turn, is let be
+        const reach = Math.max(0, ...moved.map((box) =>
+        {
+            const off = add(box.centre, m.pivot, -1);
+            return Math.hypot(...off) + Math.hypot(...box.half);
+        }));
+        const pivot = toRoom(wall, p.room, m.pivot);
+        const near = pivot[2] - reach < 0 || (sides.has("left") && pivot[0] - reach < 0)
+            || (sides.has("right") && pivot[0] + reach > p.room.width);
+        if (!near)
+        {
+            continue;
+        }
+        const hitAt = (deg: number): { wall: string; by: number } | null =>
         {
             const at = { ...m, amount: deg };
-            const hit = moved.map((box) =>
+            for (const box of moved)
             {
-                return pastWalls(inRoom(carried(box, at, 1), wall, p), p, sides);
-            }).find((h) =>
-            {
-                return h !== null;
-            });
-            if (hit !== undefined && hit !== null)
+                const h = pastWalls(inRoom(carried(box, at, 1), wall, p), p, sides);
+                if (h !== null)
+                {
+                    return h;
+                }
+            }
+            return null;
+        };
+        // Every 5 deg, then degree by degree in the last stretch before the first one that hits
+        let coarse = 5;
+        while (coarse < m.amount + 5 && hitAt(Math.min(coarse, m.amount)) === null)
+        {
+            coarse += 5;
+        }
+        let deg = coarse - 4;
+        while (deg <= Math.min(coarse, m.amount))
+        {
+            const hit = hitAt(deg);
+            if (hit !== null)
             {
                 m.full = m.amount;
                 m.stoppedBy = hit.wall;

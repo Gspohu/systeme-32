@@ -680,3 +680,23 @@ describe("the fronts of the dressers", () =>
         }
     });
 });
+
+
+describe("the TV room as measured", () =>
+{
+    it("takes the left column 25 under their 2435 ceiling and closes the gap with a filler", () =>
+    {
+        const p = tvWall();
+        expect([p.room.width, p.room.height]).toEqual([3050, 2435]);
+        const column = p.items.find((it) =>
+        {
+            return it.kind === "carcass" && it.name === "Colonne gauche";
+        }) as Carcass;
+        expect(column.y + column.height).toBe(2435 - 25);
+        const filler = analyse(p).build.parts.find((q) =>
+        {
+            return q.id === `${column.id}/filler`;
+        })!;
+        expect(filler.width).toBe(25);
+    });
+});

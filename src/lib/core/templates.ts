@@ -13,6 +13,8 @@ const GREEN = "U604_ST9";
 const BACK = "SNOW_WHITE_8685";
 // Every cupboard door of both pieces opens to a push, TIP-ON, the drawers ekep their handles
 const PUSH_DOOR = { decor: GREEN, opening: "push" as const };
+// Under the ceiling of the TV room, as measured
+const TV_CEILING = 2435;
 
 
 function lining(cellId: string, decor: string, full: boolean): Lining
@@ -71,10 +73,12 @@ export function tvWall(): Project
     const lower = split("h", [155, 347], [technical, cell(), cell()], ["adjustable", "adjustable"]);
     const niche = cell();
     const upper = split("h", [151, 343], [cell(), cell(), cell()], ["adjustable", "adjustable"]);
+    // Up to their ceiling of 2435 less 25, closed by a filler scribed on site : room to lift it over the top of the
+    // base it slides onto, and for a ceiling never quite level. Its upper cell gives up what the 1830 lost
     const column = newCarcass({
         name: "Colonne gauche",
-        width: 450, height: 1830, depth: 300, x: 0, y: 600, z: 0,
-        decor: OAK, backDecor: OAK, base: { type: "floor" },
+        width: 450, height: TV_CEILING - 25 - 600, depth: 300, x: 0, y: 600, z: 0,
+        decor: OAK, backDecor: OAK, base: { type: "floor" }, ceilingFiller: true,
         root: split("h", [700, 1073], [lower, niche, upper]),
     });
     column.fronts.push(
@@ -147,7 +151,8 @@ export function tvWall(): Project
     const sc = project.screen;
     // Their room : the left wall runs 3100 to the wall facing the set, their 1880 sofa backed against that one and
     // centred on the swung out screen. Its depth and heights are the starting ones until measured
-    project.room = { ...project.room, depth: 3100, walls: ["left"],
+    // Measured on 2026-10-23 : the back wall 3050 long and 2435 high
+    project.room = { ...project.room, width: 3050, height: TV_CEILING, depth: 3100, walls: ["left"],
                      sofas: [{ id: newId("sofa"), name: "Canapé", ...SOFA_START, width: 1880,
                                x: sc.arm!.out!.cx - 1880 / 2, distance: 3100 }] };
     return project;

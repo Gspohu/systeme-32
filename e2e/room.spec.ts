@@ -34,8 +34,8 @@ test.describe("room", () =>
                                         buffer: readFileSync("static/icon-512.png") });
         // The photos are listed before the sofa of the template, which has its own Position X
         const x = page.locator(".field", { hasText: "Position X" }).first().locator("input");
-        // Centred on the 4000 of the back wall, 600 wide
-        await expect(x).toHaveValue("1700");
+        // Centred on the 3050 of their back wall, 600 wide
+        await expect(x).toHaveValue("1225");
         await x.fill("2600");
         await x.press("Tab");
         await page.getByRole("button", { name: "Conception", exact: true }).click();
