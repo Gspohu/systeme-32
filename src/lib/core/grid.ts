@@ -2,8 +2,8 @@
 
 import type { Carcass, Settings } from "./model";
 
-// A shelf pin centre stands this far under the shelf it carries
-export const PIN_BELOW_SHELF = 4;
+// A shelf pin centre stands this far under the shelf it carries : the plate of the Häfele pins, p. 7.158 and its model
+export const PIN_BELOW_SHELF = 1;
 
 
 // Centre of hole n of the line, carcass y : the first on the axis of the bottom panel, where its joints sit, then

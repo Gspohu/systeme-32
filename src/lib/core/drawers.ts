@@ -12,7 +12,8 @@ import { sideFace } from "./locate";
 import { box } from "./fitted";
 import { meets } from "./drilling";
 import { X, Y, Z, neg } from "./geometry";
-import { MOVENTO } from "../data/rules";
+import { FRONT_GAP, MOVENTO } from "../data/rules";
+import { EDGE_PULL } from "../data/hardware";
 import { MOVENTO_760H, MOVENTO_766H, TIPON_BLUMOTION_SETS } from "../data/hardware";
 import { decorById, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
@@ -21,7 +22,8 @@ import { DIAM } from "./text";
 // Workshop choices, not Blum values : box side thickness and minimum usable side height
 export const BOX_THICKNESS = 16;
 const MIN_BOX_HEIGHT = 60;
-const BOTTOM_RECESS = 13;
+export const BOTTOM_RECESS = 13;
+const PULL_CLEARANCE = 1;
 // Ø8 x 35 dowels in 16 mm boards : 10 into a face leaves 6 of it, the holes 3 longer than the dowel for the glue
 // (Dictum, 4 x 3 tips for dowelling), the split between face and edge is a workshop convention
 const BOX_DOWEL_FACE = 10;
@@ -35,7 +37,7 @@ export interface RunnerChoice
 }
 
 
-// The lighter series that carries the load, or the one the user asked for if it carries it
+// The lighter series that carries the load, or the one chosen for the drawer if it carries it
 export function chooseRunner(depthAvailable: number, loadKg: number, asked?: "760H" | "766H"): RunnerChoice | null
 {
     const auto = loadKg <= MOVENTO.maxLoad760 ? "760H" : loadKg <= MOVENTO.maxLoad766 ? "766H" : null;
@@ -108,6 +110,8 @@ interface DrawerSlot
     zFront: number;
     SKW: number;
     SKL: number;
+    // Behind a front of its own kind, a drop-down flap : no front screwed to it, its runners start at its box
+    inner?: boolean;
 }
 
 interface DrawerBox
@@ -127,6 +131,7 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
     {
         return a.index - q.index;
     });
+    const made: { kit: DrawerBox; name: string; bay: number; front: number; box: number }[] = [];
     for (const front of c.fronts)
     {
         if (front.spec.type !== "drawers")
@@ -155,7 +160,10 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             const low = below === undefined ? nb.y : (below.rect.y + below.rect.h + fp.rect.y) / 2;
             const high = above === undefined ? nb.y + nb.h : (fp.rect.y + fp.rect.h + above.rect.y) / 2;
             const sideBottom = low + MOVENTO.bottomAboveLower - BOTTOM_RECESS;
-            const hs = Math.floor(high - MOVENTO.topBelowUpper - sideBottom);
+            // Under the tab of an edge pull and the heads of its screws, tightened from behind the front
+            const pullLimit = front.opening === "handle" && front.handle === "edge"
+                ? fp.rect.y + fp.rect.h - EDGE_PULL.height - PULL_CLEARANCE : Infinity;
+            const hs = Math.floor(Math.min(high - MOVENTO.topBelowUpper, pullLimit) - sideBottom);
             if (hs < MIN_BOX_HEIGHT)
             {
                 b.errors.push(`${c.name}, tiroir ${fp.number} : ${hs} mm de hauteur de côté disponible, ${MIN_BOX_HEIGHT} mini. `
@@ -166,14 +174,67 @@ export function buildDrawers(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             const d: DrawerSlot = {
                 c, front, spec, nb, runner, fp, index: slot, name: `Tiroir ${fp.number}`, tag: `${c.id}/drawer/${fp.id}`,
                 low, sideBottom, axis: low + MOVENTO.screwAxisAboveLower, hs,
-                zFront: front.mount === "inset" ? c.depth - c.thickness : c.depth,
+                zFront: front.mount === "inset" ? c.depth - c.thickness : c.depth + FRONT_GAP,
                 SKW: nb.w - MOVENTO.innerWidthDeduction, SKL: runner.nl - MOVENTO.lengthDeduction,
             };
             const kit = drawerBox(d, b);
             joinBox(d, kit, s, b);
             screwFront(d, kit, s, b);
             drawerHardware(d, kit, fitRunners(d, kit, faces, b), b);
+            made.push({ kit, name: d.name, bay: nb.w, front: fp.rect.w, box: d.SKW + 2 * BOX_THICKNESS });
             slot++;
+        }
+    }
+    noteUnevenBoxes(made);
+}
+
+
+// A drawer with no front of its own behind a drop-down flap : its runners on the faces given, spacers clear of the
+// stays of the flap, its box `low` up from the floor of the cell, its front `zFront` from the back of the box
+export function buildPullOut(c: Carcass, s: Settings, b: Build, fp: FrontPanel, front: Front, nb: NodeBox,
+    o: { loadKg: number; faces: FaceRef[]; spacer: number; low: number; zFront: number; hs: number; runner: RunnerChoice;
+         boxDecor?: string }): void
+{
+    const inside: NodeBox = { ...nb, x: nb.x + o.spacer, w: nb.w - 2 * o.spacer };
+    const d: DrawerSlot = {
+        c, front, spec: { type: "drawers", count: 1, loadKg: o.loadKg,
+                         boxDecor: o.boxDecor }, nb: inside, runner: o.runner, fp, index: 0,
+        name: "Tiroir intérieur", tag: `${c.id}/pull-out/${fp.id}`, low: o.low,
+        sideBottom: o.low + MOVENTO.bottomAboveLower - BOTTOM_RECESS, axis: o.low + MOVENTO.screwAxisAboveLower, hs: o.hs,
+        zFront: o.zFront, SKW: inside.w - MOVENTO.innerWidthDeduction, SKL: o.runner.nl - MOVENTO.lengthDeduction,
+        inner: true,
+    };
+    const kit = drawerBox(d, b);
+    joinBox(d, kit, s, b);
+    drawerHardware(d, kit, fitRunners(d, kit, o.faces, b), b);
+}
+
+
+// Fronts alike over boxes that aren't : an end front covers its whole side, one between 2 drawers half of each
+// upright, the bay between 2 uprights is the wider. Said on the plans of the boxes that differ, or the cabinet
+// maker cuts all of them to one size
+function noteUnevenBoxes(made: { kit: DrawerBox; name: string; bay: number; front: number; box: number }[]): void
+{
+    const fronts = new Set(made.map((m) => { return Math.round(m.front * 2); }));
+    const boxes = [...new Set(made.map((m) => { return m.box; }))];
+    if (fronts.size !== 1 || boxes.length < 2)
+    {
+        return;
+    }
+    // The size most of them take, the others told how they stand from it
+    const count = (w: number): number => { return made.filter((m) => { return m.box === w; }).length; };
+    const usual = boxes.sort((a, q) => { return count(q) - count(a) || a - q; })[0]!;
+    const usualBay = made.find((m) => { return m.box === usual; })!.bay;
+    const fmt = (x: number): string => { return String(Math.round(x * 10) / 10).replace(".", ","); };
+    for (const m of made.filter((x) => { return x.box !== usual; }))
+    {
+        const note = `${m.name} : caisson de ${fmt(m.box)} hors tout, ${fmt(m.box - usual)} de plus que les autres sous des `
+            + `façades égales de ${fmt(m.front)}. Une façade en bout couvre toute la joue, une façade entre deux tiroirs la `
+            + `moitié de chaque montant : sa case fait ${fmt(m.bay)} au lieu de ${fmt(usualBay)}. Ne pas le débiter aux cotes `
+            + "des autres caissons";
+        for (const q of [m.kit.endF, m.kit.endB, m.kit.bottomP])
+        {
+            q.notes.push(note);
         }
     }
 }
@@ -232,6 +293,13 @@ function runnerFor(c: Carcass, lay: ResolvedLayout, front: Front, spec: DrawerFr
 }
 
 
+// The 16 mm H1180 is made to order, 24 boards at least : a box may take a stocked white whatever the fronts
+function boxDecor(d: DrawerSlot): string
+{
+    return d.spec.boxDecor ?? d.c.decor;
+}
+
+
 // The five boards of the box, its sides on the runners and its bottom 13 up in grooves of glue and dowels
 function drawerBox(d: DrawerSlot, b: Build): DrawerBox
 {
@@ -239,7 +307,7 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
     const [ox, oy, oz] = [c.x, c.y, c.z];
     const xl = nb.x + MOVENTO.sideInset - BOX_THICKNESS;
     const xIn = ox + xl + BOX_THICKNESS;
-    const common = { item: c.id, itemName: c.name, decor: c.decor, thickness: BOX_THICKNESS };
+    const common = { item: c.id, itemName: c.name, decor: boxDecor(d), thickness: BOX_THICKNESS };
     const sideL = newPart({
         ...common, id: `${tag}/sideL`, label: `${name}, côté gauche`, role: "boxSide",
         length: SKL, width: hs, edges: ["v1"],
@@ -250,19 +318,23 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
         length: SKL, width: hs, edges: ["v1"],
         frame: { o: [xIn + SKW, oy + sideBottom, oz + zFront], u: neg(Z), v: Y, n: X },
     });
+    // Blum's models : the coupling stays under the bottom at the front, the rear of the runner rises 26 up the side. The
+    // front end stops at the underside of the bottom, the back end stands on the bottom running under it
     const endF = newPart({
         ...common, id: `${tag}/endF`, label: `${name}, avant de caisson`, role: "boxEnd",
-        length: SKW, width: hs, edges: ["v1"],
-        frame: { o: [xIn, oy + sideBottom, oz + zFront - BOX_THICKNESS], u: X, v: Y, n: Z },
+        length: SKW, width: hs - BOTTOM_RECESS, edges: ["v1"],
+        frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS, oz + zFront - BOX_THICKNESS], u: X, v: Y, n: Z },
     });
     const endB = newPart({
         ...common, id: `${tag}/endB`, label: `${name}, arrière de caisson`, role: "boxEnd",
-        length: SKW, width: hs, edges: ["v1"],
-        frame: { o: [xIn, oy + sideBottom, oz + zFront - SKL + BOX_THICKNESS], u: X, v: Y, n: neg(Z) },
+        length: SKW, width: hs - BOTTOM_RECESS - BOX_THICKNESS, edges: ["v1"],
+        frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS + BOX_THICKNESS, oz + zFront - SKL + BOX_THICKNESS], u: X,
+                v: Y,
+                 n: neg(Z) },
     });
     const bottomP = newPart({
         ...common, id: `${tag}/bottom`, label: `${name}, fond`, role: "boxBottom",
-        length: SKW, width: SKL - 2 * BOX_THICKNESS, edges: [],
+        length: SKW, width: SKL - BOX_THICKNESS, edges: [],
         frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS + BOX_THICKNESS, oz + zFront - BOX_THICKNESS],
                  u: X, v: neg(Z), n: neg(Y) },
     });
@@ -292,17 +364,17 @@ function joinBox(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
     const { c, hs, SKL } = d;
     const T = BOX_THICKNESS;
     const joints: Joint[] = [];
-    for (const [end, line] of [[k.endF, T / 2], [k.endB, SKL - T / 2]] as const)
+    for (const [end, line, from] of [[k.endF, T / 2, BOTTOM_RECESS], [k.endB, SKL - T / 2, BOTTOM_RECESS + T]] as const)
     {
         joints.push({ edgePart: end.id, edge: "u0", facePart: k.sideL.id, face: "A", lineAxis: "u", line,
-                      from: 0, to: hs, edgeFrom: 0, reversed: false },
+                      from, to: hs, edgeFrom: 0, reversed: false },
                     { edgePart: end.id, edge: "u1", facePart: k.sideR.id, face: "A", lineAxis: "u", line,
-                      from: 0, to: hs, edgeFrom: 0, reversed: false });
+                      from, to: hs, edgeFrom: 0, reversed: false });
     }
     for (const [edge, side] of [["u0", k.sideL], ["u1", k.sideR]] as const)
     {
         joints.push({ edgePart: k.bottomP.id, edge, facePart: side.id, face: "A", lineAxis: "v",
-                      line: BOTTOM_RECESS + T / 2, from: T, to: SKL - T, edgeFrom: 0, reversed: false });
+                      line: BOTTOM_RECESS + T / 2, from: T, to: SKL, edgeFrom: 0, reversed: false });
     }
     fitJoints(joints, { ...s, joinery: "dowel", dowelFaceDepth: BOX_DOWEL_FACE, dowelEdgeDepth: BOX_DOWEL_EDGE },
               b, c.id, c.name, false);
@@ -316,7 +388,7 @@ function screwFront(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
     let screws = 0;
     for (const u of spread(SKW, s.connectorInset, 256))
     {
-        for (const v of [hs / 4, 3 * hs / 4])
+        for (const v of [hs / 4 - BOTTOM_RECESS, 3 * hs / 4 - BOTTOM_RECESS])
         {
             k.endF.holes.push({ u, v, diameter: 0, depth: 0, face: "A", label: "Vis 4 x 30 dans la façade",
                                 purpose: "front-screw" });
@@ -337,20 +409,24 @@ function screwFront(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
 function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: Build): number
 {
     const { c, front, nb, runner, fp, name, tag, low, sideBottom, axis, zFront } = d;
+    const inner = d.inner === true;
     const [ox, oy, oz] = [c.x, c.y, c.z];
-    // MOVENTO pulls out over its whole nominal length, the front and its box together
+    // MOVENTO pulls out over its whole nominal length, the front and its box together. Behind a flap, the box alone
+    // once the flap is open
+    const box5 = [k.sideL.id, k.sideR.id, k.endF.id, k.endB.id, k.bottomP.id];
     b.motions.push({
-        item: c.id, front: fp.id, label: `${c.name}, ${name.toLowerCase()}`, kind: "slide", pivot: [0, 0, 0],
-        axis: Z, amount: runner.nl,
-        parts: [`${c.id}/front/${fp.id}`, k.sideL.id, k.sideR.id, k.endF.id, k.endB.id,
-                k.bottomP.id], fitted: [], rides: [],
+        item: c.id, front: inner ? `${fp.id}/pull-out` : fp.id, label: `${c.name}, ${name.toLowerCase()}`, kind: "slide",
+        pivot: [0, 0, 0], axis: Z, amount: runner.nl,
+        parts: inner ? box5 : [`${c.id}/front/${fp.id}`, ...box5], fitted: [], rides: [],
+        ...(inner ? { after: fp.id } : {}),
         source: `coulisses ${runner.ref} sorties de ${runner.nl} mm`,
         remedy: "Déplacer ce qui gêne ou réduire la profondeur du tiroir.",
     });
-    // The space Blum reserves for each runner (p. 419) : 21 against the cell side, under the drawer side
-    // over NL from the front of the box
-    // TODO the runner profile itself is not dimensionned on p. 419, only the space it takes
-    const zs: [number, number] = [oz + zFront - runner.nl, oz + zFront];
+    // Blum reserves 21 per runner against the cell side, over NL from the box front (p. 419)
+    // TODO the runner profile itself isn't dimensionned on p. 419, only the space it takes
+    // The box comes forward with an overlay front, its runner stays screwed in the carcass
+    const runnerFront = inner || front.mount === "inset" ? zFront : zFront - FRONT_GAP;
+    const zs: [number, number] = [oz + runnerFront - runner.nl, oz + runnerFront];
     for (const [side, x0] of [["gauche", ox + nb.x], ["droite", ox + nb.x + nb.w - MOVENTO.sideInset]] as const)
     {
         b.fitted.push(box(`${tag}/coulisse-${side}`, c.id, runner.ref, `${name}, coulisse ${side}`, "runner",
@@ -363,7 +439,8 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
     {
         offs.push(37 + o);
     }
-    const shift = front.mount === "inset" ? c.thickness : 0;
+    // A face starting at the front of the runner, the spacer of a pull-out, counts from there
+    const shift = inner ? 0 : front.mount === "inset" ? c.thickness : 0;
     for (const fr of faces)
     {
         if (fr === null)
@@ -389,7 +466,7 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
             });   
             set = known ? offs.map((o) =>
             {
-                return o + MOVENTO.alternateStep760;  
+                return o - MOVENTO.alternateStep760;
             }) : offs;
             if (!known || hits(set))
             {
@@ -399,12 +476,12 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
             else
             {
                 fr.part.notes.push(`Coulisse ${runner.ref} du tiroir ${fp.number} : vissée dans les deuxièmes trous `
-                    + `du profil, ${MOVENTO.alternateStep760} mm en arrière des positions du catalogue, l'autre face `  
+                    + `du profil, ${MOVENTO.alternateStep760} mm vers l'avant des positions du catalogue, l'autre face `
                     + "portant déjà des vis à cette hauteur");  
             }
         }
         for (const o of set)
-        {  
+        {
             fr.part.holes.push({ u, v: o + shift, diameter: 0, depth: 0, face: fr.face,
                                 label: `Coulisse ${runner.ref} : vis ${DIAM}3,5 x 15 (609.1500)`,
                                 purpose: "runner-screw", fixes: runner.ref });
@@ -424,13 +501,14 @@ function drawerHardware(d: DrawerSlot, k: DrawerBox, screwPlaces: number, b: Bui
 {
     const { c, front, spec, nb, runner, fp } = d;
     const LW = nb.w;
-    const mat = materialOfDecor(decorById(c.decor));
+    const mat = materialOfDecor(decorById(boxDecor(d)));
     let boxKg = 0;
     for (const p of [k.sideL, k.sideR, k.endF, k.endB, k.bottomP])
     {
         boxKg += p.length * p.width * p.thickness * 1e-9 * mat.density;
     }
-    const frontKg = fp.rect.w * fp.rect.h * fp.thickness * 1e-9 * materialOfDecor(decorById(fp.decor)).density;
+    const inner = d.inner === true;
+    const frontKg = inner ? 0 : fp.rect.w * fp.rect.h * fp.thickness * 1e-9 * materialOfDecor(decorById(fp.decor)).density;
     const drawerKg = boxKg + frontKg + spec.loadKg;
     b.hardware.push({ ref: runner.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
                      note: "paire gauche/droite", purpose: "runner" });
@@ -438,7 +516,8 @@ function drawerHardware(d: DrawerSlot, k: DrawerBox, screwPlaces: number, b: Bui
                      note: "paire d'accouplements", purpose: "runner-coupling" });
     b.hardware.push({ ref: "609.1500", qty: 2 * screwPlaces, item: c.id, itemName: c.name, target: fp.id,
                      note: "fixation des coulisses", purpose: "runner-screw" });
-    if (front.opening !== "push")
+    // The push of a flap opens the flap, the pull-out behind it is drawn by hand
+    if (front.opening !== "push" || inner)
     {
         return;
     }

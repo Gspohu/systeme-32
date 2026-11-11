@@ -1,4 +1,4 @@
-// What every checker hands back to the analysis : a level, the item and part it is about, a message
+// What every checker hands back to the analysis : a level, the item and part it's about, a message
 
 export type Level = "error" | "warning" | "info";
 

@@ -17,7 +17,7 @@ export const RAIL_D = 25;
 export const RAIL_WALL = 0.6;
 // EN 16122:2012 6.3.1, clothes rail supports loaded one hour (CATAS comparison table, RISE report 7F003676B)
 export const RAIL_LOAD_KG_PER_DM = 4;
-// The grade of the tube is not published : a welded precision tube of E195, the lowest usual grade, whose name
+// The grade of the tube isn't published : a welded precision tube of E195, the lowest usual grade, whose name
 // gives its minimum yield on the finished tube (Helens, a tube maker)
 // https://www.helens.se/fileadmin/user_upload/produktprogram-tekniskinfo/helens-welded-precision-steel-tubes-en.pdf
 export const STEEL_FY = 195;

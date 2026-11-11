@@ -13,7 +13,7 @@ export interface Box3
 
 
 // Rotation about the vertical and origin of each wall frame : facing the left wall the corner
-// with the back wall is on the right, facing the right wall it is on the left
+// with the back wall is on the right, facing the right wall it's on the left
 export function wallPlacement(wall: Wall, room: Room): { angle: number; origin: Vec3 }
 {
     if (wall === "left")
@@ -129,12 +129,28 @@ export function boxesMeet(a: Box3, b: Box3): boolean
 }
 
 
-// Two items take the same room space, a round corner and an appliance excepted : the corner is meant for the notch
-// between the boxes it joins, an appliance may sit in a cell and has its own checks
+// A loose carcass wholly within the box of another, its host : a shelf column set in a niche
+export function standsInside(loose: Item, host: Item): boolean
+{
+    if (loose.kind !== "carcass" || loose.freeStanding !== true || host.kind !== "carcass" || loose.wall !== host.wall)
+    {
+        return false;
+    }
+    const a = wallBox(loose);
+    const b = wallBox(host);
+    return [0, 1, 2].every((k) =>
+    {
+        return a.min[k]! >= b.min[k]! - 0.5 && a.max[k]! <= b.max[k]! + 0.5;
+    });
+}
+
+
+// 2 items take the same room space, except a round corner (made for the notch it fills) and an appliance (own
+// checks). A loose carcass may stand in its host, their parts still checked against each other as solids
 export function itemsMeet(a: Item, b: Item, room: Room): boolean
 {
     return a.kind !== "corner" && b.kind !== "corner" && a.kind !== "device" && b.kind !== "device"
-        && boxesMeet(roomBox(a, room), roomBox(b, room));
+        && !standsInside(a, b) && !standsInside(b, a) && boxesMeet(roomBox(a, room), roomBox(b, room));
 }
 
 

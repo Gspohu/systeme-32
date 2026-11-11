@@ -27,7 +27,7 @@ export interface Stability
     // centre of mass in room millimetres
     centre: [number, number, number];
     stands: boolean;
-    // How far the centre lies inside its supports, negative outside, and towards which side it is nearest the edge
+    // How far the centre lies inside its supports, negative outside, and towards which side it's nearest the edge
     margin: number;
     // Floor tilt that makes it fall, degrees, and towards which side
     tiltDeg: number;
@@ -227,7 +227,7 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
             const q = toWall(first.wall, project.room, [d[0], 0, d[1]]);
             return [q[0] - o[0], 0, q[2] - o[2]];
         };
-        // A body backed against its wall cannot fall backwards : the wall stop it
+        // A body backed against its wall can't fall backwards : the wall stop it
         const backed = body.some((it) =>
         {
             return it.kind === "carcass" && it.z <= CLASH_TOL;

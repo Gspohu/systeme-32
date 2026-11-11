@@ -1,4 +1,4 @@
-// One sheet per two workpieces : outline, drilling, grooves, banded edges, grain, and the hole cooridnate table
+// One sheet per 2 workpieces : outline, drilling, grooves, banded edges, grain and the hole cooridnate table
 
 import type { Bom, CutRow } from "../bom";
 import { edgeNotation } from "../bom";
@@ -62,7 +62,7 @@ function tableRoom(part: Part, boxH: number, boxW: number, cols: number): number
 }
 
 
-// A long or much drilled part reads better alone on its sheet than in half of it, and a table that would not fit
+// A long or much drilled part reads better alone on its sheet than in half of it, and a table that wouldn't fit
 // half a sheet takes the whole of it
 function wantsWholeSheet(row: CutRow): boolean
 {
@@ -288,12 +288,12 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     }
     const left = ox;
     const right = ox + spanX / scale;
-    canvas.dimH(left, right, oy + 1, oy + 7, `${Math.round(spanX * 10) / 10}`);
+    canvas.dimH(left, right, oy + 1, oy + 7, round1(spanX));
     // Standing, the height is dimensioned on the right, clear of the u arrow at the origin
     const dimAt = upright ? right : left;
     const away = upright ? 1 : -1;
     canvas.dimV(oy - spanY / scale, oy, dimAt + away, dimAt + (upright ? 12 : 6) * away,
-                `${Math.round(spanY * 10) / 10}`);
+                round1(spanY));
     drawFootprints(canvas, part, fitted, P);
     canvas.text(x0 + boxW, y0 + 18, `1:${scale}`, 2.5, "end");
     const lines = tableLines(row, part);
@@ -371,7 +371,7 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
         const [a, b] = P(u0, v0);
         const [c, d] = P(u1, v1);
         canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), "dashed");
-        // The reference reads along the long side of the footprint, or above it when even that is too short
+        // The reference reads along the long side of the footprint, or above it when even that's too short
         const tall = Math.abs(d - b) > Math.abs(c - a);
         if (textWidth(f.ref, 1.8) > Math.max(Math.abs(d - b), Math.abs(c - a)) - 1)
         {
