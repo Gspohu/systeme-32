@@ -1,12 +1,13 @@
 // Holes for a wall socket or a cable, cut through the back behind a cell or the pnel above, below or beside it
 
-import type { Carcass, Outlet } from "./model";
+import type { Carcass, Item, Outlet } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { Build, Part } from "./parts";
 import type { Outline, Vec3 } from "./geometry";
 import { byId } from "./edit";
 import { panelAbove, panelBelow, sideFace } from "./locate";
 import { DIAM } from "./text";
+import { LINING_PLAY } from "./curves";
 
 // A starting value, the socket or the grommet bought give the real size (convention)
 export const OUTLET_DEFAULT: Omit<Outlet, "id" | "cell"> = { panel: "back", shape: "rect", w: 80, h: 80, dx: 0, dy: 0 };
@@ -64,7 +65,7 @@ function liningsOver(c: Carcass, board: Part, near: Vec3, far: Vec3, b: Build): 
         const parallel = Math.abs(Math.abs(g.n[0] * f.n[0] + g.n[1] * f.n[1] + g.n[2] * f.n[2]) - 1) < 1e-9;
         // The gap between the two boards, whichever side of the board the lining stands on
         const gap = along(g.o, f.n, f.o);
-        const against = gap > -q.thickness - 0.01 && gap < board.thickness + q.thickness + 0.01;
+        const against = gap > -q.thickness - LINING_PLAY - 0.01 && gap < board.thickness + q.thickness + LINING_PLAY + 0.01;
         const [a, z] = [onPart(q, near), onPart(q, far)];
         const over = [a, z].every(([u, v]) =>
         {
@@ -72,6 +73,83 @@ function liningsOver(c: Carcass, board: Part, near: Vec3, far: Vec3, b: Build): 
         });
         return parallel && against && over;
     });
+}
+
+
+// The box a cut out takes on its board, an arc swept whole : enough to say a point lies in it
+function cutoutHolds(o: Outline, u: number, v: number): boolean
+{
+    const us = [o.start[0]];
+    const vs = [o.start[1]];
+    for (const s of o.segments)
+    {
+        us.push(s.x);
+        vs.push(s.y);
+        if (s.kind === "arc")
+        {
+            const r = Math.hypot(s.x - s.cx, s.y - s.cy);
+            us.push(s.cx - r, s.cx + r);
+            vs.push(s.cy - r, s.cy + r);
+        }
+    }
+    return u >= Math.min(...us) && u <= Math.max(...us) && v >= Math.min(...vs) && v <= Math.max(...vs);
+}
+
+
+// Under this gap a board stands against the hole and nothing passes between them
+const AGAINST_GAP = 1;
+// The bite of a neighbour into a hole that still leaves it open, a pencil line of lay out
+const BITE_ALLOWED = 1;
+
+// A hole opening onto another board goes nowhere : that board takes the same hole, or the hole moves. Runs once every
+// item is built, the board in the way is often another's
+export function blockedOutlets(items: Item[], b: Build): void
+{
+    const wallOf = new Map(items.map((it) =>
+    {
+        return [it.id, it.kind === "device" ? null : it.wall];
+    }));
+    for (const hole of b.outlets)
+    {
+        const board = byId(b.parts, hole.board);
+        if (board === undefined || board.frame === null)
+        {
+            continue;
+        }
+        const n = board.frame.n;
+        const along = (q: Vec3): number =>
+        {
+            return (q[0] - hole.centre[0]) * n[0] + (q[1] - hole.centre[1]) * n[1] + (q[2] - hole.centre[2]) * n[2];
+        };
+        for (const q of b.parts)
+        {
+            if (q.id === board.id || q.frame === null || q.curve !== null || wallOf.get(q.item) !== wallOf.get(hole.item)
+                || Math.abs(Math.abs(q.frame.n[0] * n[0] + q.frame.n[1] * n[1] + q.frame.n[2] * n[2]) - 1) > 1e-9)
+            {
+                continue;
+            }
+            // The hole centre lies on one face of its board : the slab it opens through, and what stands against it
+            const w0 = along(q.frame.o);
+            const w1 = w0 + (q.frame.n[0] * n[0] + q.frame.n[1] * n[1] + q.frame.n[2] * n[2]) * q.thickness;
+            const lo = Math.min(w0, w1);
+            const hi = Math.max(w0, w1);
+            const gap = Math.max(lo - board.thickness, -board.thickness - hi);
+            const [u, v] = onPart(q, hole.centre);
+            const reach = hole.reach - BITE_ALLOWED;
+            const over = u + reach > 0 && u - reach < q.length && v + reach > 0 && v - reach < q.width;
+            // Half facing the hole of its neighbour is still blocked : the whole opening must find the other
+            const open = q.cutouts.some((o) =>
+            {
+                return cutoutHolds(o, u - reach, v) && cutoutHolds(o, u + reach, v) && cutoutHolds(o, u, v - reach)
+                    && cutoutHolds(o, u, v + reach);
+            });
+            if (gap <= AGAINST_GAP && over && !open)
+            {
+                b.errors.push(`${board.itemName}, ${board.label.toLowerCase()} : le trou de ${Math.round(2 * hole.reach)} mm `
+                    + `donne sur ${q.label.toLowerCase()} de ${q.itemName}. Déplacer le trou ou percer aussi ce panneau.`);
+            }
+        }
+    }
 }
 
 
@@ -164,7 +242,8 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
                 && y + tall / 2 < fp.rect.y + fp.rect.h;
         });
         b.outlets.push({ item: c.id, id: hole.id, shape: edgeOn ? "rect" : hole.shape, x, y, w: wide, h: tall,
-                         edgeOn, hidden });
+                         edgeOn, hidden, board: part.id, reach: Math.max(hole.w, h) / 2,
+                         centre: [(near[0] + far[0]) / 2, (near[1] + far[1]) / 2, (near[2] + far[2]) / 2] });
         part.notes.push(hole.shape === "round" ? `Trou ${DIAM}${hole.w} pour prise ou câble, d'après le DXF`
             : `Découpe ${hole.w} x ${hole.h} pour prise, d'après le DXF`);
     }

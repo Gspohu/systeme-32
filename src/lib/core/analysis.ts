@@ -2,16 +2,19 @@
 
 import type { Carcass, Item, Project } from "./model";
 import { type Build, buildCarcass, emptyBuild } from "./parts";
+import { buildStiffeners } from "./dividers";
 import { buildBox, buildWallShelf, shelfSupportSpan } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
 import { buildDrawers } from "./drawers";
-import { fitBase, fitModularRows, fitShelfPins, fitSliding, lineSymmetry, partMass } from "./fittings";
+import { fitBackScrews, fitBase, fitModularRows, fitShelfPins, fitSliding, lineSymmetry, partMass } from "./fittings";
 import { fitJoints } from "./joints";
-import { antiTipKept, fitWallFixing } from "./wall_fixing";
+import { antiTipKept, fitBackWallScrews, fitWallFixing } from "./wall_fixing";
 import { fitDoors } from "./doors";
 import { fitHandles } from "./handles";
 import { fitPrints } from "./prints"; 
 import { fitLifts, liftChecks } from "./lifts";
+import { fitDropFlaps, settleSpacerScrews } from "./drop_flaps";
+import { bandVisibleEdges } from "./edge_visibility";
 import { cornerChecks } from "./corner";
 import { fitPanels } from "./cutouts";
 import { buildShoeRacks } from "./shoes";
@@ -24,6 +27,7 @@ import { itemMass, shelfDeflection, tipping, topDrawerExtension, type Deflection
 import { frontFootInset } from "./feet";
 import { solidChecks } from "./solid_checks";
 import { fitCarcassLinks } from "./carcass_links";
+import { fitShelfTies } from "./shelf_ties";
 import { letInFittings } from "./fitted";
 import { findNode, subtreeIds } from "./layout";
 import { screenSize } from "./extent";
@@ -40,9 +44,12 @@ import { armChecks, screenSpots, spotClashes } from "./tv_arm";
 import { stopAtWalls, swingChecks } from "./swing";
 import { slopeErrors } from "./slope";
 import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
-import { buildLights, lightChecks } from "./lights";
-import { fitOutlets } from "./outlets";
-import { bounds, tessellate } from "./geometry";
+import { buildLights, fitLightLeads, lightChecks } from "./lights";
+import { blockedOutlets, fitOutlets } from "./outlets";
+import { sinkHeads } from "./screw_heads";
+import { fitScrewCaps } from "./screw_caps";
+import { at, bounds, tessellate } from "./geometry";
+import { lightsInTheWay, lowest } from "./loose";
 import { MATERIALS, SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
 import { GRAVITY, SHELF_DEFLECTION_LIMIT } from "../data/rules";
 
@@ -71,7 +78,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
             const gap = wallGap(it, p.room, side);
             return gap !== null && gap <= 0.5; 
         };
-        buildCarcass(it, s, b, { left: against("left"), right: against("right") }); 
+        buildCarcass(it, s, b, { left: against("left"), right: against("right") });
         fitVentGrills(it, b);
         const lay = b.layouts.get(it.id)!;
         b.errors.push(...slopeErrors(it, lay, b.fronts.get(it.id) ?? []));
@@ -80,6 +87,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         buildDrawers(it, lay, s, b);
         fitDoors(it, lay, s, b);
         fitLifts(it, lay, b);
+        fitDropFlaps(it, lay, s, b);
         fitPanels(it, b);
         fitSliding(it, lay, s, b);
         fitHandles(it, b);
@@ -88,10 +96,12 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         fitModularRows(it, lay, s, b);
         lineSymmetry(it, lay, s, b);
         fitOutlets(it, lay, b);
+        buildStiffeners(it, lay, b);
         const clothes = buildRails(it, lay, b);
         buildLights(it, lay, s, b);
         buildShoeRacks(it, lay, b);
-        fitJoints(b.joints.slice(before), s, b, it.id, it.name);
+        fitJoints(b.joints.slice(before), { ...s, joinery: it.joinery ?? s.joinery }, b, it.id, it.name);
+        settleSpacerScrews(it, b);
         let content = 0;
         for (const f of it.fronts)
         {
@@ -116,7 +126,10 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         own.set(it.id, itemMass(b, it.id) + content + shelves + person + clothes);
         fitBase(it, b);
         fitWallFixing(it, s, b, p.items);
+        fitBackWallScrews(it, s, b);
         buildCeilingFiller(it, p.room, b, s);
+        // Last of the carcass : its screws keep clear of the others
+        fitBackScrews(it, lay, b);
     }
     else if (it.kind === "corner")
     {
@@ -187,10 +200,26 @@ export function analyse(p: Project): Analysis
     {
         checks.push({ level: "error", item: x.item, target: null, message: x.message });
     }
+    // What these steps across the items report would otherwise never reach the checks : the lead of the niche strip
+    // gave way to a Minifix bolt in silence
+    const told = { errors: b.errors.length, warnings: b.warnings.length, infos: b.infos.length };
+    fitShelfTies(p, b);
+    fitLightLeads(p, b);
+    blockedOutlets(p.items, b);
+    bandVisibleEdges(p, b);
+    sinkHeads(b);
+    fitScrewCaps(p, b);
     packRailBars(b);
     b.fitted.push(...letInFittings(b.parts));
     // Once every part and handle stands where it goes, the walls of the room stop the doors that would go through
     stopAtWalls(p, b);
+    noteLooseItems(p, b);
+    checks.push(...b.errors.slice(told.errors).map((message) => { return { level: "error" as const,
+        item: null, target: null, message }; }),
+                ...b.warnings.slice(told.warnings).map((message) => { return { level: "warning" as const, item: null,
+                    target: null, message }; }),
+                ...b.infos.slice(told.infos).map((message) => { return { level: "info" as const,
+                                                                        item: null, target: null, message }; }));
     const masses = new Map<string, number>();
     for (const it of p.items)
     {
@@ -216,9 +245,12 @@ export function analyse(p: Project): Analysis
             {
                 return k.under === null;
             }).length;
-            const verdict = !fixed ? "Aucune fixation murale : cocher Fixation murale anti-basculement sur le caisson."
+            const verdict = it.freeStanding === true ? "Posé libre, sans fixation : il se retire à la main."
+                : (it.backWallScrews ?? []).length > 0
+                    ? `Retenu par ${it.backWallScrews!.length} vis au mur à travers son fond.`
+                : !fixed ? "Aucune fixation murale : cocher Fixation murale anti-basculement sur le caisson."
                 : brackets > 0 ? `Retenu par ${brackets} équerre(s) anti-basculement fixées au mur.`
-                    : "Retenu par le caisson posé dessus, une fois les deux reliés.";
+                    : "Retenu par ce qui est posé dessus, une fois les deux reliés.";
             checks.push({
                 level: "info", item: it.id, target: null,
                 message: `${it.name} : basculement sous ${tp.pullKg.toFixed(1)} kg tirés horizontalement en haut, `
@@ -226,6 +258,14 @@ export function analyse(p: Project): Analysis
                     + `pas un essai EN 14749:2016+A1:2022 des rangements domestiques). ${verdict}`,
             });
         }
+    }
+    // Read on one fischer table, the column read by its layout : 0.12 kN recommended for the 8 x 40, resellers 25 kg max
+    if (p.settings.wallType === "hollow")
+    {
+        checks.push({ level: "warning", item: null, target: null,
+                      message: "Mur en brique creuse : tenue des chevilles faible et non vérifiée (de l'ordre de 12 à "
+                          + "25 kg par cheville fischer DuoPower 8 x 40, à confirmer sur sa fiche). Sonder le mur, et "
+                          + "prévoir un scellement chimique pour ce qui porte une charge : étagères murales, bras d'écran." });
     }
     if (p.settings.wallType === "plasterboard" && anchored(p))
     {
@@ -237,6 +277,61 @@ export function analyse(p: Project): Analysis
                 ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p), ...solidChecks(p, b),
                 ...swingChecks(p, b));
     return { build: b, checks, masses, deflections: partReport.deflections, tippings };
+}
+
+
+
+
+// A carcass meant to stand loose reads as forgotten on its plans : its bottom says so, with the room left under
+// the board over it to slide it in
+function noteLooseItems(p: Project, b: Build): void
+{
+    const blocking = lightsInTheWay(p, b);
+    for (const c of p.items)
+    {
+        if (c.kind !== "carcass" || c.freeStanding !== true)
+        {
+            continue;
+        }
+        const bottom = b.parts.find((q) => { return q.id === `${c.id}/bottom`; });
+        if (bottom === undefined)
+        {
+            continue;
+        }
+        const top = c.y + c.height;
+        let gap = Infinity;
+        let over = "";
+        for (const q of b.parts)
+        {
+            if (q.item === c.id || q.frame === null || Math.abs(q.frame.n[1]) < 0.9)
+            {
+                continue;
+            }
+            const f = q.frame;
+            const corners = [at(f, 0, 0, 0), at(f, q.length, 0, 0), at(f, 0, q.width, 0), at(f, q.length, q.width, 0)];
+            const xs = corners.map((k) => { return k[0]; });
+            const zs = corners.map((k) => { return k[2]; });
+            const under = Math.min(f.o[1], f.o[1] + f.n[1] * q.thickness);
+            const across = Math.min(...xs) < c.x + c.width && Math.max(...xs) > c.x
+                && Math.min(...zs) < c.z + c.depth && Math.max(...zs) > c.z;
+            if (across && under >= top - 0.5 && under - top < gap)
+            {
+                gap = under - top;
+                over = `${q.label.toLowerCase()} de ${q.itemName}`;
+            }
+        }
+        const mm = (x: number): string => { return String(Math.round(x * 10) / 10).replace(".", ","); };
+        const room = Number.isFinite(gap) ? `, ${mm(gap)} mm de jeu sous le ${over}` : "";
+        // A light screwed in front of it lower than its top stops the way : set after it, unscrewed to take it out
+        // (no clips for so little)
+        const light = b.fitted.find((f) => { return f.host === null && (blocking.get(f.key) ?? []).includes(c); });
+        const what = light === undefined ? "" : `${light.label.replace(/^.* : /, "")} de ${light.label.replace(/ : .*$/, "")}`;
+        const way = light === undefined ? ", elle se retire de la même façon"
+            : `, avant la pose du ${what} qui passe ${mm(top - lowest(light))} mm sous son dessus. Pour la sortir, le `
+                + "dévisser d'abord";
+        bottom.notes.push(`${c.name} posée libre, sans fixation ni perçage pour la tenir : glissée à la main dans son `
+            + `logement${room}${way}`);
+    }
 }
 
 
@@ -316,7 +411,7 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         {
             continue;
         }
-        const span = onSupports ? shelfSupportSpan(part.length) : part.length;
+        const span = onSupports ? shelfSupportSpan(part.length, hungShelf.supports) : part.length;
         const d = shelfDeflection({ ...part, length: span }, top ? 0 : s.shelfLoad, hung);
         if (d === null)
         {
@@ -457,7 +552,7 @@ function screenChecks(p: Project): Check[]
         return checks;
     }
     const { w, h } = screenSize(sc);
-    // The whole thickness of the set counts, turned as it is, and on an arm both the place it is put away in and the
+    // The whole thickness of the set counts, turned as it is, and on an arm both the place it's put away in and the
     // one it swings to
     for (const spot of screenSpots(sc))
     {

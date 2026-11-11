@@ -3,11 +3,11 @@
 
 import type { Carcass } from "../model";
 import type { Analysis } from "../analysis";
-import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
+import { PLINTH_TOP_GAP, baseHeight } from "../part_base";
 import { endReach, usableDepth } from "../extent";
 import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";
-import { endPost, endToe, floorOutline, openEndLevels } from "../curves";
+import { endPost, endToe, floorOutline, openEndLevels, plinthFootGap } from "../curves";
 import { tessellate } from "../geometry";
 import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H } from "./display";
 import { heading, paginateTable, table, type Draft } from "./draft";
@@ -18,7 +18,7 @@ import { hardware } from "../../data/hardware";
 
 type ToPage = (value: number) => number;
 
-// Page millimetres between two views, room for their titles and dimensions
+// Page millimetres betwen two views, room for their titles and dimensions
 const VIEW_GAP = 28;
 
 
@@ -94,7 +94,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         {
             const clear = levels[i + 1]! - levels[i]! - k.thickness;
             canvas.dimV(fy - (bh + levels[i + 1]!) / scale, fy - (bh + levels[i]! + k.thickness) / scale, xe, xe,
-                        `${Math.round(clear)}`, 1.8);
+                        round1(clear), 1.8);
         }
     }
     const lay = a.build.layouts.get(k.id);
@@ -113,24 +113,24 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         let i = 0;
         while (i + 1 < edges.length)
         {
-            const width = Math.round(edges[i + 1]! - edges[i]!);
-            canvas.dimH(fx + edges[i]! / scale, fx + edges[i + 1]! / scale, topY - 1, topY - 6, `${width}`, 1.8);
+            canvas.dimH(fx + edges[i]! / scale, fx + edges[i + 1]! / scale, topY - 1, topY - 6,
+                        round1(edges[i + 1]! - edges[i]!), 1.8);
             i += 2;
         }
     }
-    // The inside the fronts hide : panels, runner spaces, and the height of every cell
-    // TODO the hinges are drawn nowhere on these views, their arm and plate are not modelled yet
+    // The inside the fronts hide : panels, runner spaces and the height of every cell
+    // TODO the hinges are drawn nowhere on these views, their arm and plate aren't modelled yet
     const cutX = stacked ? fx : fx + (k.width + reachRight) / scale + VIEW_GAP + reachLeft / scale;
     const cutY = stacked ? fy + VIEW_GAP + fullHeight / scale : fy;
     drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - bh) / scale, a, false);
-    canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - fy, "Coupe, façades déposées", 3, "middle", true);
+    canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - fy, "Vue de face, façades déposées", 3, "middle", true);
     for (const cell of lay?.nodes.values() ?? [])
     {
         if (cell.kind === "cell" && cell.h / scale >= 6)
         {
             const xc = cutX + (cell.x + cell.w / 2) / scale;
             canvas.dimV(cutY - (bh + cell.y + cell.h) / scale, cutY - (bh + cell.y) / scale, xc, xc,
-                        `${Math.round(cell.h)}`, 1.8);
+                        round1(cell.h), 1.8);
         }
     }
 
@@ -145,8 +145,8 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     if (k.base.type === "plinth")
     {
         const front = sideX + (k.depth - k.base.setback) / scale;
-        canvas.rect(front - k.thickness / scale, fy - (bh - PLINTH_FOOT_GAP) / scale, k.thickness / scale,
-                    (bh - PLINTH_FOOT_GAP) / scale, "thin");
+        canvas.rect(front - k.thickness / scale, fy - (bh - PLINTH_TOP_GAP) / scale, k.thickness / scale,
+                    (bh - plinthFootGap(k) - PLINTH_TOP_GAP) / scale, "thin");
     }
     // Seen from the side the feet stand in the open, the runner spaces behind the side panel
     for (const f of a.build.fitted)
@@ -220,6 +220,10 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
         {
             kind = "abattant relevant";
         }
+        else if (fp.role === "drop")
+        {
+            kind = "abattant tombant, charnières en bas";
+        }
         else if (fp.role === "panel")
         {
             kind = "façade fixe";
@@ -253,7 +257,7 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
         return [`${h.brand} ${h.ref}`.trim(), `${count}`, h.label];
     });
     const cols = [34, 10, Math.max(60, A3.w - MARGIN - 50 - listX)];
-    // What the room left does not hold is named, never dropped
+    // What the room left doesn't hold is named, never dropped
     const pages = paginateTable(rows, cols, 2.5, 4.5, bottom - listY - 12);
     const end = table(canvas, listX + 3, listY + 6, cols, ["Référence", "Qté", "Article"], pages[0]!, 2.5, 4.5);
     if (pages.length > 1)

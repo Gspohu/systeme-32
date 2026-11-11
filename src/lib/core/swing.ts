@@ -1,4 +1,4 @@
-// Fronts swept through their opening : what each one hits on its way, and which ones cannot stadn open together
+// Fronts swept through their opening : what each one hits on its way, and which ones can't stadn open together
 
 import type { Project, Wall } from "./model";
 import type { Build, Motion, Part, PartRole } from "./parts";
@@ -7,7 +7,7 @@ import type { Vec3 } from "./geometry";
 import { sideWallDepth, toRoom } from "./room";
 import { shownSideWalls } from "./room_dressing";
 
-// A touch is not a clash : boards laid face to face or a front on the edges of its carcass
+// A touch isn't a clash : boards laid face to face or a front on the edges of its carcass
 const TOUCH = 1;
 // steps through a turn and along a slide, about every 10 deg of a door
 const TURN_STEPS = 11;
@@ -102,7 +102,7 @@ export function carried(b: Obb, m: Motion, s: number): Obb
 }
 
 
-// Separating axis test of two boxes, each shrunk by TOUCH so that faces in contact do not count
+// Separating axis test of 2 boxes, each shrunk by TOUCH so that faces in contact don't count
 export function boxesClash(a: Obb, b: Obb): boolean
 {
     const t = add(b.centre, a.centre, -1);
@@ -336,6 +336,19 @@ export function swingChecks(p: Project, b: Build): Check[]
     for (const m of b.motions)
     {
         const mine = new Set(movingOf(m));
+        // What opens first stands open, not shut, in its way
+        const first = m.after === undefined ? undefined : b.motions.find((x) => { return x.front === m.after &&
+            x !== m; });
+        const before = first === undefined ? new Set<string>() : new Set(movingOf(first));
+        const opened: Solid[] = first === undefined ? [] : movingOf(first).flatMap((id) =>
+        {
+            const box = local.get(id);
+            return box === undefined ? [] : [{ id: `${id}#open`,
+                                              label: `${solids.find((s) => { return s.id === id; })?.label ?? id} ouvert`,
+                                                box: inRoom(carried(box, first, 1), wallOf(first.item),
+                                                            p), front: false }];
+        });
+        const around = [...solids.filter((x) => { return !before.has(x.id); }), ...opened];
         // The neighbours of the hinge line, in the frame of the wall like the motion
         const spared = new Set<string>();
         for (const s of solids)
@@ -352,7 +365,7 @@ export function swingChecks(p: Project, b: Build): Check[]
         while (hit === null && k <= steps)
         {
             const moving = pose(m, k / steps);
-            const s = solids.find((x) =>
+            const s = around.find((x) =>
             {
                 return !mine.has(x.id) && !spared.has(x.id) && moving.some((a) =>
                 {

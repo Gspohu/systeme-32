@@ -8,7 +8,8 @@ import { byId } from "./edit";
 import { footFor, footPlaces } from "./feet";
 import { itemExtent } from "./extent";
 import { carrierOf } from "./devices";
-import { hangerWallChecks } from "./wall_load"; 
+import { hangerWallChecks } from "./wall_load";
+import { standsInside } from "./room";
 import { AXILO_ADJUST_MAX_CABINET, AXILO_LOAD_PER_FOOT, BLUM_HANGER_PAIR_LOAD, CAMAR_807_LOAD } from "../data/hardware";
 
 // A carcass set by hand on another sit within a millimetre of its top
@@ -66,6 +67,12 @@ function carried(p: Project, c: Carcass, own: Map<string, number>): PointLoad[]
         if (it.kind === "device" && carrierOf(p, it)?.id === c.id)
         {
             out.push({ kg: it.massKg, x: it.x + it.width / 2, z: it.z + it.depth / 2 });
+        }
+        // Not on the top but within the box : a loose column weighs on the feet like anything inside
+        if (it.id !== c.id && standsInside(it, c) && it.kind === "carcass")
+        {
+            out.push(...carried(p, it, own));
+            continue;
         }
         if (it.kind !== "carcass" || it.id === c.id || it.wall !== c.wall
             || Math.abs(itemExtent(it).y0 - (c.y + c.height)) > TOL)

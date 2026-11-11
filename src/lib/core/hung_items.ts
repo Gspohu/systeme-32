@@ -6,7 +6,8 @@ import { newPart } from "./part_base";
 import { X, Y, Z, neg, type Outline, type Segment } from "./geometry";
 import { box } from "./fitted";
 import { partMass, spread } from "./fittings";
-import { CONCEALED_SHELF_SUPPORT } from "../data/rules";
+import { CONCEALED_SHELF_SUPPORT, GRAVITY } from "../data/rules";
+import { HOLLOW_BRICK_YARDSTICK } from "../data/wall_fixings";
 import { DIAM } from "./text";
 import { wallPlug } from "./wall_load";
 
@@ -17,16 +18,26 @@ const SUPPORT_END_INSET = 100;
 
 
 // Where the concealed supports of a shelf go, from its left end
-export function shelfSupportPositions(width: number): number[]
+export function shelfSupportPositions(width: number, count?: number): number[]
 {
-    return spread(width, Math.min(SUPPORT_END_INSET, width / 4), CONCEALED_SHELF_SUPPORT.maxSpacing);
+    const inset = Math.min(SUPPORT_END_INSET, width / 4);
+    const even = spread(width, inset, CONCEALED_SHELF_SUPPORT.maxSpacing);
+    if (count === undefined || count <= even.length)
+    {
+        return even;
+    }
+    // Closer than the maker's maximum, each takes a shorter share of the shelf : a weak wall holds less per plug
+    return Array.from({ length: count }, (_, k) =>
+    {
+        return inset + (width - 2 * inset) * k / (count - 1);
+    });
 }
 
 
 // The widest gap between two supports : the span its deflection is checked on
-export function shelfSupportSpan(width: number): number
+export function shelfSupportSpan(width: number, count?: number): number
 {
-    const xs = shelfSupportPositions(width);
+    const xs = shelfSupportPositions(width, count);
     let span = 0;
     for (let i = 1; i < xs.length; i++)
     {
@@ -54,7 +65,7 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
             + "de mur.");
         return;
     }
-    const xs = shelfSupportPositions(w.width);
+    const xs = shelfSupportPositions(w.width, w.supports);
     const mid = w.thickness / 2;
     xs.forEach((x, k) =>
     {
@@ -88,7 +99,7 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
         b.hardware.push({ ref, qty, item: w.id, itemName: w.name, target: part.id, note, purpose });
     };
     line(H.ref, n, `vendue par ${H.orderMultiple} chez Häfele`, "shelf-bracket");
-    line("WALL_SCREW_5x50", n * H.wallScrews, `${H.wallScrews} par platine`, "wall-fixing");
+    line("WALL_SCREW_5x50_PAN", n * H.wallScrews, `${H.wallScrews} par platine`, "wall-fixing");
     const plug = wallPlug(s); 
     if (plug !== null)
     {
@@ -116,6 +127,31 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
         b.infos.push(`${w.name} : ${n} fixations invisibles Häfele ${H.ref}, ${load.toFixed(0)} kg/m² avec son poids `
             + `pour ${row.kgPerM2} admis à ${row.depth} mm de profondeur (p. 7.142).`);
     }
+    if (s.wallType === "hollow")
+    {
+        const [hi, lo] = plugPull(w, load, n);
+        const yard = HOLLOW_BRICK_YARDSTICK;
+        const text = `arrachement estimé de ${lo.toFixed(0)} à ${hi.toFixed(0)} daN par cheville en brique creuse `
+            + `(charge ${load.toFixed(0)} kg/m² partagée sur ${n} platines, moment repris sur la demi-hauteur de la `
+            + `platine ou sur le chant arrière en appui)`;
+        part.notes.push(`Fixation au mur au choix de l'ébéniste : ${text}. Repère : ${yard.low} à ${yard.high} daN pour `
+            + `une cheville ${yard.source}. Un scellement chimique avec tamis est conseillé`);
+        b.warnings.push(`${w.name} : ${text}, pour ${yard.low} à ${yard.high} daN cités par fischer sur un autre support. `
+            + "Choisir une fixation dont la fiche couvre la brique creuse et cette charge.");
+    }
+}
+
+
+// Pull on one plug of a concealed support in daN, worst first : the share of one support at half the
+// depth off the wall, its
+// moment taken on half the plate height, or on half the shelf thickness when the back edge bears (review of Vibe)
+export function plugPull(w: WallShelf, kgPerM2: number, supports: number): [number, number]
+{
+    const H = CONCEALED_SHELF_SUPPORT;
+    const each = kgPerM2 * w.width * w.depth * 1e-6 * GRAVITY / supports;
+    const moment = each * w.depth / 2;
+    const perPlug = (lever: number): number => { return moment / lever / H.wallScrews / 10; };
+    return [perPlug(H.plate.height / 2), perPlug(w.thickness / 2)];
 }
 
 

@@ -136,6 +136,10 @@ export function duplicateItem(p: Project, id: string, dx: number): Project
             {
                 return renamed.get(c) ?? c;
             });
+            for (const st of copy.stiffeners ?? [])
+            {
+                st.cell = renamed.get(st.cell) ?? st.cell;
+            }
         }
         q.items.push(copy);
     });
@@ -181,7 +185,7 @@ export function setRoom(p: Project, patch: Partial<Room>): Project
 
 
 // The return of one side wall of an alcove, null for a wall running the whole depth : once neither is shorter than
-// the room, there is no alcove left
+// the room, there's no alcove left
 export function setReturn(p: Project, side: "left" | "right", value: number | null): Project
 {
     if (value !== null && (!Number.isFinite(value) || value <= 0))
