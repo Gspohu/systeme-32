@@ -16,11 +16,9 @@ const GRIP_HEIGHT = 1000;
 const END_MARGIN = 40;
 // Clears an M4 pan head, 8 across at most (ISO 7045:2011 via the Fuller Fasteners table), and the screwdriver
 const SCREW_HEAD_PASSAGE = 10;
-// Aluminium in g/mm3 : the edge pull's wall comes out of its 35 g spread over its lenght and unfolded section
-const ALUMINIUM = 2.7e-3;
 
 
-// The longest handle no longer than `room`, the shortest one when even that is too long
+// The longest handle no longer than `room`, the shortest one when even that's too long
 function pickHandle(room: number): BarHandle
 {
     let best = BAR_HANDLES[0]!;
@@ -165,7 +163,7 @@ function fitEdgePull(c: Carcass, fp: FrontPanel, part: Part, b: Build): void
             + "ouverture par pression ou en poignée barre.");
         return;
     }
-    const wall = pull.massG / ALUMINIUM / pull.length / (pull.depth + 2 * pull.height);
+    const wall = pull.wall;
     if (thick + wall >= pull.depth || thick <= pull.screw - wall)
     {
         b.errors.push(`${who} : façade de ${thick} mm, la poignée Oslo prend le chant sur ${pull.depth} mm et se `
@@ -220,22 +218,25 @@ function fitEdgePull(c: Carcass, fp: FrontPanel, part: Part, b: Build): void
           centre: pt(0, wall / 2 + dn / 2, thick + dz / 2), axes: [runs, lipDir, lipNormal],
           half: [pull.length / 2, lipLength / 2, wall / 2] },
     );
-    // The two screws come from inside, throught the tab into the back of the front
-    for (const d of [-pull.centres / 2, pull.centres / 2])
+    // Tab and screw heads stand 2.2 behind the front, in the 2.6 the overlay leaves, measured on a bought pull
+    const f = part.frame!;
+    for (const a of [-pull.centres / 2, pull.centres / 2])
     {
-        const n = (wall - high) / 2;
-        const [hx, hy] = vertical ? [edge + out[0] * n, along + d] : [along + d, edge + out[1] * n];
-        part.holes.push({ u: vertical ? hy - rect.y : hx - rect.x, v: vertical ? hx - rect.x : hy - rect.y,
-                          diameter: 0, depth: 0, face: "A",
-                          label: `Poignée Oslo ${pull.ref} : vis de ${pull.screw} fournie, par l'arrière`,
-                          purpose: "handle-screw", fixes: pull.ref });
+        const p = pt(a, (wall - high) / 2, 0);
+        const d = [p[0] - f.o[0], p[1] - f.o[1], p[2] - f.o[2]];
+        const u = d[0]! * f.u[0] + d[1]! * f.u[1] + d[2]! * f.u[2];
+        const v = d[0]! * f.v[0] + d[1]! * f.v[1] + d[2]! * f.v[2];
+        part.holes.push({ u, v, diameter: 0, depth: 0, face: "A", purpose: "handle-screw",
+                          label: `Vis ${DIAM}4 x ${pull.screw} fraisée de la poignée Oslo, fournie` });
     }
     b.hardware.push({ ref: pull.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
-                      note: `à cheval sur le chant ${vertical ? "libre" : fp.role === "flap" ? "bas" : "haut"}, centrée`,
-                      purpose: "handle" });
+                      note: `à cheval sur le chant ${vertical ? "libre" : fp.role === "flap" ? "bas" : "haut"}, centrée, `
+                          + "vissée par ses 2 vis fraisées", purpose: "handle" });
     const half = pull.length / 2;
     b.handles.push({ item: c.id, front: fp.id, ref: pull.ref,
                      x0: vertical ? edge : along - half, y0: vertical ? along - half : edge,
                      x1: vertical ? edge : along + half, y1: vertical ? along + half : edge });
-    part.notes.push(`Poignée Oslo ${pull.ref} posée sur le chant, vissée depuis l'intérieur (entraxe ${pull.centres})`);
+    part.notes.push(`Poignée Oslo ${pull.ref} posée sur le chant, vissée au dos par ses 2 vis fraisées ${DIAM}4 x `
+        + `${pull.screw} fournies, entraxe ${pull.centres}. Patte et têtes dépassent de 2,2 mm au plus derrière la `
+        + "façade pour 2,6 mm de jeu : visser à fond, tête dans la fraisure de la patte");
 }

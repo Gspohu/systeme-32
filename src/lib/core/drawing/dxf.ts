@@ -2,6 +2,8 @@
 
 import type { Part } from "../parts";
 import type { Outline } from "../geometry";
+import { bandedPieces, innerOutline } from "../edge_bands";
+import { decorById } from "../../data/materials";
 
 
 type Group = [number, string | number];
@@ -99,7 +101,15 @@ export function partToDxf(p: Part, code: string): string
 {
     const ents: Group[][] = [];
     const layers = new Set<string>(["CONTOUR", "TEXTE"]);
-    contour("CONTOUR", p.outline, ents);
+    // The contour to cut is the one the banding leaves, the finished one beside it for reference
+    const t = decorById(p.decor).edgeThickness;
+    const banded = p.edges.length > 0 && t !== undefined;
+    contour("CONTOUR", banded ? innerOutline(p.outline, p.length, p.width, p.edges, t) : p.outline, ents);
+    if (banded)
+    {
+        layers.add("FINI_CHANTS_COMPRIS");
+        contour("FINI_CHANTS_COMPRIS", p.outline, ents);
+    }
     // Openings get a layer of their own, the router takes them before the outer contour
     for (const c of p.cutouts)
     {
@@ -110,24 +120,11 @@ export function partToDxf(p: Part, code: string): string
     {
         layers.add("CHANT_PLAQUE");
     }
-    for (const e of p.edges)
+    // The banded segments of the finished outline, arcs included : the sides of its bounding box drew straight bands
+    // on the quarter rounds
+    for (const { from, s } of bandedPieces(p.outline, p.length, p.width, p.edges))
     {
-        if (e === "v0")
-        {
-            ents.push(line("CHANT_PLAQUE", 0, 0, p.length, 0));
-        }
-        else if (e === "v1")
-        {
-            ents.push(line("CHANT_PLAQUE", 0, p.width, p.length, p.width));
-        }
-        else if (e === "u0")
-        {
-            ents.push(line("CHANT_PLAQUE", 0, 0, 0, p.width));
-        }
-        else
-        {
-            ents.push(line("CHANT_PLAQUE", p.length, 0, p.length, p.width));
-        }
+        contour("CHANT_PLAQUE", { start: from, segments: [s] }, ents);
     }
     for (const h of p.holes)
     {

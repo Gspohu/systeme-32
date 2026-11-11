@@ -5,13 +5,15 @@ import { frontSetback, type ResolvedLayout } from "./layout";
 import type { FrontPanel } from "./fronts";
 import { sideFace, type FaceRef } from "./locate";
 import { byId } from "./edit";
-import { X, polygonArea, tessellate } from "./geometry";
+import { at, neg, X, polygonArea, tessellate, type Vec3 } from "./geometry";
+import { screwOf } from "../data/screws";
 import type { Build, Part, Purpose } from "./part_types";
 import { SLIDELINE_M, TIPON_ADAPTER } from "../data/rules";
 import {
     GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
-import { FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces, frontFootInset, sideFootInset } from "./feet";
+import { AXILO_CLIP_SCREWS, AXILO_SCREW_PITCH, AXILO_SCREWS, FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces,
+    AXILO_SCREW_OFFSET, footLong, frontFootInset, sideFootInset } from "./feet";
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
 import { PIN_BELOW_SHELF, holeLine, nearestHole, symmetricHeights } from "./grid";
@@ -19,7 +21,11 @@ import { metHole } from "./drilling";
 
 
 // Workshop conventions, stated in the drawings as such
-const PIN_SPARE_HOLES = 3;
+export const PIN_SPARE_HOLES = 2;
+// Häfele p. 7.158 : the lug Ø4.8 x 5 of these pins, 10.45 off the side in its model, a hole with room for it
+const PIN_WITH_LUG = new Set(["282.24.727", "282.24.728"]);
+const PIN_LUG_OFF = 10.45;
+const PIN_LUG_HOLE = { diameter: 5, depth: 6 };
 
 // Holes of a hinge plate a shelf pin may land in, on the side the hinges are fixed to
 const PLATE_HOLES = new Set<Purpose>(["plate-dowel", "plate-screw"]);
@@ -177,8 +183,8 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             b.warnings.push(`${c.name}, ${shelf.label.toLowerCase()} : à ${Math.round(d.y)} mm, hors des trous du `
                 + `système 32. La déplacer à ${Math.round(line + PIN_BELOW_SHELF)} mm pour qu'elle repose sur la série.`);
         }
-        // The front row 37 in from the front of the wall it is drilled in, and kept as far behind the front of a
-        // shelf standing back as it is behind one at the setback of the settings
+        // The front row 37 in from the front of the wall it's drilled in, and kept as far behind the front of a
+        // shelf standing back as it's behind one at the setback of the settings
         const sb = frontSetback(d, s.shelfFrontSetback);
         for (const side of ["left", "right"] as const)
         {
@@ -196,6 +202,20 @@ export function fitShelfPins(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
                 break;
             }
             const rows = [frontRow - face.vOrigin, backRow - face.vOrigin];
+            if (shelf.frame !== null && PIN_WITH_LUG.has(sup.ref))
+            {
+                // The lug of the pin stands in the underside of the shelf : level with its row, in from the end
+                // of the shelf
+                const clear = s.shelfSideClearance;
+                for (const v of rows)
+                {
+                    const z = at(face.part.frame!, yPin - face.uOrigin, v, 0)[2];
+                    shelf.holes.push({ u: side === "left" ? PIN_LUG_OFF - clear : shelf.length - PIN_LUG_OFF + clear,
+                                       v: shelf.frame.o[2] - z, diameter: PIN_LUG_HOLE.diameter, depth: PIN_LUG_HOLE.depth,
+                                       face: shelf.frame.n[1] < 0 ? "B" : "A", label: `Ergot du taquet ${sup.ref} : ${DIAM}${
+                                           PIN_LUG_HOLE.diameter} x ${PIN_LUG_HOLE.depth}`, purpose: "shelf-lug" });
+                }
+            }
             let k = -PIN_SPARE_HOLES;
             while (k <= PIN_SPARE_HOLES)
             {
@@ -227,7 +247,7 @@ function drillPinHole(face: FaceRef, u: number, v: number, k: number, supportRef
     const move = "La monter ou la descendre d'un cran de la série.";
     if (k === 0 && met !== undefined && PLATE_HOLES.has(met.purpose))
     {
-        // The hole is a hinge plate's : the shelf cannot rest there
+        // The hole is a hinge plate's : the shelf can't rest there
         b.warnings.push(`${who} : son taquet tombe dans un trou d'embase de charnière. ${move}`);
     }
     else if (k === 0 && met !== undefined && met.purpose === "adapter-screw")
@@ -337,6 +357,141 @@ export function fitModularRows(c: Carcass, lay: ResolvedLayout, s: Settings, b: 
 }
 
 
+// The screws of an applied back, round its edge and along every fixed panel behind it. A long carcass works as a
+// beam through its back : closer screws. Workshop conventions, no maker gives these pitches
+const BACK_SCREW_PITCH = 900;
+const BACK_SCREW_PITCH_LONG = 600;
+const BACK_LONG_FROM = 1000;
+// The first screw of a row off its ends, workshop convention
+const BACK_SCREW_END = 40;
+const BACK_SCREW_SHIFTS = [0, 20, -20, 40, -40];
+
+export function fitBackScrews(c: Carcass, lay: ResolvedLayout, b: Build): void
+{
+    const back = byId(b.parts, `${c.id}/back`);
+    if (back === undefined || c.back.type !== "applied")
+    {
+        return;
+    }
+    // Long either way : a column of 1810 held to the wall through its back is the beam a wide carcass is
+    const pitch = Math.max(c.width, c.height) > BACK_LONG_FROM ? BACK_SCREW_PITCH_LONG : BACK_SCREW_PITCH;
+    // On the centre of each board the back lies on : around the carcass, then on the fixed shelves and uprights
+    const mid = c.thickness / 2;
+    const runs: [number, number, number, number][] = [
+        [mid, mid, c.width - mid, mid], [mid, c.height - mid, c.width - mid, c.height - mid],
+        [mid, mid, mid, c.height - mid], [c.width - mid, mid, c.width - mid, c.height - mid],
+    ];
+    for (const d of lay.dividers)
+    {
+        if (d.kind === "fixed")
+        {
+            runs.push(d.axis === "v" ? [d.x + d.w / 2, d.y, d.x + d.w / 2, d.y + d.h]
+                : [d.x, d.y + d.h / 2, d.x + d.w, d.y + d.h / 2]);
+        }
+    }
+    const qty = screwBack(c, back, runs, pitch, b);
+    back.notes.push(`Vis 4 x 30 tous les ${pitch} mm sur le pourtour et sur chaque tablette et montant fixes, soit ${qty} vis`);
+    b.hardware.push({ ref: "SCREW_4x30", qty, item: c.id, itemName: c.name, target: back.id, note: "fond rapporté",
+                      purpose: "back-screw" });
+    // The back of a rounded end lies on the shaped boards, one row along the back edge of each
+    for (const side of ["left", "right"])
+    {
+        const prefix = `${c.id}/end/${side}/`;
+        const endBack = byId(b.parts, `${prefix}back`);
+        if (endBack === undefined)
+        {
+            continue;
+        }
+        const x0 = endBack.frame!.o[0] - c.x;
+        const endRuns = b.parts.filter((q) =>
+        {
+            return q.id.startsWith(prefix) && q.frame !== null && (q.role === "endPanel" || q.role === "former");
+        }).map((q): [number, number, number, number] =>
+        {
+            const y = at(q.frame!, 0, 0, q.thickness / 2)[1] - c.y;
+            return [x0, y, x0 + endBack.width, y];
+        });
+        const n = screwBack(c, endBack, endRuns, pitch, b);
+        endBack.notes.push(`Vis 4 x 30 sur le chant arrière de chaque planche, soit ${n} vis`);
+        b.hardware.push({ ref: "SCREW_4x30", qty: n, item: c.id, itemName: c.name, target: endBack.id,
+                          note: "fond du bout arrondi", purpose: "back-screw" });
+    }
+}
+
+
+// Screws along each run of the frame of the carcass, clear of the screws already there. How many were placed
+function screwBack(c: Carcass, back: Part, runs: [number, number, number, number][], pitch: number, b: Build): number
+{
+    const f = back.frame!;
+    // The screws of the carcass already placed : a back screw reaches 30 in, it keeps a screw's width off them
+    const others = b.parts.filter((q) =>
+    {
+        return q.item === c.id && q.id !== back.id && q.frame !== null && q.curve === null;
+    }).flatMap((q) =>
+    {
+        return q.holes.filter((h) =>
+        {
+            return (h.face === "A" || h.face === "B") && screwOf(h.purpose, h.label) !== null;
+        }).map((h) =>
+        {
+            const way = h.face === "A" ? neg(q.frame!.n) : q.frame!.n;
+            return { p: at(q.frame!, h.u, h.v, h.face === "A" ? 0 : q.thickness), way, spec: screwOf(h.purpose,
+                h.label)! };
+        });
+    });
+    const clearOfOthers = (x: number, y: number): boolean =>
+    {
+        return !others.some((o) =>
+        {
+            for (let d = 0; d <= o.spec.length; d += 2)
+            {
+                const q: Vec3 = [o.p[0] - o.way[0] * d, o.p[1] - o.way[1] * d, o.p[2] - o.way[2] * d];
+                const off = Math.hypot(q[0] - (c.x + x), q[1] - (c.y + y));
+                if (off < (4 + o.spec.diameter) / 2 + 2 && q[2] >= c.z && q[2] <= c.z + 30)
+                {
+                    return true;
+                }
+            }
+            return false;
+        });
+    };
+    let qty = 0;
+    for (const [x0, y0, x1, y1] of runs)
+    {
+        const length = Math.hypot(x1 - x0, y1 - y0);
+        for (const s of spread(length, BACK_SCREW_END, pitch))
+        {
+            const shift = BACK_SCREW_SHIFTS.find((d) =>
+            {
+                const k = Math.min(Math.max((s + d) / length, 0), 1);
+                return clearOfOthers(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k);
+            });
+            if (shift === undefined)
+            {
+                continue;
+            }
+            const k = Math.min(Math.max((s + shift) / length, 0), 1);
+            const q: Vec3 = [c.x + x0 + (x1 - x0) * k - f.o[0], c.y + y0 + (y1 - y0) * k - f.o[1], 0];
+            const u = q[0] * f.u[0] + q[1] * f.u[1];
+            const v = q[0] * f.v[0] + q[1] * f.v[1];
+            const inHole = back.cutouts.some((o) =>
+            {
+                const r = o.segments[0]!;
+                return r.kind === "arc" && Math.hypot(u - r.cx, v - r.cy) < Math.hypot(r.x - r.cx, r.y -
+                    r.cy) + BACK_SCREW_END / 4;
+            });
+            if (!inHole)
+            {
+                back.holes.push({ u, v, diameter: 0, depth: 0, face: "B", label: "Vis 4 x 30 du fond",
+                                  purpose: "back-screw" });
+                qty++;
+            }
+        }
+    }
+    return qty;
+}
+
+
 // Connector positions along a joint : at the inset from both ends, spread so that no gap excees `max`
 export function spread(length: number, inset: number, max: number): number[]
 {
@@ -383,20 +538,40 @@ export function fitBase(c: Carcass, b: Build): void
             const returns = (c.base.returns ?? []).length;
             b.hardware.push({ ref: "637.38.054", qty: perRow + 2 * returns, item: c.id, itemName: c.name, target: null,
                              note: returns > 0 ? `${perRow} en façade, 2 par retour` : null, purpose: "plinth-clip" });
+            b.hardware.push({ ref: "609.1500", qty: AXILO_CLIP_SCREWS * (perRow + 2 * returns),
+                             item: c.id, itemName: c.name,
+                              target: null, note: `${AXILO_CLIP_SCREWS} par clip de plinthe, non fournies`,
+                              purpose: "plinth-clip" });
         }
         const bottom = byId(b.parts, `${c.id}/bottom`);
         if (bottom !== undefined)
         {
-            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 (axe à ${sideFootInset(c, "left")} mm de la joue `
-                + `gauche, ${sideFootInset(c, "right")} de la droite, ${FOOT_INSET} du fond, `
-                + `${frontFootInset(c)} mm de l'avant, convention)`;
+            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 x 35 (axe du pied à ${sideFootInset(c, "left")} mm de la `
+                + `joue gauche, ${sideFootInset(c, "right")} de la droite, ${FOOT_INSET} du fond, ${frontFootInset(c)} mm de `
+                + `l'avant, convention, 4 vis sur un carré de ${AXILO_SCREW_PITCH} centré à ${AXILO_SCREW_OFFSET} de l'axe `
+                + "vers le milieu du meuble, côté long de l'embase, Häfele p. 11.43A)";
+            const half = AXILO_SCREW_PITCH / 2;
             for (const f of footPlaces(c))
             {
-                const u = f.x - c.x - c.thickness;
-                bottom.holes.push({ u: Math.min(Math.max(u, 20), bottom.length - 20), v: c.z + c.depth - f.z,
-                                    diameter: 0, depth: 0, face: "B", label, purpose: "foot-mount-screw",
-                                    fixes: "637.76.333" });
+                const { dx, dz } = footLong(c, f);
+                for (const [du, dv] of [[-half, -half], [half, -half], [-half, half], [half, half]] as const)
+                {
+                    const u = f.x - c.x - c.thickness + dx * AXILO_SCREW_OFFSET + du;
+                    const v = c.z + c.depth - f.z - dz * AXILO_SCREW_OFFSET + dv;
+                    const met = metHole(bottom, "B", u, v, 4, 15);
+                    if (u < 0 || u > bottom.length || v < 0 || v > bottom.width || met !== undefined)
+                    {
+                        b.errors.push(`${c.name} : une vis d'embase de pied ${met === undefined ? "sort du dessous"
+                            : `tombe sur un perçage (${met.label})`}. Déplacer le pied ou le connecteur.`);
+                        continue;
+                    }
+                    bottom.holes.push({ u, v, diameter: 0, depth: 0, face: "B", label, purpose: "foot-mount-screw",
+                                        fixes: "637.76.333" });
+                }
             }
+            b.hardware.push({ ref: "SCREW_4x35", qty: AXILO_SCREWS * count, item: c.id, itemName: c.name,
+                             target: bottom.id,
+                              note: `${AXILO_SCREWS} par embase de pied, non fournies`, purpose: "foot-mount-screw" });
         }
     }
     else if (c.base.type === "wall" && c.base.hanger === "camar")

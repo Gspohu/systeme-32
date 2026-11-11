@@ -42,9 +42,10 @@ export function unsupported(project: Project, all: Solid[]): Unsupported[]
     const out: Unsupported[] = [];
     for (const it of project.items)
     {
+        // A light hangs under the box it's screwed to, it bears on nothing
         const mine = all.filter((s) =>
         {
-            return s.item === it.id;
+            return s.item === it.id && s.purpose !== "light";
         });
         if (mine.length === 0)
         {
@@ -94,7 +95,7 @@ export function unsupported(project: Project, all: Solid[]): Unsupported[]
         {
             return Math.abs(s.min[1] - level) <= CLASH_TOL;
         });
-        // Each bottom face must sit on the top of a sloid of another item, a mere brush of an edge does not hold
+        // Each bottom face must sit on the top of a sloid of another item, a mere brush of an edge doesn't hold
         const resting = bottoms.some((m) =>
         {
             return others.some((o) =>

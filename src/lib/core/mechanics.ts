@@ -1,4 +1,4 @@
-// Masses, shelf deflection with creep, and tipping of standing carcasses
+// Masses, shelf deflection with creep and tipping of standing carcasses
 
 import type { Carcass } from "./model";
 import type { Build, Part } from "./parts";

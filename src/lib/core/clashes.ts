@@ -82,7 +82,12 @@ export function clashes(all: Solid[]): Clash[]
             // The battens of one batch and a skin with its flat run are one part, laid out not to cross
             const other = all[j]!;
             const samePart = a.part !== null && a.part === other.part;
-            if (samePart || (other.host !== null && other.host === a.part) || (a.host !== null && a.host === other.part))
+            // A volume held in another one, the strip in its LED profile, names that one as its host
+            const held = (x: Solid, y: Solid): boolean =>
+            {
+                return x.host !== null && (x.host === y.part || x.host === y.key);
+            };
+            if (samePart || held(other, a) || held(a, other))
             {
                 j++;
                 continue;
