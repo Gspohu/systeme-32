@@ -14,18 +14,16 @@ export const CUP_DIAMETER = 35;
 export const CUP_DEPTH = 13;
 export const TB_MIN = 3;
 export const TB_MAX = 7; 
-// Front overlay FA = TB + X - MD : X = 11 full overlay (71B3550), 1.5 twin (71B3650)
+// FA = TB + X - MD : X 11 for 71B3550, 1.5 for 71B3650. 71B3750 inset : its plate FD + 1.5 in, on the 37 line
 export const OVERLAY_X_FULL = 11;
 export const OVERLAY_X_TWIN = 1.5;
+export const INSET_PLATE_SHIFT = 1.5;
+export const PLATE_LINE = 37;
 // Side adjustment of a CLIP top hinge, KA-150 p. 75 : +-2 mm, the door may be set 2 mm nearer to a wall
 export const HINGE_SIDE_ADJUST = 2;
 // Reveal left on the hige edge of a door whose side satnds against a wall. The linkage of HINGE_110 brings the
 // front corner of that edge to the reveal less 0.8 mm from the wall around 11° : 4 keeps 3.1 mm, 1.1 adjusted
 export const WALL_HINGE_REVEAL = 4;
-// Inset door (71B3750) : plate shifted inward by FD + 1.5
-export const INSET_PLATE_SHIFT = 1.5;
-// Plates on the system 32 line
-export const PLATE_LINE = 37;
 // Blum KA-150 p. 146 : 174H7100E, its EXPANDO dowels in two Ø5 holes 32 apart about the hinge axis, side 11.5 min
 export const EXPANDO_PLATE = { ref: "174H7100E", hole: 5, pitch: 32, minSide: 11.5 };
 export const MAX_DOOR_THICKNESS = 26;
@@ -63,12 +61,25 @@ export const CONNECTING_SCREW_HEAD = 16;
 // plate 13 x 18 on that axis, placed with template 65.5210.01 clipped on the unit (p. 687)
 export const TIPON_AXIS_FROM_FACE = 7.5;
 export const TIPON_HOLE_DIAMETER = 10;
+// Drilling depth of each version : short 50 (Blum KA-150 p. 172), long 76 (SFS, Blum distributor, 956A1004 sheet
+// read on 2026-11-06 : "Drill-Ø 10 mm, drilling depth 76 mm")
+// https://www.sfs.ch/CH/en/dl/p/572035
+export const TIPON_DEPTH: Record<string, number> = { "956.1004": 50, "956A1004": 76 };
 export const TIPON_CATCH_PLATE = { across: 13, high: 18 };
 // Blum KA-150 p. 173 : straight adapter plate 956.1201 screwed on that face, screws 20 and 37 from the front
 // edge, the unit axis 8 mm off the face inside the cell
 export const TIPON_ADAPTER = { ref: "956.1201", axisOffFace: 8, screws: [20, 37] };
+
+// Häfele 342.66.730 flap hinge off its STEP, flap shut : leaves on the faces, no cup. An inset flap stands on the
+// carcass leaf 12.9 up, its screw bosses rise to 14.5 behind it, for a drawer over it to clear
+export const FLAP_HINGE_LEAF = 12.9;
+// TODO 14.5 read on the STEP only, to check with a calliper on the hinge once bought
+export const FLAP_HINGE_TOP = 14.5;
 // Blum KA-150 p. 436 : TIP-ON BLUMOTION front gap FS
 export const TIPON_FRONT_GAP = 2.5;
+// Every overlay front stands this off its carcass, in one plane : TIP-ON 2.1 proud of its panel plus its catch plate
+// of 0.53 (Blum models 956.1004), the minimum of 2.6 of Blum KA-150 p. 172. The box of a drawer comes forward with it
+export const FRONT_GAP = 2.6;
 export const TIPON_SYNC_SMALL = { lwMin: 265, lwMax: 313, cut: 241 };
 
 // Blum KA-150 p. 419 : MOVENTO planning
@@ -85,9 +96,9 @@ export const MOVENTO = {
     topBelowUpper: 7,
     // Screw positions on the carcass side, from the front edge
     frontHoles: [28, 37, 69],  
-    // Blum CAD model of the 760H4800S (files 42061081 and 42306320, 2025-03-21) : each of these holes is followed by
-    // two more of the profile, 9 and 18 mm further back. A runer whose screws would meet the other face takes
-    // the second ones
+    // Blum CAD models of the 760H3800S and 760H4800S : holes of the profile at 10 19 28 37 51 60 69 243 252 261 275 284
+    // 293. Each hole of the catalogue has two more, 9 and 18 mm towards the front. A runner whose screws would meet the
+    // other face takes the last of them
     alternateStep760: 18,
     alternateKnown760: [28, 37, 69, 261, 293],   
     // Rear holes, 37 + offset, by nominal lenght group
@@ -102,13 +113,13 @@ export const MOVENTO = {
         { upTo: 600, offsets: [224, 256, 320] },
         { upTo: 750, offsets: [224, 256, 320, 416] },
     ],
-    // 760H 550/600 and every 766H show one more rear screw that the catalogue does not dimension
+    // 760H 550/600 and every 766H show one more rear screw that the catalogue doesn't dimension
     undimensionedRearHole(series: "760H" | "766H", nl: number): boolean
     {
         return series === "766H" || nl >= 550;
     },
     backHole: { diameter: 6, depth: 10, fromSide: 7, fromBottom: 11 },
-    // "concealed full extension" (Blum MOVENTO product information 2022, p. 18) : the stroke is not dimensioned
+    // "concealed full extension" (Blum MOVENTO product information 2022, p. 18) : the stroke isn't dimensioned
     // the box is taken out over its whole nominal lenght NL : the share of NL it travels
     extension: 1,
     maxLoad760: 40,
@@ -116,7 +127,7 @@ export const MOVENTO = {
 };
 
 
-// Blum KA-150 p. 44, 46, 48, and KH 205 to 600 with widths up to 1800 from the AVENTOS range table p. 23 of
+// Blum KA-150 p. 44, 46, 48 and KH 205 to 600 with widths up to 1800 from the AVENTOS range table p. 23 of
 // the Blum HK top brochure (2019)
 // https://www.hpponline.co.uk/DocumentHandler/2679093/blum-aventos-hk-top-brochure.pdf
 // power factor LF = KH (mm) x FG (kg) with the handle counted twice, ranges overlap
@@ -168,7 +179,9 @@ export const CONCEALED_SHELF_SUPPORT = {
     ref: "283.33.910",
     minThickness: 24,
     pinDiameter: 12,
-    pinDepth: 104,
+    // p. 7.142 dimensions 104 past its pocket of 12, the pin reaching 112 from the wall in the Häfele model : from the
+    // back edge of the shelf it takes 116
+    pinDepth: 116,
     pocket: { width: 70, height: 22, depth: 12 },
     plate: { width: 68, height: 20 },
     wallScrews: 2,
@@ -182,7 +195,9 @@ export const CONCEALED_SHELF_SUPPORT = {
 // Häfele U.K. 2018 p. 7.14 and 7.19 : Minifix 15, 19 mm board
 export const MINIFIX = {
     housingDiameter: 15,
-    housingDepth: 14.5,
+    // The 262.26.535 fills 14.5 in the Häfele model, sunk 0.4 under a round of edging
+    housingDepth: 15,
+    housingSink: 0.4,
     // Axis at half the thickness of the board, B from the butting edge
     distanceB: 34,
     boltPilot: 5,
@@ -216,3 +231,6 @@ export const HANDLING_LIMITS = [
 ];
 
 export const GRAVITY = 9.81;
+
+// The eyes of a person of 1.75 m, what a face is seen or hidden from
+export const EYE_LEVEL = 1700;

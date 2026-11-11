@@ -162,10 +162,17 @@ export const CAMAR_807_LOAD = 120;
 const ANTI_TIP = "Guide Furnica (vendeur), convention d'atelier : pas une donnée fabricant, référence au choix du distributeur";
 add({ id: "ANTI_TIP_BRACKET", family: "D60", label: "Équerre anti-basculement acier galvanisé 40 x 40 x 40, ép. 2 mm",
      brand: "", ref: "Générique", source: ANTI_TIP });
-add({ id: "SCREW_4x16", family: "D60", label: "Vis aggloméré 4 x 16, équerre dans le dessus du caisson", brand: "",
+add({ id: "SCREW_4x16", family: "D60", label: "Vis aggloméré 4 x 16", brand: "",
+     ref: "Générique", source: ANTI_TIP });// The seat of the AXILO plate stands 21 off the board in the Häfele
+     // Model : 14 left in the wood, 5 of skin on a 19 board
+add({ id: "SCREW_4x35", family: "D60", label: "Vis aggloméré 4 x 35, embase de pied AXILO", brand: "",
+     ref: "Générique", source: "Longueur déduite du modèle Häfele 637.76.333, marque non imposée" });
+add({ id: "WALL_SCREW_5x50", family: "D60", label: "Vis 5 x 50 tête fraisée, entre deux caissons ou noyée dans le bois",
+     brand: "",
      ref: "Générique", source: ANTI_TIP });
-add({ id: "WALL_SCREW_5x50", family: "D60", label: "Vis 5 x 50 dans le mur", brand: "", ref: "Générique",
-     source: ANTI_TIP });
+// The same length with a pan head : on the large washer of a back, in the straight slot of a shelf support plate
+add({ id: "WALL_SCREW_5x50_PAN", family: "D60", label: "Vis 5 x 50 tête cylindrique, au mur sur rondelle large ou "
+         + "dans la lumière d'une platine", brand: "", ref: "Générique", source: ANTI_TIP });
 // Slat walls : a 20 mm cleat before the 40 mm plug asks for a 70 mm screw, the slats are glued and pinned
 const SLATS = ("Convention d'atelier, pas une donnée fabricant, référence au choix du distributeur");
 add({ id: "WALL_SCREW_5x70", family: "D60", label: "Vis 5 x 70, liteau ou lisse dans le mur, le sol ou le plafond",
@@ -174,6 +181,8 @@ add({ id: "BRAD_1_6x40", family: "D60", label: "Pointe tête homme 1,6 x 40, lat
      ref: "Générique", source: SLATS });
 add({ id: "PLUG_NYLON_8x40", family: "D60", label: `Cheville nylon universelle ${DIAM}8 x 40, béton ou brique pleine`,
      brand: "", ref: "Générique", source: ANTI_TIP });
+add({ id: "PLUG_DUOPOWER_8x40", family: "D60", label: `Cheville fischer DuoPower ${DIAM}8 x 40, brique creuse`,
+     brand: "fischer", ref: "555008", source: "fischer DuoPower 8 x 40, boîte de 100, charge à lire sur sa fiche" });
 add({ id: "PLUG_AERATED", family: "D60", label: "Cheville hélicoïdale pour béton cellulaire", brand: "",
      ref: "Générique", source: ANTI_TIP });
 add({ id: "PLUG_HOLLOW_METAL", family: "D60",
@@ -216,8 +225,12 @@ add({ id: "892.12.906", family: "D80", label: "Range-chaussures, largeur réglab
 // LED : Loox 2017 survives as old stock and the Loox5 LED 3048 is marked discontinued by the one retailer
 // read on 2026-09-30, the strip, profile and driver stay generic, sized with the figures those sheets give
 const LED = "Générique, dimensionné d'après Häfele Loox (TCH Design 2017 p. 5.138, 5.149, 5.203), référence au choix du distributeur";
-add({ id: "LED_PROFILE_RECESS", family: "D81", label: "Profilé aluminium à encastrer, corps 18 x 8,5 mm, diffuseur opale",
+add({ id: "LED_PROFILE_RECESS", family: "D81",
+     label: "Profilé aluminium à encastrer, corps 18 x 8,5 mm, diffuseur opale",
      brand: "", ref: "Générique", source: LED, url: "https://assets.daro.com/HafeleLiterature/17D5-203.pdf" });
+add({ id: "LED_PROFILE_SURFACE", family: "D81", label: "Profilé aluminium en applique, 18 x 8,5 mm, diffuseur laiteux",
+     brand: "", ref: "Générique", source: "Générique, d'après Häfele Loox 833.72.840 (TCH Design 2017 p. 5.200), vissé sous le panneau",
+     url: "https://assets.daro.com/HafeleLiterature/17D5-200.pdf" });
 add({ id: "LED_STRIP_24V", family: "D81", label: "Ruban LED 24 V, 8 à 10 mm de large, en profilé aluminium", brand: "",
      ref: "Générique", source: LED, url: "https://www.homedecorhardware.com/hf-833-76-353.html" });
 add({ id: "LED_LEAD", family: "D81", label: "Cordon d'alimentation du ruban vers l'alimentation", brand: "",
@@ -246,8 +259,9 @@ add({ id: "9209218", family: "D31", label: "Kit 2 profilés SlideLine M h18 (ét
 
 
 // Connectors
-add({ id: "262.25.035", family: "D41", label: "Boîtier Minifix 15 avec bord, bois 19 mm", brand: "Häfele",
-     ref: "262.25.035", source: `${HAFELE_UK} p. 7.14`, url: "https://assets.daro.com/HafeleLiterature/18T7-14.pdf" });
+add({ id: "262.26.535", family: "D41", label: "Boîtier Minifix 15 sans bord, nickelé, sous pastille au décor",
+     brand: "Häfele",
+     ref: "262.26.535", source: `${HAFELE_UK} p. 7.14`, url: "https://assets.daro.com/HafeleLiterature/18T7-14.pdf" });
 add({ id: "262.28.020", family: "D41", label: `Goujon Minifix S100 B34, filet 8, avant-trou ${DIAM}5`, brand: "Häfele",
      ref: "262.28.020", source: `${HAFELE_UK} p. 7.19`, url: "https://assets.daro.com/HafeleLiterature/18T7-19.pdf" });
 for (const s of CONNECTING_SCREWS)
@@ -265,7 +279,18 @@ add({ id: "DOWEL_8x35", family: "D42", label: `Tourillon hêtre ${DIAM}8 x 35 ca
      ref: "Générique", source: "Article générique, sans référence fabricant" });
 // 16 mm of drawer box and 14 into a 19 mm front, 5 left befoe its face, or a 20 mm cleat and 10 into a side
 // What each one holds goes in the note of its line
-add({ id: "SCREW_4x30", family: "D41", label: "Vis aggloméré 4 x 30",  
+add({ id: "SCREW_4x30", family: "D41", label: "Vis aggloméré 4 x 30",
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
+add({ id: "SCREW_2.5x16", family: "D41", label: `Vis aggloméré tête fraisée 2,5 x 16 (DIN 7997:2008, tête ${DIAM}4,7), `
+         + `habillage de niche vissé sur lui-même dans des avant-trous ${DIAM}1,5`,
+     brand: "SPAX", ref: "TF PZ 2,5 x 16", source: "Référence trouvée chez Bricomarché (EAN 4003530000935), "
+         + "Ø2,5 pour ne pas fendre un chant de 8" });
+add({ id: "WASHER_5x20", family: "D60", label: "Rondelle large Ø5 x 20 acier zingué, sous la vis au mur",
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
+add({ id: "EDGE_CAP", family: "D60", label: `Cache-vis ${DIAM}14 découpé à l'emporte-pièce dans le chant ABS du décor, fil `
+         + "orienté comme le panneau : double face sur une vis à démonter, cyanoacrylate sinon",
+     brand: "", ref: "Atelier", source: "Taillé dans les chutes du chant posé, convention d'atelier" });
+add({ id: "GLUE_PU", family: "D41", label: "Colle polyuréthane à bois, faces mélaminées poncées",
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
 
 
@@ -287,17 +312,20 @@ export interface Foot
     height: number;
     min: number;
     max: number;
+    // Length L of the plain tube the plinth clip goes round, none under 80 where no clip fits
+    tube?: number;
 }
 
 
-// Load 150 kg per foot, adjustment under load limited to an 80 kg cabinet
+// Load 150 kg per foot, adjustment under load limited to an 80 kg cabinet. Ranges of Häfele CH 12.97 B (2021) and the
+// AXILO order sheet 732.01.681, the 351 to 70 and not 80, tubes of the fitting drawing 637.76.333-1
 export const AXILO_FEET: Foot[] = [
-    { ref: "637.76.351", height: 60, min: 53, max: 80 },
-    { ref: "637.76.352", height: 80, min: 70, max: 100 },
-    { ref: "637.76.353", height: 100, min: 90, max: 120 },
-    { ref: "637.76.354", height: 125, min: 115, max: 145 },
-    { ref: "637.76.355", height: 150, min: 140, max: 170 },
-    { ref: "637.76.356", height: 180, min: 170, max: 200 },
+    { ref: "637.76.351", height: 60, min: 53, max: 70 },
+    { ref: "637.76.352", height: 80, min: 70, max: 100, tube: 19 },
+    { ref: "637.76.353", height: 100, min: 90, max: 120, tube: 35 },
+    { ref: "637.76.354", height: 125, min: 115, max: 145, tube: 60 },
+    { ref: "637.76.355", height: 150, min: 140, max: 170, tube: 85 },
+    { ref: "637.76.356", height: 180, min: 170, max: 200, tube: 115 },
 ];
 export const AXILO_LOAD_PER_FOOT = 150;
 export const AXILO_ADJUST_MAX_CABINET = 80;
@@ -355,15 +383,27 @@ for (const h of BAR_HANDLES)
 }
 
 
-// INSPIRE Oslo edge pull at Leroy Merlin, EAN 3276007446920 : figures off its ADS Bricolage page, 17 Oct 2026
-// It sits astride the edge of the front, screwed from inside throught the tab it drops behind it
-export const EDGE_PULL = { ref: "84335807", length: 180, centres: 128, depth: 44, height: 18, massG: 35, screw: 16 };
+// INSPIRE Oslo edge pull, EAN 3276007446920 (ADS Bricolage page, 17 Oct 2026), screwed throught the tab behind the
+// front. Measured on a bought one : walls of 1, lip to 3 over its last 5, flat front 145, countersunk Ø4 x 16
+// screws, head Ø6.5 standing 0.9 to 1.2 over the tab
+export const EDGE_PULL = { ref: "84335807", length: 180, centres: 128, depth: 44, height: 18, massG: 35, screw: 16,
+                           wall: 1, tip: { length: 5, thickness: 3 }, flat: 145, headOver: 1.2 };
 add({ id: EDGE_PULL.ref, family: "D51", label: `Poignée Oslo aluminium laiton brossé, entraxe ${EDGE_PULL.centres}, `
      + `longueur ${EDGE_PULL.length}, posée sur le chant, vis de ${EDGE_PULL.screw} fournies`, brand: "INSPIRE",
      ref: EDGE_PULL.ref, source: "Leroy Merlin, cotes de la fiche ADS Bricolage de l'EAN 3276007446920 lue le "
-         + "17 octobre 2026" });
+         + "17 octobre 2026, vendue par lot de 2 (EAN 3276007458664) avec 4 vis à tête fraisée" });
 
 
+// The drop-down flap of the dresser : flap hinge and braking stays of the 2023 catalogue of Häfele Thailand, the
+// only one found with their drawings
+const HAFELE_TH = "Häfele Thaïlande, HTH Furniture Fittings 2023";
+const HAFELE_TH_URL = "https://hafelethailand.com/wp-content/uploads/2025/12/03-Hinges-and-Flap-Fittings.pdf";
+add({ id: "342.66.730", family: "D20", label: `Charnière d'abattant tombant 90°, cuvettes ${DIAM}35, réglage 3D, nickelée`,
+     brand: "Häfele", ref: "342.66.730", source: `${HAFELE_TH} p. 3.188`, url: HAFELE_TH_URL });
+add({ id: "365.55.695", family: "D22", label: "Compas d'abattant à frein STARSTOP, 2 bras, gauche, case de 556 mm mini",
+     brand: "Häfele", ref: "365.55.695", source: `${HAFELE_TH} p. 3.185`, url: HAFELE_TH_URL });
+add({ id: "365.55.685", family: "D22", label: "Compas d'abattant à frein STARSTOP, 2 bras, droit, case de 556 mm mini",
+     brand: "Häfele", ref: "365.55.685", source: `${HAFELE_TH} p. 3.185`, url: HAFELE_TH_URL });
 add({ id: "283.33.910", family: "D70", label: `Fixation invisible d'étagère à platine vissée, broche ${DIAM}12 x 112`,
      brand: "Häfele", ref: "283.33.910", source: `${HAFELE_UK} p. 7.142`,
      url: "https://assets.daro.com/HafeleLiterature/18T7-142.pdf" });

@@ -71,8 +71,8 @@ const OAK_EDGE = entry(ht(315.9 / 50), "m", `${JHS}, chant Decospan Querkus chê
 export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:H1180_ST37:19": entry(perSheet(143.36), "m2", "Houdard, 143,36 EUR HT le panneau 2800 x 2070, en stock"),
     "board:H1180_ST37:8": entry(ht(38.84), "m2", `${JHS}, 38,84 EUR TTC/m2 (225,12 le panneau), en stock`),
-    // Egger makes every thickness but its stocked one to order (decor availability guide 2020), no merchant
-    // shows a price for 16 : the 19 one stands in until a quote comes
+    // Egger stocks its boards in 19 only in France, the others to order and the synchronised pores from 24 boards
+    // (availability guide 2026), no merchant shows a price for 16 : the 19 one stands in until a quote comes
     "board:H1180_ST37:16": entry(perSheet(143.36), "m2", "Estimation au prix du 19 mm (Houdard, 143,36 EUR HT le "
                                  + "panneau) : 16 mm sur commande chez Egger, avec délai, sans prix public"),
     "board:CHENE_PLAQUE_AGGLO:39": entry(ht(79.57), "m2", "Barillet, Decospan replaqué chêne fil A/B 2800 x 2070 x 39 à "
@@ -80,12 +80,16 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:W1000_ST9:19": entry(ht(22.82), "m2", `${JHS}, 22,82 EUR TTC/m2 (132,26 le panneau), en stock`),
     "board:SNOW_WHITE_8685:8": entry(ht(22.98), "m2", `${JHS}, réf. 1001137234, 22,98 EUR TTC/m2 (133,22 le panneau `
                                      + "2800 x 2070), en stock", READ_ON_2),
+    "board:SNOW_WHITE_8685:16": entry(ht(26.12), "m2", `${JHS}, réf. 1001137235, 26,12 EUR TTC/m2, panneau 2800 x 2070, `
+                                      + "en stock, lu le 9 novembre 2026"),
     "board:U604_ST9:19": entry(perSheet(101.3), "m2", "Houdard, 101,30 EUR HT le panneau 2800 x 2070, en stock"),
     // By the whole board, its format in SOLID_STOCK
     "board:CHENE_MASSIF:20": entry(ht(29.9), "u", "Brico Dépôt, planche rabotée chêne massif 2000 x 140 x 20, "
                                    + "réf. 3663602861539, 29,90 EUR TTC la pièce", "2026-10-08"),
 
     "edge:W1000_ST9": entry(ht(1.77), "m", `${JHS}, chant ABS Egger W1000 ST9 23 x 0,8 à 1,77 EUR TTC/m`),
+    "edge:SNOW_WHITE_8685": entry(ht(1.77), "m", `${JHS}, chant ABS Egger W1000 ST9 23 x 0,8 à 1,77 EUR TTC/m, `
+                                  + "blanc le plus proche du 8685"),
     "edge:H1180_ST37": entry(ht(2.11), "m", `${JHS}, chant ABS Egger H1180 ST37 23 x 0,8 à 2,11 EUR TTC/m`),
     "edge:U604_ST9": entry(ht(1.77), "m", `${JHS}, chant ABS Egger U604 ST9 23 x 0,8 à 1,77 EUR TTC/m, en réassort`),
     "edge:CHENE_PLAQUE": OAK_EDGE,
@@ -95,6 +99,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:173H7100": entry(fromGbp(0.42), "u", "Interfit (UK), 0,42 GBP HT l'embase"),
     "hw:174H7100E": entry(fromGbp(0.57), "u", "Interfit (UK), 0,57 GBP HT l'embase nickelée", "2026-10-03"),
     "hw:760H4800S": entry(fromGbp(25.92), "u", "Interfit (UK), 25,92 GBP HT la paire"),
+    "hw:760H4500S": entry(fromGbp(28.79), "u", "Blum UK (blum.org.uk), 28,79 GBP la paire, lu le 8 novembre 2026"),
     "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière, lu le 2 octobre"),
     "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
     "hw:70T3550.TL": entry(fromGbp(1.33), "u", "Interfit (UK), 1,33 GBP HT la charnière sans ressort", READ_ON_2),
@@ -120,7 +125,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:637.76.333": entry(Math.round(0.67 / 1.21 * 1000) / 1000, "u",
                            "Monastil (Espagne), 0,67 EUR TTC l'embase avec 21 % de TVA, en stock", READ_ON_2),
 
-    "hw:262.25.035": entry(fromUsd(0.35), "u", "Home Decor Hardware (US), 0,35 USD HT le boîtier"),
+    "hw:262.26.535": entry(fromUsd(0.35), "u", "Prix du 262.25.035 avec bord, Home Decor Hardware (US), 0,35 USD HT le boîtier"),
     "hw:267.07.902": entry(fromUsd(0.76), "u", "Home Decor Hardware (US), 0,76 USD HT la vis de liaison", "2026-10-03"),
     "hw:267.07.903": entry(fromUsd(0.87), "u", "Home Decor Hardware (US), 0,87 USD HT la vis de liaison", "2026-10-03"),
     "hw:262.28.020": entry(fromUsd(0.44), "u", "Home Decor Hardware (US), 0,44 USD HT le 262.28.026, "
@@ -131,12 +136,16 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     ...handlePrices([["100.45.120", 1.5], ["100.45.121", 1.57], ["100.45.122", 1.73], ["100.45.123", 1.97],
                      ["100.45.124", 2.25], ["100.45.125", 2.41], ["100.45.126", 2.76], ["100.45.127", 2.91],
                      ["100.45.128", 3.15]]),
-    "hw:84335807": entry(ht(4.99), "u", "Leroy Merlin et ADS Bricolage, poignée Oslo 128 laiton brossé à 4,99 EUR TTC, "
-                         + "vis fournies", "2026-10-17"),
+    // Receipt, Leroy Merlin Mundolsheim : the lot of 2 at 10.90 and 0.07 of eco-contribution
+    "hw:84335807": entry(ht((10.9 + 0.07) / 2), "u", "Leroy Merlin, lot de 2 poignées Oslo laiton brossé mat 180 mm, "
+                         + "EAN 3276007458664, 10,90 EUR TTC et 0,07 d'éco-participation (ticket du 9 novembre 2026), "
+                         + "4 vis fournies", "2026-11-09", 2),
 
     // Generic LED parts read at Ledkia, one of each per lit cell : a 2 m profile, a 5 m reel, one lead
     "hw:LED_PROFILE_RECESS": entry(ht(6.99), "u", "Estimation : Ledkia, profilé encastré Lithos H12 2 m avec diffuseur "
                                   + "à 6,99 EUR TTC, son corps à vérifier contre la rainure 18 x 8,5", READ_ON_2),
+    "hw:LED_PROFILE_SURFACE": entry(ht(6.99), "u", "Prix du profilé encastré repris, celui de l'applique Loox 833.72.840 "
+                                    + "non relevé", "2026-11-08"),
     "hw:LED_STRIP_24V": entry(ht(6.49), "u", "Ledkia, ruban 24 V 8 mm coupe 5 cm, 12 W/m, bobine de 5 m à 6,49 EUR TTC",
                               READ_ON_2),
     "hw:LED_LEAD": entry(ht(1.11), "u", "Ledkia, connecteur câblé pour ruban 8 mm à 1,11 EUR TTC", READ_ON_2),
@@ -151,10 +160,25 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                                 READ_ON, 20),
     "hw:SCREW_4x16": entry(ht(8.09 / 200), "u", "Brico Dépôt, boîte de 200 vis fischer 4 x 16 à 8,09 EUR TTC", READ_ON,
                            200),
+    // No price read for this length : the 4 x 30 of the same box, to be replaced
+    "hw:SCREW_2.5x16": entry(ht(13.5 / 300), "u", "Prix de la boîte de 4 x 30 : SPAX tête fraisée PZ 2,5 x 16, boîte de "
+                             + "100 (EAN 4003530000935, Bricomarché), prix non relevé", "2026-11-09", 300),
+    "hw:SCREW_4x35": entry(ht(13.5 / 300), "u", "Prix de la boîte de 4 x 30, longueur 35 non relevée", "2026-10-03",
+                           300),
     "hw:SCREW_4x30": entry(ht(13.5 / 300), "u", "Brico Dépôt, boîte de 300 vis fischer PowerFast II 4 x 30 à 13,50 EUR TTC",
                            "2026-10-03", 300),
     "hw:WALL_SCREW_5x50": entry(ht(34.9 / 500), "u", "Brico Dépôt, boîte de 500 vis fischer 5 x 50 à 34,90 EUR TTC",
                                 READ_ON, 500),
+    "hw:WALL_SCREW_5x50_PAN": entry(ht(34.9 / 500), "u", "Prix de la boîte de 500 vis fischer 5 x 50 de Brico Dépôt, "
+                                    + "tête cylindrique non relevée", "2026-11-09", 500),
+    "hw:PLUG_DUOPOWER_8x40": entry(ht(8.52 / 100), "u",
+                                   "Boîte de 100 à 8,52 EUR relevée sur un comparateur, sans date ni "
+        + "vendeur : prix indicatif", "2026-11-04", 100),
+    "hw:WASHER_5x20": entry(ht(1.59 / 10), "u", "Castorama, lot de 10 rondelles plates Ø5 à 1,59 EUR TTC, le format large n'a "
+        + "pas été trouvé : prix indicatif", "2026-11-04", 10),
+    "hw:EDGE_CAP": entry(0, "u", "Taillé dans les chutes du chant déjà acheté, sans achat à part"),
+    "hw:GLUE_PU": entry(ht(38.87), "u", "Castorama, colle polyuréthane Bostik PU 505, pot de 1 kg à 38,87 EUR TTC, lu dans "
+        + "un résultat de recherche", "2026-11-04", 1),
 
     // No workshop seen publishes its sawing and banding apart from the board : Houdard, SM Bois, Leroy Merlin
     // Design ADF, Fouchard, tosize and Mauris quote them or fold them into a price per m2

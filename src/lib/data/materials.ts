@@ -25,12 +25,10 @@ export interface BoardMaterial
 }
 
 
-// Egger Eurospan E1 P2 datasheet rec 107 (2023-07-26) : density "specific to plant" +-10 %
-// building physics based on 600 kg/m3, 13-20 mm MOE 1600 and MOR 11
+// Egger Eurospan E1 P2 datasheet rec 107 (2023-07-26) : density +-10 %, 600 kg/m3, 13-20 mm MOE 1600 and MOR 11
 // https://panelco.com/wp-content/uploads/2025/10/Technical_Datasheet_Eurospan_E1_P2.pdf
-// Hettich SlideLine M brochure (2017) plans door weights with 700 kg/m3 for particleboard
-// TODO kdef and kmod : COFORD Handbook for Eurocode 5 tables D.7 and D.5 give 2.25 and 0.65 for P4/P5, P2 is not
-// listed and its own creep is unknown
+// Hettich SlideLine M brochure (2017) plans door weights with 700 kg/m3
+// TODO kdef and kmod : COFORD tables D.7 and D.5 give 2.25 and 0.65 for P4/P5, P2 isn't listed
 export const PARTICLEBOARD: BoardMaterial = {
     id: "p2",
     label: "Panneau de particules mélaminé P2",
@@ -41,7 +39,8 @@ export const PARTICLEBOARD: BoardMaterial = {
     strength: 11,
     kdef: 2.25,
     kmod: 0.65,
-    thicknesses: [8, 19],
+    // 16 : the Snow White 8685 of Jean Hue & Socoda, ref. 1001137235, in stock (read on 2026-11-09)
+    thicknesses: [8, 16, 19],
     source: "Egger Eurospan E1 P2 rec. 107, Hettich SlideLine M 2017, kdef et kmod repris de P4/P5 car P2 "
         + "n'est pas listé par EN 1995-1-1:2004 (via COFORD)",
 };
@@ -63,7 +62,7 @@ export const MDF: BoardMaterial = {
     source: "Isoroy MEDIUM fiche technique 2014, Hettich SlideLine M 2017, EN 1995-1-1:2004 tab. 3.2 via COFORD",
 };
 
-// Minimum radius form distributors only, the Medite datasheet was not found : 6 mm ~150, 9 mm ~200
+// Minimum radius form distributors only, the Medite datasheet wasn't found : 6 mm ~150, 9 mm ~200
 // https://mdfdirect.co.uk/ufaq/what-is-the-minimum-bending-radius-for-flexible-mdf/
 // TODO density, modulus and strength are the standard MDF ones : no flexible MDF datasheet found yet
 export const MDF_FLEX: BoardMaterial = {
@@ -146,8 +145,8 @@ export const CHIPBOARD_VENEER: BoardMaterial = {
 };
 
 
-// AGC Planibel data sheet 01/2023, EN 572-1 : 2500 kg/m3, E 70 000 N/mm2, glass does not creep. Its strength is
-// the annealed characteristic one, never used as a design value : the glass design standard was not read, the glazier
+// AGC Planibel data sheet 01/2023, EN 572-1 : 2500 kg/m3, E 70 000 N/mm2, glass doesn't creep. Its strength is
+// the annealed characteristic one, never used as a design value : the glass design standard wasn't read, the glazier
 // checks loads
 // https://www.agc-yourglass.com/sites/default/files/2023-01/TDS_Planibel_0123_EN.pdf
 export const GLASS: BoardMaterial = {
@@ -176,7 +175,7 @@ export const MATERIALS: Record<string, BoardMaterial> = {
     [GLASS.id]: GLASS,
 };
 
-// Thicknesses offered for carcasses, shelves and wall shelves, the analysis tells when a material is not
+// Thicknesses offered for carcasses, shelves and wall shelves, the analysis tells when a material isn't
 // verifed in one of them
 export const BOARD_THICKNESSES = [16, 19, 22];
 
@@ -197,6 +196,9 @@ export interface Decor
     references?: string;
     url?: string;
     edge?: string;
+    // Thickness of that edge banding in mm, read off its reference : absent when the reference doesn't say it, the
+    // cut sizes then left to the cabinet maker
+    edgeThickness?: number;
     // A product sold in one thickness only, a glass shelf, whatever the carcass is made of
     thickness?: number;
 }
@@ -231,6 +233,7 @@ export const DECORS: Decor[] = [
         colourSource: "Mesuré sur la photo de l'échantillon (éclairage intérieur)",
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/H1180_37",
         edge: "Chant ABS H1180 ST37 23x0,8 (Jean Hue Socoda)",
+        edgeThickness: 0.8,
     },
     {
         id: "U604_ST9",
@@ -244,8 +247,9 @@ export const DECORS: Decor[] = [
         references: "NCS S5010-G30Y, RAL 7033, Pantone 5635U",
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/U604_9?country=FR",
         edge: "Chant ABS U604 ST9 23x0,8 (Jean Hue Socoda)",
+        edgeThickness: 0.8,
     },
-    // Asked by Thomas D. at Colmar for a softer green and a lighter oak, read on egger.com on 2026-10-08 : the colours
+    // A softer green and a lighter oak, read on egger.com on 2026-10-08 : the colours
     // are the mean of Egger's decor picture, no French merchant price found yet
     {
         id: "U638_ST9",
@@ -300,7 +304,7 @@ export const DECORS: Decor[] = [
         url: "https://www.egger.com/fr/mobilier-agencement-interieur/decors/W1000_9?country=FR",
     },
     {
-        // The cheap white of the backs : 8 mm in stock where the W1000 is not, its maker not named by the merchant
+        // The cheap white of the backs : 8 mm in stock where the W1000 isn't, its maker not named by the merchant
         id: "SNOW_WHITE_8685",
         label: "Blanc basique",
         brand: "Jean Hue & Socoda",
@@ -312,6 +316,9 @@ export const DECORS: Decor[] = [
         references: "Décor 8685 Snow White, attribué à Kronospan par des revendeurs (non vérifié)",
         url: "https://www.jeanhue-socoda.fr/melamine/melamines-decoratifs/melamine-decoratif-les-basiques/"
             + "agglomere-melamine-les-essentiels-snow-white-8685-bs-2800x2070mm-08mm",
+        // No 8685 banding found at the merchant : the closest white it stocks, on the boxes inside the drawers only
+        edge: "Chant ABS Egger W1000 ST9 23x0,8 (Jean Hue Socoda), blanc le plus proche en stock, aucun chant 8685 trouvé",
+        edgeThickness: 0.8,
     },
     {
         id: "CHENE_MASSIF",

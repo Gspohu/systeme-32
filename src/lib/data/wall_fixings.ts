@@ -1,8 +1,7 @@
 // What a wall takes, as the plug makers state it : ever figure holds its source
 
-// NF DTU 25.41 as fischer quotes it in its DuoTec datasheet of 07/06/2017, p. 3 : up to 10 daN straight into the
-// board, 10 to 30 daN with 40 cm between plugs, past 30 daN a reinforcement that holds the load, an overturning
-// moment of 30 daN.m at most for a local load and 15 daN.m per metre for a running one (kitchen units)
+// NF DTU 25.41 per fischer DuoTec datasheet 07/06/2017 p. 3 : 10 daN straight in the board, 10 to 30 with plugs
+// 40 cm apart, past 30 a reinforcement. Overturning moment 30 daN.m local, 15 daN.m per metre running
 // https://medias.descours-cabaud.com/d180001/medias/docus/274/2017.06.07-DuoTec_fiche%20technique-V1.pdf
 export const PLASTERBOARD_LIMITS = {
     directUpTo: 10,
@@ -11,6 +10,16 @@ export const PLASTERBOARD_LIMITS = {
     momentLocal: 30,
     momentRunning: 15,
     source: "fiche fischer DuoTec 2017 p. 3",
+};
+
+
+// No load for a DuoPower 8 x 40 in hollow brick : ETA-22/0512 covers concrete only, an older fischer table gives
+// 0.20 kN in brick Hlz 12, resellers 12 daN. A yardstick for the cabinet maker, not an allowed load
+// https://fischer-international.com/en/products/standard-fixings/plastic-fixings/duopower-eta/564789-duopower-eta-8-x-40-fpf-ii
+export const HOLLOW_BRICK_YARDSTICK = {
+    low: 12,
+    high: 20,
+    source: "fischer DuoPower 8 x 40 : 0,20 kN en brique perforée Hlz 12 (ancienne table), ETA-22/0512 limitée au béton",
 };
 
 
