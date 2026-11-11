@@ -57,4 +57,10 @@ export interface CellLight
     wifi?: boolean;
     // Let into the underside of the carcass bottom, below a cell standing on it : it lights what is under the box
     under?: boolean;
+    // Its lead goes on from the end of the profile through the left side of the carcass and of the one beside it, to
+    // the driver and the controller screwed to the back of that one
+    leadThrough?: "left";
+    // A strip profile let into a groove of the panel over it. Screwed on its face by default : a groove weakens the
+    // board, 10.5 mm left over a 1.56 m span on the dresser niche
+    recess?: boolean;
 }

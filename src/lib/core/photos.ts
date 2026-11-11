@@ -84,7 +84,7 @@ export function photoMime(file: string): string
 }
 
 
-// Only the photos a decor still points at leave with the project, a removed one is not carried along
+// Only the photos a decor still points at leave with the project, a removed one isn't carried along
 export function usedPhotos(p: Project, all: Map<string, Uint8Array>): Map<string, Uint8Array>
 {
     const kept = new Map<string, Uint8Array>();

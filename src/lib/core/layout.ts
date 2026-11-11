@@ -44,6 +44,7 @@ export interface DividerBox extends Rect
     kind: DividerKind;
     finish: Finish | null;
     setback: number | null;
+    note: string | null;
 }
 
 
@@ -78,7 +79,7 @@ export function innerDepthStart(back: BackMount): number
 
 // A shelf has its own thickness, else the one of the carcass shelves, else the one of the sides
 // an upright always stay as thick as the sides
-// TODO an upright of its own thickness is not offered yet
+// TODO an upright of its own thickness isn't offered yet
 export function dividerThickness(c: Carcass, axis: "h" | "v", own: number | null): number
 {
     if (axis === "v")
@@ -101,10 +102,17 @@ export function frontSetback(d: { axis: "h" | "v"; kind: DividerKind; setback: n
 }
 
 
+// What is glued under the top : never under a sloped one, a flat board doesn't follow it
+export function topDoubling(c: Carcass): number
+{
+    return c.slope === null ? c.doubledTop ?? 0 : 0;
+}
+
+
 export function resolveLayout(c: Carcass): ResolvedLayout
 {
     const t = c.thickness;
-    const inner: Rect = { x: t, y: t, w: c.width - 2 * t, h: c.height - 2 * t };
+    const inner: Rect = { x: t, y: t, w: c.width - 2 * t, h: c.height - 2 * t - topDoubling(c) };
     const out: ResolvedLayout = {
         inner,
         zBack: innerDepthStart(c.back),
@@ -207,11 +215,13 @@ function childSpans(node: SplitNode, r: Rect, thick: number[], out: ResolvedLayo
         spans.push({ start: cursor, end: start });
         const finish = node.finishes[k] ?? null;
         const setback = node.setbacks[k] ?? null;
+        const note = node.notes?.[k] ?? null;
         const t = thick[k]!;
         const d: DividerBox = node.axis === "h"
             ? { id: `${node.id}:${k}`, split: node.id, index: k, axis: "h", kind: node.dividers[k] ?? "fixed",
-               finish, setback, x: r.x, y: start, w: r.w, h: t }
-            : { id: `${node.id}:${k}`, split: node.id, index: k, axis: "v", kind: "fixed", finish, setback, x: start,
+               finish, setback, note, x: r.x, y: start, w: r.w, h: t }
+            : { id: `${node.id}:${k}`, split: node.id, index: k, axis: "v", kind: "fixed", finish, setback, note,
+               x: start,
                y: r.y, w: t, h: r.h };
         out.dividers.push(d);
         cursor = start + t;   

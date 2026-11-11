@@ -5,6 +5,7 @@ import { boxToRoom, roomBox, sideWallDepth } from "../room";
 import { OBSTACLE_LABELS, obstacleBox } from "../obstacles";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth } from "./display";
 import { heading, table, type Draft } from "./draft";
+import { round1 } from "../text";
 
 type ToPage = (value: number) => number;
 
@@ -24,7 +25,7 @@ export function roomPlan(p: Project): Draft
     });
     const left = sideWallDepth(room, "left");
     const right = sideWallDepth(room, "right");
-    // An alcove is drawn as deep as it and the items reach, the room past it is not measured
+    // An alcove is drawn as deep as it and the items reach, the room past it isn't measured
     let shown = room.depth;
     if (room.returns !== undefined)
     {
@@ -142,7 +143,7 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
 {
     const xs = [...new Set(at.map((v) =>
     {
-        return Math.round(v);
+        return Math.round(v * 10) / 10;
     }))].sort((p, q) =>
     {
         return p - q;
@@ -152,7 +153,7 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
     const segs = xs.slice(1).map((x, i) =>
     {
         const [p, q] = [page(xs[i]!), page(x)];
-        const label = `${x - xs[i]!}`;
+        const label = round1(x - xs[i]!);
         return { p: Math.min(p, q), q: Math.max(p, q), label, fits: textWidth(label, size) + 1 <= Math.abs(q - p) };
     });
     // A figure longer than its segment steps away frm the line, outwards, to the first level where it overlaps

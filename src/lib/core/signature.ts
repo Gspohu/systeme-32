@@ -1,4 +1,4 @@
-// Whether two parts are one workpiece : board, size, outline, machining, and the hand of a part no mirror repeats
+// Whether 2 parts are one workpiece : board, size, outline, machining and the hand of a part no mirror repeats
 
 import type { Part } from "./parts";
 import { rectOutline } from "./geometry";

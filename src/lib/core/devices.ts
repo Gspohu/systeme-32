@@ -5,7 +5,7 @@ import type { Build } from "./part_types";
 import type { Check } from "./check";
 import { boxesMeet, roomBox, wallBox, type Box3 } from "./room";
 
-// An appliance set by hand sits within a millimetre of where it is drawn
+// An appliance set by hand sits within a millimetre of where it's drawn
 const TOL = 1;
 
 

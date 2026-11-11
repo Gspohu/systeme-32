@@ -6,7 +6,7 @@ import { sideWallDepth } from "./room";
 import { newId } from "./factory";
 import { CommandError, edit } from "./edit";
 
-// Starting values of a sofa until it is measured, its seat at the usual 450 of a dining chair as well
+// Starting values of a sofa until it's measured, its seat at the usual 450 of a dining chair as well
 // TODO a catalogue of the sofas they own would replace these, only the 1880 of the TV room's one is known
 export const SOFA_START = { width: 2000, depth: 900, height: 800, seat: 450 };
 // The 806 lm a lamp must give to claim a 60 W equivalent (Regulation EC 244/2009), as EPREL sheets still list it

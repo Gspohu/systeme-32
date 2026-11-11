@@ -1,4 +1,4 @@
-// A screen on a full motion arm : the places it takes, the way between them, and what the arm and the wall must carry
+// A screen on a full motion arm : the places it takes, the way between them and what the arm and the wall must carry
 
 import type { Project, Screen } from "./model";
 import type { Check } from "./check";
@@ -11,7 +11,7 @@ const G = 9.81;
 const PATH_STEPS = 40;
 
 // Where the arm holds the screen : the centre of the set in the front view, its front plane at the centre and how
-// far it is turned in degrees, positive to face the right of the room
+// far it's turned in degrees, positive to face the right of the room
 export interface ScreenSpot
 {
     label: string;
@@ -24,7 +24,7 @@ export interface ScreenSpot
 type Pt = [number, number];
 
 
-// A screen as read from a file or typed in : numbers a drawing can use, the sheet of an arm at zero until it is read
+// A screen as read from a file or typed in : numbers a drawing can use, the sheet of an arm at zero until it's read
 export function screenIsSound(raw: unknown): boolean
 {
     const positive = (v: unknown): boolean =>
@@ -125,7 +125,7 @@ function overlaps(corners: Pt[], box: { x0: number; z0: number; x1: number; z1: 
         };
         const [a0, a1] = project(corners);
         const [b0, b1] = project(boxCorners);
-        // Half a millimetre of play : touching faces are not a clash
+        // Half a millimetre of play : touching faces aren't a clash
         const slack = 0.5 * Math.hypot(ax, az);
         if (a1 <= b0 + slack || b1 <= a0 + slack)
         {
@@ -279,7 +279,7 @@ export function armChecks(p: Project): Check[]
     const { h, d } = screenSize(sc);
     // A full motion arm turns about its plate : its reach is read as the distance from the plate centre to the back
     // of the screen in plan, which the maker gives straight out from the wall
-    // TODO a two link arm cannot fold to its minimum at an angle, only straight out : read the drawing of the notice
+    // TODO a 2 link arm can't fold to its minimum at an angle, only straight out : read the drawing of the notice
     for (const spot of screenSpots(sc))
     {
         const back = spot.z - d;
