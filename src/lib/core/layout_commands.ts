@@ -116,6 +116,7 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
             parent.finishes.splice(k, 0, null);
             parent.thicknesses.splice(k, 0, null);
             parent.setbacks.splice(k, 0, null);
+            parent.notes?.splice(k, 0, null);
             parent.children.splice(k + 1, 0, fresh);
         }
         else
@@ -189,6 +190,7 @@ export function removeDivider(p: Project, carcassId: string, splitId: string, in
         sp.finishes.splice(index, 1);
         sp.thicknesses.splice(index, 1);
         sp.setbacks.splice(index, 1);
+        sp.notes?.splice(index, 1);
         sp.children.splice(index + 1, 1);
         if (sp.children.length === 1)
         {
@@ -255,7 +257,7 @@ export function distributeEvenly(p: Project, carcassId: string, splitId: string)
         const c = carcassOf(q, carcassId);
         const sp = findNode(c.root, splitId);
         const nb = resolveLayout(c).nodes.get(splitId);
-        if (sp === null || sp.kind !== "split" || nb === undefined)
+        if (sp === null || sp.kind !== "split" || nb === undefined || sp.children.length === 0)
         {
             throw new CommandError("Choisir une zone recoupée par des tablettes ou des montants.");
         }
@@ -419,7 +421,7 @@ export function setDividerThickness(p: Project, carcassId: string, splitId: stri
         }
         sp.thicknesses[index] = thickness;
         // A thicker shelf eats into the cell above it
-        // TODO it is refused when that cell gets too small, pushing the shelves above up could be the beter answer
+        // TODO it's refused when that cell gets too small, pushing the shelves above up could be the beter answer
         const errors = resolveLayout(c).errors;
         if (errors.length > 0)
         {

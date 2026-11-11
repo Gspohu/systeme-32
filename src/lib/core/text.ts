@@ -6,7 +6,7 @@ export { CUBED, DIAM } from "../data/glyphs";
 // A dimension to the tenth of a millimetre, the one way the plans, the cut list and the PBS wirte a part
 export function round1(v: number): string
 {
-    return (Math.round(v * 10) / 10).toString();
+    return (Math.round(v * 10) / 10).toString().replace(".", ",");
 }
 
 

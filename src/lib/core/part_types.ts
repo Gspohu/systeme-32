@@ -6,24 +6,24 @@ import type { Frame, Outline, Vec3 } from "./geometry";
 
 export type Edge = "u0" | "u1" | "v0" | "v1";
 
-// What a hardware line, a hole or a fitted volume is there for, read instead of its reference, label or note
+// What a hardware line, a hole or a fitted volume is there for : never guessed from its reference, label or note
 export const PURPOSES = [
     "minifix-housing", "minifix-bolt", "minifix-passage", "dowel", "clamex", "clamex-access", "link-screw",
     "hinge", "hinge-cup", "system-plate", "plate-dowel", "screwed-plate", "plate-screw", "cup-screw",
-    "push-latch", "push-adapter", "adapter-screw", "catch-plate", "flap", "flap-screw", "sliding",
+    "push-latch", "push-adapter", "adapter-screw", "catch-plate", "flap", "flap-screw", "flap-hinge", "sliding",
     "handle", "handle-screw", "screw-passage",
-    "runner", "runner-screw", "runner-hook", "runner-coupling", "front-screw",
+    "runner", "runner-screw", "runner-hook", "runner-coupling", "front-screw", "shelf-lug",
     "foot", "foot-pad", "foot-mount", "foot-mount-screw", "plinth-clip", "vent-grill", "wall-hanger",
-    "anti-tip", "anti-tip-screw", "wall-fixing", "wall-screw", "cleat-screw",
+    "anti-tip", "anti-tip-screw", "wall-fixing", "wall-screw", "cleat-screw", "spacer-screw", "screw-cap",
     "shelf-support", "shelf-pin", "pin-spare", "shelf-bracket", "rail", "rail-screw", "shoe-rack", "light", "light-lead",
-    "spot", "ladder", "slat-nail",
+    "spot", "ladder", "slat-nail", "doubler-glue", "doubler-screw", "back-screw", "lining-screw", "lining-pilot", "plinth-screw",
 ] as const;
 export type Purpose = (typeof PURPOSES)[number];
 
 
 export interface Hole
 {
-    // Part coordinates of the axis, and the face or edge it is drilled from
+    // Part coordinates of the axis, and the face or edge it's drilled from
     u: number;
     v: number;
     // 0 marks a screw position without pre-drilling
@@ -34,8 +34,10 @@ export interface Hole
     w?: number;
     label: string;
     purpose: Purpose;
-    // Catalogue reference of the article this hole holds, matched against the fitted volumes it is drawn with
+    // Catalogue reference of the article this hole holds, matched against the fitted volumes it's drawn with
     fixes?: string;
+    // Diameter on the face of a 90 degree countersink for a head on the wood
+    countersink?: number;
 }
 
 
@@ -70,7 +72,8 @@ export type PartRole =
     | "side" | "top" | "bottom" | "back" | "hdivider" | "vdivider" | "shelf" | "plinth"
     | "door" | "drawerFront" | "leaf" | "flap"
     | "boxSide" | "boxEnd" | "boxBottom"
-    | "lining" | "endPanel" | "former" | "skin" | "batten" | "flange" | "wallShelf" | "slat" | "cleat" | "filler" | "panel";
+    | "lining" | "endPanel" | "former" | "skin" | "batten" | "flange" | "wallShelf" | "slat" | "cleat" | "filler" | "panel"
+    | "stiffener";
 
 
 export interface Part
@@ -89,8 +92,9 @@ export interface Part
     grain: boolean;
     quantity: number;
     edges: Edge[];
+    // Added to its width at the saw, its edge against a wall or a ceiling planed to fit on site
+    scribe?: number;
     outline: Outline;
-    // Openings cut through the board, inside the outline
     cutouts: Outline[];
     // face A is at w = 0 and drilling goes along +n
     frame: Frame | null;
@@ -143,6 +147,10 @@ export interface Joint
     edgeFrom: number;
     // True when the edge part coordinate runs opposite to the face part coordinate
     reversed: boolean;
+    // Face of the edge part its connector housings go in, A when not told
+    housingFace?: "A" | "B";
+    // In plain sight : glued dowels alone, whatever the joinery of the carcass
+    dowelsOnly?: boolean;
 }
 
 export interface HardwareLine
@@ -176,7 +184,6 @@ export interface Build
     midLoads: Map<string, number>;
     // Tube lengths to cut, packed into bars over the whole project once every item is built
     railCuts: { item: string; itemName: string; length: number }[];
-    // hardware as volumes, for the 3D view, the clash checks and the drawings
     fitted: Fitted[];
     motions: Motion[];
     // Bar handles as the front view draws them : the bar from end to end, in the plane of the façades of its carcass
@@ -184,8 +191,9 @@ export interface Build
     // Pictures pasted on cell backs, in the frame of their wall : lower left corner, the face it lies on, its size
     prints: { item: string; cell: string; file: string; x: number; y: number; z: number; w: number; h: number }[];
     // Socket holes as the front views draw them, in the frame of their carcass : a hole in a shelf seen edge on
+    // `board` and `centre` in the frame of the wall tell what stands against the hole, `reach` its half size
     outlets: { item: string; id: string; shape: "round" | "rect"; x: number; y: number; w: number; h: number;
-               edgeOn: boolean; hidden: boolean }[];
+               edgeOn: boolean; hidden: boolean; board: string; centre: Vec3; reach: number }[];
 }
 
 
@@ -203,6 +211,8 @@ export interface Motion
     parts: string[];
     fitted: string[];
     rides: string[];
+    // The front that has to be open first, a pull-out behind a drop-down flap : checked against it open
+    after?: string;
     // The hardware that sets the movement, quoted in the message of a clash, and what to do then
     source: string;
     remedy: string;
@@ -225,7 +235,7 @@ export interface Fitted
     centre: Vec3;
     axes: [Vec3, Vec3, Vec3];
     half: Vec3;
-    // The part it is let into, never counted as clashing with it
+    // The part it's let into, never counted as clashing with it
     host: string | null;
     // Inside a closed carcass : drawn in 3D only when the hardware is asked for
     hidden: boolean;

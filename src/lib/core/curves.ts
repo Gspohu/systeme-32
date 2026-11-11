@@ -3,10 +3,13 @@
 import type { Battens, Carcass, CurveTechnique, End, RoundCorner } from "./model";
 import type { ResolvedLayout } from "./layout";
 import type { Build, Part } from "./part_types";
-import { baseHeight, newPart } from "./part_base";
-import { type Outline, type Segment, type Vec3, X, Y, Z, bounds, insidePolygon, neg, tessellate } from "./geometry";
+import { baseHeight, newPart, PLINTH_FOOT_GAP } from "./part_base";
+import { byId } from "./edit";
+import { type Outline, type Segment, type Vec3, X, Y, Z, at, bounds, insidePolygon, neg, tessellate } from "./geometry";
 import { endReach, usableDepth } from "./extent";
 import { FLEX_MIN_RADIUS } from "../data/materials";
+import { spread } from "./fittings";
+import { DIAM } from "./text";
 
 
 // Workshop conventions : one former every 400 mm of height, solid profiles only for small radii
@@ -160,7 +163,7 @@ export function basketHandle(a: number, b: number, cy: number): Segment[]
 
 
 // The floor board of an open end on a plinth, kept off the toes : from the side in line with the plinth face, a
-// quarter round set back as much, or a basket handle out to the back on a quarter round. Null when it is cut like the
+// quarter round set back as much, or a basket handle out to the back on a quarter round. Null when it's cut like the
 // boards above
 export function floorOutline(c: Carcass, side: "left" | "right"): Outline | null
 {
@@ -274,6 +277,54 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
         }
     }
     return { u: rho * Math.cos(phi), v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
+}
+
+
+// A plinth beside a low end panel on the floor comes down to it, 2 mm off : with the 3 under the mounting plate, the 5
+// at the bottom of Häfele's range of foot height less plinth height
+const PLINTH_FOOT_GAP_GROUNDED = 2;
+
+export function plinthFootGap(c: Carcass): number
+{
+    const down = (["left", "right"] as const).some((side) =>
+    {
+        const end = c.ends[side];
+        return end.type === "rounded" && endDrop(c, end) > 0;
+    });
+    return down ? PLINTH_FOOT_GAP_GROUNDED : PLINTH_FOOT_GAP;
+}
+
+
+// The side stops over the plinth, the low board of an open end on the floor : the return of the plinth stands against
+// its edge, 2 screws from inside the plinth into it. Workshop conventions
+const RETURN_SCREWS = { count: 2, end: 40, label: "Retour de plinthe dans la flasque basse : vis 5 x 50" };
+
+function plinthReturnScrews(c: Carcass, side: "left" | "right", b: Build, title: string): void
+{
+    const ret = byId(b.parts, `${c.id}/plinth/${side}`);
+    const floor = byId(b.parts, `${c.id}/end/${side}/Flasque basse`);
+    if (floor === undefined)
+    {
+        return;
+    }
+    if (ret === undefined || ret.frame === null)
+    {
+        b.errors.push(`${c.name}, ${title.toLowerCase()} : la flasque basse se visse sur le retour de plinthe, `
+            + "qui manque de ce côté. Ajouter le retour de plinthe.");
+        return;
+    }
+    // On the middle of the low board, in the depth both share, the heads inside the plinth
+    const level = at(floor.frame!, 0, 0, floor.thickness / 2)[1] - ret.frame.o[1];
+    const zs = [at(floor.frame!, 0, 0, 0)[2], at(floor.frame!, 0, floor.width, 0)[2], ret.frame.o[2],
+                ret.frame.o[2] - ret.length].sort((p, q) => { return p - q; });
+    const inner = ret.frame.n[0] * (side === "right" ? 1 : -1) > 0 ? "A" : "B";
+    for (const s of spread(zs[2]! - zs[1]!, RETURN_SCREWS.end, Infinity))
+    {
+        ret.holes.push({ u: ret.frame.o[2] - (zs[1]! + s), v: level, diameter: 0, depth: 0, face: inner,
+                         label: RETURN_SCREWS.label, purpose: "plinth-screw" });
+    }
+    b.hardware.push({ ref: "WALL_SCREW_5x50", qty: RETURN_SCREWS.count, item: c.id, itemName: c.name, target: ret.id,
+                      note: "retour de plinthe dans la flasque basse", purpose: "plinth-screw" });
 }
 
 
@@ -392,7 +443,11 @@ export function buildEnds(c: Carcass, b: Build): void
             // Shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
                            face: "B", lineAxis: "u", line: lv.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
-                           reversed: false });
+                           reversed: false, dowelsOnly: open });
+        }
+        if (open && drop > 0 && c.base.type === "plinth")
+        {
+            plinthReturnScrews(c, side, b, title);
         }
         if (post !== null)
         {
@@ -544,6 +599,16 @@ export function buildCorner(k: RoundCorner, b: Build): void
 }
 
 
+// A lining slides into its cell as one box : play each side, its screws in the edges of 8 mm, workshop conventions
+export const LINING_PLAY = 0.5;
+const LINING_SCREW_END = 40;
+const LINING_SCREW_PITCH = 300;
+// A Ø2.5 leaves 2.75 of chipboard each side in an edge of 8, a 3 left 2.5 and split it without a pilot : DIN 7997:2008
+// head 4.7. Pilot of 0.6 x d into the edge, 2 past the 8 the screw goes in
+const LINING_SCREW_LABEL = "Vis 2,5 x 16 de l'habillage, tête dehors";
+const LINING_PILOT = 1.5;
+const LINING_PILOT_DEPTH = 10;
+
 export function buildLinings(c: Carcass, lay: ResolvedLayout, b: Build): void
 {
     for (const lining of c.linings)
@@ -555,18 +620,27 @@ export function buildLinings(c: Carcass, lay: ResolvedLayout, b: Build): void
         }
         const lt = lining.thickness;
         const faces = lining.faces;
-        const x0 = c.x + nb.x;
-        const y0 = c.y + nb.y;
+        // Screwed on itself and slid into its cell : clear of the boards round it
+        const x0 = c.x + nb.x + LINING_PLAY;
+        const y0 = c.y + nb.y + LINING_PLAY;
+        const nw = nb.w - 2 * LINING_PLAY;
+        const nh = nb.h - 2 * LINING_PLAY;
         const front = c.z + c.depth;
         const depthAll = c.depth - lay.zBack - (faces.back ? lt : 0);
         const base = { item: c.id, itemName: c.name, thickness: lt, decor: lining.decor, colour: lining.colour,
                        role: "lining" as const };
         const first = b.parts.length;
         const tag = `${c.id}/lining/${lining.id}`;
+        const made: Partial<Record<"back" | "bottom" | "top" | "left" | "right", Part>> = {};
+        const add = (key: keyof typeof made, p: Part): void =>
+        {
+            made[key] = p;
+            b.parts.push(p);
+        };
         if (faces.back)
         {
-            b.parts.push(newPart({
-                ...base, id: `${tag}/back`, label: "Habillage, fond", length: nb.h, width: nb.w, edges: [],
+            add("back", newPart({
+                ...base, id: `${tag}/back`, label: "Habillage, fond", length: nh, width: nw, edges: [],
                 frame: { o: [x0, y0, c.z + lay.zBack + lt], u: Y, v: X, n: neg(Z) },
             }));
         }
@@ -574,32 +648,84 @@ export function buildLinings(c: Carcass, lay: ResolvedLayout, b: Build): void
         const hBottom = faces.bottom ? lt : 0;
         if (faces.bottom)
         {
-            b.parts.push(newPart({
-                ...base, id: `${tag}/bottom`, label: "Habillage, dessous", length: nb.w, width: depthAll, edges: ["v0"],  
+            add("bottom", newPart({
+                ...base, id: `${tag}/bottom`, label: "Habillage, dessous", length: nw, width: depthAll, edges: ["v0"],
                 frame: { o: [x0, y0 + lt, front], u: X, v: neg(Z), n: neg(Y) },
             }));
         }
         if (faces.top)
         {
-            b.parts.push(newPart({
-                ...base, id: `${tag}/top`, label: "Habillage, dessus", length: nb.w, width: depthAll, edges: ["v0"],
-                frame: { o: [x0, y0 + nb.h - lt, front], u: X, v: neg(Z), n: Y },
+            add("top", newPart({
+                ...base, id: `${tag}/top`, label: "Habillage, dessus", length: nw, width: depthAll, edges: ["v0"],
+                frame: { o: [x0, y0 + nh - lt, front], u: X, v: neg(Z), n: Y },
             }));
         }
-        const hSide = nb.h - hTop - hBottom;
+        const hSide = nh - hTop - hBottom;
         if (faces.left)
         {
-            b.parts.push(newPart({
+            add("left", newPart({
                 ...base, id: `${tag}/left`, label: "Habillage, gauche", length: hSide, width: depthAll, edges: ["v0"],
                 frame: { o: [x0 + lt, y0 + hBottom, front], u: Y, v: neg(Z), n: neg(X) },
             }));
         }
         if (faces.right)
         {
-            b.parts.push(newPart({
+            add("right", newPart({
                 ...base, id: `${tag}/right`, label: "Habillage, droite", length: hSide, width: depthAll, edges: ["v0"],
-                frame: { o: [x0 + nb.w - lt, y0 + hBottom, front], u: Y, v: neg(Z), n: X },
+                frame: { o: [x0 + nw - lt, y0 + hBottom, front], u: Y, v: neg(Z), n: X },
             }));
+        }
+        // Heads on the outer faces, hidden once in its cell : the top and bottom into the edges of the sides, the back
+        // into the edges of all 4
+        let screws = 0;
+        // The screw through q at (u, v), its pilot in the edge of the board it goes into, at the middle of its 8
+        const screw = (q: Part | undefined, u: number, v: number, into: Part | undefined,
+                       at: { u: number; v: number; face: "u0" | "u1" | "v1" }): void =>
+        {
+            if (q === undefined || into === undefined)
+            {
+                return;
+            }
+            q.holes.push({ u, v, diameter: 0, depth: 0, face: "B", label: LINING_SCREW_LABEL, purpose: "lining-screw" });
+            into.holes.push({ ...at, w: lt / 2, diameter: LINING_PILOT, depth: LINING_PILOT_DEPTH,
+                             purpose: "lining-pilot",
+                              label: `Avant-trou ${DIAM}${String(LINING_PILOT).replace(".", ",")} x ${LINING_PILOT_DEPTH} de la vis `
+                                  + `de l'habillage` });
+            screws++;
+        };
+        const rows = (length: number): number[] =>
+        {
+            return spread(length, LINING_SCREW_END, LINING_SCREW_PITCH);
+        };
+        for (const [q, face] of [[made.bottom, "u0"], [made.top, "u1"]] as const)
+        {
+            for (const v of rows(depthAll))
+            {
+                const u = face === "u0" ? 0 : hSide;
+                screw(q, lt / 2, v, made.left, { u, v, face });
+                screw(q, nw - lt / 2, v, made.right, { u, v, face });
+            }
+        }
+        for (const v of rows(nw))
+        {
+            screw(made.back, lt / 2, v, made.bottom, { u: v, v: depthAll, face: "v1" });
+            screw(made.back, nh - lt / 2, v, made.top, { u: v, v: depthAll, face: "v1" });
+        }
+        for (const u of rows(hSide))
+        {
+            screw(made.back, hBottom + u, lt / 2, made.left, { u, v: depthAll, face: "v1" });
+            screw(made.back, hBottom + u, nw - lt / 2, made.right, { u, v: depthAll, face: "v1" });
+        }
+        if (screws > 0)
+        {
+            const host = made.back ?? made.bottom ?? made.top!;
+            host.notes.push(`Habillage vissé sur lui-même, ${screws} vis 2,5 x 16 têtes dehors dans des avant-trous `
+                + `${DIAM}${String(LINING_PILOT).replace(".", ",")} x ${LINING_PILOT_DEPTH} percés à mi-chant, puis glissé `
+                + `dans sa case avec ${LINING_PLAY} mm de jeu par côté : démontable`);
+            // The housings of the boards round the cell may open on its faces : only reached with the box out
+            host.notes.push("Serrer les Minifix de la case avant de glisser l'habillage, le ressortir avant de les desserrer");
+            b.hardware.push({ ref: "SCREW_2.5x16", qty: screws, item: c.id, itemName: c.name, target: host.id,
+                              note: "habillage de niche", purpose: "lining-screw" });
         }
         let k = first;
         while (k < b.parts.length)

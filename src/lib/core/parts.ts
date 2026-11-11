@@ -1,19 +1,27 @@
 // Breaks every item down into flat parts, joints and the curved skins the workshop has to make
 
 import type { Carcass, Settings } from "./model";
-import { resolveLayout } from "./layout";
+import { resolveLayout, topDoubling, type ResolvedLayout } from "./layout";
+import { spread } from "./fittings";
 import { frontPanels, type WallSides } from "./fronts"; 
 import { X, Y, Z, neg } from "./geometry";
 import type { Build, CurveShape, Part } from "./part_types";
 import { byId } from "./edit";
 import { ceilingAt, frontOutline, sideHeights, topAngle } from "./slope";
 import { buildDividers } from "./dividers";
-import { PLINTH_FOOT_GAP, boxOrigin, newPart } from "./part_base";
+import { PLINTH_TOP_GAP, boxOrigin, newPart } from "./part_base";
+import { plinthFootGap } from "./curves";
+import { CLIP_RETURN_DROP, clipDrop, footFor } from "./feet";
+import { round1 } from "./text";
 
 export type
 {
     Build, CurveShape, Edge, Fitted, Groove, HardwareLine, Hole, Joint, Motion, Part, PartRole, Pocket,
 } from "./part_types";
+
+// Workshop convention, not a maker figure : 3 rows of screws holding the glue line while it sets
+const DOUBLER_SCREW_INSET = 60;
+const DOUBLER_SCREW_PITCH = 300;
 
 
 // Angle of the batten `s` mm along the arc : the arc is laid from the carcass side, the flat run goes on from
@@ -63,33 +71,38 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
     const common = { item: c.id, itemName: c.name, thickness: t, decor: c.decor };
 
 
-    // Sides run full height, u up, v from the front edge backwards, face A inside
+    // Sides run full heigth, u up, v from the front edge backwards, face A inside. Top and bottom over them, they
+    // stand between the two, one thicknes up
+    const over = overSides(c, lay, b);
+    const lift = over ? t : 0;
     const sides = sideHeights(c);
     const angle = topAngle(c);
     const rising = sides.right >= sides.left ? 1 : -1;
     const left = newPart({
-        ...common, id: `${c.id}/side/L`, label: "Joue gauche", role: "side", length: sides.left, width: Ds, 
-        edges: ["v0", "u1", "u0"],
-        frame: { o: [ox + t, oy, oz + D], u: Y, v: neg(Z), n: neg(X) },
+        ...common, id: `${c.id}/side/L`, label: "Joue gauche", role: "side", length: sides.left - 2 * lift, width: Ds,
+        edges: over ? ["v0"] : ["v0", "u1", "u0"],
+        frame: { o: [ox + t, oy + lift, oz + D], u: Y, v: neg(Z), n: neg(X) },
     });
     const right = newPart({
-        ...common, id: `${c.id}/side/R`, label: "Joue droite", role: "side", length: sides.right, width: Ds,
-        edges: ["v0", "u1", "u0"],
-        frame: { o: [ox + W - t, oy, oz + D], u: Y, v: neg(Z), n: X },
+        ...common, id: `${c.id}/side/R`, label: "Joue droite", role: "side", length: sides.right - 2 * lift, width: Ds,
+        edges: over ? ["v0"] : ["v0", "u1", "u0"],
+        frame: { o: [ox + W - t, oy + lift, oz + D], u: Y, v: neg(Z), n: X },
     });
-    // Top and bottom between the sides, u from the left, v from the front, face A inside
+    // Top and bottom between the sides, u from the left, v from the front, face A inside, or over them end to end
+    const span = over ? W : W - 2 * t;
+    const x0 = over ? ox : ox + t;
     const bottom = newPart({
-        ...common, id: `${c.id}/bottom`, label: "Dessous", role: "bottom", length: W - 2 * t, width: Ds,
-        edges: ["v0"],
-        frame: { o: [ox + t, oy + t, oz + D], u: X, v: neg(Z), n: neg(Y) },
+        ...common, id: `${c.id}/bottom`, label: "Dessous", role: "bottom", length: span, width: Ds,
+        edges: over ? ["v0", "u0", "u1"] : ["v0"],
+        frame: { o: [x0, oy + t, oz + D], u: X, v: neg(Z), n: neg(Y) },
     });
     // Under a roof the top runs along the slope, its length measured in the slope, its ends cut upright
     const cos = Math.cos(angle);
     const sin = Math.sin(angle) * rising;
     const top = newPart({
-        ...common, id: `${c.id}/top`, label: "Dessus", role: "top", length: (W - 2 * t) / cos, width: Ds,
-        edges: ["v0"],
-        frame: { o: [ox + t, oy + ceilingAt(c, t), oz + D], u: [cos, sin, 0], v: neg(Z), n: [-sin, cos, 0] },
+        ...common, id: `${c.id}/top`, label: "Dessus", role: "top", length: span / cos, width: Ds,
+        edges: over ? ["v0", "u0", "u1"] : ["v0"],
+        frame: { o: [x0, oy + ceilingAt(c, t), oz + D], u: [cos, sin, 0], v: neg(Z), n: [-sin, cos, 0] },
     });
     if (c.slope !== null)
     {
@@ -103,15 +116,35 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
         low.bevel = { u0: 0, u1: -t * Math.tan(angle) };
     }
     b.parts.push(left, right, bottom, top);
+    const doubling = topDoubling(c);
+    // Over the sides : their ends against the inner faces of top and bottom, as a hung box (hung_items.ts). Open to
+    // the eye, the housings go in the outer faces of the sides, against what stands beside it : tightened in the
+    // workshop before it is set
+    const outer = c.hiddenLinks === true ? "B" as const : undefined;
+    for (const [hp, end] of over ? [[bottom, "u0"], [top, "u1"]] as const : [])
+    {
+        b.joints.push({ edgePart: left.id, edge: end, facePart: hp.id, face: "A", lineAxis: "u", line: t / 2, from: 0,
+                        to: Ds, edgeFrom: 0, reversed: false, housingFace: outer });
+        b.joints.push({ edgePart: right.id, edge: end, facePart: hp.id, face: "A", lineAxis: "u", line: W - t / 2,
+                        from: 0, to: Ds, edgeFrom: 0, reversed: false, housingFace: outer });
+    }
     // Four corner joints : the ends of top and bottom against the inner faces of the sides
-    for (const hp of [bottom, top])
+    // A board glued under the top would close its housings over : they go in its upper face
+    for (const hp of over ? [] : [bottom, top])
     {
         const lineL = hp === bottom ? t / 2 : sides.left - t / cos / 2;
         const lineR = hp === bottom ? t / 2 : sides.right - t / cos / 2;
+        // An open carcass keeps them off the floor of its cell as well, under it where what it stands on hides them
+        const hidden = (hp === top && doubling > 0) || (hp === bottom && c.hiddenLinks === true);
+        const housingFace = hidden ? "B" as const : undefined;
         b.joints.push({ edgePart: hp.id, edge: "u0", facePart: left.id, face: "A", lineAxis: "u", line: lineL, from: 0,
-                       to: Ds, edgeFrom: 0, reversed: false });
+                       to: Ds, edgeFrom: 0, reversed: false, housingFace });
         b.joints.push({ edgePart: hp.id, edge: "u1", facePart: right.id, face: "A", lineAxis: "u", line: lineR,
-                       from: 0, to: Ds, edgeFrom: 0, reversed: false });
+                       from: 0, to: Ds, edgeFrom: 0, reversed: false, housingFace });
+    }
+    if (doubling > 0)
+    {
+        buildTopDoubler(c, top, doubling, b);
     }
 
 
@@ -128,9 +161,11 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
         const decor = fp.decor;
         const vertical = fp.role !== "drawer" && fp.role !== "flap";
         const labels = { door: "Porte", drawer: "Façade de tiroir", leaf: "Vantail coulissant", flap: "Abattant",
-                         panel: "Façade fixe" };
-        const roles = { door: "door", drawer: "drawerFront", leaf: "leaf", flap: "flap", panel: "panel" } as const;
-        // Grain runs vertically on doors and leaves, horizontally on drawer fronts and flaps
+                         panel: "Façade fixe", drop: "Abattant tombant" };
+        const roles = { door: "door", drawer: "drawerFront", leaf: "leaf", flap: "flap", panel: "panel",
+                       drop: "flap" } as const;
+        // Grain runs vertically on doors and leaves, horizontally on drawer fronts and lift-up flaps. A drop-down flap
+        // among doors keeps their grain
         const part = newPart({
             item: c.id, itemName: c.name, thickness: fp.thickness, decor,
             id: `${c.id}/front/${fp.id}`,
@@ -150,6 +185,60 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
         }
         b.parts.push(part);
     }
+}
+
+
+// Top and bottom over the sides, only where nothing counts side heights from the carcass floor (empty box)
+// TODO shelves, fronts and outlets still measure a side from the carcass floor : a box with them keeps its sides full
+function overSides(c: Carcass, lay: ResolvedLayout, b: Build): boolean
+{
+    if (c.overSides !== true)
+    {
+        return false;
+    }
+    const why = c.slope !== null ? "un dessus sous rampant" : topDoubling(c) > 0 ? "un dessus doublé"
+        : lay.dividers.length > 0 ? "des séparations" : c.fronts.length > 0 ? "des façades"
+        : c.outlets.length > 0 ? "des passages de câble" : null;
+    if (why !== null)
+    {
+        b.errors.push(`${c.name} : dessus et dessous sur les joues pas encore gérés avec ${why}. Les joues restent `
+            + "pleine hauteur, retirer l'option ou ce qui la bloque.");
+        return false;
+    }
+    return true;
+}
+
+
+// The board under the top, the same size, both glued into one before the box goes together. PVA holds badly on
+// melamine : both faces scuffed, polyurethane, screws to clamp it (Selleys, melamine to melamine)
+// https://www.selleys.com.au/ask-an-expert/adhesives/what-is-the-best-adhesive-to-glue-two-pieces-of-melamine-together/
+function buildTopDoubler(c: Carcass, top: Part, thickness: number, b: Build): void
+{
+    const [ox, oy, oz] = boxOrigin(c);
+    const part = newPart({
+        item: c.id, itemName: c.name, thickness, decor: c.decor,
+        id: `${c.id}/top-doubler`, label: "Doublage du dessus", role: "top", length: top.length, width: top.width,
+        edges: ["v0"],
+        frame: { o: [ox + c.thickness, oy + c.height - c.thickness - thickness, oz + c.depth], u: X, v: neg(Z), n: Y },
+    });
+    let screws = 0;
+    for (const u of spread(top.length, DOUBLER_SCREW_INSET, DOUBLER_SCREW_PITCH))
+    {
+        for (const v of [DOUBLER_SCREW_INSET, top.width / 2, top.width - DOUBLER_SCREW_INSET])
+        {
+            top.holes.push({ u, v, diameter: 0, depth: 0, face: "B", label: "Vis 4 x 30 du doublage, tête noyée",
+                             purpose: "doubler-screw" });
+            screws++;
+        }
+    }
+    part.notes.push("Collée sous le dessus avant le montage du caisson : faces en contact poncées au gros grain, colle "
+        + `polyuréthane, ${screws} vis 4 x 30 depuis le dessus. Serrer les boîtiers Minifix par le dessus.`);
+    b.parts.push(part);
+    b.hardware.push({ ref: "SCREW_4x30", qty: screws, item: c.id, itemName: c.name, target: part.id,
+                      note: "doublage du dessus", purpose: "doubler-screw" });
+    b.hardware.push({ ref: "GLUE_PU", qty: 1, item: c.id, itemName: c.name, target: part.id,
+                      note: `doublage du dessus, ${Math.round(top.length)} x ${Math.round(top.width)} mm`,
+                      purpose: "doubler-glue" });
 }
 
 
@@ -227,15 +316,23 @@ function buildBase(c: Carcass, b: Build): void
     const [ox, oy, oz] = boxOrigin(c);
     const t = c.thickness;
     const returns = c.base.returns ?? [];
-    const y0 = oy - c.base.height + PLINTH_FOOT_GAP;
+    const foot = plinthFootGap(c);
+    const y0 = oy - c.base.height + foot;
     const zFront = oz + c.depth - c.base.setback - t;
     // The front plinth runs the whole width, the returns come from the wall in the plane of the sides to its back
     const part = newPart({
         item: c.id, itemName: c.name, thickness: t, decor: c.decor,
-        id: `${c.id}/plinth`, label: "Plinthe", role: "plinth", length: c.width, width: c.base.height - PLINTH_FOOT_GAP,
+        id: `${c.id}/plinth`, label: "Plinthe", role: "plinth", length: c.width,
+        width: c.base.height - foot - PLINTH_TOP_GAP,
         edges: ["v1"], frame: { o: [ox, y0, zFront], u: X, v: Y, n: Z },
     });
-    part.notes.push("Clipsée sur les pieds AXILO (clips 637.38.054)");
+    // Measured from the top of the plinth, as the fitting drawing gives it
+    const drop = clipDrop(footFor(c.base.height));
+    const under = drop === null ? null : drop - PLINTH_TOP_GAP;
+    part.notes.push(under === null
+        ? "Clipsée sur les pieds AXILO (clips 637.38.054)"
+        : `Clipsée sur les pieds AXILO : clips 637.38.054 vissés au dos, vis à ${round1(under)} mm sous le haut de la plinthe `
+            + "(plan Häfele 637.76.333-1)");
     b.parts.push(part);
     for (const side of returns)
     {
@@ -243,10 +340,12 @@ function buildBase(c: Carcass, b: Build): void
         const ret = newPart({
             item: c.id, itemName: c.name, thickness: t, decor: c.decor,
             id: `${c.id}/plinth/${side}`, label: `Plinthe, retour ${right ? "droit" : "gauche"}`, role: "plinth",
-            length: zFront - oz, width: c.base.height - PLINTH_FOOT_GAP, edges: ["v1"],
+            length: zFront - oz, width: c.base.height - foot - PLINTH_TOP_GAP, edges: ["v1"],
             frame: { o: [right ? ox + c.width - t : ox + t, y0, zFront], u: neg(Z), v: Y, n: right ? X : neg(X) },
         });
-        ret.notes.push(`Clipsée sur les deux pieds ${right ? "de droite" : "de gauche"}, contre le dos de la plinthe`);
+        ret.notes.push(`Clipsée sur les deux pieds ${right ? "de droite" : "de gauche"}, contre le dos de la plinthe`
+            + (under === null ? "" : `, vis des clips à ${round1(under + CLIP_RETURN_DROP)} mm sous son haut : `
+                + `${CLIP_RETURN_DROP} mm plus bas que ceux de la plinthe, pour croiser le clip de façade au pied d'angle`));
         b.parts.push(ret);
     }
 }

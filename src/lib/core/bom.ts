@@ -6,6 +6,7 @@ import type { Part, Edge } from "./parts";
 import { partMass } from "./fittings";
 import { bounds, polygonArea, tessellate } from "./geometry";
 import { groupBySignature } from "./signature";
+import { bandLength, plainRectangle } from "./edge_bands";
 import { round1 } from "./text";  
 import { MATERIALS, decorById } from "../data/materials";
 import { FAMILY_LABELS, HARDWARE, type Family } from "../data/hardware";
@@ -20,17 +21,45 @@ export const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
 
 // A cut list row is one workpiece, its Part fields keep their meaning over the merged identical parts
 export interface CutRow extends Pick<Part, "label" | "quantity" | "length" | "width" | "thickness" | "decor" | "grain"
-    | "edges" | "notes">
+    | "edges" | "notes" | "scribe">
 {
     code: string;
     items: string[];
     decorLabel: string;
-    // cut after the DXF : curved, or a straight outline that is no rectangle
+    // cut after the DXF : curved, or a straight outline that's no rectangle
     shaped: boolean;
     curved: boolean;
     areaM2: number;
     massKg: number;
     parts: Part[];
+}
+
+
+// The size to saw a part to before its edges are glued on : its finished size less the banding on each edge, the ends
+// u0 and u1 off its length, the sides v0 and v1 off its width. Null when its decor doesn't say how thick its banding
+// is
+export function sawSize(r: Pick<CutRow, "length" | "width" | "edges" | "decor" | "shaped" | "scribe">):
+    { length: number; width: number } | "dxf" | null
+{
+    const t = decorById(r.decor).edgeThickness;
+    // A filler sawn wider, planed to the wall or the ceiling on site
+    const extra = r.scribe ?? 0;
+    if (r.edges.length === 0)
+    {
+        return { length: r.length, width: r.width + extra };
+    }
+    // Another outline is cut after its DXF, its contour already the one under the banding
+    if (r.shaped)
+    {
+        return "dxf";
+    }
+    if (t === undefined)
+    {
+        return null;
+    }
+    const on = (e: Edge): number => { return r.edges.includes(e) ? t : 0; };
+    const tenth = (x: number): number => { return Math.round(x * 10) / 10; };
+    return { length: tenth(r.length - on("u0") - on("u1")), width: tenth(r.width - on("v0") - on("v1") + extra) };
 }
 
 
@@ -342,6 +371,7 @@ function cutRows(a: Analysis, codeOfPart: Map<string, string>): { cut: CutRow[];
             decorLabel: `${decor.ref} ${decor.label}`.trim(),
             grain: first.grain,
             edges: first.edges,
+            scribe: first.scribe,
             shaped,
             curved,
             areaM2: (bb.maxX - bb.minX) * (bb.maxY - bb.minY) * 1e-6 * qty,
@@ -373,9 +403,17 @@ function edgeTotals(a: Analysis): Bom["edges"]
     for (const part of a.build.parts)
     {
         let mm = 0;
-        for (const e of part.edges)
+        // A board of another outline than its rectangle : the true length of its banded segments, arcs included
+        if (part.edges.length > 0 && !plainRectangle(part.outline, part.length, part.width))
         {
-            mm += (e === "v0" || e === "v1" ? part.length : part.width) + EDGE_OVERLENGTH;
+            mm = bandLength(part.outline, part.length, part.width, part.edges) + EDGE_OVERLENGTH;
+        }
+        else
+        {
+            for (const e of part.edges)
+            {
+                mm += (e === "v0" || e === "v1" ? part.length : part.width) + EDGE_OVERLENGTH;
+            }
         }
         edgeMap.set(part.decor, (edgeMap.get(part.decor) ?? 0) + mm * part.quantity);
     }
@@ -407,7 +445,7 @@ export function computeBom(p: Project, a: Analysis): Bom
 
 
 // L1 L2 along the length, l1 l2 across the ends, the usual French cut list notation
-// How a row is cut beyond its rectangle : curved, pierced, or a straight outline that is no rectangle
+// How a row is cut beyond its rectangle : curved, pierced, or a straight outline that's no rectangle
 export function shapeWord(r: CutRow): string
 {
     if (r.curved)

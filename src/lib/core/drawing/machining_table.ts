@@ -12,7 +12,7 @@ export const TABLE_COL_W = 198;
 const TABLE_COLS = [16, 16, 10, 11, 24, 111];
 
 
-// The arcs of an outline : centre, radius, and the angle of their middle, u and v as x and y
+// The arcs of an outline : centre, radius and the angle of their middle, u and v as x and y
 export function outlineArcs(part: Part): { cu: number; cv: number; r: number; mid: number }[]
 {
     const out: { cu: number; cv: number; r: number; mid: number }[] = [];
@@ -96,7 +96,7 @@ export function tableLines(row: CutRow, part: Part): string[][]
     }
     for (const g of part.grooves)
     {
-        const where = `le long de ${g.along} à ${round1(g.at)}, de ${Math.round(g.from)} à ${Math.round(g.to)}`;
+        const where = `le long de ${g.along} à ${round1(g.at)}, de ${round1(g.from)} à ${round1(g.to)}`;
         lines.push(...wrap(`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`, 2.4,
                            TABLE_COL_W - 5).map((t) =>
         {
@@ -114,7 +114,7 @@ export function tableLines(row: CutRow, part: Part): string[][]
 }
 
 
-// The table down as many columns as it is given from `top`, under its heading : what does not fit is returned
+// The table down as many columns as it's given from `top`, under its heading : what doesn't fit is returned
 export function drawTable(canvas: Canvas, lines: string[][], x0: number, top: number, tableCols: number,
                           heading: string): string[][]
 {
