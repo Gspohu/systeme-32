@@ -125,10 +125,10 @@ describe("system 32 line", () =>
             const k = q.items[0] as Carcass;
             return resolveLayout(k).nodes.get(root.id)!.y + (k.root as SplitNode).cuts[0]!;
         };
-        // 500 typed : the pin 4 under it lands within half a mm of 9.5 + 32k
-        expect(offLine(underside(p) - 4)).toBeLessThanOrEqual(0.5);
+        // 500 typed : the pin 1 under it lands within half a mm of 9.5 + 32k
+        expect(offLine(underside(p) - 1)).toBeLessThanOrEqual(0.5);
         const typed = moveDivider(p, c.id, root.id, 0, 611, true);
-        expect(offLine(underside(typed) - 4)).toBeLessThanOrEqual(0.5);
+        expect(offLine(underside(typed) - 1)).toBeLessThanOrEqual(0.5);
         expect(Math.abs(underside(typed) - 611)).toBeLessThanOrEqual(16);
         expect(analyse(typed).checks.filter((k) =>
         {
@@ -138,6 +138,6 @@ describe("system 32 line", () =>
         const fixed = setDividerKind(moveDivider(setDividerKind(typed, c.id, root.id, 0, "fixed"), c.id, root.id, 0, 611,
                                                  true), c.id, root.id, 0, "fixed");
         expect(underside(fixed)).toBe(611);
-        expect(offLine(underside(setDividerKind(fixed, c.id, root.id, 0, "adjustable")) - 4)).toBeLessThanOrEqual(0.5);
+        expect(offLine(underside(setDividerKind(fixed, c.id, root.id, 0, "adjustable")) - 1)).toBeLessThanOrEqual(0.5);
     });
 });

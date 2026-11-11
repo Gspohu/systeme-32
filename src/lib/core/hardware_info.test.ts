@@ -165,7 +165,7 @@ describe("hardware the user is told about", () =>
         {
             return h.u;
         })).toEqual([100, 800, 1500]);
-        expect(shelf.holes[0]).toMatchObject({ diameter: 12, depth: 104, face: "v1", w: 19.5 });
+        expect(shelf.holes[0]).toMatchObject({ diameter: 12, depth: 116, face: "v1", w: 19.5 });
         const qty = (ref: string): number =>
         {
             return a.build.hardware.filter((h) =>
@@ -177,7 +177,8 @@ describe("hardware the user is told about", () =>
             }, 0);
         };
         expect(qty("283.33.910")).toBe(3);
-        expect(qty("WALL_SCREW_5x50")).toBe(6);
+        // In the straight slots of the plates : a pan head
+        expect(qty("WALL_SCREW_5x50_PAN")).toBe(6);
         expect(qty("PLUG_NYLON_8x40")).toBe(6);
         expect(messages(p, "info").some((m) =>
         {
