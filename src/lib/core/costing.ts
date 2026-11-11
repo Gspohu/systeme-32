@@ -38,7 +38,7 @@ export interface Cost
     totalTtc: number;
     // lines without a price are listed, never counted as zero
     missing: CostLine[];
-    // what the total leaves out : import VAT and handling outside the EU, a merchant whose country is not known
+    // what the total leaves out : import VAT and handling outside the EU, a merchant whose country isn't known
     notes: string[];
 }
 
@@ -233,7 +233,8 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
     const notes: string[] = [];
     for (const s of shipped.values())
     {
-        const ship: CostLine = { key: `ship:${s.name}`, label: `Port ${s.name}${s.country === null ? "" : ` (${s.country})`}`,
+        const ship: CostLine = { key: `ship:${s.name}`,
+                                label: `Port ${s.name}${s.country === null ? "" : ` (${s.country})`}`,
                                  qty: 1, unit: "u", price: null, bought: null, total: null };
         lines.push(ship);
         price(ship);

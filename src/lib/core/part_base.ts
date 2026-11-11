@@ -7,6 +7,8 @@ import { decorById, materialOfDecor } from "../data/materials";
 
 // Häfele plinth holder : plinth height = foot height minus 5 to 10 mm, 7 kpt
 export const PLINTH_FOOT_GAP = 7;
+// Under the tab 2.8 thick of the AXILO mounting plate : 10 off the foot height in all, the top of Häfele's range
+export const PLINTH_TOP_GAP = 3;
 
 // The cleat stock of slats, ceiling fillers and side fillers, 40 x 20 solid wood
 export const CLEAT_THICKNESS = 20;

@@ -17,7 +17,6 @@ export interface Settings
 {
     // Snapping pitch for dividers and fronts, 32 is the European obring system
     grid: number;
-    // gap between two neighbouring fronts
     frontGap: number;
     // Reveal left around the outer edge of an overlay front
     edgeReveal: number;
@@ -44,12 +43,11 @@ export interface Settings
     // The 24 V strip bought, its power and the pitch it may be cut at
     ledWattPerMetre: number;
     ledCutPitch: number;
-    // Power of one round spot
     spotWatt: number;
     // Hours of the workshop and of fitting on site, typed by whoever quotes them : null until then
     makeHours: number | null;
     fitHours: number | null;
-    // The people of the title block (ISO 7200:2004 : creator, approval person, legal owner) and whom it is made for
+    // The people of the title block (ISO 7200:2004 : creator, approval person, legal owner) and whom it's made for
     creator: string;
     approver: string;
     owner: string; 
@@ -58,7 +56,7 @@ export interface Settings
 }
 
 // A reinforced partition has a timber cross piece fixed to its studs ebhind the board, the screws go into it
-export type WallType = "solid" | "aerated" | "plasterboard" | "reinforced";
+export type WallType = "solid" | "hollow" | "aerated" | "plasterboard" | "reinforced";
 
 export const DEFAULT_SETTINGS: Settings = {
     grid: 32,
@@ -112,6 +110,9 @@ export interface SplitNode
     // How far each divider stands back from the front edge of the carcass in mm, null keeps it flush (an adjustable
     // shelf then takes the setback of the settings)
     setbacks: (number | null)[];
+    // Why a divider stands where it does when nothing computed says so, carried to the plan of its part. Absent in
+    // projects saved before 2026-11-08
+    notes?: (string | null)[];
     children: LayoutNode[];
 }
 
@@ -158,8 +159,10 @@ export interface DrawerFront
     cutlery?: boolean[];
     // Expectd load per drawer (kg), drives the runner and TIP-ON choice
     loadKg: number;
-    // MOVENTO series asked by the user, the lightest one carrying the load when absent
+    // MOVENTO series chosen for the drawer, the lightest one carrying the load when absent
     runner?: "760H" | "766H";
+    // Decor of the 5 boards of each box, the carcass one when absent
+    boxDecor?: string;
 }
 
 // SlideLine M overlay runs on one track : leaves sit side by side and never cover the whole opening
@@ -191,7 +194,17 @@ export interface PanelFront
 }
 
 
-export type FrontSpec = DoorFront | DoubleDoorFront | DrawerFront | SlidingFront | LiftFront | PanelFront;
+// Drop-down flap hinged along its bottom edge, held open by 2 braking stays, open level with the floor of its cell :
+// a pull-out behind it slides out over it, the bottles of the dresser
+export interface DropFront
+{
+    type: "drop";
+    // A drawer with no front of its own behind the flap, its load in kg, or none
+    pullOut: { loadKg: number; boxDecor?: string } | null;
+}
+
+
+export type FrontSpec = DoorFront | DoubleDoorFront | DrawerFront | SlidingFront | LiftFront | PanelFront | DropFront;
 
 
 export interface Front
@@ -271,8 +284,10 @@ export interface Carcass
     height: number;
     depth: number;
     thickness: number;
-    // thickness of the shelves, null for the one of the sides
+    // Null : the sides' one
     shelfThickness: number | null;
+    // Board glued under the top to stiffen a long span, its thickness in mm, taken off the inside height
+    doubledTop?: number;
     decor: string;
     base: Base;
     back: BackMount;
@@ -282,6 +297,22 @@ export interface Carcass
     fronts: Front[];
     linings: Lining[];
     fixToWall: boolean;
+    // Stands loose inside another carcass and lifts out by hand : no screw, no bracket ties it to anything
+    freeStanding?: boolean;
+    // Its own way of joining its boards, an open carcass showing every connector, else the one of the settings
+    joinery?: Joinery;
+    // Open to the eye : what joins it to its neighbours is screwed from inside them, no head shows in it
+    hiddenLinks?: boolean;
+    // Top and bottom running its whole width, the sides standing between them : what stands on it bears on a board
+    // and not on 2 edges of 19, the dresser niche
+    overSides?: boolean;
+    // Boards on edge under the panel over a zone, from side to side of it, stiffening a span something stands on : `z`
+    // the middle of the board from the back of the box
+    stiffeners?: { cell: Id; z: number; height: number }[];
+    // Screws through the back into the wall, in carcass coordinates from its lower left corner
+    backWallScrews?: { x: number; y: number }[];
+    // Carcasses it touches but isn't screwed to, held well enough by another
+    unlinkedFrom?: string[];
     // The top is sat on : nothing may stand on it and it must carry a person
     seat: Seat | null;
     // top following a roof slope : `height` is then the high side, `slope.height` the low one
@@ -353,6 +384,10 @@ export interface WallShelf
     decor: string;
     // A desk top is checked for its height and the room left for the legs
     purpose: "shelf" | "desk";
+    // Held as well by the carcasses it touches : brackets on its end against a side, screws through a top under it
+    tied?: boolean;
+    // Concealed supports asked for, more than the maker's spacing would need, on a wall that holds little
+    supports?: number;
     // radius of the two front corners, 0 for a square one
     corners: { left: number; right: number };
 }
@@ -395,7 +430,7 @@ export interface SlatWall
 }
 
 
-// Library ladder hooked on a rail along the wall : the rail is built, the ladder bought, and its load, slope and
+// Library ladder hooked on a rail along the wall : the rail is built, the ladder bought and its load, slope and
 // rail brackets come from its maker (none could be read)
 export interface LadderRail
 {
@@ -516,7 +551,7 @@ export interface Obstacle
     width: number;
     height: number;
     depth: number;
-    // A radiator : the room its notice asks on every side, null until it is read
+    // A radiator : the room its notice asks on every side, null until it's read
     clearance: number | null;  
 }
 
@@ -553,7 +588,7 @@ export interface ScreenArm
     // Centre of the plate on the back wall
     x: number;
     y: number;
-    // The screen swung out to be watched : its centre in the front view, its front plane and how far it is turned
+    // The screen swung out to be watched : its centre in the front view, its front plane and how far it's turned
     // in degrees, positive to face the right of the room. Null when only stored
     out: { cx: number; z: number; yaw?: number } | null;
     source: string;

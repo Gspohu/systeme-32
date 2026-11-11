@@ -23,24 +23,48 @@ export interface Sequence
 
 // Workshop convention : a square carcass shows equal diagonals within a millimetre
 const SQUARE_TOLERANCE = 1;
-const CARCASS = new Set(["side", "top", "bottom", "vdivider", "hdivider"]);
+const CARCASS = new Set(["side", "top", "bottom", "vdivider", "hdivider", "stiffener"]);
 const BOX = new Set(["boxSide", "boxEnd", "boxBottom"]);
 
 
-// Items in the order they go up : what stands lower first, left to right along each wall
+// Items in the order they go up : what stands lower first, left to right allong each wall
 // TODO an L of two walls goes up wall after wall by name, nothing yet weighs which corner carcass must stand first
 export function assemblyOrder(p: Project): Item[]
 {
     // An appliance is set in place by its owner, nothing to assemble
-    return p.items.filter((it) =>
+    const order = p.items.filter((it) =>
     {
         return it.kind !== "device";
     }).sort((a, b) =>
     {
         const ea = itemExtent(a);
         const eb = itemExtent(b);
-        return ea.y0 - eb.y0 || a.wall.localeCompare(b.wall) || ea.x0 - eb.x0;
+        // A loose carcass goes into its place once what surrounds it stands
+        const loose = Number(a.kind === "carcass" && a.freeStanding === true)
+            - Number(b.kind === "carcass" && b.freeStanding === true);
+        return loose || ea.y0 - eb.y0 || a.wall.localeCompare(b.wall) || ea.x0 - eb.x0;
     });
+    // A tall carcass waits for what stacks up on its left, or that would have to slide in with no play between it
+    // and the one further left, already on the wall
+    const tall = order.filter((it) =>
+    {
+        return it.kind === "carcass" && it.freeStanding !== true && order.some((q) =>
+        {
+            const [eq, ei] = [itemExtent(q), itemExtent(it)];
+            return q.kind === "carcass" && q.freeStanding !== true && q.wall === it.wall && eq.y0 > ei.y0 + 0.5
+                && eq.y0 < ei.y1 && eq.x1 <= ei.x0 + 0.5;
+        });
+    });
+    const rest = order.filter((it) =>
+    {
+        return !tall.includes(it);
+    });
+    const firstLoose = rest.findIndex((it) =>
+    {
+        return it.kind === "carcass" && it.freeStanding === true;
+    });
+    const at = firstLoose < 0 ? rest.length : firstLoose;
+    return [...rest.slice(0, at), ...tall, ...rest.slice(at)];
 }
 
 
@@ -221,6 +245,15 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return `${t}, coulisses vissées sur les joues et montants avant assemblage`;
     }));
+    const doubler = shell.find((q) =>
+    {
+        return q.id === `${id}/top-doubler`;
+    });
+    pick(serving("doubler-glue", "doubler-screw"));
+    if (doubler !== undefined)
+    {
+        prep.push(...doubler.notes);
+    }
     steps.push({ title: "Préparer les panneaux", lines: prep });
 
     // Standing the shell : bottom, sides, the inside panels, then the top
@@ -264,7 +297,7 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
             + "la face avant", ...back.flatMap((q) =>
         {
             return q.notes;
-        })] });
+        }), ...listed(pick(serving("back-screw")))] });
     }
 
     // A rounded end comes on its side once the box is square, its boards joined to the side
@@ -296,7 +329,8 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     });
     if (linings.length > 0)
     {
-        steps.push({ title: "Habillage", lines: [`${codes(bom, linings)} posés dans leur case`,
+        steps.push({ title: "Habillage", lines: [`${codes(bom, linings)} vissés ensemble, têtes dehors, puis glissés dans leur case`,
+                                                 ...listed(pick(serving("lining-screw"))),
                                                  ...new Set(linings.flatMap(
             (q) =>
             {
@@ -305,13 +339,17 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     }
 
     // The base goes under while the carcass still lies down
-    steps.push({ title: "Socle", lines: listed(pick(serving("foot", "foot-mount"))).map((t) =>
+    steps.push({ title: "Socle", lines: listed(pick(serving("foot", "foot-mount", "foot-mount-screw"))).map((t) =>
     {
         return `${t}, sous le dessous`;
     }) });
 
     // set in place : levelled, held to the wall, joined to its neighbours, closed to the walls
     const place: string[] = [];
+    if (c.freeStanding === true)
+    {
+        place.push("Glisser à la main dans son logement, sans vis ni équerre : il se retire de la même façon");
+    }
     if (c.base.type === "plinth" || c.base.type === "feet")
     {
         place.push("Mettre en place et régler les pieds avant de charger le meuble");
@@ -320,20 +358,27 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
                                       "wall-fixing"))));
     place.push(...pick(serving("link-screw")).map((h) =>
     {
+        if (h.ref === "WALL_SCREW_5x50" || h.ref === "SCREW_4x30")
+        {
+            const [size, hole] = h.ref === "SCREW_4x30" ? ["4 x 30", 4] : ["5 x 50", 5];
+            return `${h.qty} vis ${size} depuis l'intérieur du caisson fermé : ${h.note ?? ""}, dans les trous ${DIAM}${hole} `
+                + "déjà percés";
+        }
         return `${h.qty} vis de liaison ${h.ref} : ${h.note ?? ""}, dans les trous ${DIAM}8 déjà percés`;
     }));
+    // The spacers under the runners of a pull-out go with the drawers, not with the fillers
+    const spacer = (id: string): boolean => { return id.includes("/pull-out/"); };
+    const spacers = of((q) => { return q.role === "cleat" && spacer(q.id); });
     const fillers = of((q) =>
     {
-        return q.role === "filler" || q.role === "cleat";
+        return (q.role === "filler" || q.role === "cleat") && !spacer(q.id);
     });
     if (fillers.length > 0)
     {
-        const screws = pick(serving("cleat-screw")).reduce((n, h) =>
-        {
-            return n + h.qty;
-        }, 0);
-        place.push(`${codes(bom, fillers)} : tasseaux vissés sur les joues (${screws} vis 4 x 30), fileurs ajustés au mur `
-            + "puis collés sur leur tasseau");
+        // Each fixing as it is : a side filler screwed from the back of its cleat, the one up to the ceiling glued on
+        // its cleat once the carcass stands. One sentence for all mixed their screws and said them all glued
+        place.push(`${codes(bom, fillers)} : tasseaux et fileurs, ajustés au mur ou au plafond sur place`,
+                   ...listed(pick(serving("cleat-screw"))));
     }
     const plinths = of((q) =>
     {
@@ -342,14 +387,19 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     if (plinths.length > 0)
     {
         place.push(`${codes(bom, plinths)} : ${plinths.length > 1 ? "clipsées" : "clipsée"} en dernier, une fois le `
-            + "meuble réglé");
+            + "meuble réglé", ...listed(pick(serving("plinth-screw"))));
     }
+    // Last of all, every screw driven : the caps cut out of the banding over the heads seen
+    place.push(...listed(pick(serving("screw-cap"))));
     steps.push({ title: "Mise en place", lines: place });
 
     // Drawers : box, runners, then the front set and screwed from inside
     if (boxes.length > 0)
     {
+        const under = pick(serving("spacer-screw")).reduce((n, h) => { return n + h.qty; }, 0);
         steps.push({ title: "Tiroirs", lines: [
+            ...(spacers.length > 0 ? [`${codes(bom, spacers)} : cales vissées sur les montants (${under} vis 4 x 30), `
+                + "avant les coulisses du tiroir intérieur"] : []),
             `Caissons (${codes(bom, boxes)}) : ${holes(boxes, "dowel")} tourillons collés, fond entre les côtés`,
             ...listed(pick(serving("runner-coupling"))),
             ...listed(pick(serving("front-screw"))),
@@ -362,8 +412,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return ["door", "drawerFront", "leaf", "flap", "panel"].includes(q.role);
     });
-    const doorStep = hardwareStep("Portes et façades", pick(serving("hinge", "flap", "sliding", "push-latch",
-                                                                    "push-adapter", "handle", "cup-screw",
+    const doorStep = hardwareStep("Portes et façades", pick(serving("hinge", "flap", "flap-hinge", "sliding",
+                                                                    "push-latch",
+                                                                    "push-adapter", "adapter-screw", "handle", "cup-screw",
                                                                     "flap-screw", "screwed-plate")));
     if (fronts.length > 0)
     {

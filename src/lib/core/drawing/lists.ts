@@ -2,11 +2,12 @@
 
 import type { Analysis } from "../analysis";
 import type { Bom, PbsNode } from "../bom";
-import { edgeNotation, shapeWord } from "../bom";
+import { edgeNotation, sawSize, shapeWord } from "../bom";
 import type { NestResult } from "../nesting";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, textWidth, wrap } from "./display";
 import { heading, pageSuffix, paginateTable, table, type Draft } from "./draft";
 import { FAMILY_LABELS } from "../../data/hardware";
+import { round1 } from "../text";
 
 
 const TABLE_TOP = MARGIN + 18;
@@ -18,15 +19,18 @@ export function cutListSheets(bom: Bom): Draft[]
     const rows: string[][] = [];
     for (const r of [...bom.cut, ...bom.offSheet])
     {
+        const saw = sawSize(r);
         rows.push([
-            r.code, r.items.join(", "), r.label, String(r.quantity), `${Math.round(r.length * 10) / 10}`,
-            `${Math.round(r.width * 10) / 10}`, String(r.thickness), r.decorLabel, r.grain ? "oui" : "non",
-            edgeNotation(r.edges), shapeWord(r), r.massKg.toFixed(1),
+            r.code, r.items.join(", "), r.label, String(r.quantity), round1(r.length),
+            round1(r.width), saw === null ? "chant ?" : saw === "dxf" ? "DXF" : `${round1(saw.length)} x ${round1(saw.width)}`,
+            String(r.thickness),
+            r.decorLabel, r.grain ? "oui" : "non", edgeNotation(r.edges), shapeWord(r), r.massKg.toFixed(1).replace(".",
+                ","),
         ]);
     }
-    const header = ["Code", "Meuble", "Pièce", "Qté", "Long. (fil)", "Larg.", "Ép.", "Décor", "Fil", "Chants",
+    const header = ["Code", "Meuble", "Pièce", "Qté", "Long. (fil)", "Larg.", "Débit", "Ép.", "Décor", "Fil", "Chants",
                     "Forme", "kg"];
-    const cols = [22, 50, 62, 10, 20, 18, 10, 70, 10, 26, 18, 16];
+    const cols = [22, 46, 58, 10, 18, 16, 30, 10, 60, 10, 24, 16, 14];
     const top = TABLE_TOP + 8;
     const pages = paginateTable(rows, cols, 2.2, 4, TABLE_BOTTOM - top);
     const out: Draft[] = [];
@@ -34,8 +38,9 @@ export function cutListSheets(bom: Bom): Draft[]
     {
         const canvas = new Canvas();
         heading(canvas, `Fiche de débit${pageSuffix(i, pages.length)}`);
-        canvas.text(MARGIN + 5, TABLE_TOP - 2, "Cotes finies, chants collés compris : le débit retranche l'épaisseur "
-            + "du chant posé. Formes autres que rectangle : découper d'après le DXF.", 2.3);
+        canvas.text(MARGIN + 5, TABLE_TOP - 2, "Long. et Larg. : cotes finies, chants collés compris. Débit : cote à "
+            + "scier, chants retranchés ('chant ?' : épaisseur du chant à confirmer). Formes autres que rectangle : "
+            + "découper d'après le DXF.", 2.3);
         canvas.text(MARGIN + 5, TABLE_TOP + 2, "Chants : L1 et L2 les deux grands côtés (v = 0 et v = largeur), "
             + "l1 et l2 les deux petits (u = 0 et u = longueur), u et v comme sur le plan de chaque pièce.", 2.3);
         table(canvas, MARGIN + 5, top, cols, header, chunk);
@@ -58,7 +63,7 @@ export function hardwareSheets(bom: Bom): Draft[]
     const pages = paginateTable(rows, cols, 2.1, 4.2, TABLE_BOTTOM - TABLE_TOP);
     const edges = bom.edges.map((e) =>
     {
-        return [e.label, e.metres.toFixed(1)];
+        return [e.label, e.metres.toFixed(1).replace(".", ",")];
     });
     const out: Draft[] = [];
     pages.forEach((chunk, i) =>
@@ -66,7 +71,7 @@ export function hardwareSheets(bom: Bom): Draft[]
         const canvas = new Canvas();
         heading(canvas, `Quincaillerie${pageSuffix(i, pages.length)}`);
         const y = table(canvas, MARGIN + 5, TABLE_TOP, cols, header, chunk, 2.1, 4.2);
-        // The edge metres close the last hardware page, or take one of their own when it is full
+        // The edge metres close the last hardware page, or take one of their own when it's full
         if (i === pages.length - 1)
         {
             let at = y + 6;

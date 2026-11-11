@@ -26,7 +26,7 @@ export const GAMMA_M = 1.3;
 
 export interface SeatCheck
 {
-    // Widest free span of the top between two supports reaching it, mm
+    // Widest free span of the top betwen 2 supports reaching it, mm
     span: number;
     // Bending stress under the load at mid span, and what the board may take, N/mm2
     stress: number;
@@ -79,10 +79,9 @@ export function checkSeat(c: Carcass, lay: ResolvedLayout, top: Part): SeatCheck
 }
 
 
-// Top board of an open end sat on, carried between the side and the upright a seat always gets, the load
-// halfway between them. The whole depth works as one beam, as for a top
-// TODO the upright is a point under a pate, not a line across it : a plate model would tell how much of the
-// depth really carry the sitter
+// Top board of an open end sat on, between the side and the upright a seat always gets, load halfway, whole depth
+// as one beam
+// TODO the upright is a point under a pate, not a line across it : a plate model would tell how much depth carry it
 export function checkEndSeat(c: Carcass, side: "left" | "right", top: Part): SeatCheck | null
 {
     const post = endPost(c, side);
