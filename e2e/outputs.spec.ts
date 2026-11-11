@@ -47,10 +47,14 @@ test.describe("plans and lists", () =>
     {
         await outputsTab(page, "Montage");
         const titles = page.locator(".assembly .section-title");
-        await expect(titles).toHaveText(["Colonne gauche", "Placards et tiroirs", "Colonne droite", "Niche",
-                                         "Placards hauts"]);
+        // The right column waits for the high cupboards it would have to slide in beside, the small loose columns
+        // go last (assembly.test.ts)
+        await expect(titles).toHaveText(["Colonne gauche", "Placards et tiroirs", "Niche", "Placards hauts",
+                                         "Colonne droite", "Petite colonne gauche", "Petite colonne droite"]);
         await expect(page.locator(".assembly").first()).toContainText("7 embases 174H7100E enfoncées");
-        await expect(page.locator(".assembly").nth(3)).toContainText("vis de liaison 267.07.903");
+        // The niche hides its links (4 x 30 from inside), the high cupboards still bolt to the columns
+        await expect(page.locator(".assembly", { has: page.locator(".section-title", { hasText: /^Placards hauts$/ }) }))
+            .toContainText("vis de liaison 267.07.903");
     });
 
 
@@ -60,6 +64,7 @@ test.describe("plans and lists", () =>
         const sheets = page.locator(".grid-sheets .sheet");
         await expect(sheets.first()).toBeVisible();
         const count = await sheets.count();
+        // The figure written above the sheets has to be the number drawn, not a total kept apart
         await expect(page.locator(".muted", { hasText: "planches A3" })).toHaveText(new RegExp(`^${count} planches A3`));
         await sheets.nth(1).click();
         await expect(page.locator(".sheet.big img")).toBeVisible();
@@ -192,7 +197,8 @@ test.describe("plans and lists", () =>
         await hours.fill("40");
         await hours.press("Tab");
         await outputsTab(page, "Chiffrage"); 
-        const rate = page.locator(".tab-content tr", { hasText: "Main-d'oeuvre de fabrication, 40 h" }).locator("input.price");
+        const rate = page.locator(".tab-content tr",
+                                  { hasText: "Main-d'oeuvre de fabrication, 40 h" }).locator("input.price");
         await rate.fill("45");
         await rate.press("Tab");
         await expect(page.locator(".tab-content tr", { hasText: "Main-d'oeuvre de fabrication, 40 h" }))
@@ -256,6 +262,17 @@ test.describe("plans and lists", () =>
     test("fills the title block, issues index A, and tells a set changed since", async ({ page }) =>
     {
         const design = page.getByRole("button", { name: "Conception", exact: true });
+        await design.click();
+        // The templates come with their designer in the 3 fields : emptied, the check names them all
+        expect((await checkLines(page, true)).join("\n")).not.toMatch(/Cartouche incomplet/);
+        await outputsTab(page, "Réglages");
+        const blank = [/^Propriétaire$/, /^Dessiné par$/, /^Approuvé par$/];
+        for (const label of blank)
+        {
+            const field = page.locator(".field", { has: page.locator(".label", { hasText: label }) }).locator("input");
+            await field.fill("");
+            await field.press("Tab");
+        }
         await design.click();
         expect((await checkLines(page, true)).join("\n"))
             .toMatch(/Cartouche incomplet.*propriétaire, dessiné par, approuvé par/);

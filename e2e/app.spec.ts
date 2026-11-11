@@ -19,8 +19,8 @@ test.describe("application", () =>
     test("loads both templates and the blank project", async ({ page }) =>
     {
         await openTemplate(page, "Vaisselier bibliothèque");
-        // Five colmuns of the dresser
-        await expect(page.locator(".facade .grip")).toHaveCount(5);
+        // Five colmuns of the dresser and the 2 small ones loose in its niche
+        await expect(page.locator(".facade .grip")).toHaveCount(7);
         expect(await errorCount(page)).toBe(0);
         await page.getByLabel("Nouveau projet").selectOption({ label: "Composition TV et bibliothèque" });
         expect(await errorCount(page)).toBe(0);

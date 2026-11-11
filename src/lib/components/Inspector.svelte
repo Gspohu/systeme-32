@@ -534,7 +534,7 @@
                         onchange={(e) => app.apply(setShoeRack, carcass.id, nodeBox.id, num(e))} />
                 </label>
                 {@const light = carcass.lights.find((l) => { return l.cell === nodeBox.id; }) ?? null}
-                <label class="form-check" title="Profilé LED encastré sous le panneau au-dessus de la case">
+                <label class="form-check" title="Profilé ou spots LED sous le panneau au-dessus de la case">
                     <input type="checkbox" checked={light !== null}
                         onchange={(e) => app.apply(setLight, carcass.id, nodeBox.id, checked(e)
                             ? { kind: "strip", spots: 0, setback: 40, kelvin: 3000 } : null)} />
@@ -555,6 +555,14 @@
                                 under: checked(e) })} />
                         Sous le caisson
                     </label>
+                    {#if light.kind === "strip"}
+                        <label class="form-check" title="Profilé dans une rainure du panneau, sinon vissé en applique">
+                            <input type="checkbox" checked={light.recess === true}
+                                onchange={(e) => app.apply(setLight, carcass.id, nodeBox.id, { ...light,
+                                    recess: checked(e) })} />
+                            Encastré
+                        </label>
+                    {/if}
                     {#if light.kind === "spots"}
                         <label class="field"><span class="label">Spots</span>
                             <input class="input" type="number" min="1" step="1" value={light.spots}

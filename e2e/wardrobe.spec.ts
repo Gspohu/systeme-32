@@ -51,6 +51,8 @@ test.describe("wardrobe", () =>
     {
         await cells(page).first().click();
         await check(page, "Éclairage LED").check();
+        // Screwed on the face unless asked : a groove weakens the panel over the cell
+        await check(page, "Encastré").check();
         await setField(page, "Retrait (mm)", "60");
         await field(page, "Teinte").selectOption("4000");
         await expect(page.locator(".facade .led")).toHaveCount(1);
