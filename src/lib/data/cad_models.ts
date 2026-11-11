@@ -16,8 +16,8 @@ const BLUM = "blum/step";
 const HAFELE = "hafele";
 const NICKEL: [number, number, number] = [224, 222, 214];
 const CARBON: [number, number, number] = [41, 41, 41];
-const STEEL: [number, number, number] = [150, 152, 158];
-const ZINC: [number, number, number] = [192, 192, 192];
+export const STEEL: [number, number, number] = [150, 152, 158];
+export const ZINC: [number, number, number] = [192, 192, 192];
 // The dark oak of the 3D view would hide them, a beech dowel is pale
 const BEECH: [number, number, number] = [219, 190, 150];
 const ALUMINIUM_BRASS: [number, number, number] = [176, 150, 96];
@@ -33,6 +33,11 @@ export const CAD_MODELS: Record<string, CadModel> = {
                        file: `${BLUM}/760H4500S_46204387.step`, rgb: STEEL },
     "760H4500S.right": { ref: "760H4500S", label: "Coulisse MOVENTO NL 450, droite",
                         file: `${BLUM}/760H4500S_46581677.step`, rgb: STEEL },
+    // The pull-out once set back behind the gas stays, its left one positive along x as the 450 one, 30 shorter
+    "760H4200S.left": { ref: "760H4200S", label: "Coulisse MOVENTO NL 420, gauche",
+                       file: `${BLUM}/760H4200S_41524174.step`, rgb: STEEL },
+    "760H4200S.right": { ref: "760H4200S", label: "Coulisse MOVENTO NL 420, droite",
+                        file: `${BLUM}/760H4200S_42183110.step`, rgb: STEEL },
     "760H4800S.left":{ ref: "760H4800S", label: "Coulisse MOVENTO NL 480, gauche",
                       file: `${BLUM}/760H4800S_42061081.step`, rgb: STEEL },
     "760H4800S.right": { ref: "760H4800S", label: "Coulisse MOVENTO NL 480, droite",

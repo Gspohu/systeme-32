@@ -47,8 +47,7 @@ FIX_TOUCH = 0.1
 HEAD_DEPTH = 0.6
 CORE_RATIO = 0.7
 NOT_HELD = ("PLUG_DUOPOWER_8x40", "PLUG_NYLON_8x40")
-# TODO the STARSTOP 365.55.69x of the bottle drawer has no model yet : this check can't see its bracket
-# against the open flap
+# TODO only the shut flap is built : the gas stays 365.01.901 swung open over the bottle drawer go unchecked
 
 # The bottom of the cup in each Blum model of hinge, read off their Ø35 cylinders : the crank of the twin one sets it 9.5
 # further. A cup further than this from the bottom of its boring is a hinge off its door

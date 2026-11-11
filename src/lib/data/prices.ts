@@ -28,6 +28,12 @@ function ht(ttc: number): number
     return Math.round(ttc / 1.2 * 1000) / 1000;
 }
 
+// A German shop price, its VAT of 19 % taken off
+function htDe(ttc: number): number
+{
+    return Math.round(ttc / 1.19 * 1000) / 1000;
+}
+
 function fromGbp(gbp: number): number
 {
     return Math.round(gbp / GBP * 1000) / 1000;
@@ -102,6 +108,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:760H4500S": entry(fromGbp(28.79), "u", "Blum UK (blum.org.uk), 28,79 GBP la paire, lu le 8 novembre 2026"),
     "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière, lu le 2 octobre"),
     "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
+    "hw:760H4200S": entry(fromGbp(25.65), "u", "Interfit (UK), 25,65 GBP HT la paire, lu le 11 novembre", "2026-11-11"),
     "hw:70T3550.TL": entry(fromGbp(1.33), "u", "Interfit (UK), 1,33 GBP HT la charnière sans ressort", READ_ON_2),
     "hw:70T3650.TL": entry(fromGbp(1.61), "u", "Interfit (UK), 1,61 GBP HT la charnière sans ressort", READ_ON_2),
     // Sold as a set with its strike plaet, black or white at the same price
@@ -140,11 +147,16 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:84335807": entry(ht((10.9 + 0.07) / 2), "u", "Leroy Merlin, lot de 2 poignées Oslo laiton brossé mat 180 mm, "
                          + "EAN 3276007458664, 10,90 EUR TTC et 0,07 d'éco-participation (ticket du 9 novembre 2026), "
                          + "4 vis fournies", "2026-11-09", 2),
+    "hw:342.66.730": entry(htDe(9.16), "u", "hwt-pro.com (Allemagne), Häfele 342.66.730, 9,16 EUR TTC la pièce jusqu'à 9, "
+                           + "TVA 19 %, en stock", "2026-11-11"),
+    "hw:365.01.901": entry(24.14, "u", "Häfele France, compte client, prix net 24,14 EUR la pièce, disponibilité sur "
+                           + "demande", "2026-11-11"),
 
     // Generic LED parts read at Ledkia, one of each per lit cell : a 2 m profile, a 5 m reel, one lead
     "hw:LED_PROFILE_RECESS": entry(ht(6.99), "u", "Estimation : Ledkia, profilé encastré Lithos H12 2 m avec diffuseur "
                                   + "à 6,99 EUR TTC, son corps à vérifier contre la rainure 18 x 8,5", READ_ON_2),
-    "hw:LED_PROFILE_SURFACE": entry(ht(6.99), "u", "Prix du profilé encastré repris, celui de l'applique Loox 833.72.840 "
+    "hw:LED_PROFILE_SURFACE": entry(ht(6.99), "u",
+                                    "Prix du profilé encastré repris, celui de l'applique Loox 833.72.840 "
                                     + "non relevé", "2026-11-08"),
     "hw:LED_STRIP_24V": entry(ht(6.49), "u", "Ledkia, ruban 24 V 8 mm coupe 5 cm, 12 W/m, bobine de 5 m à 6,49 EUR TTC",
                               READ_ON_2),

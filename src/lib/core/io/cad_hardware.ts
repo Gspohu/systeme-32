@@ -10,7 +10,7 @@ import { decorById } from "../../data/materials";
 import { FRONT_GAP, MINIFIX, MOVENTO, TIPON_ADAPTER } from "../../data/rules";
 import { screwOf, type ScrewSpec } from "../../data/screws";
 import { AXILO_FEET, EDGE_PULL } from "../../data/hardware";
-import type { CadModel } from "../../data/cad_models";
+import { STEEL, ZINC, type CadModel } from "../../data/cad_models";
 
 export interface CadScrew extends ScrewSpec
 {
@@ -67,6 +67,8 @@ export interface CadInstance
     after?: string[];
     // A screw cap : the purpose of the screw it covers
     covers?: string;
+    // An article drawn in several solids : the one bought unit each of them belongs to
+    unit?: string;
 }
 
 // Its own front stops 16.6 before the first screw (Blum model 956.1201), the unit reaching the same front with its
@@ -618,6 +620,41 @@ function capModels(b: Build, out: CadInstance[], drawn: Record<string, CadModel>
 }
 
 
+// The gas stays of a drop flap, drawn off their volumes (drop_flaps.ts) : the STEP of 365.01.901 holds an open shell
+// for its strut and no cabinet bracket, no solid to check a clash against
+function gasStays(b: Build, out: CadInstance[], drawn: Record<string, CadModel>): void
+{
+    for (const f of b.fitted)
+    {
+        if (f.purpose !== "flap-stay")
+        {
+            continue;
+        }
+        const [a, w, h] = [2 * f.half[0], 2 * f.half[1], 2 * f.half[2]];
+        const z = f.axes[2];
+        const unit = f.key.slice(0, f.key.lastIndexOf("/"));
+        if (f.shape === "cylinder")
+        {
+            const key = `${f.ref}@verin${Math.round(h)}`;
+            drawn[key] = { ref: f.ref, label: `Compas ${f.ref}, vérin`, rgb: STEEL, draw: { cylinder: [a / 2, h] } };
+            const o: Vec3 = [0, 1, 2].map((k) => { return f.centre[k]! - z[k]! * h / 2; }) as Vec3;
+            out.push({ model: key, item: f.item, part: f.label, o, x: f.axes[0], y: f.axes[1], z, unit });
+            continue;
+        }
+        // A box : its section across the first 2 axes, padded along the third
+        const key = `${f.ref}@${Math.round(a)}x${Math.round(w)}x${Math.round(h * 10) / 10}`;
+        drawn[key] = { ref: f.ref, label: `Compas ${f.ref}, équerre`, rgb: ZINC,
+                       draw: { section: [[0, 0], [a, 0], [a, w], [0, w]], length: h } };
+        const [x, y] = [f.axes[0], f.axes[1]];
+        const o: Vec3 = [0, 1, 2].map((k) =>
+        {
+            return f.centre[k]! - x[k]! * a / 2 - y[k]! * w / 2 - z[k]! * h / 2;
+        }) as Vec3;
+        out.push({ model: key, item: f.item, part: f.label, o, x, y, z, unit });
+    }
+}
+
+
 // The Häfele model of each flap hinge, flap shut, placed from the box of its carcass leaf : model x to the back, y to
 // the left, z up. Its 6 supplied screws run along the 30 degree holes as DIN 7997:2008 3 x 20, head 5.6 in a 6.3 bore
 const FLAP_HINGE_SCREW: ScrewSpec = { kind: "countersunk", diameter: 3, length: 20, standard: "DIN7997", head: 5.6,
@@ -684,6 +721,7 @@ export function cadHardware(p: Project, b: Build): { instances: CadInstance[]; s
     const drawn: Record<string, CadModel> = {};
     lightModels(p, b, instances, drawn);
     capModels(b, instances, drawn);
+    gasStays(b, instances, drawn);
     return { instances, screws, drawn };
 }
 

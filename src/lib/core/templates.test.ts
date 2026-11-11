@@ -152,7 +152,7 @@ describe("the sketch templates", () =>
     }
 
 
-    it("fits the dresser with 22 unsprung hinges, a TIP-ON per door and flap, three 480 runner pairs and a 450 one",
+    it("fits the dresser with 22 unsprung hinges, a TIP-ON per door and flap, three 480 runner pairs and a 420 one",
        () =>
     {
         // 7 short doors of 2 hinges, the 861 one of the left column three, the full height right one 5. The
@@ -160,7 +160,8 @@ describe("the sketch templates", () =>
         const hw = hardwareCount(dresser);
         expect((hw.get("70T3550.TL") ?? 0) + (hw.get("70T3650.TL") ?? 0)).toBe((7 * 2) + 3 + 5);
         expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(0);
-        expect([hw.get("342.66.730"), hw.get("365.55.695"), hw.get("365.55.685")]).toEqual([2, 1, 1]);
+        // 2 gas stays : the STARSTOP of the first design is no longer sold in France
+        expect([hw.get("342.66.730"), hw.get("365.01.901")]).toEqual([2, 2]);
         // The 2253 rigth door is past the 1300 of the short unit, the flap takes a short one
         expect(hw.get("956.1004")).toBe(9);
         expect(hw.get("956A1004")).toBe(1);
@@ -168,7 +169,9 @@ describe("the sketch templates", () =>
         expect(hw.get("174H7100E")).toBe(22);
         expect(hw.get("173H7100")).toBeUndefined();
         expect(hw.get("760H4800S")).toBe(3);
-        expect(hw.get("760H4500S")).toBe(1);
+        // Set back behind the struts of the gas stays, the pull-out loses its 450 for a 420
+        expect(hw.get("760H4500S")).toBeUndefined();
+        expect(hw.get("760H4200S")).toBe(1);
     });
 
 
@@ -1644,6 +1647,28 @@ describe("the inset drop flap of the dresser", () =>
             const off = Math.min(...[0, 1, 2].map((k) => { return Math.abs(Math.abs(s.out[k]!) - 0.866); }));
             expect(off).toBeLessThan(1e-3);
         }
+    });
+
+
+    it("holds it on 2 gas stays sold in France, warns past their 600, and keeps the pull-out behind their struts", () =>
+    {
+        // The STARSTOP of the first design is gone from Häfele France : 365.01.901, 600 high at most (MB 5.313)
+        expect(b.warnings.filter((w) => { return /617,6 mm de haut.*365\.01\.901/.test(w); })).toHaveLength(1);
+        const stays = b.fitted.filter((f) => { return f.item === low.id && f.purpose === "flap-stay"; });
+        expect(stays).toHaveLength(2 * 4);
+        const struts = stays.filter((f) => { return f.shape === "cylinder"; });
+        expect(struts).toHaveLength(2);
+        // Their rear-most point, flap shut, against the front of the box and of its spacers
+        const strutBack = Math.min(...struts.map((f) => { return f.centre[2] - f.half[0]; }));
+        const box = b.parts.filter((q) => { return q.item === low.id &&
+                                           /Tiroir intérieur|Cale de coulisse/.test(q.label); });
+        expect(box.length).toBeGreaterThan(2);
+        const boxFront = Math.max(...box.flatMap((q) =>
+        {
+            return [0, q.thickness].flatMap((w) => { return [at(q.frame!, 0, 0, w)[2], at(q.frame!, q.length,
+                q.width, w)[2]]; });
+        }));
+        expect(boxFront).toBeLessThan(strutBack);
     });
 
 

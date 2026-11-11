@@ -1,6 +1,5 @@
-// A drop-down flap and the pull-out behind it : 2 flap hinges in the floor of the cell and in the flap, a braking
-// stay on each side, a TIP-ON in the front edge of the panel over it (Häfele, HTH Furniture Fittings 2023 p. 3.185
-// and 3.188)
+// A drop-down flap and the pull-out behind it : 2 flap hinges in the floor of the cell and in the flap (Häfele 2023
+// p. 3.188), a gas stay on each side (Häfele France MB 5.313), a TIP-ON in the front edge of the panel over it
 
 import type { Carcass, DropFront, Settings } from "./model";
 import type { NodeBox, ResolvedLayout } from "./layout";
@@ -40,18 +39,21 @@ export const FLAP_HINGE = {
 };
 // Workshop choice : each hinge 100 in from the side of the cell, clear of the stays against them
 const HINGE_INSET = 100;
-// STARSTOP, p. 3.185 : the version for cells of 556 and more, its bracket on the side on the row 28 off the front
-// edge, A = 372 over the floor, the one on the flap B = 150 over its lower edge. Brackets of 30 x 22 (holes 22
-// apart, one over the other) and 45 x 32 (holes 32 apart, side by side)
-export const STARSTOP = { left: "365.55.695", right: "365.55.685", minCell: 556, row: 28, sideUp: 372, flapUp: 150,
-                          sideHoles: 22, flapHoles: 32, bracket: 45 };
+// Häfele gas stay 365.01.901, LGH-M 2017 p. MB 5.313 : flap shut, its pivots 238 and 65 over the lower edge of the
+// flap, 18 and 16 behind its back, 25 off the side, a strut of 15, its ball sockets 16.5 long. 2 of them past 400
+// high, 10 kg and 600 high at
+// most. The flap bracket off its STEP : a plate 46 x 31 x 3, 2 screws 32 apart 19 from the pivot
+export const GAS_STAY = { ref: "365.01.901", sideUp: 238, flapUp: 65, sideBehind: 18, flapBehind: 16, offSide: 25,
+                          strut: 15, socket: 16.5, pin: 8, maxHigh: 600, maxKg: 10,
+                          plate: { long: 46, wide: 31, thick: 3, screws: 32, offPivot: 19 } };
 // Workshop choices for the pull-out : spacers of the carcass board under its runners, clear of the stays, its box
 // raised over the bracket of the stay standing on the open flap, its front back off the front edge, its sides
 // holding bottles
 const SPACER_HEIGHT = 80;
 // The box 3 over the leaves, 14.5 proud of the floor and of the open flap, its front 3 behind the flap leaf. The edge
 // of the box passes over the stay's bracket on the open flap too
-// TODO the height of the STARSTOP bracket over the open flap, not in the 2023 catalogue : the box clears 17.5
+// TODO the height of the gas stay's bracket over the open flap isn't printed : the box clears 17.5, the CAD check
+// judges it
 const PULL_OUT_CLEAR = 3;
 const PULL_OUT_SETBACK = 30;
 const PULL_OUT_SIDE = 150;
@@ -125,11 +127,11 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             continue;
         }
         const name = `${c.name}, abattant ${fp.number}`;
-        if (nb.h < STARSTOP.minCell)
+        if (fp.rect.h > GAS_STAY.maxHigh)
         {
-            b.errors.push(`${name} : case de ${Math.round(nb.h)} mm, ${STARSTOP.minCell} mini pour les compas STARSTOP `
-                + "(Häfele p. 3.185). Agrandir la case.");
-            continue;
+            const high = String(Math.round(fp.rect.h * 10) / 10).replace(".", ",");
+            b.warnings.push(`${name} : ${high} mm de haut, au-delà des ${GAS_STAY.maxHigh} mm `
+                + `des compas ${GAS_STAY.ref} (Häfele MB 5.313). Essai de butée avant pose, comme le recommande Häfele.`);
         }
         const floor = panelBelow(c, lay, nb, b);
         const faces = [sideFace(c, lay, b, nb, "left"), sideFace(c, lay, b, nb, "right")];
@@ -139,7 +141,7 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             continue;
         }
         hinges(c, nb, fp, floor, flap, b);
-        stays(c, nb, fp.rect.x, faces as FaceRef[], flap, b);
+        stays(c, nb, fp, faces as FaceRef[], flap, b);
         // Open, the leaves lie in line and the back of the flap levels with the floor. An inset flap h up and t thick
         // turns about (h - t) / 2 under the floor and in front of its back, an overlay one about its outer lower edge
         const inset = front.mount === "inset";
@@ -197,48 +199,77 @@ function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part
                             half: [half[1]!, half[2]!, half[0]!], host: host.id, hidden: true });
         }
     }
-    // Found in no shop on 2026-11-08, its neighbour 342.66.709 in stock : kept for its drawing, the cabinet maker
-    // confirms it
     b.hardware.push({ ref: FLAP_HINGE.ref, qty: 2, item: c.id, itemName: c.name, target: flap.id,
-                      note: "en applique, abattant intérieur posé sur l'aile du meuble, vis fournies, référence à confirmer "
-                          + "chez Häfele", purpose: "flap-hinge" });
+                      note: "en applique, abattant intérieur posé sur l'aile du meuble, vis fournies",
+                      purpose: "flap-hinge" });
     flap.notes.push(`Abattant intérieur entre les montants, posé sur les ailes des charnières ${FLAP_HINGE.ref} : son `
         + `chant bas ${FLAP_HINGE_LEAF} mm au-dessus du fond de la case. Charnières en applique, sans cuvette, vissées `
         + "par leurs 6 vis fournies chacune, à 30 degrés à travers les ailes, 3 dans le fond et 3 dans l'abattant, rien "
-        + "à percer. Vis fournies et référence à confirmer chez Häfele");
+        + "à percer");
 }
 
 
-// A braking stay on each side : its bracket on the side of the cell, the other on the flap
-function stays(c: Carcass, nb: NodeBox, flapX: number, faces: FaceRef[], flap: Part, b: Build): void
+// A gas stay on each side, flap shut : its bracket on the side of the cell, the other on the back of the flap. Häfele
+// sets them by trial (the cabinet first, the flap bracket once the flap is open) : screw places, nothing drilled
+function stays(c: Carcass, nb: NodeBox, fp: FrontPanel, faces: FaceRef[], flap: Part, b: Build): void
 {
+    const g = GAS_STAY;
+    const p = g.plate;
+    const back = c.z + fp.z;
+    const edge = c.y + fp.rect.y;
     for (const [k, fr] of faces.entries())
     {
         const left = k === 0;
-        const ref = left ? STARSTOP.left : STARSTOP.right;
-        const u = nb.y + STARSTOP.sideUp - fr.uOrigin;
-        for (const du of [-STARSTOP.sideHoles / 2, STARSTOP.sideHoles / 2])
+        const hand = left ? "gauche" : "droit";
+        const inward = left ? 1 : -1;
+        const sideX = left ? nb.x : nb.x + nb.w;
+        const axisX = sideX + inward * g.offSide;
+        const upper: Vec3 = [c.x + axisX, edge + g.sideUp, back - g.sideBehind];
+        const lower: Vec3 = [c.x + axisX, edge + g.flapUp, back - g.flapBehind];
+        fr.part.holes.push({ u: fp.rect.y + g.sideUp - fr.uOrigin, v: c.depth - (fp.z - g.sideBehind) - fr.vOrigin,
+                             diameter: 0, depth: 0, face: fr.face, purpose: "flap-screw", fixes: g.ref,
+                             label: `Compas ${g.ref} ${hand} : axe de l'équerre de corps, posée par essai (Häfele)` });
+        // The plate on the flap reaches 26 in from its pivot and 5 out, its screws 19 in
+        const screwsX = axisX + inward * p.offPivot - fp.rect.x;
+        for (const du of [-p.screws / 2, p.screws / 2])
         {
-            fr.part.holes.push({ u: u + du, v: STARSTOP.row - fr.vOrigin, diameter: 0, depth: 0, face: fr.face,
-                                 label: `Compas STARSTOP ${ref} : équerre de côté, vis selon la notice`, purpose: "flap-screw",
-                                 fixes: ref });
+            flap.holes.push({ u: g.flapUp + du, v: screwsX, diameter: 0, depth: 0, face: "A", purpose: "flap-screw",
+                              fixes: g.ref, label: `Compas ${g.ref} ${hand} : équerre d'abattant, vissée abattant ouvert` });
         }
-        // The bracket on the flap in line with the one on the side, half its width in from the side of the cell
-        const x = left ? nb.x + STARSTOP.bracket / 2 : nb.x + nb.w - STARSTOP.bracket / 2;
-        for (const dv of [-STARSTOP.flapHoles / 2, STARSTOP.flapHoles / 2])
-        {
-            flap.holes.push({ u: STARSTOP.flapUp, v: x - flapX + dv, diameter: 0, depth: 0, face: "A",
-                              label: `Compas STARSTOP ${ref} : équerre d'abattant, vis selon la notice`, purpose: "flap-screw",
-                              fixes: ref });
-        }
-        // The version for cells of 556 shown discontinued by a US shop on 2026-11-08, still in the 2023 catalogue
-        b.hardware.push({ ref, qty: 1, item: c.id, itemName: c.name, target: flap.id,
-                          note: `compas à frein ${left ? "gauche" : "droit"}, disponibilité à confirmer chez Häfele`, purpose: "flap" });
+        const d: Vec3 = [upper[0] - lower[0], upper[1] - lower[1], upper[2] - lower[2]];
+        const len = Math.hypot(...d);
+        const axis: Vec3 = [d[0] / len, d[1] / len, d[2] / len];
+        const across: Vec3 = [0, axis[2], -axis[1]];
+        const key = `${c.id}/drop/${fp.id}/compas-${hand}`;
+        const plateX = c.x + axisX + inward * (p.wide / 2 - 5);
+        b.fitted.push(
+            { key: `${key}/verin`, item: c.id, ref: g.ref, label: `${c.name}, compas ${g.ref} ${hand} : vérin`,
+              purpose: "flap-stay", shape: "cylinder", centre: [lower[0] + d[0] / 2, lower[1] + d[1] / 2,
+                                                                lower[2] + d[2] / 2],
+              axes: [X, across, axis], half: [g.strut / 2, g.strut / 2, len / 2 - g.socket / 2], host: null,
+              hidden: true },
+            { key: `${key}/equerre-abattant`, item: c.id, ref: g.ref, host: flap.id, hidden: true,
+              label: `${c.name}, compas ${g.ref} ${hand} : équerre d'abattant`, purpose: "flap-stay", shape: "box",
+              centre: [plateX, lower[1], back - p.thick / 2], axes: [X, Y, Z], half: [p.wide / 2, p.long / 2,
+                                                                                      p.thick / 2] },
+            // Not in the STEP : a plate as large as the flap one on the side, a pin out to the pivot
+            { key: `${key}/equerre-corps`, item: c.id, ref: g.ref, host: fr.part.id, hidden: true,
+              label: `${c.name}, compas ${g.ref} ${hand} : équerre de corps (encombrement)`, purpose: "flap-stay",
+              shape: "box", centre: [c.x + sideX + inward * p.thick / 2, upper[1], upper[2]], axes: [X, Y, Z],
+              half: [p.thick / 2, p.long / 2, p.wide / 2] },
+            { key: `${key}/teton`, item: c.id, ref: g.ref, host: null, hidden: true,
+              label: `${c.name}, compas ${g.ref} ${hand} : téton de l'équerre de corps (encombrement)`,
+              purpose: "flap-stay", shape: "box", centre: [c.x + sideX + inward * (p.thick + g.offSide) / 2, upper[1],
+                                                           upper[2]], axes: [X, Y, Z],
+              half: [(g.offSide - p.thick) / 2, g.pin / 2, g.pin / 2] },
+        );
+        b.hardware.push({ ref: g.ref, qty: 1, item: c.id, itemName: c.name, target: flap.id, purpose: "flap",
+                          note: `compas à vérin à gaz ${hand}, équerres fournies, disponibilité sur demande chez Häfele` });
     }
-    flap.notes.push(`Compas à frein STARSTOP ${STARSTOP.left} et ${STARSTOP.right} : équerres à ${STARSTOP.sideUp} mm `
-        + `au-dessus du fond sur la rangée à ${STARSTOP.row} mm et à ${STARSTOP.flapUp} mm du chant bas de l'abattant. Cote `
-        + "C à régler par essai de montage, charge admise non publiée et disponibilité de la version 556 à confirmer "
-        + "auprès de Häfele (2023 p. 3.185)");
+    flap.notes.push(`2 compas à vérin à gaz ${g.ref} : axes à ${g.sideUp} et ${g.flapUp} mm du chant bas de l'abattant, `
+        + `à ${g.sideBehind} et ${g.flapBehind} mm derrière lui, à ${g.offSide} mm des joues (Häfele MB 5.313). `
+        + "Position exacte à la pose : équerres de corps d'abord, équerres d'abattant vissées l'abattant ouvert. "
+        + `${g.maxKg} kg et ${g.maxHigh} mm de haut au plus pour la paire : essai de butée avant pose`);
 }
 
 
@@ -248,9 +279,10 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
     { loadKg, boxDecor }: { loadKg: number; boxDecor?: string }): void
 {
     const t = c.thickness;
-    // Behind the flap leaf of an inset flap, else the setback off the front edge
-    // The flap leaf stands 14.5 behind the back of the flap, as high as the carcass leaf rises
-    const zFront = front.mount === "inset" ? fp.z - FLAP_HINGE_TOP - PULL_OUT_CLEAR : c.depth - PULL_OUT_SETBACK;
+    // Behind the flap leaf of an inset flap, else the setback off the front edge, and behind the struts of the gas
+    // stays, flap shut : the box and its spacers ran into them in the clash check of the dresser
+    const ahead = front.mount === "inset" ? fp.z - FLAP_HINGE_TOP - PULL_OUT_CLEAR : c.depth - PULL_OUT_SETBACK;
+    const zFront = Math.min(ahead, fp.z - GAS_STAY.sideBehind - GAS_STAY.strut / 2 - PULL_OUT_CLEAR);
     const runner = chooseRunner(zFront - lay.zBack, loadKg);
     if (runner === null)
     {

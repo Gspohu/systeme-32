@@ -398,12 +398,11 @@ add({ id: EDGE_PULL.ref, family: "D51", label: `Poignée Oslo aluminium laiton b
 // only one found with their drawings
 const HAFELE_TH = "Häfele Thaïlande, HTH Furniture Fittings 2023";
 const HAFELE_TH_URL = "https://hafelethailand.com/wp-content/uploads/2025/12/03-Hinges-and-Flap-Fittings.pdf";
-add({ id: "342.66.730", family: "D20", label: `Charnière d'abattant tombant 90°, cuvettes ${DIAM}35, réglage 3D, nickelée`,
+add({ id: "342.66.730", family: "D20", label: "Charnière d'abattant tombant 90°, 2 ailes vissées en applique, sans cuvette, nickelée",
      brand: "Häfele", ref: "342.66.730", source: `${HAFELE_TH} p. 3.188`, url: HAFELE_TH_URL });
-add({ id: "365.55.695", family: "D22", label: "Compas d'abattant à frein STARSTOP, 2 bras, gauche, case de 556 mm mini",
-     brand: "Häfele", ref: "365.55.695", source: `${HAFELE_TH} p. 3.185`, url: HAFELE_TH_URL });
-add({ id: "365.55.685", family: "D22", label: "Compas d'abattant à frein STARSTOP, 2 bras, droit, case de 556 mm mini",
-     brand: "Häfele", ref: "365.55.685", source: `${HAFELE_TH} p. 3.185`, url: HAFELE_TH_URL });
+add({ id: "365.01.901", family: "D22", label: "Compas d'abattant à vérin à gaz, à frein, 235 mm, course 74 mm, gris argent, "
+         + "gauche ou droite, équerres de corps et d'abattant fournies",
+     brand: "Häfele", ref: "365.01.901", source: "Häfele France, LGH-M Technique 2017 p. MB 5.313" });
 add({ id: "283.33.910", family: "D70", label: `Fixation invisible d'étagère à platine vissée, broche ${DIAM}12 x 112`,
      brand: "Häfele", ref: "283.33.910", source: `${HAFELE_UK} p. 7.142`,
      url: "https://assets.daro.com/HafeleLiterature/18T7-142.pdf" });

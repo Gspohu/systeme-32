@@ -73,10 +73,12 @@ describe("the bought articles of the CAD export", () =>
                     off.push(`${key} : ${count(i, key)} posés pour ${ordered} commandés`);
                 }
             }
-            // A drawn model is cut to its length : counted by its reference over all its lengths
+            // A drawn model is cut to its length : counted by its reference over all its lengths, an article drawn in
+            // several solids once (the strut and the brackets of a gas stay)
             for (const ref of new Set(Object.values(drawn).map((m) => { return m.ref; })))
             {
-                const placed = i.filter((x) => { return drawn[x.model]?.ref === ref; }).length;
+                const mine = i.filter((x) => { return drawn[x.model]?.ref === ref; });
+                const placed = new Set(mine.map((x, k) => { return x.unit ?? `#${k}`; })).size;
                 if (placed !== listed(b, ref))
                 {
                     off.push(`${ref} : ${placed} posés pour ${listed(b, ref)} commandés`);
