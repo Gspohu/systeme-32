@@ -27,18 +27,17 @@ function centreOf(q: Part): [number, number]
 
 describe("a cable hole through the side of a cell", () =>
 {
-    it("goes through the outer side of the TV column, behind the amplifier, clear of every drilling", () =>
+    it("goes through the outer side of the TV column, in line with the book column, clear of every drilling", () =>
     {
         const p = tvWall();
         const a = analyse(p);
         const column = p.items.find((it): it is Carcass => { return it.name === "Colonne gauche"; })!;
         const side = a.build.parts.find((q) => { return q.id === `${column.id}/side/R`; })!;
         expect(side.cutouts.length).toBe(1);
-        // The middle of the 155 cell over the 19 bottom, 196 from the front : 104 off the wall, the amplifier's
-        // back at 215
+        // The middle of the 155 cell over the 19 bottom, 85 off the wall : the back row of shelf holes stands at 45
         const [u, v] = centreOf(side);
         expect(u).toBeCloseTo(19 + 155 / 2, 6);
-        expect(column.depth - v).toBeCloseTo(104, 6);
+        expect(column.depth - v).toBeCloseTo(85, 6);
         expect(cutThrough(side)).toEqual([]);
         // from the front the hole stay edge on, over the thickness of the side
         const seen = a.build.outlets.filter((o) => { return o.item === column.id && o.edgeOn; });
@@ -71,7 +70,7 @@ describe("a cable hole through the side of a cell", () =>
                                                   q.label === "Joue droite"; })!;
         const [u, v] = centreOf(column);
         const pin = column.holes.find((h) => { return h.face === "A" && h.diameter > 0; })!;
-        const reach = 30 + pin.diameter / 2 + 2;
+        const reach = 20 + pin.diameter / 2 + 2;
         column.holes.push({ ...pin, u, v: v + reach - 0.5, label: "Taquet de Mulhouse" });
         expect(cutThrough(column).map((h) => { return h.label; })).toEqual(["Taquet de Mulhouse"]);
         column.holes[column.holes.length - 1]!.v = v + reach + 0.5;

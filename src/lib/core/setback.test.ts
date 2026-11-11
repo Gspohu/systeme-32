@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CommandError, NICHE_SETBACK, addItem, setDividerSetback, setFront, splitCell, splitZone } from "./commands";
-import { cell, newCarcass, newProject, split } from "./factory";
+import { cell, newCarcass, newFront, newProject, split } from "./factory";
 import { analyse } from "./analysis";
 import { resolveLayout } from "./layout";
 import { validateProject } from "./io/project_file";
@@ -38,9 +38,13 @@ function cupboard(): { p: Project; c: Carcass }
 
 describe("shelves behind a door over several cells", () =>
 {
-    it("adds one in the tallest cell of the right column of the dresser, its door kept over the whole", () =>
+    it("adds one in the tallest cell of a tall column, its door kept over the whole", () =>
     {
-        const p = dresser();
+        const root0 = split("h", [776, 1666], [cell(), cell(), cell()]);
+        const tall = newCarcass({ name: "Colonne droite", width: 678, height: 2256, depth: 500, base: { type: "floor" },
+                                  root: root0 });
+        tall.fronts.push(newFront(root0.id, { type: "door", hinge: "right" }));
+        const p = addItem(newProject("Colonne"), tall);
         const kr = carcassNamed(p, "Colonne droite");
         // The zone the door covers is no single cell : the inspector had no way to cut it
         expect(() =>
@@ -79,11 +83,27 @@ describe("shelves behind a door over several cells", () =>
 });
 
 
+// A niche whose side shelves and uprights stand back, the way the dresser had them until its columns came loose
+function recessedNiche(): Project
+{
+    const sideShelves = (): SplitNode =>
+    {
+        const s = split("h", [201, 421], [cell(), cell(), cell()]);
+        s.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
+        return s;
+    };
+    const root = split("v", [220, 1325], [sideShelves(), cell(), sideShelves()]);
+    root.setbacks = [NICHE_SETBACK, NICHE_SETBACK];
+    return addItem(newProject("Niche"), newCarcass({ name: "Niche", width: 1602, height: 680, depth: 500,
+                                                     base: { type: "floor" }, root }));
+}
+
+
 describe("dividers standing back from the front", () =>
 {
-    it("sets the shelves and uprights of the small niches of the dresser back, the opening keeps its depth", () =>
+    it("sets the shelves and uprights of a niche back, the opening keeps its depth", () =>
     {
-        const p = dresser();
+        const p = recessedNiche();
         const side = partsOf(p, "Niche", "side")[0]!;
         const uprights = partsOf(p, "Niche", "vdivider");
         const shelves = partsOf(p, "Niche", "hdivider");
@@ -94,11 +114,12 @@ describe("dividers standing back from the front", () =>
             expect(side.width - q.width).toBe(NICHE_SETBACK);
             expect(side.frame!.o[2] - q.frame!.o[2]).toBe(NICHE_SETBACK);
         }
-        // Nothing stands back anywhere else in the piece
-        for (const name of ["Colonne gauche", "Placards et tiroirs", "Placards hauts", "Colonne droite"])
+        // Nothing stands back in the dresser now : its small columns are loose boxes of their own
+        const piece = dresser();
+        for (const name of ["Colonne gauche", "Placards et tiroirs", "Niche", "Placards hauts", "Colonne droite"])
         {
-            const k = partsOf(p, name, "side")[0]!;
-            for (const q of [...partsOf(p, name, "hdivider"), ...partsOf(p, name, "vdivider")])
+            const k = partsOf(piece, name, "side")[0]!;
+            for (const q of [...partsOf(piece, name, "hdivider"), ...partsOf(piece, name, "vdivider")])
             {
                 expect(q.width).toBe(k.width);
             }
@@ -111,7 +132,7 @@ describe("dividers standing back from the front", () =>
 
     it("joins a shelf standing back over the depth it shares with each side", () =>
     {
-        const p = dresser();
+        const p = recessedNiche();
         const b = analyse(p).build;
         const shelf = partsOf(p, "Niche", "hdivider")[0]!;
         const joints = b.joints.filter((j) =>

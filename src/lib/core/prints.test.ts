@@ -16,7 +16,7 @@ function withPanorama(): { p: Project; niche: Carcass; cell: string }
     {
         return it.name === "Niche";
     }) as Carcass;
-    const cell = (niche.root as SplitNode).children[1]!.id;
+    const cell = niche.root.id;
     // The command hand back a new project, the niche is looked up again in it
     const p = setPrint(base, niche.id, cell, "montagnes.png");
     const placed = p.items.find((it) =>
@@ -46,16 +46,29 @@ describe("pictures printed on the back of a cell", () =>
 
     it("bills each print its area, one square metre at least", () =>
     {
-        const { p, niche } = withPanorama();
-        const side = (niche.root as SplitNode).children[0] as SplitNode;
-        // A second, small picture in a side cell : its 0.04 m2 is billed as 1
-        const both = setPrint(p, niche.id, side.children[0]!.id, "carlin.jpg");
+        const { p } = withPanorama();
+        const high = p.items.find((it) =>
+        {
+            return it.name === "Placards hauts";
+        }) as Carcass;
+        // A second, small picture in a cell of the high cupboards, under 1 m2 : billed as 1. The small columns have
+        // had no back since 2026-11-09
+        let leaf = high.root;
+        while ("children" in leaf)
+        {
+            leaf = (leaf as SplitNode).children[0]!;
+        }
+        const both = setPrint(p, high.id, leaf.id, "carlin.jpg");
+        const cell = analyse(both).build.prints.find((q) => { return q.file === "carlin.jpg"; })!;
+        expect(cell.w * cell.h / 1e6).toBeLessThan(1);
         const line = computeOutputs(both).cost.lines.find((l) =>
         {
             return l.key === SERVICE_PRINT;
         })!;
-        expect(line.qty).toBeCloseTo(2, 6);
-        expect(line.total).toBeCloseTo(2 * 29.9 / 1.2, 2);
+        // The 1564 x 642 of the niche, 1.004 m2 since its top is no longer doubled, is billed as it is
+        const niche = 1564 * 642 / 1e6;
+        expect(line.qty).toBeCloseTo(1 + niche, 6);
+        expect(line.total).toBeCloseTo((1 + niche) * 29.9 / 1.2, 2);
     });
 
 

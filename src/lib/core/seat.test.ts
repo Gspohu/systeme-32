@@ -120,7 +120,7 @@ describe("seats", () =>
             return { ...b, fronts: [newFront(b.root.id, { type: "door", hinge: "left" }, { opening })] };
         };
         expect(analyse(projectOf(withFront("push"))).checks)
-            .toContainEqual(flagged("warning", "ouverture par pression sur 1 façade(s) d'un caisson qui sert d'assise"));
+            .toContainEqual(flagged("warning", "ouverture par pression sur 1 façade"));
         expect(analyse(projectOf(withFront("handle"))).checks.map((k) =>
         {
             return k.message;

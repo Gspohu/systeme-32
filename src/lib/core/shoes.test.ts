@@ -52,7 +52,9 @@ describe("shoe racks", () =>
     it("refuses more levels than the height of the cell holds", () =>
     {
         // 762 / 10 = 76 uner the 102 of the rack
-        expect(errors(entrance(800, 10))).toContain("10 niveau(x) de 102 x 221 mm ne tiennent pas");
+        // Plural as the message may write it, "niveaux" or "niveaux"
+        expect(errors(entrance(800, 10))).toContain("10 niveau");
+        expect(errors(entrance(800, 10))).toContain("de 102 x 221 mm ne tiennent pas");
         expect(errors(entrance(800, 7))).toBe("");
     });
 

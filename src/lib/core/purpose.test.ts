@@ -95,6 +95,8 @@ function fixture(): Project[]
     out.push(one("Meuble TV de Munster", { width: 1800, height: 500, y: 100,
                                            base: { type: "plinth", height: 100, setback: 50, grills: 2 } }).p);
     out.push(one("Bahut de Cernay", { y: 100, base: { type: "feet", height: 100 } }).p);
+    // The dresser no longer doubles a top : a long one of its own still glues and screws its doubler
+    out.push(one("Enfilade de Guémar", { width: 1600, doubledTop: 19 }).p);
     out.push(embase());
 
     const standing: Item[] = [newLadder({ name: "Échelle de Bergheim", x: 200 }),

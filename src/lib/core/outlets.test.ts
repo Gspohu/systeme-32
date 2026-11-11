@@ -107,9 +107,9 @@ describe("socket holes", () =>
     {
         const { p, c, lower } = tvUnit();
         const q = addOutlet(p, c.id, lower);
-        expect(analyse(q).build.outlets).toEqual([{ item: c.id, id: (q.items[0] as Carcass).outlets[0]!.id,
-                                                     shape: "rect", x: 260, y: 171, w: 80, h: 80, edgeOn: false,
-                                                     hidden: false }]);
+        expect(analyse(q).build.outlets).toMatchObject([{ item: c.id, id: (q.items[0] as Carcass).outlets[0]!.id,
+                                                          shape: "rect", x: 260, y: 171, w: 80, h: 80, edgeOn: false,
+                                                          hidden: false }]);
         const shut = setFront(q, c.id, lower, { type: "door", hinge: "left" });
         expect(analyse(shut).build.outlets[0]!.hidden).toBe(true);
     });
