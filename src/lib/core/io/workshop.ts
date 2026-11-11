@@ -20,7 +20,7 @@ export function drawingSet(p: Project, o: Outputs): Page[]
 export function workshopArchive(p: Project, o: Outputs): Uint8Array
 {
     const base = slug(p.name) || "projet";
-    const pages = drawingSet(p, o);
+    const pages = buildSheets(p, o.analysis, o.bom, o.nesting, true);
     const files: Record<string, Uint8Array> = {
         [`${base}_plans.pdf`]: pagesToPdf(pages, p.name),
         [`${base}_fiche_de_debit.csv`]: strToU8(cutListCsv(o.bom)),
