@@ -1,10 +1,8 @@
-/* ── Extended Components ──────────────────────────────────────────────
-   Import AFTER components.css. No external dependencies
-   ──────────────────────────────────────────────────────────────────── */
+/* Imported after components.css */
 
 
-/* ── Select ───────────────────────────────────────────────────────── */
-/* Styled native <select>                                             */
+/* Select
+   Styled native <select> */
 
 .select
 {
@@ -38,7 +36,6 @@
 }
 
 
-/* ── Empty State ──────────────────────────────────────────────────── */
 
 .empty-state
 {
@@ -68,8 +65,8 @@
 }
 
 
-/* ── Alert / Banner ───────────────────────────────────────────────── */
-/* Inline notification, not a toast : stays in the document flow      */
+/* Alert / Banner
+   Inline notification, not a toast : stays in the document flow */
 
 .alert
 {
@@ -131,7 +128,7 @@
 }
 
 
-/* ── Radio & Checkbox ─────────────────────────────────────────────── */
+/* Radio & Checkbox */
 
 .form-check
 {
@@ -154,8 +151,8 @@
 }
 
 
-/* ── Segmented Control ────────────────────────────────────────────── */
-/* Button group where exactly one is active                           */
+/* Segmented Control
+   Button group where exactly one is active */
 
 .segmented
 {

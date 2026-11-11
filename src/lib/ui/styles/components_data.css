@@ -1,11 +1,11 @@
-/* ── Data & Navigation Components ─────────────────────────────────────
+/* Data & Navigation Components
    Import AFTER components_extended.css. No external dependencies
    Covers: tables, tabs, the only ones this app uses
-   ──────────────────────────────────────────────────────────────────── */
+   */
 
 
-/* ── Data Table ───────────────────────────────────────────────────── */
-/* Sortable, striped, responsive. Wraps in a scrollable container     */
+/* Data Table
+   Sortable, striped, responsive. Wraps in a scrollable container */
 
 .table-container
 {
@@ -80,8 +80,8 @@
 }
 
 
-/* ── Tabs ─────────────────────────────────────────────────────────── */
-/* Real tab navigation. Active tab has underline indicator            */
+/* Tabs
+   Real tab navigation. Active tab has underline indicator */
 
 .tabs
 {

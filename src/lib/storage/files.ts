@@ -1,4 +1,4 @@
-// Files on the user's device : download, open, and the system share sheet on phones and tablets
+// Files on the user's device : download, open and the system share sheet on phones and tablets
 
 export function downloadBytes(bytes: Uint8Array, name: string, mime: string): void
 {

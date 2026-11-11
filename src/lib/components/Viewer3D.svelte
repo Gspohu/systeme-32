@@ -38,6 +38,8 @@
     <div class="view-toggles">
         <label class="form-check" title="Panneaux translucides, quincaillerie en couleur">
             <input type="checkbox" bind:checked={app.showHardware} /> Voir la quincaillerie</label>
+        <label class="form-check" title="Un repère bleu sur chaque perçage des panneaux fixes">
+            <input type="checkbox" bind:checked={app.showHoles} /> Voir les perçages</label>
         <label class="form-check">
             <input type="checkbox" bind:checked={app.showRoom} /> Mur et plafond</label>
         <label class="form-check" title="Pièce assombrie, éclairages LED allumés">

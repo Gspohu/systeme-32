@@ -242,7 +242,7 @@ body:has(.app) .boot
     grid-template-rows: minmax(0, 1fr);
 }
 
-/* The named areas of the wide grid do not exist here, placing a pane in one would spawn implicit tracks */
+/* The named areas of the wide grid don't exist here, placing a pane in one would spawn implicit tracks */
 .narrow-body > .pane
 {
     grid-area: auto;

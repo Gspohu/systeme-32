@@ -456,6 +456,7 @@
             <label class="field"><span class="label">Type de mur</span>
                 <select class="select" value={s.wallType} onchange={(e) => settings({ wallType: str(e) as WallType })}>
                     <option value="solid">Béton, brique pleine</option>
+                    <option value="hollow">Brique creuse, parpaing</option>
                     <option value="aerated">Béton cellulaire</option>
                     <option value="plasterboard">Plaque de plâtre</option>
                     <option value="reinforced">Plaque de plâtre sur renfort bois</option>

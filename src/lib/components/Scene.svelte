@@ -9,6 +9,7 @@
     import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
     import { armMesh, armZoneMesh, cushionMesh, deviceMeshes, fittedMeshes, fittingMeshes, ladderMeshes, partMeshes,
              screenMesh, sofaMeshes, MM, type DeviceSkin, type FittingMesh, type MeshSpec } from "../view3d/meshes";
+    import { holeMarks } from "../core/fitted";
     import { shownSideWalls } from "../core/room_dressing";
     import { spotClashes, spotFor } from "../core/tv_arm";
     import { kelvinColour } from "../view3d/kelvin";
@@ -200,7 +201,7 @@
 
     // The screen where the arm slider puts it, the arm from its plate, and the ring the arm can reach
     const pose = $derived(app.project.screen === null ? null : spotFor(app.project.screen, app.armSpot));
-    // The set turns red as long as it is in something, the names are given in the toggles
+    // The set turns red as long as it's in something, the names are given in the toggles
     const clashing = $derived(pose !== null && spotClashes(app.project, pose).length > 0);
     const screenGeo = $derived(app.project.screen === null || pose === null ? null
         : screenMesh(app.project.screen, pose));
@@ -264,7 +265,7 @@
     });
 
 
-    // The fabric is not chosen yet : a plain neutral cushion
+    // The fabric isn't chosen yet : a plain neutral cushion
     const cushions = $derived.by(() =>
     {
         const list: { key: string; wall: Wall; geometry: THREE.BufferGeometry }[] = [];
@@ -327,6 +328,34 @@
                         brass: f?.ref === EDGE_PULL.ref });
         }
         return list;
+    });
+    // The drillings asked for, each a peg on its panel, in the accent colour
+    const holeMat = new THREE.MeshStandardMaterial({ color: 0x1c7aaf, roughness: 0.5 });
+    const holes = $derived.by(() =>
+    {
+        if (!app.showHoles)
+        {
+            return [];
+        }
+        const walls = new Map(app.project.items.map((it) =>
+        {
+            return [it.id, it.wall];
+        }));
+        return fittedMeshes(holeMarks(build.parts)).map((m) =>
+        {
+            return { ...m, wall: walls.get(m.item) ?? "back" };
+        });
+    });
+    $effect(() =>
+    {
+        const current = holes;
+        return () =>
+        {
+            for (const f of current)
+            {
+                f.geometry.dispose();
+            }
+        };
     });
     // AXILO feet in the black plastic Häfele sells, runner spaces in the accent colour as a reserved volume
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
@@ -491,7 +520,7 @@
 
     // The room dimmed to a fifth, the way a lit niche is looked at in the evening
     const dim = $derived(app.ledsOn ? 0.2 : 1);
-    // A rendering exposure set by eye against the lights of this scene, which are not photometric either : a real
+    // A rendering exposure set by eye against the lights of this scene, which aren't photometric either : a real
     // strip of 1400 lm/m behind 18 mm of diffuser is near 25 000 cd/m2 and would only burn the picture white
     const LED_NITS = 14;
     $effect(() =>
@@ -688,6 +717,10 @@
             </T.Group>
         </T.Group>
     {/if}
+{/each}
+{#each holes as f (f.key)}
+    {@const pl = placement(f.wall)}
+    <T.Mesh geometry={f.geometry} material={holeMat} rotation={pl.rotation} position={pl.position} />
 {/each}
 {#each fittings as f (f.key)}
     {@const pl = placement(f.wall)}

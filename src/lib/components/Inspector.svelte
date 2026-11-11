@@ -939,6 +939,10 @@
             {#if carcass.base.type !== "wall"}
                 <label class="form-check"><input type="checkbox" checked={carcass.fixToWall}
                     onchange={(e) => patch({ fixToWall: checked(e) } as Partial<Carcass>)} /> Fixation murale anti-basculement</label>
+                <label class="form-check" title="Posé dans un autre caisson, retiré à la main : aucune vis, aucune équerre">
+                    <input type="checkbox" checked={carcass.freeStanding === true}
+                        onchange={(e) => patch({ freeStanding: checked(e),
+                                                fixToWall: !checked(e) } as Partial<Carcass>)} /> Posé libre</label>
             {/if}
             <label class="field" title="Taquets des étagères réglables, charge admise pour 4 (Häfele)">
                 <span class="label">Taquets</span>
