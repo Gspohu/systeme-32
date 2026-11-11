@@ -52,10 +52,11 @@ describe("up to the ceiling", () =>
         p = setFront(p, c.id, c.root.id, { type: "doubleDoor" }, { decor: "U604_ST9" });
         const strip = part(p, "/filler")!;
         expect([strip.length, strip.width, strip.thickness, strip.decor]).toEqual([800, 400, 19, "U604_ST9"]);
-        expect(strip.frame!.o).toEqual([0, 2100, 600]);
-        expect(strip.notes.join()).toContain("Hauteur théorique 400 mm");
+        expect(strip.frame!.o).toEqual([0, 2100, 602.6]);
+        expect(strip.notes.join()).toContain("Hauteur finie 400 mm");
         const cleat = part(p, "/filler-cleat")!;
-        expect([cleat.length, cleat.width, cleat.thickness, cleat.material]).toEqual([762, 40, 20, "solid"]);
+        // A strip of the carcass board, whole : no oak board bought for a hidden cleat
+        expect([cleat.length, cleat.width, cleat.thickness, cleat.material]).toEqual([762, 40, 19, "p2"]);
         expect(said(p, "warning")).not.toContain("épaisseur non vérifiée");
     });
 
@@ -68,6 +69,21 @@ describe("up to the ceiling", () =>
         expect(part(narrow, "/filler")!.notes.join()).toContain("coller le fileur");
     });
 
+
+    it("screws the flat cleat from above only and glues the strip on it once the carcass stands", () =>
+    {
+        // Screwed from the back edge of the cleat, the strip was out of reach against the wall
+        const p = wardrobe({ height: 2370 });
+        const cleat = part(p, "/filler-cleat")!;
+        expect(cleat.holes.filter((h) => { return h.face === "v0" || h.face === "v1"; })).toEqual([]);
+        expect(cleat.holes.every((h) => { return h.face === "A" && h.label.includes("dans le dessus"); })).toBe(true);
+        expect(part(p, "/filler")!.notes.join()).toContain("Collé sur le chant avant du tasseau");
+        expect(analyse(p).build.hardware.some((h) => { return h.ref === "GLUE_PU"; })).toBe(true);
+        expect(analyse(p).build.hardware.some((h) => { return h.ref === "WALL_SCREW_5x50" &&
+                                                      h.note?.includes("fileur") === true; }))
+            .toBe(false);
+    });
+
     it("refuses a filler over a sloped top or a carcass already at the ceiling", () =>
     {
         expect(said(wardrobe({ slope: { low: "left", height: 1500 } }),
@@ -77,7 +93,7 @@ describe("up to the ceiling", () =>
 
     it("warns when a tall carcass cannot be raised under the ceiling", () =>
     {
-        // hypot(2400, 600) = 2474 clears 2500, hypot(2450, 600) = 2522 does not
+        // hypot(2400, 600) = 2474 clears 2500, hypot(2450, 600) = 2522 doesn't
         expect(said(wardrobe({ height: 2400, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
             .not.toContain("se relève");
         expect(said(wardrobe({ height: 2450, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))

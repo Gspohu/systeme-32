@@ -367,16 +367,19 @@ describe("anti-tip fixing", () =>
         const { p, c } = oneBox();
         const solid = hardwareOf(p);
         expect(solid.get("ANTI_TIP_BRACKET")).toBe(2);
-        expect(solid.get("WALL_SCREW_5x50")).toBe(2);
+        // Through the plain hole of the bracket : a pan head
+        expect(solid.get("WALL_SCREW_5x50_PAN")).toBe(2);
         expect(solid.get("PLUG_NYLON_8x40")).toBe(2);
         const top = analyse(p).build.parts.find((q) => { return q.id === `${c.id}/top`; })!;
         const screws = top.holes.filter((h) => { return h.label.startsWith("Équerre anti-basculement"); });
-        expect(screws).toMatchObject([{ u: 120 - 19, v: top.width - 20, face: "B" },
-                                      { u: 480 - 19, v: top.width - 20, face: "B" }]);
+        // In the hole of the bracket, 20 off the wall : the applied back of 8 stands between the wall and the top
+        expect(c.back).toMatchObject({ type: "applied", thickness: 8 });
+        expect(screws).toMatchObject([{ u: 120 - 19, v: top.width - (20 - 8), face: "B" },
+                                      { u: 480 - 19, v: top.width - (20 - 8), face: "B" }]);
 
         const plaster = hardwareOf({ ...p, settings: { ...p.settings, wallType: "plasterboard" } });
         expect(plaster.get("PLUG_HOLLOW_METAL")).toBe(2);
-        expect(plaster.has("WALL_SCREW_5x50")).toBe(false);
+        expect(plaster.has("WALL_SCREW_5x50_PAN")).toBe(false);
 
         const loose = hardwareOf({ ...p, items: [{ ...c, fixToWall: false }] });
         expect(loose.has("ANTI_TIP_BRACKET")).toBe(false);

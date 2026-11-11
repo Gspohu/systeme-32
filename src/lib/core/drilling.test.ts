@@ -52,11 +52,14 @@ describe("drillings meeting in a part", () =>
     });
 
 
-    it("leaves the edge holes out", () =>
+    it("sees a screw of the face running into a dowel of the edge", () =>
     {
+        // It left the edge holes out, the blind spot of the review of 2026-11-09 : the dowel runs 9.5 deep along v, the
+        // screw goes 15 into the face 3 off that edge, right through it
         const edge: Hole = { u: 120, v: 0, diameter: 8, depth: 30, face: "v0", w: 9.5, label: "tourillon",
                              purpose: "dowel" };
-        expect(crossedHoles(side([screw("A", 120, 3), edge])).length).toBe(0);
+        expect(crossedHoles(side([screw("A", 120, 3), edge])).length).toBe(1);
+        expect(crossedHoles(side([screw("A", 160, 3), edge])).length).toBe(0);
     });
 
 
@@ -69,6 +72,25 @@ describe("drillings meeting in a part", () =>
             return c.level === "error";
         });
         expect(k.length).toBe(1);
-        expect(k[0]!.message).toContain("1 paire(s) de perçages se rencontrent");
+        // Plural as the message may write it, "paires" or "paires"
+        expect(k[0]!.message).toContain("1 paire");
+        expect(k[0]!.message).toContain("de perçages se rencontrent");
+    });
+
+
+    it("sees a drilling in an edge meeting a face drilling, not the passage of a bolt running into its housing", () =>
+    {
+        // Review of 2026-11-09 : the drillings in an edge were never checked against the others
+        const passage: Hole = { u: 0, v: 37, w: 9.5, diameter: 8, depth: 34, face: "u0", label: "passage",
+                               purpose: "minifix-passage" };
+        const housing: Hole = { u: 34, v: 37, diameter: 15, depth: 15, face: "A", label: "boîtier",
+                               purpose: "minifix-housing" };
+        // A lead hole through the board on the way of the passage, 20 in from the edge
+        const lead: Hole = { u: 20, v: 39, diameter: 8, depth: 19, face: "A", label: "fil", purpose: "light-lead" };
+        expect(crossedHoles(side([passage, housing]))).toEqual([]);
+        expect(crossedHoles(side([passage, housing, lead])).map(([x, y]) => { return [x.label,
+            y.label]; })).toEqual([["passage", "fil"]]);
+        // Moved off the passage, clear
+        expect(crossedHoles(side([passage, housing, { ...lead, v: 60 }]))).toEqual([]);
     });
 });

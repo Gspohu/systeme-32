@@ -80,7 +80,19 @@ describe("costing with the dated public prices", () =>
 
     it("tells an estimate and an indicative scale from a listed price", () =>
     {
-        const lines = computeOutputs(dresser()).cost.lines;
+        // Its drawer boxes taken back to the 16 mm Halifax oak, the one board priced from another thickness
+        const p = dresser();
+        for (const it of p.items)
+        {
+            for (const f of "fronts" in it ? it.fronts : [])
+            {
+                if (f.spec.type === "drawers")
+                {
+                    delete f.spec.boxDecor;
+                }
+            }
+        }
+        const lines = computeOutputs(p).cost.lines;
         const source = (key: string): string =>
         {
             return lines.find((l) =>
