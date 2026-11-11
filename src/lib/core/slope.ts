@@ -55,7 +55,7 @@ export function frontOutline(c: Carcass): [number, number][]
 }
 
 
-// Lowest ceiling over a span, the line being straight it is at one end
+// Lowest ceiling over a span, the line being straight it's at one end
 export function ceilingOver(c: Carcass, x0: number, x1: number): number
 {
     return Math.min(ceilingAt(c, x0), ceilingAt(c, x1));
@@ -89,7 +89,7 @@ export function slopeErrors(c: Carcass, lay: ResolvedLayout, panels: FrontPanel[
     {
         errors.push(`${c.name} : une assise ne peut pas être en pente. Retirer l'assise ou le rampant.`);
     }
-    // The roof keeps rising past the high side, a rounded end there still fits under it
+    // The roof keeps rising past the high side, a rounded end fit under it there
     if (c.ends[c.slope.low].type === "rounded")
     {
         errors.push(`${c.name} : bout arrondi côté bas du rampant, il percerait la pente. Le passer en bout droit.`);

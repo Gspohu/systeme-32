@@ -10,14 +10,14 @@ import { DESK_HEIGHT } from "./desk";
 import { restsOnSeat } from "./seat";
 import { itemsMeet } from "./room";
 
-// Workshop conventions of a new carcass : on a plinth on the floor, on the top of what it is dropped onto
+// Workshop conventions of a new carcass : on a plinth on the floor, on the top of what it's dropped onto
 export const NEW_CARCASS = { width: 600, height: 800, depth: 500, plinth: 100, setback: 50 };
 export const NEW_DRAWERS: DrawerFront = { type: "drawers", count: 3, loadKg: 10 };
 export const NEW_LIFT: LiftFront = { type: "lift", handleKg: 0 };
 export const NEW_SHOE_RACK_LEVELS = 2;
 
 
-// Top of the highest carcass or box under (x, y) on that wall, the floor when there is none
+// Top of the highest carcass or box under (x, y) on that wall, the floor when there's none
 function supportUnder(p: Project, x: number, y: number, wall: Wall): number | null
 {
     let best: number | null = null;

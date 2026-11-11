@@ -2,7 +2,7 @@
 
 import type { Carcass, Settings } from "./model";
 import type { ResolvedLayout } from "./layout";
-import { MIN_CELL, findNode, frontSetback, subtreeIds } from "./layout";
+import { MIN_CELL, findNode, frontSetback, subtreeIds, topDoubling } from "./layout";
 import { X, Y, Z, neg } from "./geometry";
 import { byId } from "./edit";
 import { ceilingAt, topAngle } from "./slope";
@@ -10,9 +10,11 @@ import type { Build, Part } from "./part_types";
 import { boxOrigin, newPart } from "./part_base";
 import { DIAM } from "./text";
 import { decorById } from "../data/materials";
+import { EYE_LEVEL } from "../data/rules";
+import { sideFace } from "./locate";
 
 
-// Two faces meet when they are closer than this, in mm
+// 2 faces meet when they're closer than this, in mm
 const TOUCH = 0.01;
 
 
@@ -91,6 +93,10 @@ export function buildDividers(c: Carcass, lay: ResolvedLayout, s: Settings, b: B
             b.parts.push(part);
         }
         const last = b.parts[b.parts.length - 1]!;
+        if (div.note !== null)
+        {
+            last.notes.push(div.note);
+        }
         if (last.colour !== null)
         {
             last.notes.push(`Teinte ${last.colour}`);
@@ -126,8 +132,9 @@ function attachEnds(c: Carcass, lay: ResolvedLayout, part: Part,
     {
         // Bottom end on the panel below, top end under the panel above
         const below = d.y <= t + TOUCH ? byId(b.parts, `${c.id}/bottom`) : panelAtY(c, lay, d.y, d.x, b, "below");
-        const above = d.y + d.h >= c.height - t - TOUCH
-            ? byId(b.parts, `${c.id}/top`)
+        const doubling = topDoubling(c);
+        const above = d.y + d.h >= c.height - t - doubling - TOUCH
+            ? byId(b.parts, doubling > 0 ? `${c.id}/top-doubler` : `${c.id}/top`)
             : panelAtY(c, lay, d.y + d.h, d.x, b, "above");
         if (below !== undefined)
         {
@@ -146,6 +153,8 @@ function attachEnds(c: Carcass, lay: ResolvedLayout, part: Part,
         }
         return;
     }
+    // A fixed shelf under the eyes shows its top, one above them its underside : the housings on the face not seen
+    const housingFace = c.y + d.y < EYE_LEVEL ? "B" as const : undefined;
     const leftP = d.x <= t + TOUCH ? byId(b.parts, `${c.id}/side/L`) : panelAtX(c, lay, d.x, d.y, b, "left");
     const rightP = d.x + d.w >= c.width - t - TOUCH
         ? byId(b.parts, `${c.id}/side/R`)
@@ -154,13 +163,55 @@ function attachEnds(c: Carcass, lay: ResolvedLayout, part: Part,
     {
         const line = d.y + d.h / 2 - panelStartY(leftP, c);
         b.joints.push({ edgePart: part.id, edge: "u0", facePart: leftP.id, face: leftP.role === "side" ? "A" : "B",
-                       lineAxis: "u", line, ...span(leftP), reversed: false });
+                       lineAxis: "u", line, ...span(leftP), reversed: false, housingFace });
     }
     if (rightP !== undefined)
     {
         const line = d.y + d.h / 2 - panelStartY(rightP, c);
         b.joints.push({ edgePart: part.id, edge: "u1", facePart: rightP.id, face: "A", lineAxis: "u", line,
-                       ...span(rightP), reversed: false });
+                       ...span(rightP), reversed: false, housingFace });
+    }
+}
+
+
+// A board on edge under the panel over a zone, joined to what bounds it left and right, bearing up against that panel
+// without a screw through it : its top shows or stands loaded, nothing needs to come through it
+export function buildStiffeners(c: Carcass, lay: ResolvedLayout, b: Build): void
+{
+    const [ox, oy, oz] = boxOrigin(c);
+    let n = 0;
+    for (const st of c.stiffeners ?? [])
+    {
+        const nb = lay.nodes.get(st.cell);
+        if (nb === undefined)
+        {
+            continue;
+        }
+        n++;
+        const y = nb.y + nb.h - st.height;
+        const left = sideFace(c, lay, b, nb, "left");
+        const right = sideFace(c, lay, b, nb, "right");
+        if (left === null || right === null)
+        {
+            b.errors.push(`${c.name}, traverse ${n} : pas de paroi pleine hauteur de chaque côté. La placer sous une case bornée.`);
+            continue;
+        }
+        const part = newPart({
+            item: c.id, itemName: c.name, thickness: c.thickness, decor: c.decor,
+            id: `${c.id}/stiffener/${n}`, label: `Traverse sur chant ${n}`, role: "stiffener", length: nb.w,
+            width: st.height, edges: ["v0"],
+            frame: { o: [ox + nb.x, oy + y, oz + st.z - c.thickness / 2], u: X, v: Y, n: Z },
+        });
+        part.notes.push("Ajustée sans jeu sous le panneau du dessus, en appui, sans vis à travers lui");
+        b.parts.push(part);
+        // Each end against its wall : across the height of the board, on the line of its depth
+        const line = c.depth - st.z;
+        for (const [edge, face] of [["u0", left], ["u1", right]] as const)
+        {
+            b.joints.push({ edgePart: part.id, edge, facePart: face.part.id, face: face.face, lineAxis: "v",
+                            line: line - face.vOrigin, from: y - face.uOrigin, to: y + st.height - face.uOrigin,
+                            edgeFrom: 0, reversed: false });
+        }
     }
 }
 

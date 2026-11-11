@@ -7,7 +7,7 @@ import type { Fitted, Part, Purpose } from "./part_types";
 // A hinge cup fit its 35 boring, a Minifix housign its 15 one : the volume is the hole itself
 const LET_IN: { purpose: Purpose; ref: string; label: string }[] = [
     { purpose: "hinge-cup", ref: "CLIP top", label: "cuvette de charnière" },
-    { purpose: "minifix-housing", ref: "262.25.035", label: "boîtier Minifix" },
+    { purpose: "minifix-housing", ref: "262.26.535", label: "boîtier Minifix" },
 ];
 
 
@@ -60,6 +60,40 @@ export function fittedExtent(f: Fitted): { min: Vec3; max: Vec3 }
         }
     }
     return { min, max };
+}
+
+
+// Panels that never move, the ones whose drillings a mark can stay on while the fronts open and the drawers slide
+const FIXED_ROLES = new Set(["side", "top", "bottom", "back", "hdivider", "vdivider", "stiffener"]);
+const MARK_PROUD = 2;
+
+
+// A short peg standing proud on each face drilling of the fixed panels, to read the drilling in 3D : a view, not
+// hardware, it joins neither the clash checks nor the drawings
+export function holeMarks(parts: Part[]): Fitted[]
+{
+    const out: Fitted[] = [];
+    for (const p of parts)
+    {
+        if (p.frame === null || !FIXED_ROLES.has(p.role))
+        {
+            continue;
+        }
+        p.holes.forEach((h, n) =>
+        {
+            if (h.face !== "A" && h.face !== "B")
+            {
+                return;
+            }
+            const r = Math.max(h.diameter, 4) / 2;
+            out.push({
+                key: `${p.id}/mark${n}`, item: p.item, ref: "", label: h.label, purpose: h.purpose, shape: "cylinder",
+                centre: at(p.frame!, h.u, h.v, h.face === "A" ? -MARK_PROUD / 2 : p.thickness + MARK_PROUD / 2),
+                axes: [p.frame!.u, p.frame!.v, p.frame!.n], half: [r, r, MARK_PROUD], host: p.id, hidden: false,
+            });
+        });
+    }
+    return out;
 }
 
 

@@ -1,4 +1,4 @@
-// Façades meeting other items across a corner : covered fronts, doors that cannot reach square, drawers blocked
+// Façades meeting other items across a corner : covered fronts, doors that can't reach square, drawers blocked
 
 import type { Carcass, Project, Wall } from "./model";
 import type { FrontPanel } from "./fronts";
