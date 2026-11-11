@@ -4,7 +4,7 @@ import type { Carcass, Item, Project, Wall } from "../model";
 import { WALL_LABELS } from "../room";
 import { openingPoints } from "../cutouts";
 import type { Analysis } from "../analysis";
-import { PLINTH_FOOT_GAP, baseHeight } from "../part_base";
+import { PLINTH_TOP_GAP, baseHeight } from "../part_base";
 import { endReach, itemExtent, projectExtent, screenSize, sideFiller } from "../extent";
 import { screenSpots, spotSpan } from "../tv_arm";
 import { slatLayout } from "../slats";
@@ -14,10 +14,13 @@ import { SPOT_RIM, lightLevel, spotCentres } from "../lights";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth, wrap } from "./display";  
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
-import { endDrop, endPost, floorOutline, openEndLevels } from "../curves";
+import { topDoubling } from "../layout";
+import { endDrop, endPost, floorOutline, openEndLevels, plinthFootGap } from "../curves";
 import { bounds, tessellate } from "../geometry";
 import { chain } from "./plan";
 import { OBSTACLE_LABELS } from "../obstacles";
+import { sectionPlanes } from "./sections";
+import { round1 } from "../text";
 
 
 type ToPage = (value: number) => number;
@@ -72,7 +75,7 @@ export function drawFront(canvas: Canvas, it: Item, scale: number, ox: number, o
         return;
     }
     const box = itemExtent(it);
-    // An appliance is not made : dashed, behind a door or out in the open
+    // An appliance isn't made : dashed, behind a door or out in the open
     canvas.rect(pageX(box.x0), pageY(box.y1), (box.x1 - box.x0) / scale, (box.y1 - box.y0) / scale,
                 it.kind === "device" ? "dashed" : "normal");
     if (it.kind === "box")
@@ -122,7 +125,6 @@ function drawCarcass(canvas: Canvas, k: Carcass, scale: number, pageX: ToPage, p
 }
 
 
-// Carcass points to the page
 function onPage(v: CarcassView, pts: [number, number][]): [number, number][]
 {
     return pts.map(([x, y]): [number, number] => { return [v.pageX(v.k.x + x), v.pageY(v.k.y + y)]; });
@@ -175,7 +177,9 @@ function drawShell(v: CarcassView): void
     }
     if (k.base.type === "plinth")
     {
-        canvas.rect(pageX(k.x), pageY(k.y - PLINTH_FOOT_GAP), k.width / scale, (bh - PLINTH_FOOT_GAP) / scale, "thin");
+        canvas.rect(pageX(k.x), pageY(k.y - PLINTH_TOP_GAP), k.width / scale, (bh - plinthFootGap(k) -
+            PLINTH_TOP_GAP) / scale,
+                    "thin");
     }
 }
 
@@ -264,6 +268,19 @@ function drawInside(v: CarcassView): void
     {
         canvas.poly(at([[t, t], [W - t, t], [W - t, ceilingAt(k, W - t)], [t, ceilingAt(k, t)]]), true, "thin");
     }
+    const doubling = topDoubling(k);
+    if (doubling > 0)
+    {
+        canvas.rect(pageX(k.x + t), pageY(k.y + k.height - t), (k.width - 2 * t) / scale, doubling / scale, "thin");
+    }
+    for (const st of k.stiffeners ?? [])
+    {
+        const nb = a.build.layouts.get(k.id)?.nodes.get(st.cell);
+        if (nb !== undefined)
+        {
+            canvas.rect(pageX(k.x + nb.x), pageY(k.y + nb.y + nb.h), nb.w / scale, st.height / scale, "dashed");
+        }
+    }
     for (const d of a.build.layouts.get(k.id)?.dividers ?? [])
     {
         // An upright reaching a sloped top ends in its bevel
@@ -331,6 +348,11 @@ function drawFronts(v: CarcassView): void
         else if (fp.role === "flap")
         {
             canvas.poly([[x0, y1], [(x0 + x1) / 2, y0], [x1, y1]], false, "thin");
+        }
+        else if (fp.role === "drop")
+        {
+            // Hinged along its bottom edge : the lines meet in the middle of it
+            canvas.poly([[x0, y0], [(x0 + x1) / 2, y1], [x1, y0]], false, "thin");
         }
         else if (fp.role === "panel")
         {
@@ -436,9 +458,38 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     }
     const floorY = oy - all.y0 / scale;
     canvas.line(ox + frame.x0 / scale - 5, floorY, ox + frame.x1 / scale + 5, floorY, "thin");
-    canvas.dimH(ox + all.x0 / scale, ox + all.x1 / scale, floorY + 2, floorY + 10, `${Math.round(all.x1 - all.x0)}`);
+    canvas.dimH(ox + all.x0 / scale, ox + all.x1 / scale, floorY + 2, floorY + 16, round1(all.x1 - all.x0));
     canvas.dimV(oy - all.y1 / scale, floorY, ox + frame.x0 / scale - 2, ox + frame.x0 / scale - 10,
-                `${Math.round(all.y1 - all.y0)}`);
+                round1(all.y1 - all.y0));
+    // What each item takes along the wall, a filler apart from the side it closes
+    chain(canvas, items.filter((it) =>
+    {
+        return it.kind !== "device" && !(it.kind === "carcass" && it.freeStanding === true);
+    }).flatMap((it) =>
+    {
+        const box = itemExtent(it);
+        return it.kind === "carcass" ? [box.x0, box.x1, it.x, it.x + it.width] : [box.x0, box.x1];
+    }), (v) =>
+    {
+        return ox + v / scale;
+    }, floorY + 2, floorY + 8, "h");
+    // Where the sections of this set are cut, a long line with its letter at each end
+    const cutOf = sectionPlanes(p, a, wall);
+    for (const s of cutOf)
+    {
+        if (s.axis === "x")
+        {
+            const x = ox + s.at / scale;
+            canvas.line(x, oy - all.y1 / scale - 4, x, floorY + 1, "centre");
+            canvas.text(x, oy - all.y1 / scale - 5, s.letter, 3, "middle", true);
+        }
+        else
+        {
+            const y = oy - s.at / scale;
+            canvas.line(ox + all.x0 / scale - 4, y, ox + all.x1 / scale + 1, y, "centre");
+            canvas.text(ox + all.x0 / scale - 6, y + 1, s.letter, 3, "middle", true);
+        }
+    }
     // The levels on the right : floor, underside and top of each item, and the ceiling of an alcove
     const right = ox + frame.x1 / scale;
     chain(canvas, [0, ...items.flatMap((it) =>

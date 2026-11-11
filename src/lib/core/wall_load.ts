@@ -17,6 +17,10 @@ export function wallPlug(s: Settings): string | null
     {
         return null;
     }
+    if (s.wallType === "hollow")
+    {
+        return "PLUG_DUOPOWER_8x40";
+    }
     return s.wallType === "aerated" ? "PLUG_AERATED" : "PLUG_NYLON_8x40";
 }
 

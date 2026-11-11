@@ -1,10 +1,11 @@
 // Finds the panel faces that bound a layuot node, where runners, plates and pins get fixed
 
 import type { Carcass } from "./model";
-import type { NodeBox, ResolvedLayout } from "./layout";
+import { topDoubling, type NodeBox, type ResolvedLayout } from "./layout";
 import type { Build, Part } from "./parts";
 import { byId } from "./edit";
 import { panelAtY } from "./dividers";
+import { boxOrigin } from "./part_base";
 
 
 export interface FaceRef
@@ -25,7 +26,9 @@ export function sideFace(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox,
     if (outer)
     {
         const p = byId(b.parts, `${c.id}/side/${side === "left" ? "L" : "R"}`);
-        return p === undefined ? null : { part: p, face: "A", uOrigin: 0, vOrigin: 0 };
+        // A side standing between a top and a bottom starts a board up
+        return p === undefined || p.frame === null ? null
+            : { part: p, face: "A", uOrigin: p.frame.o[1] - boxOrigin(c)[1], vOrigin: 0 };
     }
     // An upright bounding the node on that side and spanning its whole height
     const edge = side === "left" ? nb.x : nb.x + nb.w;
@@ -48,9 +51,10 @@ export function sideFace(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox,
 export function panelAbove(c: Carcass, lay: ResolvedLayout, nb: NodeBox, b: Build): { part: Part; face: "A" |
     "B" } | null
 {
-    if (nb.y + nb.h >= c.height - c.thickness - 0.01)
+    const doubling = topDoubling(c);
+    if (nb.y + nb.h >= c.height - c.thickness - doubling - 0.01)
     {
-        const top = byId(b.parts, `${c.id}/top`);
+        const top = byId(b.parts, doubling > 0 ? `${c.id}/top-doubler` : `${c.id}/top`);
         return top === undefined ? null : { part: top, face: "A" };
     }
     const shelf = panelAtY(c, lay, nb.y + nb.h, nb.x + nb.w / 2, b, "above");

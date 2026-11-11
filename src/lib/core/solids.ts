@@ -9,7 +9,7 @@ import type { Item, Project } from "./model";
 import type { Purpose } from "./part_types";
 import { toRoom, toWall } from "./room";
 
-// Contact is not a clash : boards but against each other and a Häfele foot plate sits on the floor
+// Contact isn't a clash : boards but against each other and a Häfele foot plate sits on the floor
 export const CLASH_TOL = 0.5;
 
 

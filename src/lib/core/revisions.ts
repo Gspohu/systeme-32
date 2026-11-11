@@ -95,6 +95,6 @@ export function titleBlockChecks(p: Project): Check[]
         return [];
     }
     return [{ level: "info", item: null, target: null,
-              message: `Cartouche incomplet au sens de l'ISO 7200:2004 :${missing.join(", ")}. Les remplir dans les `
+              message: `Cartouche incomplet au sens de l'ISO 7200:2004 : ${missing.join(", ")}. Les remplir dans les `
                   + "réglages, rubrique Cartouche." }];
 }

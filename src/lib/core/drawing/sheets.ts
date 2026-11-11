@@ -8,21 +8,25 @@ import type { NestResult } from "../nesting";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, frameAndTitle, type Page } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { composition } from "./views";
+import { sectionSheets } from "./sections";
 import { roomPlan } from "./plan";
 import { itemViews } from "./item_views";
 import { partSheets } from "./workpiece";
 import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
 import { assemblySheets } from "./assembly_sheets";
 import { assemblySequences } from "../assembly";
+import { PIN_SPARE_HOLES } from "../fittings";
 import { CUBED, DIAM } from "../text";
 import { issueState } from "../revisions";   
 import { MATERIALS } from "../../data/materials";
 import { SHELF_TEST_LOADS } from "../../data/rules";
 
 
-export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResult): Page[] 
+// The nesting and the saw figures stay on the screen for the estimate : how to cut is the workshop's to decide, with
+// its own machines : the set sent to it leaves them out
+export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResult, forWorkshop = false): Page[]
 {
-    const drafts: Draft[] = [cover(p, a, bom), composition(p, a)];
+    const drafts: Draft[] = [cover(p, a, bom, forWorkshop), composition(p, a)];
     // Side walls add their compositions, the setting out from above comes with every project
     const sides: Wall[] = [];
     for (const wall of ["left", "right"] as const)
@@ -40,6 +44,10 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
         drafts.push(composition(p, a, wall));
     }
     drafts.push(roomPlan(p));
+    for (const wall of ["back", ...sides] as Wall[])
+    {
+        drafts.push(...sectionSheets(p, a, wall));
+    }
     for (const it of p.items)
     {
         if (it.kind === "carcass")
@@ -49,7 +57,8 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
     }
     drafts.push(...partSheets(bom, a.build.fitted), ...cutListSheets(bom), ...hardwareSheets(bom));
     drafts.push(...assemblySheets(assemblySequences(p, a, bom)));
-    drafts.push(...nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
+    drafts.push(...forWorkshop ? [] : nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
+    drafts.splice(1, 0, contents(drafts));
     const issue = issueState(p);
     const { owner, creator, approver } = p.settings; 
     const pages: Page[] = [];
@@ -63,6 +72,41 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
         pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind });
     });
     return pages;
+}
+
+
+// Every sheet with its number, the sheet of a part found by its code : the same title running on is one line
+function contents(drafts: Draft[]): Draft
+{
+    const canvas = new Canvas();
+    heading(canvas, "Sommaire");
+    const lines: { title: string; first: number; last: number }[] = [];
+    drafts.forEach((d, i) =>
+    {
+        // This sheet comes second, those after it are one further on
+        const number = i === 0 ? 1 : i + 2;
+        const open = lines[lines.length - 1];
+        if (open !== undefined && open.title === d.title)
+        {
+            open.last = number;
+        }
+        else
+        {
+            lines.push({ title: d.title, first: number, last: number });
+        }
+    });
+    const [size, rowH, colW] = [2.4, 3.8, 98];
+    const perCol = Math.floor((A3.h - 2 * MARGIN - 24 - TITLE_BLOCK_H) / rowH);
+    lines.forEach((l, k) =>
+    {
+        const col = Math.floor(k / perCol);
+        const x = MARGIN + 5 + col * colW;
+        const y = MARGIN + 20 + (k % perCol) * rowH;
+        const pages = l.first === l.last ? `${l.first}` : `${l.first}-${l.last}`;
+        canvas.text(x, y, pages, size, "start", true);
+        canvas.text(x + 11, y, fit(l.title, size, colW - 13), size);
+    });
+    return { title: "Sommaire", scale: "-", canvas };
 }
 
 
@@ -101,7 +145,7 @@ function dims(it: Item): string
 
 
 // Cover : what is inside the set, the legend, the workshop conventions and every source
-function cover(p: Project, a: Analysis, bom: Bom): Draft
+function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
 {
     const canvas = new Canvas();
     heading(canvas, p.name);
@@ -113,7 +157,8 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         cursorY += 6;
     };
     canvas.text(MARGIN + 5, cursorY,
-                "Dossier de fabrication : plans cotés, fiche de débit, quincaillerie, calepinage, PBS, contrôles.", 3);
+                `Dossier de fabrication : plans cotés, coupes, fiche de débit, quincaillerie, ${forWorkshop ? ""
+                    : "calepinage, "}gamme, PBS, contrôles.`, 3);
     cursorY += 5;
     const whom = [p.settings.client === "" ? "" : `Client : ${p.settings.client}`,
                   p.settings.site === "" ? "" : `Chantier : ${p.settings.site}`].filter((t) =>
@@ -199,10 +244,11 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
         `Connecteurs à ${s.connectorInset} mm des chants avant et arrière, intermédiaires tous les 256 mm maxi`,
         `Tourillons ${DIAM}8 x 35 : ${s.dowelFaceDepth} mm dans la face, ${s.dowelEdgeDepth} mm dans le chant`,
         `Taquets : trous ${DIAM}5 de ${s.pinDepth} mm, rangées à 37 mm des chants, `
-            + "3 trous de réglage de part et d'autre",
+            + `${PIN_SPARE_HOLES} trous de réglage de part et d'autre`,
         `Étagères réglables : jeu latéral ${s.shelfSideClearance} mm par côté, retrait avant ${s.shelfFrontSetback} mm`,
         `Charnières à ${s.hingeEdgeDistance} mm des chants de porte, décalées hors des tablettes fixes`,
-        `Chants : ${EDGE_OVERLENGTH} mm de surlongueur par bande. Trait de scie ${s.kerf} mm, délignage ${s.trim} mm`,
+        ...forWorkshop ? [] : [`Chants : ${EDGE_OVERLENGTH} mm de surlongueur par bande. Trait de scie ${s.kerf} mm, `
+            + `délignage ${s.trim} mm`],
         "Côtés de tiroir en 16 mm, fond en retrait de 13 mm (Blum : 12 à 15)", 
     ];
     for (const line of conventions)
@@ -250,7 +296,7 @@ function cover(p: Project, a: Analysis, bom: Bom): Draft
     sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée "
         + `sous ${load} kg/dm²${use === undefined ? ", charge choisie hors catégorie" : `, ${use.label}`}`);
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
-    // Every source printed, the lines closing up to 3.2 mm, and said when some still do not fit
+    // Every source printed, the lines closing up to 3.2 mm, and said when some still don't fit
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 4;
     const pitch = Math.max(3.2, Math.min(4, (bottom - cursorY) / sources.size));
     const fits = Math.max(0, Math.floor((bottom - cursorY) / pitch) + 1);

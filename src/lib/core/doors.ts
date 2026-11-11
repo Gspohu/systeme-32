@@ -11,7 +11,7 @@ import type { Build, Part } from "./parts";
 import {
     CUP_DEPTH, CUP_DIAMETER, EXPANDO_PLATE, HINGE_CHART, HINGE_CHART_WIDTH, HINGE_OPENING_DEG, MIN_GAP, MIN_GAP_FD,
     PLATE_LINE, TB_MAX, TB_MIN, TIPON_ADAPTER, TIPON_AXIS_FROM_FACE, TIPON_CATCH_PLATE, TIPON_DOOR_SHORT_MAX_HEIGHT,
-    TIPON_HOLE_DIAMETER,
+    TIPON_DEPTH, TIPON_HOLE_DIAMETER,
 } from "../data/rules";
 import { DIAM } from "./text";
 import { meets } from "./drilling";
@@ -22,6 +22,8 @@ import { at, neg, Y, type Frame, type Vec3 } from "./geometry";
 // Workshop conventions, stated in the drawings as such
 const PLATE_CLEARANCE = 25;
 const TIPON_FROM_EDGE = 100;
+// Height off the floor a hand pushes at : a workshop choice to try on a door, no Blum rule was found
+const TIPON_REACH = 1100;
 // A TIP-ON on an adapter whose screws would meet a drilling already there oges down by steps, 50 mm at most
 const TIPON_STEP = 10;
 const TIPON_SHIFT_MAX = 50;
@@ -158,7 +160,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 + "l'abaque Blum (2500 mm, 22 kg). Diviser la porte.");
             continue;
         }
-        // On a short door the cups of two hinges run into each other, the plates are not dimensioned yet
+        // On a short door the cups of 2 hinges run into each other, the plates aren't dimensioned yet
         const pitch = (fp.rect.h - 2 * s.hingeEdgeDistance) / Math.max(1, hingeTotal - 1);
         if (hingeTotal > 1 && pitch < CUP_DIAMETER)
         {
@@ -225,6 +227,10 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
             b.errors.push(`${name} : ${face.part.label.toLowerCase()} de ${face.part.thickness} mm, ${EXPANDO_PLATE.minSide} `
                 + `mini pour les chevilles de l'embase ${EXPANDO_PLATE.ref} (Blum p. 146).`);
         }
+        const push = front.opening === "push";
+        const refs = { full: push ? "70T3550.TL" : "71B3550", twin: push ? "70T3650.TL" : "71B3650",
+                      inset: push ? "70T3750.TL" : "71B3750" };
+        const hingeRef = refs[fp.hingeKind!];
         const cupV = tb + CUP_DIAMETER / 2;
         for (const y of ys)
         {
@@ -244,7 +250,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 face.part.holes.push(onSystem
                     ? { u: y + dy - face.uOrigin, v: line, diameter: EXPANDO_PLATE.hole, depth: s.pinDepth,
                         face: face.face, label: `Embase ${EXPANDO_PLATE.ref} : cheville EXPANDO ${DIAM}5 (Blum p. 146)`,
-                        purpose: "plate-dowel" as const }
+                        purpose: "plate-dowel" as const, fixes: hingeRef }
                     : { u: y + dy - face.uOrigin, v: line, diameter: 0, depth: 0, face: face.face,
                         label: `Embase 173H7100 : vis ${DIAM}3,5 x 15`, purpose: "plate-screw" as const });
             }
@@ -253,10 +259,6 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
         {
             b.errors.push(`${name} : aucune joue ou montant continu côté charnières.`);
         }
-        const push = front.opening === "push";
-        const refs = { full: push ? "70T3550.TL" : "71B3550", twin: push ? "70T3650.TL" : "71B3650",
-                      inset: push ? "70T3750.TL" : "71B3750" };
-        const hingeRef = refs[fp.hingeKind!];
         b.hardware.push({ ref: hingeRef, qty: hingeTotal, item: c.id, itemName: c.name, target: fp.id,
                          note: `TB ${tb.toFixed(1)}`, purpose: "hinge" });
         b.hardware.push({ ref: onSystem ? EXPANDO_PLATE.ref : "173H7100", qty: hingeTotal, item: c.id, itemName: c.name,
@@ -279,7 +281,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                 remedy: "Déplacer l'un des deux ou poser les charnières de l'autre côté.",
             });
         }
-        // TODO : the cup screw positions are not dimensioned in the Blum catalogue, drill them from the template
+        // TODO : the cup screw positions aren't dimensioned in the Blum catalogue, drill them from the template
         part.notes.push("Cuvettes à visser : position des vis selon la charnière (non cotée au catalogue)");
         if (push)
         {
@@ -289,7 +291,7 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
                              note: "jeu mini 2,6 mm entre corps et porte (Blum p. 172)", purpose: "push-latch" });
             tipOns.push(() =>
             {
-                fitTipOnHole(c, lay, b, nb, fp, hingeSide); 
+                fitTipOnHole(c, lay, b, nb, fp, hingeSide, tipRef);
             });
         }
     }
@@ -308,10 +310,21 @@ function along(f: Frame, axis: "u" | "v" | "n", p: Vec3): number
 }
 
 
-// The TIP-ON on the opening side : drilled into the front edge of the panel when the catch plate facing it stays on
-// the door, else clipped in an adapter plate screwed on the face of that panel (Blum p. 172, 173 and 687)
-function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp: FrontPanel,
-    hingeSide: "left" | "right"): void
+// The TIP-ON on the opening side : drilled into the panel edge when its catch plate stays on the door, else clipped
+// in an adapter plate on the face (Blum p. 172, 173 and 687). A note goes once on a part, however many doors it serves
+function note(part: Part, text: string): void
+{
+    if (!part.notes.includes(text))
+    {
+        part.notes.push(text);
+    }
+}
+
+
+// Each drilling carries the reference ordered, short or long, for the CAD export. An inset front stands `setBack`
+// behind the panel edge : the unit on its adapter plate as far back, never drilled in that edge (Blum KA-150 p. 173)
+export function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp: FrontPanel,
+    hingeSide: "left" | "right", tipRef: string, centred = false, setBack = 0): void
 {
     const openSide = hingeSide === "left" ? "right" : "left";
     const face = sideFace(c, lay, b, nb, openSide);
@@ -331,16 +344,20 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         const drilled = onDoor(at(part.frame!, u, 0, cellFace === "A" ? TIPON_AXIS_FROM_FACE : t -
                                   TIPON_AXIS_FROM_FACE));
         const half = TIPON_CATCH_PLATE.across / 2;
-        if (drilled.room >= half && t >= TIPON_AXIS_FROM_FACE + TIPON_HOLE_DIAMETER / 2)
+        if (setBack === 0 && drilled.room >= half && t >= TIPON_AXIS_FROM_FACE + TIPON_HOLE_DIAMETER / 2)
         {
-            part.holes.push({ u, v: 0, diameter: TIPON_HOLE_DIAMETER, depth: 50, face: "v0",
+            part.holes.push({ u, v: 0, diameter: TIPON_HOLE_DIAMETER, depth: TIPON_DEPTH[tipRef] ?? 50, face: "v0",
                               w: cellFace === "A" ? TIPON_AXIS_FROM_FACE : t - TIPON_AXIS_FROM_FACE,
                               label: `${label}, axe à ${TIPON_AXIS_FROM_FACE} de la face ${cellFace} (Blum p. 172)`,
-                              purpose: "push-latch" });
+                              purpose: "push-latch", fixes: tipRef });
+            note(part, `TIP-ON percé : axe ${DIAM}${TIPON_HOLE_DIAMETER} à ${String(TIPON_AXIS_FROM_FACE).replace(".", ",")} mm `
+                + `de la face intérieure, pas au milieu de l'épaisseur. Cote du gabarit Blum 65.5010, en appui sur la `
+                + "face intérieure : catalogue Blum 2024-2025 p. 676, 'Distance from cabinet inner side to centre "
+                + "drilling 7.5 mm'");
             door.holes.push({ u: drilled.u, v: drilled.v, diameter: 0, depth: 0, face: "A",
                               label: `Contreplaque TIP-ON à coller ${TIPON_CATCH_PLATE.across} x `
                                   + `${TIPON_CATCH_PLATE.high} centrée ici, gabarit Blum 65.5210.01 (p. 687)`,
-                              purpose: "catch-plate" });
+                              purpose: "catch-plate", fixes: tipRef });
             return;
         }
         // drilled, the plate would hang past the door edge : the adapter plate brings the unit into the cell
@@ -350,8 +367,8 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         let down = 0;  
         while (TIPON_ADAPTER.screws.some((v) =>
         {
-            return meets(part, cellFace, u - down, v, 4, 15);
-        })) 
+            return meets(part, cellFace, u - down, v + setBack, 4, 15);
+        }))
         {
             down += TIPON_STEP;
             if (down > TIPON_SHIFT_MAX) 
@@ -362,12 +379,12 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
             }
         }
         if (down > 0)   
-        {  
+        {
             part.notes.push(`TIP-ON de la porte ${fp.number} décalé de ${down} mm : l'autre face porte déjà des `
                 + "perçages à sa hauteur");
             u -= down; 
         }
-        const clipped = onDoor(at(part.frame!, u, 0, cellFace === "A" ? -off : t + off));
+        const clipped = onDoor(at(part.frame!, u, setBack, cellFace === "A" ? -off : t + off));
         if (clipped.room < half)
         {
             b.errors.push(`${c.name}, porte ${fp.number} : la contreplaque TIP-ON (${TIPON_CATCH_PLATE.across} mm) `
@@ -377,23 +394,33 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
         }
         for (const v of TIPON_ADAPTER.screws)
         {
-            part.holes.push({ u, v, diameter: 0, depth: 0, face: cellFace,
+            part.holes.push({ u, v: v + setBack, diameter: 0, depth: 0, face: cellFace,
                               label: `Embase TIP-ON ${TIPON_ADAPTER.ref} : vis ${DIAM}3,5 (Blum p. 173)`,
-                              purpose: "adapter-screw" });
+                              purpose: "adapter-screw", fixes: tipRef });
         }
+        const why = setBack > 0
+            ? `la façade est intérieure, son dos ${setBack} mm derrière le chant : l'embase recule d'autant, ses vis à `
+                + `${TIPON_ADAPTER.screws.map((v) => { return v + setBack; }).join(" et ")} mm du chant`
+            : `percé, il placerait sa contreplaque de ${TIPON_CATCH_PLATE.across} mm à `
+                + `${drilled.room.toFixed(1).replace(".", ",")} mm du chant de la porte, trop près pour la coller`;
+        note(part, `TIP-ON sur embase ${TIPON_ADAPTER.ref}, vissée sur la face du panneau, hors de son épaisseur : `
+            + `${why} (Blum KA-150 p. 172-173)`);
         b.hardware.push({ ref: TIPON_ADAPTER.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
-                         note: `monté sur embase : percé dans le panneau, il placerait sa contreplaque à ` 
-                             + `${drilled.room.toFixed(1).replace(".", ",")} mm du chant de la porte, trop près pour la coller`,
-                         purpose: "push-adapter" });
+                         note: `monté sur embase : ${why}`, purpose: "push-adapter" });
+        // Blum p. 173 : fixed with chipboard screws, the kit holds only the one of its screw-on catch plate
+        b.hardware.push({ ref: "609.1500", qty: TIPON_ADAPTER.screws.length, item: c.id, itemName: c.name, target: fp.id,
+                          note: "embase TIP-ON", purpose: "adapter-screw" });
         door.holes.push({ u: clipped.u, v: clipped.v, diameter: 0, depth: 0, face: "A",
                           label: `Contreplaque TIP-ON à coller centrée ici, axe à ${off} de la face du panneau `
-                              + `(embase ${TIPON_ADAPTER.ref}, Blum p. 173)`, purpose: "catch-plate" });
+                              + `(embase ${TIPON_ADAPTER.ref}, Blum p. 173)`, purpose: "catch-plate", fixes: tipRef });
     };
-    const y = fp.rect.y + fp.rect.h - TIPON_FROM_EDGE;
+    // As near the hand as the door lets it, a door flexing more the further it's pushed from its unit
+    const y = Math.min(Math.max(TIPON_REACH - c.y, fp.rect.y + TIPON_FROM_EDGE), fp.rect.y + fp.rect.h -
+                       TIPON_FROM_EDGE);
     const single = byId(c.fronts, fp.front)?.spec.type === "door";
     if (single && face !== null)
     {
-        mount(face.part, face.face, y - face.uOrigin, `TIP-ON ${DIAM}10 x 50 mini`);
+        mount(face.part, face.face, y - face.uOrigin, `TIP-ON ${tipRef} ${DIAM}10 x ${TIPON_DEPTH[tipRef] ?? 50} mini`);
         return;
     }
     // Double doors meet in the middle : the unit fit into the front edge of the panel above
@@ -412,10 +439,13 @@ function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: NodeBox, fp
     }
     if (above !== undefined && above.frame !== null)
     {
-        const xLocal = openSide === "left" ? fp.rect.x + TIPON_FROM_EDGE : fp.rect.x + fp.rect.w - TIPON_FROM_EDGE;
+        // A drop-down flap is pushed in the middle of its top edge, a door near its opening edge
+        const xLocal = centred ? fp.rect.x + fp.rect.w / 2
+            : openSide === "left" ? fp.rect.x + TIPON_FROM_EDGE : fp.rect.x + fp.rect.w - TIPON_FROM_EDGE;
         const u = xLocal - (above.frame.o[0] - c.x);
         // The face of the top looks down into the cell, a shelf turns its face B down
-        mount(above, above.role === "top" ? "A" : "B", u, `TIP-ON ${DIAM}10 x 50 mini dans le chant avant`);
+        mount(above, above.role === "top" ? "A" : "B", u,
+              `TIP-ON ${tipRef} ${DIAM}10 x ${TIPON_DEPTH[tipRef] ?? 50} mini dans le chant avant`);
     }
     else
     {

@@ -2,14 +2,27 @@
 
 import type { Carcass, Project, Room } from "./model";
 import type { Check } from "./check";
-import type { Build } from "./part_types";
-import { CLEAT_THICKNESS, newPart } from "./part_base";
+import type { Build, Edge } from "./part_types";
+import { newPart } from "./part_base";
+import { sideWallDepth } from "./room";
 import { X, Y, Z, neg } from "./geometry";
-import { buttedLengths, type Cut } from "./solid_stock";
+import type { Cut } from "./solid_stock";
+import { spread } from "./fittings";
+import { FRONT_GAP } from "../data/rules";
 
 
 // The slat cleats of the same project, 40 x 20
 export const CLEAT_WIDTH = 40;
+// A filler sawn this much wider than finished, its edge against the wall or the ceiling recut to fit on site
+// Workshop convention : cut to the exact gap, 25 mm left nothing to scribe (review of 2026-11-09)
+export const FILLER_SCRIBE = 15;
+// Workshop conventions, the screws of the side fillers
+const CEILING_CLEAT_SCREW_END = 100;
+// How near a side wall an end stands to be against it
+const WALL_TOUCH = 1;
+const CEILING_CLEAT_SCREW_PITCH = 400;
+// Its long screw runs in the width of the cleat, 10 in the strip of 19, along it from the screw into the top
+export const CLEAT_TO_STRIP = { hole: 5, along: 25 };
 
 
 export function fillerGap(c: Carcass, room: Room): number
@@ -39,39 +52,61 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): 
     const t = c.thickness;
     // In the plane of the overlay façades, in their decor whne there are some
     const front = c.fronts[0];
+    // An end against a side wall is seen by no one : no edging there
+    const reach = c.z + c.depth + FRONT_GAP + t;
+    const walled = (side: "left" | "right"): boolean =>
+    {
+        const at = side === "left" ? c.x <= WALL_TOUCH : c.x + c.width >= room.width - WALL_TOUCH;
+        return at && (room.walls ?? []).includes(side) && sideWallDepth(room, side) >= reach;
+    };
+    const edges: Edge[] = [...(walled("left") ? [] : ["u0" as const]), ...(walled("right") ? [] : ["u1" as const]),
+                           "v0"];
     const strip = newPart({
         item: c.id, itemName: c.name, thickness: t, decor: front?.decor ?? c.decor, colour: front?.colour ?? null,
         id: `${c.id}/filler`, label: "Fileur de plafond", role: "filler", length: c.width, width: gap,
-        edges: ["u0", "u1", "v0"],
-        frame: { o: [c.x, c.y + c.height, c.z + c.depth], u: X, v: Y, n: Z },
+        edges,
+        frame: { o: [c.x, c.y + c.height, c.z + c.depth + FRONT_GAP], u: X, v: Y, n: Z },
     });
-    strip.notes.push(`Hauteur théorique ${Math.round(gap)} mm : plafond rarement droit, ajuster sur place`);
+    strip.scribe = FILLER_SCRIBE;
+    strip.notes.push(`Hauteur finie ${Math.round(gap)} mm, débitée à ${Math.round(gap) + FILLER_SCRIBE} mm : plafond rarement `
+        + "droit, chant du haut recoupé sur place");
     b.parts.push(strip);
-    // Solid wood like the slat cleats, a 20 mm melamine board does not exist. In lengths butted end to end when
-    // no board on sale gives it whole
-    const lengths = buttedLengths(c.width - 2 * t, "CHENE_MASSIF", CLEAT_THICKNESS, cut);
-    const many = lengths.length > 1;
-    if (gap < CLEAT_THICKNESS)
+    if (gap < t)
     {
         strip.notes.push("Trop étroit pour un tasseau : coller le fileur sur le chant du dessus");
         return;
     }
-    let x = c.x + t;
-    lengths.forEach((l, k) =>
+    // A strip of the carcass board, hidden behind the filler, whole between the sides out of the offcuts
+    const l = c.width - 2 * t;
+    const common = { item: c.id, itemName: c.name, decor: c.decor, id: `${c.id}/filler-cleat`,
+                    label: "Tasseau du fileur",
+                     role: "cleat" as const, length: l, edges: [], width: CLEAT_WIDTH, thickness: t };
+    // Standing behind the strip, or laid flat on the top when the gap is lower than the cleat is wdie
+    const flat = gap < CLEAT_WIDTH;
+    const part = newPart({ ...common, frame: !flat
+        ? { o: [c.x + t, c.y + c.height, c.z + c.depth + FRONT_GAP - t], u: X, v: Y, n: Z }
+        : { o: [c.x + t, c.y + c.height + t, c.z + c.depth + FRONT_GAP], u: X, v: neg(Z), n: neg(Y) } });
+    part.notes.push(`Bande de ${CLEAT_WIDTH} mm débitée dans le panneau de la caisse, cachée derrière le fileur`);
+    b.parts.push(part);
+    const spots = spread(l, CEILING_CLEAT_SCREW_END, CEILING_CLEAT_SCREW_PITCH);
+    // TODO a cleat standing behind a strip higher than 40 takes no screw yet : the fixing check names it
+    if (flat)
     {
-        const common = { item: c.id, itemName: c.name, decor: "CHENE_MASSIF",
-                         id: `${c.id}/filler-cleat${many ? `/${k + 1}` : ""}`,
-                         label: `Tasseau du fileur${many ? `, morceau ${k + 1}/${lengths.length}` : ""}`,
-                         role: "cleat" as const, length: l, edges: [], width: CLEAT_WIDTH, thickness: CLEAT_THICKNESS };
-        // Standing behind the strip, or laid flat on the top when the gap is lower than the cleat is wdie
-        b.parts.push(newPart({ ...common, frame: gap >= CLEAT_WIDTH
-            ? { o: [x, c.y + c.height, c.z + c.depth - CLEAT_THICKNESS], u: X, v: Y, n: Z }
-            : { o: [x, c.y + c.height + CLEAT_THICKNESS, c.z + c.depth], u: X, v: neg(Z), n: neg(Y) } }));
-        x += l;
-    });
-    if (many) 
-    {
-        strip.notes.push(`Tasseau en ${lengths.length} morceaux aboutés`);
+        // Down through the cleat into the top, nothing of it seen from the room, before the carcass is set. The strip
+        // glued on the front edge of the cleat once it stands : on it before, the carcass wouldn't pass under the
+        // ceiling, and the back edge of the cleat is against the wall then
+        for (const s of spots)
+        {
+            part.holes.push({ u: s, v: CLEAT_WIDTH / 2, diameter: 0, depth: 0, face: "A",
+                              label: "Tasseau du fileur dans le dessus : vis 4 x 30", purpose: "cleat-screw" });
+        }
+        b.hardware.push({ ref: "SCREW_4x30", qty: spots.length, item: c.id, itemName: c.name, target: null,
+                          note: "tasseau du fileur de plafond dans le dessus, avant de poser la colonne", purpose: "cleat-screw" });
+        b.hardware.push({ ref: "GLUE_PU", qty: 1, item: c.id, itemName: c.name, target: strip.id,
+                          note: "fileur de plafond collé sur le chant avant de son tasseau, une fois la colonne posée",
+                          purpose: "cleat-screw" });
+        strip.notes.push("Collé sur le chant avant du tasseau une fois la colonne en place : ajusté au plafond, dos poncé, "
+            + "colle polyuréthane, maintenu jusqu'à la prise");
     }
 }
 
@@ -86,7 +121,7 @@ export function ceilingChecks(p: Project): Check[]
         {
             continue;
         }
-        // Assembled lying on its back, it is raised about its bottom front edge
+        // Assembled lying on its back, it's raised about its bottom front edge
         const swing = Math.hypot(c.height, c.depth);
         if (swing > h)
         {
