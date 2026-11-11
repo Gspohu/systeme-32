@@ -72,7 +72,7 @@
     });
 
 
-    // A template or a blank project just opened, saved only once it is changed : opening one thrice made three copies
+    // A template or a blank project just opened, saved only once it's changed : opening one thrice made 3 copies
     let untouched: unknown = null;
     // The save waiting for its second, run at once when the page goes away
     let pending: (() => void) | null = null;

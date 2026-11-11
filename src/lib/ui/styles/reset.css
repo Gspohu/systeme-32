@@ -1,6 +1,6 @@
-/* ── Minimal Reset + Baseline ─────────────────────────────────────────
+/* Minimal Reset + Baseline
    Sensible defaults, import BEFORE tokens.css
-   ──────────────────────────────────────────────────────────────────── */
+   */
 
 *,
 *::before,
@@ -110,7 +110,7 @@ table
     border-collapse: collapse;
 }
 
-/* Respect reduced motion */
+
 @media (prefers-reduced-motion: reduce)
 {
     *,

@@ -1,10 +1,7 @@
-/* ── Design System Tokens ─────────────────────────────────────────────
-   Generated from tokens_master.py, do not edit directly
-   Dark-first, light theme via prefers-colour-scheme or .light class
-   ──────────────────────────────────────────────────────────────────── */
+/* Dark first, light theme via prefers-colour-scheme or the .light class */
 
 
-/* ── Typography ───────────────────────────────────────────────────── */
+/* Typography */
 
 :root
 {
@@ -37,7 +34,7 @@
 }
 
 
-/* ── Spacing Scale ────────────────────────────────────────────────── */
+/* Spacing Scale */
 
 :root
 {
@@ -53,7 +50,7 @@
 }
 
 
-/* ── Borders & Radius ─────────────────────────────────────────────── */
+/* Borders & Radius */
 
 :root
 {
@@ -70,7 +67,7 @@
 }
 
 
-/* ── Shadows ──────────────────────────────────────────────────────── */
+/* Shadows */
 
 :root
 {
@@ -82,7 +79,7 @@
 }
 
 
-/* ── Transitions ──────────────────────────────────────────────────── */
+/* Transitions */
 
 :root
 {
@@ -93,7 +90,7 @@
 }
 
 
-/* ── Z-Index Scale ────────────────────────────────────────────────── */
+/* Z-Index Scale */
 
 :root
 {
@@ -106,7 +103,7 @@
 }
 
 
-/* ── Semantic Component Tokens ────────────────────────────────────── */
+/* Semantic Component Tokens */
 
 :root
 {
@@ -121,7 +118,7 @@
 }
 
 
-/* ── Dark Theme (default) ─────────────────────────────────────────── */
+/* Dark Theme (default) */
 
 :root
 {
@@ -173,7 +170,7 @@
 }
 
 
-/* ── Light Theme ──────────────────────────────────────────────────── */
+/* Light Theme */
 
 @media (prefers-color-scheme: light)
 {

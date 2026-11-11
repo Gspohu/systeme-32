@@ -30,7 +30,7 @@ export function openPose(m: Motion): Pose
 }
 
 
-// The motion moving each part, and each piece of hardware with the part it is fixed in
+// The motion moving each part, and each piece of hardware with the part it's fixed in
 export function movers(motions: Motion[], fitted: Fitted[], open: (m: Motion) => boolean): Map<string, Motion>
 {
     const by = new Map<string, Motion>();

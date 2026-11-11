@@ -269,7 +269,7 @@ export function fittingMeshes(c: Carcass,
         {
             continue;
         }
-        // 1 mm into the face it is let in, from below
+        // 1 mm into the face it's let in, from below
         const lit = c.y + lightLevel(nb, l) + (l.under === true ? 1 : -1);
         if (l.kind === "spots")
         {
@@ -375,7 +375,7 @@ export type DeviceSkin = "body" | "grille" | "brass";
 
 
 // An appliance in the frame of its wall : a block, or an amplifier cabinet whose front is a grille and whose top
-// carries a brass plate with its knobs. Those details follow photographs by eye, they are not dimensioned and no
+// carries a brass plate with its knobs. Those details follow photographs by eye, they're not dimensioned and no
 // check reads them, only the overall box counts
 export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.BufferGeometry }[]
 {
@@ -385,7 +385,7 @@ export function deviceMeshes(d: Device): { skin: DeviceSkin; geometry: THREE.Buf
         geometry.translate(...at);
         out.push({ skin, geometry });
     };
-    // Built standing, then laid on its flank when it is taller than wide, its top turned to +x
+    // Built standing, then laid on its flank when it's taller than wide, its top turned to +x
     const onFlank = d.look === "amplifier" && d.height > d.width;
     const W = onFlank ? d.height : d.width;
     const H = onFlank ? d.width : d.height;
