@@ -8,7 +8,7 @@
     import type { Project } from "../core/model";
 
 
-    // The other saved projects ordered with the open one, for this session only : they stay where they are saved
+    // The other saved projects ordered with the open one, for this session only : they stay where they're saved
     let partners = $state.raw<Project[]>([]);
     const order = $derived(partners.length === 0 ? null : groupOrder([app.project, ...partners]));
     // The projetcs of this browser, read once when the tab opens

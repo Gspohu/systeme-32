@@ -27,10 +27,10 @@ Every hardware reference and limit comes from the manufacturer document named ne
 
 ## Honest limits
 
-- A few workshop conventions are not from any manufacturer : connector spacing, dowel hole depths, shelf pin depth, shelf clearance, hinge distance from the door edge, drawer box sides in 16 mm. They are listed on the cover sheet and editable in the settings.
-- The flexible MDF minimum radii (150 mm for 6 mm, 200 mm for 9 mm) come from distributors, the manufacturer data sheet was not found : test on an offcut.
-- The screw positions of screw-on hinge cups, one rear runner screw on long MOVENTO runners, the cross position of the TIP-ON hole and the Clamex lever access are not dimensioned in the catalogues : the drawings refer to the manufacturer instructions instead of guessing.
-- The concealed fixing of wal shelves and an anti-tip wall bracket are not sourced yet.  
+- A few workshop conventions aren't from any manufacturer : connector spacing, dowel hole depths, shelf pin depth, shelf clearance, hinge distance from the door edge, drawer box sides in 16 mm. They're listed on the cover sheet and editable in the settings.
+- The flexible MDF minimum radii (150 mm for 6 mm, 200 mm for 9 mm) come from distributors, the manufacturer data sheet wasn't found : test on an offcut.
+- The screw positions of screw-on hinge cups, one rear runner screw on long MOVENTO runners, the cross position of the TIP-ON hole and the Clamex lever access aren't dimensioned in the catalogues : the drawings refer to the manufacturer instructions instead of guessing.
+- The concealed fixing of wal shelves and an anti-tip wall bracket aren't sourced yet.  
 - Tipping is a static calculation, not the EN 14749:2016+A1:2022 test.
 - Only two panel prices are prefilled, read on a French retailer on 29 September 2026. Every other line of the estimate stays empty until you enter a price.
 - The layout is a guillotine split tree : a pinwheel arrangement where no cut runs across can't be drawn.

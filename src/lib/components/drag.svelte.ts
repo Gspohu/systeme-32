@@ -1,4 +1,4 @@
-// Pointer driven drag and drop, works with a finger as well as a mouse (HTML5 drag events do not on touch)
+// Pointer driven drag and drop, works with a finger as well as a mouse (HTML5 drag events don't on touch)
 
 export type DragPayload =
     | { kind: "palette"; tool: string }

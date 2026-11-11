@@ -34,13 +34,14 @@ class AppState
     refusals = $state(0);
     // The 3D view shows the hardware hidden inside the carcasses, the boards seen through
     showHardware = $state(false);
+    showHoles = $state(false);
     // The back wall, the ceiling and the side walls an item stands against
     showRoom = $state(true);
     // The room dimmed and every LED strip or spot lighting what is undre it
     ledsOn = $state(false);
     // Every front open in 3D, and the ones a click turned the other way from that
     frontsOpen = $state(false);
-    // Where the 3D view puts the screen on its arm, null where it is put away, and the room its arm reaches
+    // Where the 3D view puts the screen on its arm, null where it's put away, and the room its arm reaches
     armSpot = $state<{ cx: number; z: number; yaw: number } | null>(null);
     showArmZone = $state(true);
     flipped = new SvelteSet<string>();

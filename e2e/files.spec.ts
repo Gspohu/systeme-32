@@ -15,7 +15,7 @@ async function choose(page: Page, trigger: Locator, name: string, mimeType: stri
 }
 
 
-// Items of the project of that name in the browser sotre, -1 while it is not saved yet
+// Items of the project of that name in the browser sotre, -1 while it's not saved yet
 function storedItems(page: Page, name: string): Promise<number>
 {
     return page.evaluate((wanted) =>
@@ -132,7 +132,7 @@ test.describe("files", () =>
         const dialog = page.getByRole("dialog", { name: "Mes projets" });
         await expect(dialog.getByText("Aucun projet enregistré ici.")).toBeVisible(); 
         await dialog.getByRole("button", { name: "Fermer" }).click();
-        // Changed, a setting will do, it is saved, and the next one of that template gets a number
+        // Changed, a setting will do, it's saved and the next one of that template gets a number
         await outputsTab(page, "Réglages");
         const kerf = page.locator(".field", { hasText: "Trait de scie" }).locator("input");
         await kerf.fill("5");

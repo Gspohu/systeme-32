@@ -290,7 +290,7 @@
             {/each}
         </div>
     </div>
-    <!-- the size of the drawing alone : the tools row above is not part of what the zoom frames -->
+    <!-- the size of the drawing alone : the tools row above isn't part of what the zoom frames -->
     <div class="drawing" bind:clientWidth={hostWidth} bind:clientHeight={hostHeight}>
     <svg bind:this={facadeBridge.svg} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" onwheel={onWheel}
         role="application" aria-label="Vue de face">
@@ -488,7 +488,8 @@
                             onpointerdown={(e) =>
                             {
                                 const label = { drawer: "Tiroirs", leaf: "Coulissant", door: "Porte",
-                                               flap: "Abattant", panel: "Façade fixe" }[fp.role];
+                                               flap: "Abattant", panel: "Façade fixe",
+                                               drop: "Abattant tombant" }[fp.role];
                                 app.selection = { kind: "front", item: it.id, front: fp.front };
                                 drag.start(e, { kind: "front", item: it.id, front: fp.front }, label, handleDrop);
                             }}
@@ -681,7 +682,7 @@
         pointer-events: none;
     }
 
-    /* An appliance is not made : the ghost's dashes, open so a door in front still shows */
+    /* An appliance isn't made : the ghost's dashes, open so a door in front still shows */
     .device
     {
         fill: none;
@@ -797,7 +798,7 @@
     }
 
 
-    /* above a roof line : whatever the layout drew there is not built */
+    /* above a roof line : whatever the layout drew there isn't built */
     .slope-mask
     {
         fill: var(--colour-bg-primary);
@@ -866,7 +867,7 @@
         pointer-events: none;
     }
 
-    /* Swung out on its arm : the same colour, finer dots, it is a place it goes to, not where it lives */
+    /* Swung out on its arm : the same colour, finer dots, it's a place it goes to, not where it lives */
     .screen.out
     {
         stroke-width: 4;

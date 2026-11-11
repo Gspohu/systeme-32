@@ -1,4 +1,4 @@
-// Front view hit testing : which item, which deepest cell, and the local coordinates under a world point
+// Front view hit testing : which item, which deepest cell and the local coordinates under a world point
 
 import type { Carcass, Item, Project, Wall } from "../core/model";
 import type { Analysis } from "../core/analysis";

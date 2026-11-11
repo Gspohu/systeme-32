@@ -64,7 +64,7 @@ test.describe("inspector", () =>
         await check(page, "Assise").check();
         await setField(page, "Coussin (mm)", "50");
         await expect(page.locator(".facade .cushion")).toBeVisible();
-        // 562 of free span in 19 mm particleboard is too much under a medium-term load, 362 is not
+        // 562 of free span in 19 mm particleboard is too much under a medium-term load, 362 isn't
         expect((await checkLines(page, true)).join("\n")).toContain("ne porte pas une personne");
         await setField(page, "Largeur", "400");
         expect((await checkLines(page, true)).join("\n")).toContain("assise vérifiée");

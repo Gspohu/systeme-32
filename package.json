@@ -12,7 +12,8 @@
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
         "test": "vitest run",
         "test:watch": "vitest",
-        "e2e": "playwright test"
+        "e2e": "playwright test",
+        "cad": "rolldown scripts/cad_export.ts --file .svelte-kit/cad_export.mjs --platform node && node .svelte-kit/cad_export.mjs"
     },
     "dependencies": {
         "@threlte/core": "8.6.1",
