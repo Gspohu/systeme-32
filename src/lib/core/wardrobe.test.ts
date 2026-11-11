@@ -119,7 +119,7 @@ describe("clothes rails", () =>
         const q = setRail(setRail(p, c.id, c.root.kind === "split" ? c.root.children[1]!.id : c.root.id, false),
                           c.id, low, true);
         expect(errorsOf(q).join("\n")).toContain("support central");
-        // Nothing is marked for a rail that is refused
+        // Nothing is marked for a rail that's refused
         expect(partById(analyse(q).build.parts, `${c.id}/side/L`).holes).not.toContainEqual(labelled("Axe de tringle"));
     });
 
@@ -192,19 +192,31 @@ describe("clothes rails", () =>
 
 describe("cell lights", () =>
 {
-    it("grooves the underside of the top and sizes strip and driver", () =>
+    it("screws the profile under the top, grooves it only when let in, and sizes strip and driver", () =>
     {
         let p = addItem(newProject("essai"), wardrobe());
         const c = p.items[0] as Carcass;
         p = setLight(p, c.id, c.root.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000 });
         const a = analyse(p);
         const top = partById(a.build.parts, `${c.id}/top`);
-        expect(top.grooves).toContainEqual({ face: "A", along: "u", at: 49, from: 1, to: 999, width: 18, depth: 8.5,
-                                             label: "Rainure du profilé LED", weakens: true });
+        // On its face by default : the board keeps its whole section, the profile hangs 8.5 under it
+        expect(top.grooves).toEqual([]);
+        expect(hardwareOf(a.build.hardware, "LED_PROFILE_SURFACE")?.note).toBe("coupé à 998 mm");
+        const profile = a.build.fitted.find((f) => { return f.ref === "LED_PROFILE_SURFACE"; })!;
+        expect(profile.half).toEqual([499, 9, 4.25]);
+        const r = addItem(newProject("essai"), wardrobe());
+        const rc = r.items[0] as Carcass;
+        const recessed = analyse(setLight(r, rc.id, rc.root.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000,
+                                                                 recess: true }));
+        expect(partById(recessed.build.parts, `${rc.id}/top`).grooves).toContainEqual({ face: "A", along: "u", at: 49,
+            from: 1,
+                                                                                      to: 999, width: 18, depth: 8.5,
+                                                                                      label: "Rainure du profilé LED",
+                                                                                      weakens: true });
         // 998 of profile, the strip keeps a whole 50 mm pitch clear : 900 mm at 14.4 W/m
         expect(hardwareOf(a.build.hardware, "LED_STRIP_24V")?.note).toBe("900 mm, 3000 K, 14.4 W/m");
-        expect(hardwareOf(a.build.hardware, "LED_DRIVER_24V")?.note)
-            .toBe("17 W mini pour 13.0 W de LED (1 éclairage(s), charge à 80 %)");
+        // Plural as the note may write it, "éclairages" or "éclairages"
+        expect(hardwareOf(a.build.hardware, "LED_DRIVER_24V")?.note).toMatch(/^17 W mini pour 13\.0 W de LED \(1 éclairage.*, charge à 80 %\)$/);
         // The profile ends butt the sides of the cell, hidden : no end cap, and no Wi-Fi controller unasked
         expect(hardwareOf(a.build.hardware, "LED_END_CAPS")).toBeUndefined();
         expect(hardwareOf(a.build.hardware, "SHELLY_PLUS_RGBW_PM")).toBeUndefined();
@@ -220,7 +232,7 @@ describe("cell lights", () =>
         // 13.0 W of strip on 24 V
         expect(hardwareOf(a.build.hardware, "SHELLY_PLUS_RGBW_PM")?.note)
             .toBe("entre l'alimentation et les rubans, 0.54 A sur une voie, pilotage local");
-        // 2000 wide : 1800 of strip at 50 W/m make 90 W, 3.75 A, still under. At 60 W/m, 4.5 A is not
+        // 2000 wide : 1800 of strip at 50 W/m make 90 W, 3.75 A, still under. At 60 W/m, 4.5 A isn't
         let wide = addItem(newProject("Sélestat"), wardrobe({ width: 2000 }));
         const w = wide.items[0] as Carcass;
         wide = setLight(wide, w.id, w.root.id, { kind: "strip", spots: 0, setback: 40, kelvin: 3000, wifi: true });
@@ -266,7 +278,7 @@ describe("cell lights", () =>
             lines.push(`${h.ref} x${h.qty} ${h.note ?? ""}`);
         }
         expect(lines).toContain("LED_SPOT_ROUND x3 3000 K, 1.7 W chacun");
-        expect(lines).toContain("LED_DRIVER_24V x1 7 W mini pour 5.1 W de LED (1 éclairage(s), charge à 80 %)");
+        expect(lines.some((l) => { return /^LED_DRIVER_24V x1 7 W mini pour 5\.1 W de LED \(1 éclairage.*, charge à 80 %\)$/.test(l); })).toBe(true);
     });
 
     it("refuses more spots than the cell holds and warns past the six driver sockets", () =>

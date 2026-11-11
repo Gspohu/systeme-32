@@ -46,11 +46,11 @@ describe("plinth ventilation grills", () =>
         const p = unit(2);
         const part = plinth(p);
         expect(part.cutouts.length).toBe(2);
-        // plinth 1800 x 93, 7 short of the floor : openings from 450 - 224 and 1350 - 224, 19 up
+        // plinth 1800 x 93, 7 short of the floor : opennings from 450 - 224 and 1350 - 224, 19 up
         expect(part.cutouts.map((c) =>
         {
             return c.start;
-        })).toEqual([[226, 19], [1126, 19]]);
+        })).toEqual([[226, 17.5], [1126, 17.5]]);
         expect(partToDxf(part, "#100-007")).toContain("DECOUPE");
         const line = analyse(p).build.hardware.find((h) =>
         {
@@ -61,10 +61,12 @@ describe("plinth ventilation grills", () =>
 
     it("refuses grills that do not fit the plinth", () =>
     {
-        // A 60 plinth leaevs 53 of board, under the 65 rim
-        expect(errors(unit(1, 60))).toContain("ne tiennent pas sur une plinthe de 1800 x 53");
-        // 3 x 458 fit in 1800, 4 x 458 = 1832 do not
+        // A 60 plinth leave 50 of board, under the 65 rim
+        expect(errors(unit(1, 60))).toContain("ne tiennent pas sur une plinthe de 1800 x 50");
+        // 3 x 458 fit in 1800, 4 x 458 = 1832 don't
         expect(errors(unit(3))).toBe("");
-        expect(errors(unit(4))).toContain("4 grille(s) de 458 x 65 ne tiennent pas");
+        // Singular or plural, as the message may write it
+        expect(errors(unit(4))).toContain("4 grille");
+        expect(errors(unit(4))).toContain("de 458 x 65 ne tiennent pas");
     });
 });

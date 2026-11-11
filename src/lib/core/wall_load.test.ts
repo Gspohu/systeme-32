@@ -80,7 +80,7 @@ describe("the wall behind a hung carcass", () =>
         {
             return h.ref;
         });
-        expect(refs).toContain("WALL_SCREW_5x50");
+        expect(refs).toContain("WALL_SCREW_5x50_PAN");
         expect(refs.some((r) =>
         {
             return r.startsWith("PLUG_");

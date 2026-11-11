@@ -61,7 +61,7 @@ describe("solid wood bought by the whole board", () =>
     });
 
 
-    it("prices the dresser's filler cleats on two whole boards, butted in four lengths", () =>
+    it("cuts the dresser's filler cleats whole out of the carcass board, no oak board bought", () =>
     {
         const p = dresser();
         const cleats = analyse(p).build.parts.filter((q) =>
@@ -70,15 +70,26 @@ describe("solid wood bought by the whole board", () =>
         });
         expect(cleats.map((q) =>
         {
-            return q.length;
-        })).toEqual([1128, 1128, 1128, 1128]);
-        const oak = computeOutputs(p).cost.lines.find((l) =>
+            return [q.length, q.thickness, q.material];
+        })).toEqual([[2256, 19, "p2"], [2256, 19, "p2"]]);
+        expect(computeOutputs(p).cost.lines.some((l) =>
         {
             return l.key === "board:CHENE_MASSIF:20";
-        })!;
-        expect(oak.unit).toBe("u");
-        expect(oak.qty).toBe(2);
-        expect(oak.total).toBeCloseTo(2 * oak.price!.value, 2);
+        })).toBe(false);
+    });
+
+
+    it("screws each filler cleat of the dresser on 4 rows, half the 7 it had", () =>
+    {
+        // Far too many for a hidden strip. A row is a screw into the side and one into the filler
+        const b = analyse(dresser()).build;
+        for (const q of b.parts.filter((x) => { return x.label.startsWith("Tasseau du fileur"); }))
+        {
+            expect(q.holes.filter((h) => { return h.face === "B" && h.purpose === "cleat-screw"; })).toHaveLength(4);
+            expect(q.holes.filter((h) => { return h.face === "v0" && h.purpose === "cleat-screw"; })).toHaveLength(4);
+        }
+        expect(b.hardware.filter((h) => { return h.purpose === "cleat-screw" && h.note?.includes("fileur") === true; })
+            .map((h) => { return h.qty; })).toEqual([4, 4, 4, 4]);
     });
 
 

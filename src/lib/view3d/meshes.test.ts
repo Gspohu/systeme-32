@@ -55,8 +55,8 @@ describe("hardware in the 3D view", () =>
         {
             return f.ref.startsWith("760H");
         });
-        // Three drawers : each one need a runer per side
-        expect(runners.length).toBe(6);
+        // Three drawers and the pull-out behind the flap since 2026-11-08 : each one need a runer per side
+        expect(runners.length).toBe(8);
         for (const r of runners)
         {
             expect(r.hidden).toBe(true);
