@@ -258,6 +258,18 @@
         drag.start(e, { kind: "item", item: it.id, dx: w[0] - ax, dy: w[1] - ay }, it.name, handleDrop);
     }
 
+    // Enter or space on what the keyboard reached selects it, as a touch would : the palette then adds to it
+    function pick(e: KeyboardEvent, s: NonNullable<typeof app.selection>): void
+    {
+        if (e.key === "Enter" || e.key === " ")
+        {
+            e.preventDefault();
+            app.selection = s;
+        }
+        return;
+    }
+
+
     // The point under the pointer stays put : zooming on the centre alone left the edges out of reach
     function onWheel(e: WheelEvent): void
     {
@@ -307,6 +319,7 @@
         zoom = 1;
         panX = 0;
         panY = 0;
+        return;
     }
 </script>
 
@@ -457,8 +470,9 @@
                             <rect
                                 x={nb.x} y={-(nb.y + nb.h)} width={nb.w} height={nb.h}
                                 class="cell" class:hover={isHover} class:selected={isSel}
-                                role="button" tabindex="-1" aria-label="Case"
+                                role="button" tabindex="0" aria-label="Case"
                                 onpointerdown={() => (app.selection = { kind: "node", item: it.id, node: nb.id })}
+                                onkeydown={(e) => pick(e, { kind: "node", item: it.id, node: nb.id })}
                             />
                         {/each}
                         {#each lay.dividers as d (d.id)}
@@ -468,7 +482,9 @@
                                 x={d.x} y={-(d.y + d.h)} width={d.w} height={d.h}
                                 fill={d.finish === null ? shade(it.decor, 0.82) : fill(d.finish.decor, d.finish.colour)}
                                 class="split-panel" class:adjustable={d.kind === "adjustable"} class:selected={isSel}
-                                role="button" tabindex="-1" aria-label="Séparation"
+                                role="button" tabindex="0" aria-label="Séparation"
+                                onkeydown={(e) => pick(e, { kind: "divider", item: it.id, split: d.split,
+                                                           index: d.index })}
                                 onpointerdown={(e) =>
                                 {
                                     app.selection = { kind: "divider", item: it.id, split: d.split, index: d.index };
@@ -523,7 +539,8 @@
                         {@const midY = (y0 + y1) / 2}
                         <g
                             class="front" class:selected={isSel}
-                            role="button" tabindex="-1" aria-label="Façade"
+                            role="button" tabindex="0" aria-label="Façade"
+                            onkeydown={(e) => pick(e, { kind: "front", item: it.id, front: fp.front })}
                             onpointerdown={(e) =>
                             {
                                 const label = { drawer: "Tiroirs", leaf: "Coulissant", door: "Porte",
@@ -649,8 +666,9 @@
             {@const base = b.y1 + (GRIP_GAP + GRIP_ROW * grip.lift) * u}
             <g
                 class="grip" class:selected={sel !== null && sel.item === it.id}
-                role="button" tabindex="-1" aria-label={`Déplacer ${it.name}`}
+                role="button" tabindex="0" aria-label={`Déplacer ${it.name}`}
                 onpointerdown={(e) => startItemDrag(e, it)}
+                onkeydown={(e) => pick(e, { kind: "item", item: it.id })}
             >
                 <!-- the whole name under the pointer when the grip cuts it -->  
                 <title>{it.name}</title>   
@@ -802,6 +820,26 @@
     {
         stroke: var(--colour-accent);
         stroke-width: 8;
+    }
+
+    /* Reached with the keyboard, told apart from the selection */
+    .cell:focus-visible,
+    .split-panel:focus-visible,
+    .front:focus-visible rect
+    {
+        outline: none;
+        stroke: var(--colour-focus-ring);
+        stroke-width: 8;
+    }
+
+    .grip:focus-visible
+    {
+        outline: none;
+    }
+
+    .grip:focus-visible rect
+    {
+        stroke: var(--colour-focus-ring);
     }
 
 

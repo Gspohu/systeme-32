@@ -2,13 +2,37 @@
 
 import { app } from "./app_state.svelte";
 import { clientToWorld } from "./bridge";
-import { hitTest } from "./hit";
-import { dropTool, PLACE_STEP, TOOLS } from "./tools";
+import { hitTest, selectionHit } from "./hit";
+import { aimsAtCell, dropTool, PLACE_STEP, TOOLS } from "./tools";
 import { snap } from "../core/layout";
 import { moveDivider, moveFront, updateItem } from "../core/commands";
 import { byId } from "../core/edit";
 import type { DragPayload } from "./drag.svelte";
 import type { Item } from "../core/model";
+
+// A palette tool clicked or taken with Enter : set on the selection the way a drop on it would, the keyboard has no
+// other way to design
+export function addTool(tool: string): void
+{
+    const label = byId(TOOLS, tool)?.label ?? tool;
+    if (!aimsAtCell(tool))
+    {
+        app.notify(`Glisser ${label} à sa place sur la façade.`, "info");
+        return;
+    }
+    const hit = selectionHit(app.project, app.outputs.analysis, app.selection);
+    if (hit === null)
+    {
+        app.notify(`Sélectionner d'abord une case, ou glisser ${label} dessus.`, "warning");
+        return;
+    }
+    if (app.apply(dropTool, tool, hit, hit.item?.wall ?? app.wall))
+    {
+        app.notify(`Ajouté : ${label}`, "success");
+    }
+    return;
+}
+
 
 export function handleDrop(payload: DragPayload, clientX: number, clientY: number): void
 {

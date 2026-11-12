@@ -76,6 +76,17 @@ export const TOOLS: Tool[] = [
 ];
 
 
+// The tools that go into a cell or onto a carcass : a click sets them on the selection. The others need a free
+// place on the wall, only a drop gives one
+const IN_CELL = new Set(["shelf-fixed", "shelf", "upright", "door", "double", "drawers", "sliding", "lift", "arch",
+                         "porthole", "lining", "rail", "lift-rail", "shoes", "light", "spots", "round-end"]);
+
+export function aimsAtCell(tool: string): boolean
+{
+    return IN_CELL.has(tool);
+}
+
+
 function need(cond: boolean, message: string): void
 {
     if (!cond)

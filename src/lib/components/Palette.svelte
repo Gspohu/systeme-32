@@ -1,6 +1,6 @@
 <script lang="ts">
     import { drag } from "./drag.svelte";
-    import { handleDrop } from "./actions";
+    import { addTool, handleDrop } from "./actions";
     import { TOOLS } from "./tools";
 
 
@@ -16,6 +16,7 @@
             class="tool"
             title={t.hint}
             onpointerdown={(e) => drag.start(e, { kind: "palette", tool: t.id }, t.label, handleDrop)}
+            onclick={() => addTool(t.id)}
         >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.icon} /></svg>
             <span>{t.label}</span>

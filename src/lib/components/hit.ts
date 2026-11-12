@@ -3,6 +3,7 @@
 import type { Carcass, Item, Project, Wall } from "../core/model";
 import type { Analysis } from "../core/analysis";
 import type { NodeBox } from "../core/layout";
+import type { Selection } from "./app_state.svelte";
 import { itemExtent } from "../core/extent";
 
 
@@ -90,4 +91,34 @@ export function hitTest(p: Project, a: Analysis, x: number, y: number, wall: Wal
         return out;
     }
     return out;
+}
+
+
+// What a tool clicked in the palette aims at : the cell selected or the one its front closes, as it is, or the middle
+// of a whole item as a drop there would. Null for a divider or nothing selected
+export function selectionHit(p: Project, a: Analysis, sel: Selection | null): Hit | null
+{
+    const it = sel === null || sel.kind === "divider" ? undefined : p.items.find((i) => { return i.id === sel.item; });
+    if (sel === null || it === undefined)
+    {
+        return null;
+    }
+    if (sel.kind === "item")
+    {
+        const e = itemExtent(it);
+        return hitTest(p, a, (e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2, it.wall);
+    }
+    if (it.kind !== "carcass")
+    {
+        return null;
+    }
+    const node = sel.kind === "node" ? sel.node
+        : sel.kind === "front" ? it.fronts.find((f) => { return f.id === sel.front; })?.node : undefined;
+    const n = node === undefined ? undefined : a.build.layouts.get(it.id)?.nodes.get(node);
+    if (n === undefined)
+    {
+        return null;
+    }
+    const local: [number, number] = [n.x + n.w / 2, n.y + n.h / 2];
+    return { x: it.x + local[0], y: it.y + local[1], item: it, carcass: it, cell: n, chain: [n], local };
 }

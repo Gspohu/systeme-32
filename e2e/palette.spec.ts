@@ -1,4 +1,5 @@
-import { addCarcass, cells, centreOf, drop, expect, openBlank, selectItem, test, toClient } from "./helpers";
+import { addCarcass, cells, centreOf, drop, expect, expectToast, openBlank, selectItem, test, toClient, tool }
+    from "./helpers";
 
 // Tools dropped in the one cell of a fresh 600 x 800 carcass, and waht the front view must shw after
 const IN_CELL: { label: string; selector: string; count: number }[] = [
@@ -16,7 +17,6 @@ const IN_CELL: { label: string; selector: string; count: number }[] = [
 
 test.describe("palette", () =>
 {
-    console.log("chien avant");
     for (const t of IN_CELL)
     {
         test(`drops ${t.label} in a cell`, async ({ page }) =>
@@ -27,6 +27,44 @@ test.describe("palette", () =>
             await expect(page.locator(`.facade ${t.selector}`)).toHaveCount(t.count);
         });   
     }
+
+    // Dragging was the only way : the keyboard could reach neither a cell nor a tool that did anything
+    test("designs with the keyboard alone, a cell reached and a tool taken with Enter", async ({ page }) =>
+    {
+        await openBlank(page);
+        await addCarcass(page);
+        const cell = cells(page).first();
+        // Focused from a script whatever its tabindex : in the tab order only at 0
+        await expect(cell).toHaveAttribute("tabindex", "0");
+        await expect(tool(page, "Tiroirs")).not.toHaveAttribute("tabindex", "-1");
+        await cell.focus();
+        await expect(cell).toBeFocused();
+        await page.keyboard.press("Enter");
+        await expect(cell).toHaveClass(/selected/);
+        await tool(page, "Tiroirs").focus();
+        await page.keyboard.press("Enter");
+        await expectToast(page, "Ajouté : Tiroirs");
+        await expect(page.locator(".facade .front")).toHaveCount(3);
+    });
+
+
+    test("sets a clicked tool on the selected cell, says what to do otherwise", async ({ page }) =>
+    {
+        await openBlank(page);
+        await addCarcass(page);
+        await tool(page, "Porte").click();
+        await expectToast(page, "Sélectionner d'abord une case, ou glisser Porte dessus.");
+        await expect(page.locator(".facade .front")).toHaveCount(0);
+        await cells(page).first().click();
+        await tool(page, "Porte").click();
+        await expectToast(page, "Ajouté : Porte");
+        await expect(page.locator(".facade .front")).toHaveCount(1);
+        // A carcass needs a free place on the wall, only a drop gives one
+        await tool(page, "Caisson").click();
+        await expectToast(page, "Glisser Caisson à sa place sur la façade.");
+        await expect(page.locator(".facade .grip")).toHaveCount(1);
+    });
+
 
     test("lines a cell", async ({ page }) =>
     {
