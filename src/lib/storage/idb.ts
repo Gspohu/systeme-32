@@ -56,8 +56,10 @@ export async function saveLocal(p: Project, textures: Map<string, Uint8Array>): 
     const d = await db();
     const rec: Stored = { id: p.id, name: p.name, saved: new Date().toISOString(), project: p,
                          textures: [...usedPhotos(p, textures).entries()] };
-    await d.put("projects", rec);
-    await d.put("meta", p.id, "last");
+    // The project and the pointer to it in one transaction : written in 2, a page closed between them reopened the
+    // project before (e2e files.spec.ts, the change made just before the page closes)
+    const tx = d.transaction(["projects", "meta"], "readwrite");
+    await Promise.all([tx.objectStore("projects").put(rec), tx.objectStore("meta").put(p.id, "last"), tx.done]);
 }
 
 
