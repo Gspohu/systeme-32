@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyse } from "./analysis";
-import { dresser, openDresser, smallNichesDresser, tvWall } from "./templates";
+import { dresser, tvWall } from "./templates";
 import { resolveLayout } from "./layout";
 import { footPlaces } from "./feet";
 import { computeBom, sawSize } from "./bom";
@@ -12,6 +12,7 @@ import { round1 } from "./text";
 import { at } from "./geometry";
 import { crossedHoles, meets } from "./drilling";
 import { placedHardware, screwPlaces } from "./io/cad_model";
+import { FLAP_HINGE, floorEdge, hingeSetting } from "./drop_flaps";
 import type { Part } from "./parts";
 import type { Carcass, Project, SplitNode } from "./model";
 
@@ -152,7 +153,7 @@ describe("the sketch templates", () =>
     }
 
 
-    it("fits the dresser with 22 unsprung hinges, a TIP-ON per door and flap, three 480 runner pairs and a 420 one",
+    it("fits the dresser with 22 unsprung hinges, a TIP-ON per door and flap, three 480 runner pairs and a 450 one",
        () =>
     {
         // 7 short doors of 2 hinges, the 861 one of the left column three, the full height right one 5. The
@@ -160,8 +161,8 @@ describe("the sketch templates", () =>
         const hw = hardwareCount(dresser);
         expect((hw.get("70T3550.TL") ?? 0) + (hw.get("70T3650.TL") ?? 0)).toBe((7 * 2) + 3 + 5);
         expect((hw.get("71B3550") ?? 0) + (hw.get("71B3650") ?? 0)).toBe(0);
-        // 2 gas stays : the STARSTOP of the first design is no longer sold in France
-        expect([hw.get("342.66.730"), hw.get("365.01.901")]).toEqual([2, 2]);
+        // 2 overlay flap hinges and 2 gas stays : the STARSTOP of the first design is no longer sold in France
+        expect([hw.get("342.78.700"), hw.get("365.01.901")]).toEqual([2, 2]);
         // The 2253 rigth door is past the 1300 of the short unit, the flap takes a short one
         expect(hw.get("956.1004")).toBe(9);
         expect(hw.get("956A1004")).toBe(1);
@@ -169,9 +170,9 @@ describe("the sketch templates", () =>
         expect(hw.get("174H7100E")).toBe(22);
         expect(hw.get("173H7100")).toBeUndefined();
         expect(hw.get("760H4800S")).toBe(3);
-        // Set back behind the struts of the gas stays, the pull-out loses its 450 for a 420
-        expect(hw.get("760H4500S")).toBeUndefined();
-        expect(hw.get("760H4200S")).toBe(1);
+        // The flap in line with the doors, the pull-out behind the struts keeps its 450
+        expect(hw.get("760H4500S")).toBe(1);
+        expect(hw.get("760H4200S")).toBeUndefined();
     });
 
 
@@ -1422,64 +1423,22 @@ describe("the sketch templates", () =>
 });
 
 
-describe("the dresser with open columns", () =>
+describe("a light under a carcass", () =>
 {
-    it("runs an open column of shelves up each side of a narrower niche, under a cupboard of two doors", () =>
+    // Kept from the small niches dresser, gone : the high cupboards lit from under their middle cell
+    it("lights from under the cupboards above, and refuses it once they stand on feet", () =>
     {
-        const p = openDresser();
-        const named = (name: string): Carcass =>
+        const p = dresser();
+        const high = p.items.find((it) =>
         {
-            return p.items.find((it) =>
-            {
-                return it.kind === "carcass" && it.name === name;
-            }) as Carcass;
-        };
-        const top = named("Colonne gauche").y + named("Colonne gauche").height;
-        for (const name of ["Colonne ouverte gauche", "Colonne ouverte droite"])
-        {
-            const c = named(name);
-            expect(c.fronts).toEqual([]);
-            expect(c.width).toBe(400);
-            // From the top of the drawers to the top of the end columns
-            expect(c.y).toBe(named("Placards et tiroirs").y + named("Placards et tiroirs").height);
-            expect(c.y + c.height).toBe(top);
-            expect((c.root as SplitNode).cuts.length).toBe(2);
-        }
-        const niche = named("Niche");
-        expect(niche.width).toBe(802);
-        expect(niche.root.kind).toBe("cell");
-        expect(named("Placard haut").fronts.length).toBe(2);
-        expect(named("Placard haut").y + named("Placard haut").height).toBe(top);
-        expect(analyse(p).build.errors).toEqual([]);
-    });
-});
-
-
-describe("the dresser with small niches", () =>
-{
-    it("sets two triple columns in the opening and lights it from under the cupboards above", () =>
-    {
-        const p = smallNichesDresser();
-        expect(p.items.some((it) =>
-        {
-            return it.kind === "carcass" && it.name === "Niche";
-        })).toBe(false);
+            return it.kind === "carcass" && it.name === "Placards hauts";
+        }) as Carcass;
+        const middle = (high.root as SplitNode).children[1]!;
+        high.lights = [...high.lights.filter((l) => { return l.cell !== middle.id; }),
+                       { id: "li-under", cell: middle.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
+                         wifi: true, under: true }];
         const a = analyse(p);
         expect(a.build.errors).toEqual([]);
-        const shelves = a.build.parts.filter((q) =>
-        {
-            return q.itemName.startsWith("Petite niche") && q.role === "hdivider";
-        });
-        expect(shelves.length).toBe(4);
-        // As their save has them : the box 300 deep against the wall stands back, its shelves flush with it
-        for (const it of p.items)
-        {
-            if (it.kind === "carcass" && it.name.startsWith("Petite niche"))
-            {
-                expect([it.depth, it.z]).toEqual([300, 0]);
-                expect((it.root as SplitNode).setbacks).toEqual([null, null]);
-            }
-        }
         const bottom = a.build.parts.find((q) =>
         {
             return q.itemName === "Placards hauts" && q.id.endsWith("/bottom");
@@ -1487,18 +1446,8 @@ describe("the dresser with small niches", () =>
         // The profile screwed under it, on the face looking down : no groove, it hangs into the opening
         expect(bottom.grooves).toEqual([]);
         const profile = a.build.fitted.find((f) => { return f.ref === "LED_PROFILE_SURFACE" &&
-                                                    f.item === bottom.item; })!;
+                                                    f.key.includes("li-under"); })!;
         expect(profile.centre[1]).toBeLessThan(bottom.frame!.o[1] - bottom.thickness / 2);
-    });
-
-    it("refuses a light under the carcass from a cell that does not stand on its bottom", () =>
-    {
-        const p = smallNichesDresser();
-        const high = p.items.find((it) =>
-        {
-            return it.kind === "carcass" && it.name === "Placards hauts";
-        }) as Carcass;
-        expect(analyse(p).build.errors).toEqual([]);
         // On feet the underside is the gap above the floor : nothing to light there
         high.base = { type: "feet", height: 100 };
         expect(analyse(p).build.errors.some((e) =>
@@ -1513,7 +1462,7 @@ describe("the fronts of the dressers", () =>
 {
     it("gives the three drawers and the cupboards under and over them one width of 531", () =>
     {
-        for (const make of [dresser, smallNichesDresser, openDresser])
+        for (const make of [dresser])
         {
             const p = make();
             const a = analyse(p);
@@ -1618,34 +1567,52 @@ describe("the small columns of the dresser", () =>
 });
 
 
-describe("the inset drop flap of the dresser", () =>
+describe("the drop flap of the dresser", () =>
 {
-    // The hinge 342.66.730 has no cup, 2 leaves 14.5 thick screwed on the faces, the flap
-    // inset between the uprights standing on the leaf of the carcass
+    // It stood inset on the hinge 342.66.730, 30 higher, 10 lower at its top and 21.6 behind the doors beside it : on
+    // the overlay 342.78.700 it's one of them
     const p = dresser();
     const b = analyse(p).build;
     const low = p.items.find((it) => { return it.name === "Placards et tiroirs"; }) as Carcass;
     const fp = (b.fronts.get(low.id) ?? []).find((f) => { return f.role === "drop"; })!;
     const flap = b.parts.find((q) => { return q.id === `${low.id}/front/${fp.id}`; })!;
     const floor = b.parts.find((q) => { return q.item === low.id && q.role === "bottom"; })!;
-    const floorTop = Math.max(...[0, floor.thickness].map((w) => { return at(floor.frame!, 0, 0, w)[1]; }));
+    const floorTop = floorEdge(floor).top;
 
-    it("stands the flap inset on the carcass leaves, nothing drilled, 3 supplied screws at 30 degrees in each board",
-       () =>
+    it("lays the flap in line with the doors, on 2 hinges 342.78.700 in the Ø26 bores of the catalogue", () =>
     {
-        expect(fp.z).toBeCloseTo(low.depth - fp.thickness, 6);
-        expect(low.y + fp.rect.y).toBeCloseTo(floorTop + 12.9, 6);
-        expect([...floor.holes, ...flap.holes].filter((h) => { return h.diameter === 35 ||
-                                                              /Charnière d'abattant/.test(h.label); })).toEqual([]);
-        const { instances, every } = placedHardware(p, b);
-        expect(instances.filter((i) => { return i.model === "342.66.730"; })).toHaveLength(2);
-        const screws = every.filter((s) => { return s.holds === "342.66.730"; });
-        expect(screws).toHaveLength(12);
-        // Each leaf : 2 run 30 degrees off its face across the hinge, one 30 degrees off it along the depth
-        for (const s of screws)
+        for (const door of (b.fronts.get(low.id) ?? []).filter((f) => { return f.role === "door"; }))
         {
-            const off = Math.min(...[0, 1, 2].map((k) => { return Math.abs(Math.abs(s.out[k]!) - 0.866); }));
-            expect(off).toBeLessThan(1e-3);
+            expect([fp.rect.y, fp.rect.h, fp.rect.w, fp.z]).toEqual([door.rect.y, door.rect.h, door.rect.w, door.z]);
+        }
+        // Bores 10.5 off the front edge of the floor and off the lower edge of the flap (Häfele MB 5.318)
+        const bores = (q: Part, depth: number) =>
+        {
+            return q.holes.filter((h) => { return h.purpose === "flap-hinge" && h.diameter === 26 &&
+                                          h.depth === depth; });
+        };
+        const inFloor = bores(floor, 15);
+        expect(inFloor).toHaveLength(2);
+        for (const h of inFloor)
+        {
+            expect(at(floor.frame!, h.u, h.v, 0)[2]).toBeCloseTo(floorEdge(floor).front - 10.5, 6);
+        }
+        const inFlap = bores(flap, 14);
+        expect(inFlap).toHaveLength(2);
+        for (const h of inFlap)
+        {
+            expect(at(flap.frame!, h.u, h.v, 0)[1]).toBeCloseTo(low.y + fp.rect.y + 10.5, 6);
+        }
+        expect([...floor.holes, ...flap.holes].filter((h) => { return h.purpose === "flap-hinge-pilot"; })).toHaveLength(8);
+        // The drop and the gap of the doors taken up by the hinge's settings, within its + 2 and +- 4
+        const set = hingeSetting(low, fp, floor);
+        expect(set.lift).toBeCloseTo(0.85, 6);
+        expect(Math.abs(set.depth)).toBeLessThan(0.05);
+        expect(set.lift).toBeLessThanOrEqual(FLAP_HINGE.lift[1]);
+        const { instances } = placedHardware(p, b);
+        for (const half of ["floor", "flap"])
+        {
+            expect(instances.filter((i) => { return i.model === `342.78.700.${half}`; })).toHaveLength(2);
         }
     });
 
@@ -1653,7 +1620,7 @@ describe("the inset drop flap of the dresser", () =>
     it("holds it on 2 gas stays sold in France, warns past their 600, and keeps the pull-out behind their struts", () =>
     {
         // The STARSTOP of the first design is gone from Häfele France : 365.01.901, 600 high at most (MB 5.313)
-        expect(b.warnings.filter((w) => { return /617,6 mm de haut.*365\.01\.901/.test(w); })).toHaveLength(1);
+        expect(b.warnings.filter((w) => { return /657,5 mm de haut.*365\.01\.901/.test(w); })).toHaveLength(1);
         const stays = b.fitted.filter((f) => { return f.item === low.id && f.purpose === "flap-stay"; });
         expect(stays).toHaveLength(2 * 4);
         const struts = stays.filter((f) => { return f.shape === "cylinder"; });
@@ -1672,27 +1639,33 @@ describe("the inset drop flap of the dresser", () =>
     });
 
 
-    it("sets the TIP-ON on its adapter plate back by the thickness of the flap, its catch plate on the back of it", () =>
+    it("pushes it open with a TIP-ON on its adapter plate under the shelf above, its catch plate on the flap", () =>
     {
-        const shelf = b.parts.filter((q) => { return q.item === low.id &&
-                                             q.notes.some((n) => { return n.includes("la façade est intérieure"); }); });
+        // An overlay front : the plate flush with the front edge, its screws 20 and 37 off it (Blum KA-150 p. 173)
+        // Centred on the flap : the uprights either side carry the plates of the doors, under its overlay
+        const middle = low.x + fp.rect.x + fp.rect.w / 2;
+        const shelf = b.parts.filter((q) => { return q.item === low.id && q.holes.some((h) =>
+        {
+            return h.purpose === "adapter-screw" && Math.abs(at(q.frame!, h.u, h.v, 0)[0] - middle) < 50;
+        }); });
         expect(shelf).toHaveLength(1);
         const screws = shelf[0]!.holes.filter((h) => { return h.purpose === "adapter-screw"; });
-        expect(screws.map((h) => { return h.v; }).sort((x, y) => { return x - y; })).toEqual([20 + 19, 37 + 19]);
+        expect(screws.map((h) => { return h.v; }).sort((x, y) => { return x - y; })).toEqual([20, 37]);
         expect(flap.holes.filter((h) => { return h.purpose === "catch-plate"; })).toHaveLength(1);
     });
 
 
-    it("runs the bottle drawer 17.5 over the floor, behind the flap leaf, over the flap lying open level with the floor",
+    it("runs the bottle drawer 17.5 over the floor, behind the struts, over the flap lying open level with the floor",
        () =>
     {
-        const bottom = b.parts.find((q) => { return q.label === "Tiroir intérieur, côté gauche"; })!;
-        const ys = [0, bottom.width].map((v) => { return at(bottom.frame!, 0, v, 0)[1]; });
+        const side = b.parts.find((q) => { return q.label === "Tiroir intérieur, côté gauche"; })!;
+        const ys = [0, side.width].map((v) => { return at(side.frame!, 0, v, 0)[1]; });
+        // Its spacers stand on the floor : the collars of the hinges, 3.35 up, are well under it
         expect(Math.min(...ys) - floorTop).toBeCloseTo(17.5, 6);
-        const front = b.parts.find((q) => { return q.label === "Tiroir intérieur, avant de caisson"; })!;
-        const zs = [0, front.thickness].map((w) => { return at(front.frame!, 0, 0, w)[2]; });
-        expect(Math.max(...zs)).toBeLessThanOrEqual(low.z + fp.z - 14.5 - 3 + 1e-6);
-        // Turned open, the back of the flap comes level with the floor of the cell, its lower edge at the front
+        expect(Math.min(...ys) - floorTop).toBeGreaterThan(FLAP_HINGE.floorCollar[2]![1]);
+        expect(b.hardware.filter((h) => { return h.item === low.id && h.ref === "760H4500S"; })).toHaveLength(1);
+        // Turned open, the back of the flap comes level with the floor of the cell, its lower edge back to its plane
+        // shut, clear of the front edge of the floor
         const m = b.motions.find((x) => { return x.front === fp.id && x.kind === "turn"; })!;
         const back = [low.z + fp.z, low.y + fp.rect.y];
         const turned = (z: number, y: number): [number, number] =>
@@ -1700,6 +1673,7 @@ describe("the inset drop flap of the dresser", () =>
             return [m.pivot[2] + (y - m.pivot[1]), m.pivot[1] - (z - m.pivot[2])];
         };
         expect(turned(back[0]!, back[1]! + fp.rect.h)[1]).toBeCloseTo(floorTop, 6);
-        expect(turned(back[0]!, back[1]!)[0]).toBeCloseTo(low.z + low.depth, 6);
+        expect(turned(back[0]!, back[1]!)[0]).toBeCloseTo(back[0]!, 6);
+        expect(turned(back[0]!, back[1]!)[0]).toBeGreaterThan(floorEdge(floor).front);
     });
 });

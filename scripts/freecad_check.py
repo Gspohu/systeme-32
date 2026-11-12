@@ -352,6 +352,15 @@ def check_fixed(boards, fixings, pairs, without="", apart=None):
         return n
 
     held = {n: 0 for n in names}
+    # The pieces of one article hold together however far its settings set them apart
+    units = {}
+    for name, f in kept.items():
+        unit = getattr(f, "Unit", "")
+        if unit:
+            if unit in units:
+                parent[find(name)] = find(units[unit])
+            else:
+                units[unit] = name
     for a, b in pairs:
         if (a not in kept or (b not in kept and b not in names)):
             continue

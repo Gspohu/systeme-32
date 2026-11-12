@@ -714,6 +714,10 @@ def place_hardware(doc, model, models, hardware):
         link.LinkedObject = base
         link.Label = f"{base.Label} {k + 1}, {i['part']}"
         link.Label2 = i["model"]
+        # The 2 halves of a flap hinge, set apart by its settings : one article for the check of what holds what
+        if i.get("unit"):
+            link.addProperty("App::PropertyString", "Unit", "Article", "The bought article this solid is a piece of")
+            link.Unit = i["unit"]
         link.Placement = turn.multiply(App.Placement(m))
         link.Visibility = True
 

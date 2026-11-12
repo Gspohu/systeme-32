@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { analyse } from "./analysis";
 import { at } from "./geometry";
-import { dresser, openDresser, smallNichesDresser, tvWall } from "./templates";
+import { dresser, tvWall } from "./templates";
 
-const PIECES = { tvWall, dresser, smallNichesDresser, openDresser };
+const PIECES = { tvWall, dresser };
 
 
 describe("applied backs", () =>
