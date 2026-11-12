@@ -49,14 +49,18 @@
         <ul>
             {#each shown as c}
                 <li class={c.level}>
-                    <button class="line" onclick={() =>
-                    {
-                        tour.mark("checks");
-                        if (c.item !== null)
+                    <!-- a line about the whole project has no item to lead to : text, not a button that does nothing -->
+                    {#if c.item === null}
+                        <span class="line plain">{c.message}</span>
+                    {:else}
+                        {@const item = c.item}
+                        <button class="line" onclick={() =>
                         {
-                            app.selection = { kind: "item", item: c.item };
-                        }
-                    }}>{c.message}</button>
+                            tour.mark("checks");
+                            app.selection = { kind: "item", item };
+                            return;
+                        }}>{c.message}</button>
+                    {/if}
                 </li>
             {/each}
         </ul>
@@ -110,5 +114,10 @@
         cursor: pointer;
         font-size: var(--font-size-xs);
         color: var(--colour-text-primary);
+    }
+
+    .line.plain
+    {
+        cursor: default;
     }
 </style>

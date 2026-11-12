@@ -1,5 +1,5 @@
-// LED lights under the panel above a cell : a strip in a recessed profile or round spots, their driver and the
-// Wi-Fi controler that dims them
+// LED lights under the panel above a cell : a strip in a profile screwed on the face or let into a groove, or round
+// spots, their driver and the Wi-Fi controler that dims them
 
 import type { Carcass, CellLight, Project, Settings } from "./model";
 import { DIAM } from "./text";

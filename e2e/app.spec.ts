@@ -92,6 +92,40 @@ test.describe("application", () =>
     });
 
 
+    // A line about the whole project was a button that did nothing
+    test("keeps a line about the whole project as text, a line about an item as a button", async ({ page }) =>
+    {
+        await openBlank(page);
+        await addCarcass(page);
+        expect(await drop(page, "Abattant", await centreOf(cells(page).first()))).toBe("Ajouté : Abattant");
+        if ((await page.locator("main.narrow").count()) > 0)
+        {
+            await page.locator("main.narrow .tabs .tab", { hasText: "Contrôles" }).click();
+        }
+        await page.locator(".checks .form-check", { hasText: "Infos" }).locator("input").check();
+        const project = page.locator(".checks li", { hasText: "Cartouche incomplet" });
+        await expect(project).toHaveCount(1);
+        await expect(project.getByRole("button")).toHaveCount(0);
+        await expect(page.locator(".checks li.error").getByRole("button").first()).toBeVisible();
+    });
+
+
+    // Its size was said 0 until first dragged, with no bounds to set it against
+    test("gives each pane handle its bounds and a size within them", async ({ page }) =>
+    {
+        await openBlank(page);
+        test.skip((await page.locator("main.narrow").count()) > 0, "one pane at a time, no handle");
+        const handle = page.getByRole("slider", { name: "Largeur de la palette" });
+        const min = Number(await handle.getAttribute("aria-valuemin"));
+        const max = Number(await handle.getAttribute("aria-valuemax"));
+        const now = Number(await handle.getAttribute("aria-valuenow"));
+        expect(min).toBe(96);
+        expect(max).toBeGreaterThan(min);
+        expect(now).toBeGreaterThanOrEqual(min);
+        expect(now).toBeLessThanOrEqual(max);
+    });
+
+
     // Filtered on a clean item, the panel said no fabrication problem while its badge counted one elsewhere
     test("says the selection alone is clean, not the whole project", async ({ page }) =>
     {

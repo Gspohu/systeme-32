@@ -14,6 +14,7 @@
     import { byId } from "../core/edit";
     import { MIN_CELL, findNode, findParent } from "../core/layout";
     import { topAngle } from "../core/slope";
+    import { fillerGap } from "../core/ceiling";
     import { DIAM } from "../core/text";
     import { BOARD_THICKNESSES, DECORS, MATERIALS, decorById } from "../data/materials";
     import { HARDWARE, SHELF_SUPPORTS } from "../data/hardware";
@@ -32,6 +33,14 @@
             }
         }
         return null;
+    }
+
+
+    // A carcass standing past the ceiling read as such, a negative height said nothing
+    function ceilingGap(c: Carcass): string
+    {
+        const gap = Math.round(fillerGap(c, app.project.room));
+        return gap < 0 ? `dépasse de ${-gap} mm` : `${gap} mm`;
     }
 
 
@@ -369,9 +378,11 @@
                 {#if sp.axis === "h"}
                     <div class="segmented">
                         <button class="segmented-item" class:active={sp.dividers[sel.index] === "fixed"}
+                            aria-pressed={sp.dividers[sel.index] === "fixed"}
                             onclick={() => app.apply(setDividerKind, carcass.id, sp.id, sel.index,
                                                      "fixed")}>Fixe</button>
                         <button class="segmented-item" class:active={sp.dividers[sel.index] === "adjustable"}
+                            aria-pressed={sp.dividers[sel.index] === "adjustable"}
                             onclick={() => app.apply(setDividerKind, carcass.id, sp.id, sel.index,
                                                      "adjustable")}>Réglable</button>
                     </div>
@@ -516,9 +527,9 @@
                 </label>
                 {#if rail !== null}
                     <div class="segmented">
-                        <button class="segmented-item" class:active={rail.kind === "fixed"}
+                        <button class="segmented-item" class:active={rail.kind === "fixed"} aria-pressed={rail.kind === "fixed"}
                             onclick={() => app.apply(setRail, carcass.id, nodeBox.id, true, "fixed")}>Fixe</button>
-                        <button class="segmented-item" class:active={rail.kind === "lift"}
+                        <button class="segmented-item" class:active={rail.kind === "lift"} aria-pressed={rail.kind === "lift"}
                             onclick={() => app.apply(setRail, carcass.id, nodeBox.id, true, "lift")}>Ascenseur</button>
                     </div>
                 {/if}
@@ -542,10 +553,10 @@
                 </label>
                 {#if light !== null}
                     <div class="segmented">
-                        <button class="segmented-item" class:active={light.kind === "strip"}
+                        <button class="segmented-item" class:active={light.kind === "strip"} aria-pressed={light.kind === "strip"}
                             onclick={() => app.apply(setLight, carcass.id, nodeBox.id, { ...light, kind: "strip" })}>
                             Profilé</button>
-                        <button class="segmented-item" class:active={light.kind === "spots"}
+                        <button class="segmented-item" class:active={light.kind === "spots"} aria-pressed={light.kind === "spots"}
                             onclick={() => app.apply(setLight, carcass.id, nodeBox.id, { ...light, kind: "spots",
                                                      spots: Math.max(1, light.spots) })}>Spots</button>
                     </div>
@@ -597,14 +608,14 @@
                     <div class="segmented">
                         {#each ([["back", "Fond"], ["above", "Dessus"], ["below", "Dessous"], ["left", "Gauche"],
                             ["right", "Droite"]] as const) as [panel, label]}
-                            <button class="segmented-item" class:active={o.panel === panel}
+                            <button class="segmented-item" class:active={o.panel === panel} aria-pressed={o.panel === panel}
                                 onclick={() => app.apply(updateOutlet, carcass.id, o.id, { panel })}>{label}</button>
                         {/each}
                     </div>
                     <div class="segmented">
-                        <button class="segmented-item" class:active={o.shape === "round"}
+                        <button class="segmented-item" class:active={o.shape === "round"} aria-pressed={o.shape === "round"}
                             onclick={() => app.apply(updateOutlet, carcass.id, o.id, { shape: "round" })}>Rond</button>
-                        <button class="segmented-item" class:active={o.shape === "rect"}
+                        <button class="segmented-item" class:active={o.shape === "rect"} aria-pressed={o.shape === "rect"}
                             onclick={() => app.apply(updateOutlet, carcass.id, o.id,
                                                      { shape: "rect" })}>Rectangle</button>
                     </div>
@@ -649,9 +660,9 @@
             {#if front.spec.type === "door"}
                 {@const spec = front.spec}
                 <div class="segmented">
-                    <button class="segmented-item" class:active={spec.hinge === "left"}
+                    <button class="segmented-item" class:active={spec.hinge === "left"} aria-pressed={spec.hinge === "left"}
                         onclick={() => frontPatch({ spec: { ...spec, hinge: "left" } })}>Charnières à gauche</button>
-                    <button class="segmented-item" class:active={spec.hinge === "right"}
+                    <button class="segmented-item" class:active={spec.hinge === "right"} aria-pressed={spec.hinge === "right"}
                         onclick={() => frontPatch({ spec: { ...spec, hinge: "right" } })}>À droite</button>
                 </div>
             {/if}
@@ -733,16 +744,16 @@
             {/if}
             {#if front.spec.type !== "sliding" && front.spec.type !== "panel"}
                 <div class="segmented">
-                    <button class="segmented-item" class:active={front.opening === "handle"}
+                    <button class="segmented-item" class:active={front.opening === "handle"} aria-pressed={front.opening === "handle"}
                         onclick={() => frontPatch({ opening: "handle" })}>Poignée</button>
-                    <button class="segmented-item" class:active={front.opening === "push"}
+                    <button class="segmented-item" class:active={front.opening === "push"} aria-pressed={front.opening === "push"}
                         onclick={() => frontPatch({ opening: "push" })}>Pression</button>
                 </div>
                 {#if front.opening === "handle" && front.spec.type !== "lift"}
                     <div class="segmented" title="Oslo laiton brossé sur le chant, ou barre inox sur la face">
-                        <button class="segmented-item" class:active={front.handle === "edge"}
+                        <button class="segmented-item" class:active={front.handle === "edge"} aria-pressed={front.handle === "edge"}
                             onclick={() => frontPatch({ handle: "edge" })}>Oslo</button>
-                        <button class="segmented-item" class:active={front.handle === "bar"}
+                        <button class="segmented-item" class:active={front.handle === "bar"} aria-pressed={front.handle === "bar"}
                             onclick={() => frontPatch({ handle: "bar" })}>Barre</button>
                     </div>
                 {/if}
@@ -764,9 +775,9 @@
             {/if}
             {#if front.spec.type !== "sliding" && front.spec.type !== "lift"}
                 <div class="segmented">
-                    <button class="segmented-item" class:active={front.mount === "overlay"}
+                    <button class="segmented-item" class:active={front.mount === "overlay"} aria-pressed={front.mount === "overlay"}
                         onclick={() => frontPatch({ mount: "overlay" })}>En applique</button>
-                    <button class="segmented-item" class:active={front.mount === "inset"}
+                    <button class="segmented-item" class:active={front.mount === "inset"} aria-pressed={front.mount === "inset"}
                         onclick={() => frontPatch({ mount: "inset" })}>Encastrée</button>
                 </div>
             {/if}
@@ -966,7 +977,7 @@
             <label class="form-check" title="Bandeau au nu des façades, du dessus au plafond de la pièce">
                 <input type="checkbox" checked={carcass.ceilingFiller}
                     onchange={(e) => patch({ ceilingFiller: checked(e) } as Partial<Carcass>)} />
-                Fileur jusqu'au plafond ({Math.round(app.project.room.height - carcass.y - carcass.height)} mm)</label>
+                Fileur jusqu'au plafond ({ceilingGap(carcass)})</label>
             <label class="field" title="Bande au nu des façades jusqu'au mur de chaque côté, 0 pour aucune">
                 <span class="label">Fileurs G / D (mm)</span>
                 <span class="row">
@@ -998,10 +1009,10 @@
             {#if carcass.slope !== null}
                 {@const slope = carcass.slope}
                 <div class="segmented">
-                    <button class="segmented-item" class:active={slope.low === "left"}
+                    <button class="segmented-item" class:active={slope.low === "left"} aria-pressed={slope.low === "left"}
                         onclick={() => patch({ slope: { ...slope,
                                                        low: "left" } } as Partial<Carcass>)}>Bas à gauche</button>
-                    <button class="segmented-item" class:active={slope.low === "right"}
+                    <button class="segmented-item" class:active={slope.low === "right"} aria-pressed={slope.low === "right"}
                         onclick={() => patch({ slope: { ...slope,
                                                        low: "right" } } as Partial<Carcass>)}>Bas à droite</button>
                 </div>
@@ -1016,16 +1027,16 @@
                 {@const e = carcass.ends[side]}
                 <div class="section-title">Côté {side === "left" ? "gauche" : "droit"}</div>
                 <div class="segmented">
-                    <button class="segmented-item" class:active={e.type === "square"}
+                    <button class="segmented-item" class:active={e.type === "square"} aria-pressed={e.type === "square"}
                         onclick={() => endPatch(side, "square")}>Droit</button>
-                    <button class="segmented-item" class:active={e.type === "rounded"}
+                    <button class="segmented-item" class:active={e.type === "rounded"} aria-pressed={e.type === "rounded"}
                         onclick={() => endPatch(side, "rounded")}>Arrondi</button>
                 </div>
                 {#if e.type === "rounded"}
                     <div class="segmented">
-                        <button class="segmented-item" class:active={e.sweep === 90}
+                        <button class="segmented-item" class:active={e.sweep === 90} aria-pressed={e.sweep === 90}
                             onclick={() => endPatch(side, { sweep: 90 })}>Quart</button>
-                        <button class="segmented-item" class:active={e.sweep === 180}
+                        <button class="segmented-item" class:active={e.sweep === 180} aria-pressed={e.sweep === 180}
                             onclick={() => endPatch(side, { sweep: 180 })}>Demi</button>
                     </div>
                     {#if e.sweep === 90}
@@ -1211,9 +1222,9 @@
                 <input class="input" maxlength="80" value={t.name} onchange={(e) => patch({ name: str(e) })} />
             </label>
             <div class="segmented">
-                <button class="segmented-item" class:active={t.mode === "wall"}
+                <button class="segmented-item" class:active={t.mode === "wall"} aria-pressed={t.mode === "wall"}
                     onclick={() => patch({ mode: "wall" } as Partial<Item>)}>Sur liteaux</button>
-                <button class="segmented-item" class:active={t.mode === "divider"}
+                <button class="segmented-item" class:active={t.mode === "divider"} aria-pressed={t.mode === "divider"}
                     onclick={() => patch({ mode: "divider" } as Partial<Item>)}>Claustra</button>
             </div>
             <label class="field"><span class="label">Largeur</span>

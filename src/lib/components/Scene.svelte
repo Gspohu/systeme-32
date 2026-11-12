@@ -467,13 +467,55 @@
             }
         };
     });
-    const printMats = new Map<string, THREE.MeshStandardMaterial>();
-    const wallMats = new Map<string, THREE.MeshStandardMaterial>();
+    // One material for each wall and each printed file, made again when what it shows changes : keyed by size, each
+    // drag of the room left a material and a copy of the photo on the GPU for good
+    type Slot = { sig: string; m: THREE.MeshStandardMaterial };
+    const printMats = new Map<string, Slot>();
+    const wallMats = new Map<string, Slot>();
+
+    function release(s: Slot | undefined): void
+    {
+        // The copies of the photo are their own, never shared
+        s?.m.map?.dispose();
+        s?.m.dispose();
+        return;
+    }
+
+    function slot(cache: Map<string, Slot>, key: string, sig: string, make: () => THREE.MeshStandardMaterial):
+        THREE.MeshStandardMaterial
+    {
+        const old = cache.get(key);
+        if (old !== undefined && old.sig === sig)
+        {
+            return old.m;
+        }
+        release(old);
+        const m = make();
+        cache.set(key, { sig, m });
+        return m;
+    }
+
+    $effect(() =>
+    {
+        return () =>
+        {
+            for (const s of [...wallMats.values(), ...printMats.values()])
+            {
+                release(s);
+            }
+            // Their textures are the decors' shared ones or the photos', freed where those are
+            for (const m of materials.values())
+            {
+                m.dispose();
+            }
+            return;
+        };
+    });
 
 
     // The photo of the walls over a wall w x h mm : one motif every tileMm across, as high as the photo's own
     // proportions make it, laid from the bottom left corner
-    function wallMaterial(w: number, h: number): THREE.MeshStandardMaterial | null
+    function wallMaterial(wall: string, w: number, h: number): THREE.MeshStandardMaterial | null
     {
         const wp = app.project.room.wallPhoto;
         const photo = wp === undefined ? undefined : photos.get(wp.file);
@@ -481,41 +523,33 @@
         {
             return null;
         }
-        const key = `${wp.file}@${photo.version}@${wp.tileMm}@${w}x${h}`;
-        let m = wallMats.get(key);
-        if (m === undefined)
+        return slot(wallMats, wall, `${wp.file}@${photo.version}@${wp.tileMm}@${w}x${h}`, () =>
         {
             const img = photo.tex.image as { width: number; height: number };
             const tileH = wp.tileMm * img.height / img.width;
             const map = photo.tex.clone();
             map.repeat.set(w / wp.tileMm, h / tileH);
             map.needsUpdate = true;
-            m = new THREE.MeshStandardMaterial({ map, roughness: 0.9, side: THREE.FrontSide });
-            wallMats.set(key, m);
-        }
-        return m;
+            return new THREE.MeshStandardMaterial({ map, roughness: 0.9, side: THREE.FrontSide });
+        });
     }
 
 
     function printMaterial(file: string): THREE.MeshStandardMaterial | null
     {
-        const photo = photos.get(file);   
+        const photo = photos.get(file);
         if (photo === undefined)
         {
             return null;
         }
-        const key = `${file}@${photo.version}`;
-        let m = printMats.get(key); 
-        if (m === undefined)
+        return slot(printMats, file, String(photo.version), () =>
         {
             // its own copy of the texture : a decor photo repeats per millimetre, a print shows oce
             const map = photo.tex.clone();
             map.repeat.set(1, 1);
             map.needsUpdate = true;
-            m = new THREE.MeshStandardMaterial({ map, roughness: 0.6 });
-            printMats.set(key, m);
-        }
-        return m;  
+            return new THREE.MeshStandardMaterial({ map, roughness: 0.6 });
+        });
     }
 
     // The room dimmed to a fifth, the way a lit niche is looked at in the evening
@@ -636,7 +670,7 @@
     </T.Mesh>
     <!-- the returns of an alcove frame it whatever stands against them -->
     {#each roomWalls as w (w.key)}
-        {@const photo = wallMaterial(w.length, r.height)}
+        {@const photo = wallMaterial(w.key, w.length, r.height)}
         {#if photo !== null}
             <T.Mesh position={w.position} rotation={w.rotation} material={photo}>
                 <T.PlaneGeometry args={[w.length * MM, r.height * MM]} />

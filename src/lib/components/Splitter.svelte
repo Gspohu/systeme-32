@@ -31,11 +31,26 @@
     }
 
 
-    function set(px: number): void
+    function clamp(px: number): number
     {
         const [lo, hi] = bounds();
-        size = Math.round(Math.min(Math.max(px, lo), Math.max(lo, hi)));
+        return Math.round(Math.min(Math.max(px, lo), Math.max(lo, hi)));
     }
+
+
+    function set(px: number): void
+    {
+        size = clamp(px);
+        return;
+    }
+
+
+    // Read again on each change of size : the stylesheet size, 0 before, was announced out of its own bounds
+    const range = $derived.by((): { min: number; max: number; now: number } =>
+    {
+        const [lo, hi] = bounds();
+        return { min: Math.round(lo), max: Math.round(Math.max(lo, hi)), now: size ?? clamp(current()) };
+    });
 
 
     function down(e: PointerEvent): void
@@ -44,6 +59,7 @@
         from = current();
         start = axis === "x" ? e.clientX : e.clientY;
         dragging = true;
+        return;
     }
 
 
@@ -53,6 +69,7 @@
         {
             set(from + grows * ((axis === "x" ? e.clientX : e.clientY) - start));
         }
+        return;
     }
 
 
@@ -63,6 +80,7 @@
             dragging = false;
             onrelease();
         }
+        return;
     }
 
 
@@ -76,11 +94,13 @@
             set(current() + grows * (e.key === forward ? STEP : -STEP));
             onrelease();
         }
+        return;
     }
 </script>
 
 <div class="splitter {axis}" class:active={dragging} role="slider" tabindex="0" aria-label={label} style={place}
-    aria-orientation={axis === "x" ? "horizontal" : "vertical"} aria-valuenow={size ?? 0}
+    aria-orientation={axis === "x" ? "horizontal" : "vertical"} aria-valuenow={range.now}
+    aria-valuemin={range.min} aria-valuemax={range.max}
     aria-valuetext={size === null ? "taille d'origine" : `${size} px`}
     title="Glisser pour régler, double-clic pour la taille d'origine"
     onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up} onkeydown={key}
@@ -88,6 +108,7 @@
     {
         size = null;
         onrelease();
+        return;
     }}></div>
 
 <style>

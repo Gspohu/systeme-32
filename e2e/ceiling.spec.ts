@@ -1,4 +1,4 @@
-import { addCarcass, check, checkLines, drop, expect, openBlank, outputsTab, selectItem, test,
+import { addCarcass, check, checkLines, drop, expect, openBlank, outputsTab, selectItem, setField, test,
         toClient } from "./helpers";
 
 
@@ -21,6 +21,16 @@ test.describe("ceiling and desk", () =>
         await outputsTab(page, "Débit");
         await expect(page.locator(".tab-content tbody").first()).toContainText("Fileur de plafond");
         await expect(page.locator(".tab-content tbody").first()).toContainText("Tasseau du fileur");
+    });
+
+
+    // A negative height of filler was shown for a carcass standing past the ceiling
+    test("says how far a carcass stands past the ceiling", async ({ page }) =>
+    {
+        await selectItem(page);
+        await setField(page, "Hauteur", "2500");
+        await expect(page.locator(".inspector-body .form-check", { hasText: "Fileur jusqu'au plafond" }))
+            .toContainText("(dépasse de 100 mm)");
     });
 
 

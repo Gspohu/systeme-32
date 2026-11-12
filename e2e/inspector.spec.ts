@@ -55,6 +55,21 @@ test.describe("inspector", () =>
     });
 
 
+    // The switches of the inspector showed their state by colour alone
+    test("tells which side of a switch is on", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await check(page, "Éclairage LED").check();
+        const strip = page.locator(".inspector-body").getByRole("button", { name: "Profilé", exact: true });
+        const spots = page.locator(".inspector-body").getByRole("button", { name: "Spots", exact: true });
+        await expect(strip).toHaveAttribute("aria-pressed", "true");
+        await expect(spots).toHaveAttribute("aria-pressed", "false");
+        await spots.click();
+        await expect(spots).toHaveAttribute("aria-pressed", "true");
+        await expect(strip).toHaveAttribute("aria-pressed", "false");
+    });
+
+
     test("changes the decor of the carcass", async ({ page }) =>
     {
         const before = await body(page).getAttribute("fill");
