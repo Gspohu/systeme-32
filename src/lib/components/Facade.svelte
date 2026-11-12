@@ -266,7 +266,6 @@
             e.preventDefault();
             app.selection = s;
         }
-        return;
     }
 
 
@@ -280,7 +279,6 @@
         panX += (e.clientX - (r.left + r.width / 2)) * lost;
         panY -= (e.clientY - (r.top + r.height / 2)) * lost;
         zoom = next;
-        return;
     }
 
 
@@ -295,7 +293,6 @@
         }
         (e.currentTarget as Element).setPointerCapture(e.pointerId);
         panFrom = { id: e.pointerId, x: e.clientX, y: e.clientY, panX, panY };
-        return;
     }
 
     function movePan(e: PointerEvent): void
@@ -305,13 +302,11 @@
             panX = panFrom.panX - (e.clientX - panFrom.x) * mmPerPx;
             panY = panFrom.panY + (e.clientY - panFrom.y) * mmPerPx;
         }
-        return;
     }
 
     function endPan(): void
     {
         panFrom = null;
-        return;
     }
 
     function reset(): void
@@ -319,7 +314,6 @@
         zoom = 1;
         panX = 0;
         panY = 0;
-        return;
     }
 </script>
 

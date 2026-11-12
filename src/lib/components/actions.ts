@@ -30,7 +30,6 @@ export function addTool(tool: string): void
     {
         app.notify(`Ajouté : ${label}`, "success");
     }
-    return;
 }
 
 

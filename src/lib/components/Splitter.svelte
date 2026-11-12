@@ -41,7 +41,6 @@
     function set(px: number): void
     {
         size = clamp(px);
-        return;
     }
 
 
@@ -59,7 +58,6 @@
         from = current();
         start = axis === "x" ? e.clientX : e.clientY;
         dragging = true;
-        return;
     }
 
 
@@ -69,7 +67,6 @@
         {
             set(from + grows * ((axis === "x" ? e.clientX : e.clientY) - start));
         }
-        return;
     }
 
 
@@ -80,7 +77,6 @@
             dragging = false;
             onrelease();
         }
-        return;
     }
 
 
@@ -94,7 +90,6 @@
             set(current() + grows * (e.key === forward ? STEP : -STEP));
             onrelease();
         }
-        return;
     }
 </script>
 
@@ -108,7 +103,6 @@
     {
         size = null;
         onrelease();
-        return;
     }}></div>
 
 <style>

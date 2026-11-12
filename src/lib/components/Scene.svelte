@@ -478,7 +478,6 @@
         // The copies of the photo are their own, never shared
         s?.m.map?.dispose();
         s?.m.dispose();
-        return;
     }
 
     function slot(cache: Map<string, Slot>, key: string, sig: string, make: () => THREE.MeshStandardMaterial):
@@ -508,7 +507,6 @@
             {
                 m.dispose();
             }
-            return;
         };
     });
 

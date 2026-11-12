@@ -32,7 +32,6 @@
     $effect(() =>
     {
         projectsDialog?.focus();
-        return;
     });
     // The workspace and the panes the handles measure before their first drag
     let panesHost = $state<HTMLElement>();
@@ -185,7 +184,6 @@
             return [];
         });
         projectsOpen = true;
-        return;
     }
 
 
@@ -196,7 +194,6 @@
         await tick();
         opener?.focus();
         opener = null;
-        return;
     }
 
 
@@ -208,7 +205,6 @@
             app.load(rec.project, rec.textures);
         }
         await closeProjects();
-        return;
     }
 
     async function removeLocal(id: string): Promise<void>
@@ -320,7 +316,6 @@
                             {
                                 tour.mark("checks");
                             }
-                            return;
                         }}>{label}</button>
                 {/each}
             </div>
@@ -385,7 +380,6 @@
                     e.stopPropagation();
                     closeProjects();
                 }
-                return;
             }}>
             <div class="modal-title">Projets de ce navigateur</div>
             {#if localProjects.length === 0}
@@ -409,7 +403,6 @@
                     {
                         await closeProjects();
                         tour.begin();
-                        return;
                     }}>Visite</button>
                 {/if}
                 <button class="btn btn-secondary" onclick={closeProjects}>Fermer</button>

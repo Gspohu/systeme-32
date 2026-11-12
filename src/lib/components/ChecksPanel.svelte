@@ -58,7 +58,6 @@
                         {
                             tour.mark("checks");
                             app.selection = { kind: "item", item };
-                            return;
                         }}>{c.message}</button>
                     {/if}
                 </li>

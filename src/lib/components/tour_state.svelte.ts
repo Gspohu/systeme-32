@@ -29,7 +29,6 @@ function writeStored(value: string): void
     {
         // Not kept, the tour stay closed until the page is reloaded
     }
-    return;
 }
 
 
@@ -47,7 +46,6 @@ class Tour
         {
             this.marks[m]++;
         }
-        return;
     }
 
 
@@ -58,7 +56,6 @@ class Tour
         {
             this.set(observe(startTour(now, stepFrom(this.stored)), now));
         }
-        return;
     }
 
 
@@ -66,7 +63,6 @@ class Tour
     start(now: Snapshot): void
     {
         this.set(observe(startTour(now), now));
-        return;
     }
 
 
@@ -76,7 +72,6 @@ class Tour
     begin(): void
     {
         this.starter?.();
-        return;
     }
 
 
@@ -88,21 +83,18 @@ class Tour
         {
             this.set(next);
         }
-        return;
     }
 
 
     next(now: Snapshot): void
     {
         this.set(nextStep(untrack(() => { return this.state; }), now));
-        return;
     }
 
 
     stop(): void
     {
         this.set(stopTour());
-        return;
     }
 
 
@@ -114,7 +106,6 @@ class Tour
         this.seen = key === null;
         this.stored = key ?? "seen";
         writeStored(this.stored as string);
-        return;
     }
 }
 

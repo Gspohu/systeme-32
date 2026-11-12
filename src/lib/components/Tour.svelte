@@ -45,19 +45,16 @@
         {
             tour.offer(now);
         }
-        return;
     });
 
     $effect(() =>
     {
         tour.observe(now);
-        return;
     });
 
     tour.starter = () =>
     {
         tour.start(now);
-        return;
     };
 
     const view = $derived(stepView(tour.state, narrow));
