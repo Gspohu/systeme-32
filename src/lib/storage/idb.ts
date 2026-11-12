@@ -63,9 +63,55 @@ export async function saveLocal(p: Project, textures: Map<string, Uint8Array>): 
 }
 
 
+// A browser may drop a transaction begun while the page goes away : the project is also written at once, without
+// its photos, where nothing waits. Taken back on the next opening when newer than what the database kept
+const STASH = "systeme-32.unsaved";
+
+export function stashNow(p: Project): void
+{
+    try
+    {
+        localStorage.setItem(STASH, JSON.stringify({ id: p.id, saved: new Date().toISOString(), project: p }));
+    }
+    catch (e)
+    {
+        console.warn("systeme-32 : copie de secours impossible", e);
+    }
+}
+
+
+function takeStash(): { id: string; saved: string; project: Project } | null
+{
+    try
+    {
+        const raw = localStorage.getItem(STASH);
+        localStorage.removeItem(STASH);
+        return raw === null ? null : JSON.parse(raw) as { id: string; saved: string; project: Project };
+    }
+    catch (e)
+    {
+        console.warn("systeme-32 : copie de secours illisible", e);
+        return null;
+    }
+}
+
+
 export async function loadLast(): Promise<{ project: Project; textures: Map<string, Uint8Array> } | null>
 {
     const d = await db();
+    const stash = takeStash();
+    if (stash !== null)
+    {
+        const kept = await d.get("projects", stash.id) as Stored | undefined;
+        if (kept === undefined || stash.saved > kept.saved)
+        {
+            // Its photos from the database, written there when they were added
+            const project = validateProject(stash.project);
+            const textures = new Map(kept?.textures ?? []);
+            await saveLocal(project, textures);
+            return { project, textures };
+        }
+    }
     const id = await d.get("meta", "last") as string | undefined;
     if (id === undefined)
     {

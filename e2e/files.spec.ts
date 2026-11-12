@@ -122,6 +122,31 @@ test.describe("files", () =>
     });
 
 
+    test("keeps it even when the browser drops the database write of the closing page", async ({ page }) =>
+    {
+        // The runner of the deployment lost it so : the write begun as the page went away never landed
+        await openBlank(page);
+        const name = page.getByLabel("Nom du projet");
+        await name.fill("Banc de Kaysersberg");
+        await name.press("Tab");
+        await addCarcass(page);
+        await page.evaluate(() =>
+        {
+            IDBObjectStore.prototype.put = function (): IDBRequest
+            {
+                throw new DOMException("écriture abandonnée", "AbortError");
+            };
+            return true;
+        });
+        const context = page.context();
+        await page.close({ runBeforeUnload: true });
+        const again = await context.newPage();
+        await again.goto("/");
+        await expect(again.locator(".facade .grip")).toHaveCount(1);
+        await expect(again.getByLabel("Nom du projet")).toHaveValue("Banc de Kaysersberg");
+    });
+
+
     test("saves no copy of a template opened and left as it is, and numbers a namesake", async ({ page }) =>
     {
         await openBlank(page);

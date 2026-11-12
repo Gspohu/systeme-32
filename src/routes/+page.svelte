@@ -16,7 +16,8 @@
     import { packProject, unpackProject, ProjectFileError } from "$lib/core/io/project_file";
     import { slug } from "$lib/core/text";
     import { pickFile, readFile, shareOrDownload } from "$lib/storage/files";
-    import { deleteLocal, listLocal, loadLast, loadLocal, saveLocal, storageAvailable } from "$lib/storage/idb";
+    import { deleteLocal, listLocal, loadLast, loadLocal, saveLocal, stashNow,
+            storageAvailable } from "$lib/storage/idb";
 
 
     const narrow = new MediaQuery("max-width: 1100px");
@@ -106,7 +107,11 @@
 
     function flush(): void
     {
-        pending?.();
+        if (pending !== null)
+        {
+            stashNow(app.project);
+            pending();
+        }
     }
 
 
