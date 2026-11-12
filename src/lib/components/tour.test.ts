@@ -59,7 +59,6 @@ describe("guided tour", () =>
         {
             now = { ...now, ...over, marks: { ...now.marks, ...over.marks } };
             s = observe(s, now);
-            return;
         };
         act({ projectId: "p2", carcasses: 3 });
         act({ selection: "carcass" });

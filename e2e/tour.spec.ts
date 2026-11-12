@@ -12,7 +12,6 @@ async function onStep(page: Page, n: number, title: string): Promise<void>
 {
     await expect(card(page)).toContainText(`Étape ${n} sur 8`);
     await expect(card(page)).toContainText(title);
-    return;
 }
 
 
@@ -112,7 +111,6 @@ test.describe("guided tour", () =>
             {
                 throw new DOMException("bloqué", "SecurityError");
             } });
-            return;
         });
         await page.goto("/");
         await onStep(page, 2, "Sélectionner un caisson");

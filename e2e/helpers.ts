@@ -16,11 +16,9 @@ export const test = base.extend<{ problems: string[]; tourSeen: boolean }>({
             await page.addInitScript(() =>
             {
                 localStorage.setItem("systeme-32.tour", "seen");
-                return;
             });
         }
         await use(page);
-        return;
     },
     problems: [
         async ({ page }, use) =>
