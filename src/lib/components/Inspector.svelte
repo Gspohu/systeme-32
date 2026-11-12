@@ -549,7 +549,7 @@
                             onclick={() => app.apply(setLight, carcass.id, nodeBox.id, { ...light, kind: "spots",
                                                      spots: Math.max(1, light.spots) })}>Spots</button>
                     </div>
-                    <label class="form-check" title="Encastré sous le caisson, il éclaire ce qui est dessous">
+                    <label class="form-check" title="Posé sous le caisson, il éclaire ce qui est en dessous">
                         <input type="checkbox" checked={light.under === true}
                             onchange={(e) => app.apply(setLight, carcass.id, nodeBox.id, { ...light,
                                 under: checked(e) })} />
@@ -873,9 +873,12 @@
             </label>
             <label class="field"><span class="label">X / Y / Z</span>
                 <span class="row">
-                    <input class="input xyz" type="number" value={carcass.x} onchange={(e) => patch({ x: num(e) })} />
-                    <input class="input xyz" type="number" value={carcass.y} onchange={(e) => patch({ y: num(e) })} />
-                    <input class="input xyz" type="number" value={carcass.z} onchange={(e) => patch({ z: num(e) })} />
+                    <input class="input xyz" type="number" aria-label="Position X" value={carcass.x}
+                        onchange={(e) => patch({ x: num(e) })} />
+                    <input class="input xyz" type="number" aria-label="Position Y" value={carcass.y}
+                        onchange={(e) => patch({ y: num(e) })} />
+                    <input class="input xyz" type="number" aria-label="Position Z" value={carcass.z}
+                        onchange={(e) => patch({ z: num(e) })} />
                 </span>
             </label>
             <label class="field"><span class="label">Décor</span>
@@ -1073,9 +1076,9 @@
             </label>
             <label class="field"><span class="label">Centre X / Y</span>
                 <span class="row">
-                    <input class="input xyz" type="number" value={k.cx}
+                    <input class="input xyz" type="number" aria-label="Centre X" value={k.cx}
                         onchange={(e) => patch({ cx: num(e) } as Partial<Item>)} />
-                    <input class="input xyz" type="number" value={k.cy}
+                    <input class="input xyz" type="number" aria-label="Centre Y" value={k.cy}
                         onchange={(e) => patch({ cy: num(e) } as Partial<Item>)} />
                 </span>
             </label>

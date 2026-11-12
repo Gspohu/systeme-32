@@ -1,4 +1,4 @@
-import { addCarcass, errorCount, expect, openBlank, openTemplate, test } from "./helpers";
+import { addCarcass, cells, centreOf, drop, errorCount, expect, openBlank, openTemplate, test } from "./helpers";
 
 
 test.describe("application", () =>
@@ -55,5 +55,58 @@ test.describe("application", () =>
         await page.keyboard.press("Control+y");
         await expect(page.locator(".facade .grip")).toHaveCount(1);
         await expect(redo).toBeDisabled();
+    });
+
+
+    // The dialogue never had the focus : Escape went to the page and the list stayed open
+    test("takes the focus into the projects dialog and closes it with Escape", async ({ page }) =>
+    {
+        await openBlank(page);
+        const opener = page.getByRole("button", { name: "Mes projets" });
+        await opener.click();
+        const dialog = page.getByRole("dialog", { name: "Mes projets" });
+        await expect(dialog).toBeVisible();
+        await expect.poll(() =>
+        {
+            return dialog.evaluate((d) =>
+            {
+                return d.contains(document.activeElement);
+            });
+        }).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(dialog).toHaveCount(0);
+        await expect(opener).toBeFocused();
+    });
+
+
+    test("tells assistive technologies which view is on", async ({ page }) =>
+    {
+        await openBlank(page);
+        const design = page.getByRole("button", { name: "Conception", exact: true }).first();
+        const outputs = page.getByRole("button", { name: "Plans et listes", exact: true });
+        await expect(design).toHaveAttribute("aria-pressed", "true");
+        await expect(outputs).toHaveAttribute("aria-pressed", "false");
+        await outputs.click();
+        await expect(outputs).toHaveAttribute("aria-pressed", "true");
+        await expect(page.locator(".outputs .tabs .tab[aria-pressed='true']")).toHaveText("Plans");
+    });
+
+
+    // Filtered on a clean item, the panel said no fabrication problem while its badge counted one elsewhere
+    test("says the selection alone is clean, not the whole project", async ({ page }) =>
+    {
+        await openBlank(page);
+        await addCarcass(page);
+        // A flap needs a zone of 205 to 600 mm, the single cell of the carcass is higher
+        expect(await drop(page, "Abattant", await centreOf(cells(page).first()))).toBe("Ajouté : Abattant");
+        expect(await errorCount(page)).toBeGreaterThan(0);
+        await addCarcass(page, 1250);
+        await page.locator(".facade .grip").nth(1).click();
+        if ((await page.locator("main.narrow").count()) > 0)
+        {
+            await page.locator("main.narrow .tabs .tab", { hasText: "Contrôles" }).click();
+        }
+        await page.locator(".checks .form-check", { hasText: "Sélection seule" }).locator("input").check();
+        await expect(page.locator(".checks p.muted")).toHaveText("Aucun problème sur la sélection.");
     });
 });

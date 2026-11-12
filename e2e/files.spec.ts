@@ -43,6 +43,18 @@ function storedItems(page: Page, name: string): Promise<number>
 
 test.describe("files", () =>
 {
+    // In a field the browser took Ctrl+S for itself and offered to save the page
+    test("saves the project with Ctrl+S while a field has the focus", async ({ page }) =>
+    {
+        await openBlank(page);
+        // Typed and never left : the name goes in the file all the same
+        await page.getByLabel("Nom du projet").fill("Buffet de Sélestat");
+        const pending = page.waitForEvent("download", { timeout: 5000 });
+        await page.keyboard.press("Control+s");
+        expect((await pending).suggestedFilename()).toBe("buffet_de_selestat.systeme-32.zip");
+    });
+
+
     test("saves a project archive and opens it again", async ({ page }) =>
     {
         await openBlank(page);
@@ -98,7 +110,7 @@ test.describe("files", () =>
         await page.getByLabel("Nouveau projet").selectOption("blank");
         await expect(page.locator(".facade .grip")).toHaveCount(0);
         await page.getByRole("button", { name: "Mes projets" }).click();
-        await dialog.getByRole("button", { name: "Penderie de Haguenau" }).click();
+        await dialog.getByRole("button", { name: "Penderie de Haguenau", exact: true }).click();
         await expect(dialog).toHaveCount(0);
         await expect(page.locator(".facade .grip")).toHaveCount(1);
         await expect(name).toHaveValue("Penderie de Haguenau");

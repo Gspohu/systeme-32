@@ -35,6 +35,33 @@ test.describe("tablet", () =>
         await expect(page.locator(".inspector-body .section-title", { hasText: "Façade" })).toBeVisible();
     });
 
+    test.describe("guided tour", () =>
+    {
+        test.use({ tourSeen: false });
+
+        test("speaks of the tabs and takes the controls tab opened", async ({ page }) =>
+        {
+            await page.goto("/");
+            const card = page.getByRole("region", { name: "Visite guidée" });
+            await expect(card).toContainText("Étape 1 sur 8");
+            const next = card.getByRole("button", { name: "Suivant" });
+            await next.click();
+            await next.click();
+            await expect(card).toContainText("Onglet Détails : changer une valeur");
+            await next.click();
+            await next.click();
+            await expect(card).toContainText("Ouvrir l'onglet Contrôles.");
+            await tab(page, "Contrôles").click();
+            await expect(card).toContainText("Étape 6 sur 8");
+            // Never wider than the screen
+            const b = (await card.boundingBox())!;
+            expect(b.x + b.width).toBeLessThanOrEqual(820);
+            await card.getByRole("button", { name: "Passer" }).click();
+            await expect(card).toHaveCount(0);
+        });
+    });
+
+
     test("keeps the outputs usable at tablet width", async ({ page }) =>
     {
         await openBlank(page);  

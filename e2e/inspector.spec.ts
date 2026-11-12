@@ -35,6 +35,26 @@ test.describe("inspector", () =>
     });
 
 
+    // The profile is screwed under the carcass unless Encastré is ticked, the tooltip said let in
+    test("says how a light under the carcass is fitted", async ({ page }) =>
+    {
+        await cells(page).first().click();
+        await check(page, "Éclairage LED").check();
+        const under = page.locator(".inspector-body .form-check", { hasText: "Sous le caisson" });
+        await expect(check(page, "Encastré")).not.toBeChecked();
+        await expect(under).not.toHaveAttribute("title", /ncastr/);
+    });
+
+
+    test("names each coordinate field of the carcass", async ({ page }) =>
+    {
+        for (const axis of ["X", "Y", "Z"])
+        {
+            await expect(page.getByRole("spinbutton", { name: `Position ${axis}`, exact: true })).toBeVisible();
+        }
+    });
+
+
     test("changes the decor of the carcass", async ({ page }) =>
     {
         const before = await body(page).getAttribute("fill");

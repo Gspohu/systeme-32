@@ -168,6 +168,18 @@ test.describe("plans and lists", () =>
         await expect(total).not.toHaveText(before);
     });
 
+    // A source typed on a line without price was dropped without a word, the price field had no name
+    test("names the price fields and keeps the source shut until the line has a price", async ({ page }) =>
+    {
+        await outputsTab(page, "Chiffrage");
+        const unpriced = page.locator(".tab-content tr", { hasText: "heures à saisir dans les Réglages" }).first();
+        await expect(unpriced.locator("input.price")).toHaveAccessibleName(/^Prix unitaire HT, /);
+        await expect(unpriced.locator("textarea.source")).toBeDisabled();
+        const priced = page.locator(".tab-content tr", { has: page.locator("textarea.source:not([disabled])") }).first();
+        await expect(priced.locator("textarea.source")).toHaveAccessibleName(/^Source, /);
+    });
+
+
     test("exports the estimate with its sources, its total the sum of the lines", async ({ page }) =>
     {
         await outputsTab(page, "Chiffrage");

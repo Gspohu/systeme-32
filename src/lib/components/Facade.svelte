@@ -258,10 +258,48 @@
         drag.start(e, { kind: "item", item: it.id, dx: w[0] - ax, dy: w[1] - ay }, it.name, handleDrop);
     }
 
+    // The point under the pointer stays put : zooming on the centre alone left the edges out of reach
     function onWheel(e: WheelEvent): void
     {
         e.preventDefault();
-        zoom = Math.min(8, Math.max(0.3, zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+        const next = Math.min(8, Math.max(0.3, zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+        const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+        const lost = mmPerPx * (1 - zoom / next);
+        panX += (e.clientX - (r.left + r.width / 2)) * lost;
+        panY -= (e.clientY - (r.top + r.height / 2)) * lost;
+        zoom = next;
+        return;
+    }
+
+
+    // A drag started off every item moves the view, the items keep their own drags
+    let panFrom: { id: number; x: number; y: number; panX: number; panY: number } | null = null;
+
+    function startPan(e: PointerEvent): void
+    {
+        if (e.button !== 0 || (e.target as Element).closest("[role='button']") !== null)
+        {
+            return;
+        }
+        (e.currentTarget as Element).setPointerCapture(e.pointerId);
+        panFrom = { id: e.pointerId, x: e.clientX, y: e.clientY, panX, panY };
+        return;
+    }
+
+    function movePan(e: PointerEvent): void
+    {
+        if (panFrom !== null && e.pointerId === panFrom.id)
+        {
+            panX = panFrom.panX - (e.clientX - panFrom.x) * mmPerPx;
+            panY = panFrom.panY + (e.clientY - panFrom.y) * mmPerPx;
+        }
+        return;
+    }
+
+    function endPan(): void
+    {
+        panFrom = null;
+        return;
     }
 
     function reset(): void
@@ -281,7 +319,7 @@
         <button class="btn btn-ghost" onclick={reset}>Recadrer</button>
         <div class="segmented" role="group" aria-label="Mur">
             {#each WALLS as [w, label] (w)}
-                <button class="segmented-item" class:active={app.wall === w} onclick={() =>
+                <button class="segmented-item" class:active={app.wall === w} aria-pressed={app.wall === w} onclick={() =>
                 {
                     app.wall = w;
                     app.selection = null;
@@ -293,6 +331,7 @@
     <!-- the size of the drawing alone : the tools row above isn't part of what the zoom frames -->
     <div class="drawing" bind:clientWidth={hostWidth} bind:clientHeight={hostHeight}>
     <svg bind:this={facadeBridge.svg} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" onwheel={onWheel}
+        onpointerdown={startPan} onpointermove={movePan} onpointerup={endPan} onpointercancel={endPan}
         role="application" aria-label="Vue de face">
         <line x1={extent.x0} y1="0" x2={extent.x1} y2="0" class="floor" />
         <polyline points={`${wallSpan[0]},0 ${wallSpan[0]},${-project.room.height} ${wallSpan[1]},${-project.room.height} `
