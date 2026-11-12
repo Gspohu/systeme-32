@@ -6,7 +6,22 @@ import { unzipSync } from "fflate";
 export { expect };
 
 // Every test fails on an uncaught error of the page, even when its own assertions pass
-export const test = base.extend<{ problems: string[] }>({
+// The first use tour is marked seen before every load, but in the scenarios that walk it
+export const test = base.extend<{ problems: string[]; tourSeen: boolean }>({
+    tourSeen: [true, { option: true }],
+    page: async ({ page, tourSeen }, use) =>
+    {
+        if (tourSeen)
+        {
+            await page.addInitScript(() =>
+            {
+                localStorage.setItem("systeme-32.tour", "seen");
+                return;
+            });
+        }
+        await use(page);
+        return;
+    },
     problems: [
         async ({ page }, use) =>
         {

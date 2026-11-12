@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
     import { app } from "$lib/components/app_state.svelte";
     import { drag } from "$lib/components/drag.svelte";
@@ -8,6 +8,8 @@
     import Inspector from "$lib/components/Inspector.svelte";
     import ChecksPanel from "$lib/components/ChecksPanel.svelte";
     import Splitter from "$lib/components/Splitter.svelte";
+    import Tour from "$lib/components/Tour.svelte";
+    import { tour } from "$lib/components/tour_state.svelte";
     import { panes, savePanes } from "$lib/components/panes.svelte";
     import { TEMPLATES } from "$lib/core/templates";
     import { newProject } from "$lib/core/factory";
@@ -25,6 +27,13 @@
     let narrowTab = $state(0);
     const NARROW_TABS = ["Conception", "3D", "Détails", "Contrôles"];
     let projectsOpen = $state(false);
+    let projectsDialog = $state<HTMLElement>();
+    let opener: HTMLElement | null = null;
+    $effect(() =>
+    {
+        projectsDialog?.focus();
+        return;
+    });
     // The workspace and the panes the handles measure before their first drag
     let panesHost = $state<HTMLElement>();
     let paletteEl = $state<HTMLElement>();
@@ -165,15 +174,28 @@
         const name = `${slug(app.project.name) || "projet"}.systeme-32.zip`;
         const how = await shareOrDownload(packProject(app.project, app.textures), name, "application/zip");
         app.notify(how === "shared" ? "Projet partagé" : `Projet enregistré : ${name}`, "success");
+        tour.mark("saved");
     }
 
     async function showProjects(): Promise<void>
     {
+        opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         localProjects = await listLocal().catch(() =>
         {
             return [];
         });
         projectsOpen = true;
+    }
+
+
+    // The page behind is inert while the dialogue is open : the focus goes back once it's live again
+    async function closeProjects(): Promise<void>
+    {
+        projectsOpen = false;
+        await tick();
+        opener?.focus();
+        opener = null;
+        return;
     }
 
 
@@ -184,7 +206,8 @@
         {
             app.load(rec.project, rec.textures);
         }
-        projectsOpen = false;
+        await closeProjects();
+        return;
     }
 
     async function removeLocal(id: string): Promise<void>
@@ -196,9 +219,19 @@
     function onKey(e: KeyboardEvent): void
     {
         const target = e.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA") 
+        const typing = target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA";
+        // Left to the browser in a field it opened the save page dialogue : the entry is committed first
+        if (typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s")
         {
-            return; 
+            e.preventDefault();
+            target.blur();
+            target.focus();
+            save();
+            return;
+        }
+        if (typing)
+        {
+            return;
         }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")
         {
@@ -233,12 +266,12 @@
 <!-- a phone hides the page before killing it, pagehide may never come -->
 <svelte:document onvisibilitychange={() => { if (document.visibilityState === "hidden") { flush(); } }} />
 
-<div class="app">
+<div class="app" inert={projectsOpen}>
     <header class="toolbar bar">
         <strong>systeme-32</strong>
         <input class="input name" aria-label="Nom du projet" maxlength="80" value={app.project.name}
             onchange={(e) => app.apply(rename, (e.currentTarget as HTMLInputElement).value)} />
-        <select class="select" aria-label="Nouveau projet" value=""
+        <select class="select" aria-label="Nouveau projet" data-tour="new" value=""
             onchange={(e) =>
             {
                 const picker = e.currentTarget as HTMLSelectElement;
@@ -250,7 +283,8 @@
             <option value="blank">Projet vide</option>
         </select>
         <button class="btn btn-secondary" onclick={open}>Ouvrir</button>
-        <button class="btn btn-secondary" onclick={save} title="Archive .zip du projet et de ses textures">Enregistrer</button>
+        <button class="btn btn-secondary" onclick={save} data-tour="save"
+            title="Archive .zip du projet et de ses textures">Enregistrer</button>
         {#if app.storageOk}
             <button class="btn btn-ghost" onclick={showProjects}>Mes projets</button>
         {/if}
@@ -258,11 +292,12 @@
             onclick={() => app.undo()}>&#8630;</button>
         <button class="btn btn-ghost btn-icon" title="Rétablir (Ctrl+Y)" disabled={!app.canRedo}
             onclick={() => app.redo()}>&#8631;</button>
+        <Tour {mode} narrow={narrow.current} {ready} />
         <span class="spacer"></span>
-        <div class="segmented">
-            <button class="segmented-item" class:active={mode === "design"}
+        <div class="segmented" data-tour="outputs">
+            <button class="segmented-item" class:active={mode === "design"} aria-pressed={mode === "design"}
                 onclick={() => (mode = "design")}>Conception</button>
-            <button class="segmented-item" class:active={mode === "outputs"}
+            <button class="segmented-item" class:active={mode === "outputs"} aria-pressed={mode === "outputs"}
                 onclick={() => (mode = "outputs")}>Plans et listes</button>
         </div>
     </header>
@@ -276,7 +311,16 @@
         <main class="narrow">
             <div class="tabs">
                 {#each NARROW_TABS as label, i}
-                    <button class="tab" class:active={narrowTab === i} onclick={() => (narrowTab = i)}>{label}</button>
+                    <button class="tab" class:active={narrowTab === i} aria-pressed={narrowTab === i}
+                        onclick={() =>
+                        {
+                            narrowTab = i;
+                            if (label === "Contrôles")
+                            {
+                                tour.mark("checks");
+                            }
+                            return;
+                        }}>{label}</button>
                 {/each}
             </div>
             <div class="narrow-body" class:single={narrowTab !== 0}>
@@ -329,10 +373,19 @@
 
 {#if projectsOpen}
     <!-- the design system overlay stays transparent and deaf to clicks without .active -->
-    <div class="modal-overlay active" role="presentation" onclick={() => (projectsOpen = false)}>
+    <div class="modal-overlay active" role="presentation" onclick={closeProjects}>
         <div class="modal" role="dialog" aria-modal="true" aria-label="Mes projets" tabindex="-1"
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.key === "Escape" && (projectsOpen = false)}>
+            bind:this={projectsDialog} onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) =>
+            {
+                // Closing the list must not also drop the selection the page handler clears on Escape
+                if (e.key === "Escape")
+                {
+                    e.stopPropagation();
+                    closeProjects();
+                }
+                return;
+            }}>
             <div class="modal-title">Projets de ce navigateur</div>
             {#if localProjects.length === 0}
                 <p class="muted">Aucun projet enregistré ici.</p>
@@ -343,14 +396,14 @@
                             <button class="btn btn-ghost" onclick={() => openLocal(lp.id)}>{lp.name}</button>
                             <span class="muted">{new Date(lp.saved).toLocaleString("fr-FR")}{lp.id === app.project.id
                                 ? ", ouvert" : ""}</span>
-                            <button class="btn btn-ghost btn-icon" title="Supprimer"
+                            <button class="btn btn-ghost btn-icon" title="Supprimer" aria-label={`Supprimer ${lp.name}`}
                                 onclick={() => removeLocal(lp.id)}>&#10005;</button>
                         </li>
                     {/each}
                 </ul>
             {/if}
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick={() => (projectsOpen = false)}>Fermer</button>
+                <button class="btn btn-secondary" onclick={closeProjects}>Fermer</button>
             </div>
         </div>
     </div>

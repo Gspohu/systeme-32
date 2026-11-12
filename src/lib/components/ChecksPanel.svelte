@@ -1,5 +1,6 @@
 <script lang="ts">
     import { app } from "./app_state.svelte";
+    import { tour } from "./tour_state.svelte";
     import type { Check } from "../core/analysis";
 
     let onlySelected = $state(false);
@@ -35,17 +36,22 @@
     <div class="head bar">
         <span class="badge badge-danger">{counts.error} erreur{counts.error > 1 ? "s" : ""}</span>
         <span class="badge badge-warning">{counts.warning} alerte{counts.warning > 1 ? "s" : ""}</span>
-        <label class="form-check"><input type="checkbox" bind:checked={showInfo} /> Infos ({counts.info})</label> 
-        <label class="form-check"><input type="checkbox" bind:checked={onlySelected} /> Sélection seule</label>
+        <label class="form-check"><input type="checkbox" bind:checked={showInfo} onchange={() => tour.mark("checks")} />
+            Infos ({counts.info})</label>
+        <label class="form-check"><input type="checkbox" bind:checked={onlySelected} onchange={() => tour.mark("checks")} />
+            Sélection seule</label>
     </div>
     {#if shown.length === 0}
-        <p class="muted">Aucun problème de fabrication détecté.</p>
+        <!-- filtered on one item, the rest of the project may still have problems -->
+        <p class="muted">{onlySelected && app.selection !== null ? "Aucun problème sur la sélection."
+            : "Aucun problème de fabrication détecté."}</p>
     {:else}
         <ul>
             {#each shown as c}
                 <li class={c.level}>
                     <button class="line" onclick={() =>
                     {
+                        tour.mark("checks");
                         if (c.item !== null)
                         {
                             app.selection = { kind: "item", item: c.item };

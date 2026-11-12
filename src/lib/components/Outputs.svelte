@@ -6,6 +6,7 @@
     import { eur, slug } from "../core/text";
     import { costCsv } from "../core/costing";
     import GroupOrder from "./GroupOrder.svelte";
+    import { tour } from "./tour_state.svelte";
     import { pagesToPdf } from "../core/drawing/pdf";
     import { pageToDataUri } from "../core/drawing/svg";
     import { cutListCsv, edgeNotation, hardwareCsv, pbsJson, type PbsNode } from "../core/bom";
@@ -118,6 +119,7 @@
     {
         const how = await shareOrDownload(bytes, name, mime);
         app.notify(how === "shared" ? `${name} partagé` : `${name} téléchargé`, "success");
+        tour.mark("saved");
     }
 
     function settings(p: Partial<Settings>): void
@@ -202,7 +204,8 @@
 <div class="outputs">
     <div class="tabs">
         {#each TABS as label, i}
-            <button class="tab" class:active={i === tab} onclick={() => { tab = i; zoomed = null; }}>{label}</button>
+            <button class="tab" class:active={i === tab} aria-pressed={i === tab}
+                onclick={() => { tab = i; zoomed = null; }}>{label}</button>
         {/each}
     </div>
 
@@ -225,7 +228,12 @@
             {:else}
                 <div class="grid-sheets">
                     {#each pages as pg, i}
-                        <button class="sheet" title={pg.title} onclick={() => (zoomed = i)}>
+                        <button class="sheet" title={pg.title} onclick={() =>
+                        {
+                            zoomed = i;
+                            tour.mark("sheet");
+                            return;
+                        }}>
                             <img src={pageToDataUri(pg)} alt="" /><span>{i + 1}. {pg.title}</span>
                         </button>
                     {/each}
@@ -362,7 +370,8 @@
                                         ",") ?? "-"}</td>
                                     <td data-label="Source" class="muted">{l.price?.source ?? ""}</td>
                                 {:else}
-                                    <td data-label="Prix unitaire HT"><input class="input price" type="number" min="0" step="0.01" value={l.price?.value ?? ""}
+                                    <td data-label="Prix unitaire HT"><input class="input price" type="number" min="0" step="0.01"
+                                        aria-label={`Prix unitaire HT, ${l.label}`} value={l.price?.value ?? ""}
                                         onchange={(e) =>
                                         {
                                             const v = str(e);
@@ -375,8 +384,11 @@
                                                                                             pack: l.price?.pack, formats: l.price?.formats });
                                         }} /></td>
                                     <!-- the whole source read without entering the field, the longest default ones run past 200 -->
+                                    <!-- a source alone can't be kept, a price entry needs its value : shut until then -->
                                     <td data-label="Source"><textarea class="input source" rows="3" maxlength="300"
-                                        placeholder="Fournisseur, date" value={l.price?.source ?? ""}  
+                                        aria-label={`Source, ${l.label}`} disabled={l.price === null}
+                                        title={l.price === null ? "Saisir d'abord le prix unitaire" : undefined}
+                                        placeholder="Fournisseur, date" value={l.price?.source ?? ""}
                                         onchange={(e) =>
                                         {
                                             if (l.price !== null)
