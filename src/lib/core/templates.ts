@@ -278,9 +278,8 @@ function dresserFrame(name: string, upper: Carcass[], bottles = false): Project
     // 20 bottles or so of 1.3 kg in the pull-out
     low.fronts.push(
         newFront(doors[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
-        // The flap inset between the uprights, standing on the leaves of its hinges
-        bottles ? newFront(doors[1]!.id, { type: "drop", pullOut: { loadKg: 30, boxDecor: BOX } },
-                           { ...PUSH_DOOR, mount: "inset" })
+        // The flap in line with the doors beside it, as large and as high, on overlay flap hinges
+        bottles ? newFront(doors[1]!.id, { type: "drop", pullOut: { loadKg: 30, boxDecor: BOX } }, PUSH_DOOR)
             : newFront(doors[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(doors[2]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
     );
@@ -355,67 +354,7 @@ export function dresser(): Project
 }
 
 
-// The variant asked on 2026-10-17 : no niche box, its two triple columns set in the opening at each end, 300 deep
-// against the wall after their save of that evening. The strip goes under the cupboards above, over the opening
-export function smallNichesDresser(): Project
-{
-    const box = dresserBox;
-    const triple = (name: string, x: number): Carcass =>
-    {
-        const c = box(name, x, 960, 250, 680, split("h", [201, 421], [cell(), cell(), cell()]), true);
-        c.depth = 300;
-        return c;
-    };
-    const top = [cell(), cell(), cell()];
-    const high = box("Placards hauts", 600, DRESSER_HIGH_Y, DRESSER_MIDDLE, 716, split("v", [...DRESSER_BAYS],
-        top), true);
-    high.fronts.push(
-        newFront(top[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
-        newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
-        newFront(top[2]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
-    );
-    // Its middle cell is the one wholly over the opening, the side ones sit partly on the small columns
-    high.lights.push({ id: newId("li"), cell: top[1]!.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
-                       wifi: true, under: true });
-    return dresserFrame("Vaisselier petites niches", [triple("Petite niche gauche", 600), high,
-                                                      triple("Petite niche droite", 600 + DRESSER_MIDDLE - 250)]);
-}
-
-
-// Their second sketch of 2026-10-17 : no small niches, an open column of shelves either side running up to the
-// top, a narrower niche between them under a cupboard of two doors. The 400 / 800 / 400 and the 760 high niche
-// are its proportions rounded, nothing on it is dimensioned
-export function openDresser(): Project
-{
-    const box = dresserBox;
-    // Over the drawers 1396 are left : 1358 inside, three equal cells of 440 between two shelves
-    const column = (name: string, x: number): Carcass =>
-    {
-        return box(name, x, 960, 400, 1396, split("h", [440, 899], [cell(), cell(), cell()]), true);
-    };
-    const opening = cell();
-    const niche = box("Niche", 1000, 960, DRESSER_MIDDLE - 800, 760, opening, true);
-    niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
-                        wifi: true });
-    // Two doors over the niche, a shelf behind each halfway up its 598
-    const halves = [0, 1].map(() =>
-    {
-        return split("h", [289], [cell(), cell()]);
-    });
-    const wide = DRESSER_MIDDLE - 800;
-    const high = box("Placard haut", 1000, 1720, wide, 636, split("v", [(wide - 38 - 19) / 2], halves), true);
-    high.fronts.push(
-        newFront(halves[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
-        newFront(halves[1]!.id, { type: "door", hinge: "right" }, PUSH_DOOR),
-    );
-    return dresserFrame("Vaisselier colonnes ouvertes", [column("Colonne ouverte gauche", 600), niche, high,
-                                                         column("Colonne ouverte droite", 1000 + wide)]);
-}
-
-
 export const TEMPLATES = [
     { id: "tv", label: "Composition TV et bibliothèque", make: tvWall },
     { id: "dresser", label: "Vaisselier bibliothèque", make: dresser },
-    { id: "dresser-small", label: "Vaisselier petites niches", make: smallNichesDresser },
-    { id: "dresser-open", label: "Vaisselier colonnes ouvertes", make: openDresser },
 ];

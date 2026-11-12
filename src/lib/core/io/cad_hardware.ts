@@ -655,33 +655,24 @@ function gasStays(b: Build, out: CadInstance[], drawn: Record<string, CadModel>)
 }
 
 
-// The Häfele model of each flap hinge, flap shut, placed from the box of its carcass leaf : model x to the back, y to
-// the left, z up. Its 6 supplied screws run along the 30 degree holes as DIN 7997:2008 3 x 20, head 5.6 in a 6.3 bore
-const FLAP_HINGE_SCREW: ScrewSpec = { kind: "countersunk", diameter: 3, length: 20, standard: "DIN7997", head: 5.6,
-                                      headHeight: 1.65 };
-
-function flapHinges(b: Build, out: CadInstance[], screws: CadScrew[]): void
+// The 2 halves of each flap hinge, placed off the collars drop_flaps.ts lays : model x to the front, y across, z up
+// The flap half carries the settings in its collar's place, its HOSPA 3 drawn in the bodies
+function flapHinges(b: Build, out: CadInstance[]): void
 {
     for (const f of b.fitted)
     {
-        if (f.purpose !== "flap-hinge" || !f.key.endsWith("/aile-meuble"))
+        const half = f.key.endsWith("/fond") ? "floor" : f.key.endsWith("/abattant") ? "flap" : null;
+        if (f.purpose !== "flap-hinge" || half === null)
         {
             continue;
         }
-        const mid = FLAP_HINGE.floorLeaf.map(([a, z]) => { return (a + z) / 2; });
-        const o: Vec3 = [f.centre[0] + mid[1]!, f.centre[1] - mid[2]!, f.centre[2] + mid[0]!];
+        const box = half === "floor" ? FLAP_HINGE.floorCollar : FLAP_HINGE.flapCollar;
+        const mid = box.map(([a, z]) => { return (a + z) / 2; });
+        const o: Vec3 = [f.centre[0] - mid[1]!, f.centre[1] - mid[2]!, f.centre[2] - mid[0]!];
         const host = b.parts.find((q) => { return q.id === f.host; });
-        const i: CadInstance = { model: FLAP_HINGE.ref, item: f.item, part: host?.label ?? "Abattant", o, x: neg(Z),
-                                y: neg(X),
-                                 z: Y };
-        out.push(i);
-        for (const s of FLAP_HINGE.screws)
-        {
-            const head = [0, 1, 2].map((k) => { return s.at[k]! + s.way[k]! * FLAP_HINGE.seat; }) as Vec3;
-            screws.push({ ...modelScrew(i, head, neg(s.way), FLAP_HINGE_SCREW,   
-                                        `Charnière d'abattant ${FLAP_HINGE.ref} : vis 3 x 20 fournie`),
-                          free: FLAP_HINGE.free, holds: FLAP_HINGE.ref });
-        }
+        out.push({ model: `${FLAP_HINGE.ref}.${half}`, item: f.item, part: host?.label ?? "Abattant", o,
+                  x: Z, y: X, z: Y,
+                   unit: f.key.slice(0, f.key.lastIndexOf("/")) });
     }
 }
 
@@ -715,7 +706,7 @@ export function cadHardware(p: Project, b: Build): { instances: CadInstance[]; s
         }
     }
     concealed(b, instances, screws);
-    flapHinges(b, instances, screws);
+    flapHinges(b, instances);
     brackets(b, instances, screws);
     cupScrews(instances, screws);
     const drawn: Record<string, CadModel> = {};

@@ -396,10 +396,9 @@ add({ id: EDGE_PULL.ref, family: "D51", label: `Poignée Oslo aluminium laiton b
 
 // The drop-down flap of the dresser : flap hinge and braking stays of the 2023 catalogue of Häfele Thailand, the
 // only one found with their drawings
-const HAFELE_TH = "Häfele Thaïlande, HTH Furniture Fittings 2023";
-const HAFELE_TH_URL = "https://hafelethailand.com/wp-content/uploads/2025/12/03-Hinges-and-Flap-Fittings.pdf";
-add({ id: "342.66.730", family: "D20", label: "Charnière d'abattant tombant 90°, 2 ailes vissées en applique, sans cuvette, nickelée",
-     brand: "Häfele", ref: "342.66.730", source: `${HAFELE_TH} p. 3.188`, url: HAFELE_TH_URL });
+add({ id: "342.78.700", family: "D20", label: `Charnière d'abattant à corps 90°, en applique, recouvrement 18,5 mm, `
+         + `logements ${DIAM}26, alliage zingué nickelé, boîte de 4`,
+     brand: "Häfele", ref: "342.78.700", source: "Häfele France, LGH-M Technique 2017 p. MB 5.318" });
 add({ id: "365.01.901", family: "D22", label: "Compas d'abattant à vérin à gaz, à frein, 235 mm, course 74 mm, gris argent, "
          + "gauche ou droite, équerres de corps et d'abattant fournies",
      brand: "Häfele", ref: "365.01.901", source: "Häfele France, LGH-M Technique 2017 p. MB 5.313" });

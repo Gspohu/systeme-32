@@ -64,17 +64,13 @@ export const TIPON_HOLE_DIAMETER = 10;
 // Drilling depth of each version : short 50 (Blum KA-150 p. 172), long 76 (SFS, Blum distributor, 956A1004 sheet
 // read on 2026-11-06 : "Drill-Ø 10 mm, drilling depth 76 mm")
 // https://www.sfs.ch/CH/en/dl/p/572035
+// TODO the 76 of the long unit has no Blum source yet : the archived SFS sheet hides it under its cookie banner
 export const TIPON_DEPTH: Record<string, number> = { "956.1004": 50, "956A1004": 76 };
 export const TIPON_CATCH_PLATE = { across: 13, high: 18 };
 // Blum KA-150 p. 173 : straight adapter plate 956.1201 screwed on that face, screws 20 and 37 from the front
 // edge, the unit axis 8 mm off the face inside the cell
 export const TIPON_ADAPTER = { ref: "956.1201", axisOffFace: 8, screws: [20, 37] };
 
-// Häfele 342.66.730 flap hinge off its STEP, flap shut : leaves on the faces, no cup. An inset flap stands on the
-// carcass leaf 12.9 up, its screw bosses rise to 14.5 behind it, for a drawer over it to clear
-export const FLAP_HINGE_LEAF = 12.9;
-// TODO 14.5 read on the STEP only, to check with a calliper on the hinge once bought
-export const FLAP_HINGE_TOP = 14.5;
 // Blum KA-150 p. 436 : TIP-ON BLUMOTION front gap FS
 export const TIPON_FRONT_GAP = 2.5;
 // Every overlay front stands this off its carcass, in one plane : TIP-ON 2.1 proud of its panel plus its catch plate

@@ -80,9 +80,12 @@ export const CAD_MODELS: Record<string, CadModel> = {
                    rgb: STEEL },
     "637.76.353": { ref: "637.76.353", label: "Pied AXILO H100", file: `${HAFELE}/637_76_353_6.stp`, rgb: CARBON },
     "637.76.333": { ref: "637.76.333", label: "Embase AXILO à visser", file: `${HAFELE}/637_76_333_1.stp`, rgb: CARBON },
-    // Folded at 90 degrees, flap shut : the build places it as drop_flaps.ts reads it
-    "342.66.730": { ref: "342.66.730", label: "Charnière d'abattant", file: `${HAFELE}/step/342_66_730_1.stp`,
-                   rgb: STEEL },
+    // Its STEP shut, split in its 2 halves to set the flap one by the hinge's settings (drop_flaps.ts) : the body in the
+    // floor, and the body in the flap with its setting screw and its arm (342_78_700_1.stp, solids 2 and 0 1 3)
+    "342.78.700.floor": { ref: "342.78.700", label: "Charnière d'abattant, côté meuble",
+                         file: `${HAFELE}/step/342_78_700_1_meuble.stp`, rgb: NICKEL },
+    "342.78.700.flap": { ref: "342.78.700", label: "Charnière d'abattant, côté abattant",
+                        file: `${HAFELE}/step/342_78_700_1_abattant.stp`, rgb: NICKEL },
     "637.38.054": { ref: "637.38.054", label: "Clip de plinthe AXILO", file: `${HAFELE}/637_38_054_2.stp`,
                    rgb: [235, 235, 230] },
     "ANTI_TIP_BRACKET": { ref: "ANTI_TIP_BRACKET", label: "Équerre 40 x 40 x 40", rgb: ZINC },

@@ -13,29 +13,24 @@ import type { FrontPanel } from "./fronts";
 import { fitTipOnHole } from "./doors";
 import { X, Y, Z, at, neg, type Vec3 } from "./geometry";
 import { crossedHoles } from "./drilling";
-import { FLAP_HINGE_LEAF, FLAP_HINGE_TOP, MOVENTO } from "../data/rules";
-import { DIAM } from "./text";
+import { MOVENTO } from "../data/rules";
+import { DIAM, round1 } from "./text";
 
-// Häfele 342.66.730 read on its STEP model, folded flap shut : x to the back, y along it, z up. No cup, the leaves
-// at z -11.7 on the floor and x -11.7 on the flap. Its supplied screws at 30 degrees, counterbore 6.3, cone 60, hole 4.4
+// Häfele 342.78.700, an overlay flap hinge (LGH-M 2017 p. MB 5.318) : a body in a Ø26 bore 15 deep of the floor 10.5
+// off its front edge, the other in a Ø26 bore 14 deep of the flap 10.5 over its lower edge, sold by 4. Its STEP shut :
+// x to the front, y across, z up from the floor, origin on the axis of the floor bore
 export const FLAP_HINGE = {
-    ref: "342.66.730", floorZ: -11.7, flapX: -11.7,
-    screws: [
-        { at: [-7.37, 13.95, 1.2], way: [0, 0.5, -0.866] },
-        { at: [-7.37, -13.95, 1.2], way: [0, -0.5, -0.866] },
-        { at: [6.61, 0, 1.2], way: [0.5, 0, -0.866] },
-        { at: [1.2, 13.95, 10.94], way: [-0.866, 0.5, 0] },
-        { at: [1.2, -13.95, 10.94], way: [-0.866, -0.5, 0] },
-        { at: [1.2, 0, 24.89], way: [-0.866, 0, 0.5] },
-    ] as { at: Vec3; way: Vec3 }[],
-    // Head 5.6 on the cone 1.49 in, measured on the model (0.02 mm3 of thread left). 13.34 of leaf on its axis, and its
-    // shank of 3 meets the board at 30 degrees over 1.5 x tan 30 more (essai31)
-    seat: 1.49, free: 13.34 + 1.5 * Math.tan(Math.PI / 6),
-    // The boxes of the leaves in its frame, x, y, z from and to : the carcass leaf up to 1.2 where the flap stands on
-    // it, its bosses up to 2.8 behind the back of the flap only
-    floorLeaf: [[-16.1, 12.3], [-19, 19], [-11.7, 1.2]] as [number, number][],
-    bosses: [[-11.7, 12.3], [-19, 19], [1.2, 2.8]] as [number, number][],
-    flapLeaf: [[-11.7, 2.8], [-19, 19], [2.2, 30.6]] as [number, number][],
+    ref: "342.78.700", pack: 4, bore: 26, floorDepth: 15, flapDepth: 14, offEdge: 10.5,
+    // Where the model has the flap : its back 13.09 in front of the floor bore, its bore 7.85 under the floor
+    flapBack: 13.09, flapBore: -7.85,
+    // Its HOSPA 3 drawn in the bodies, 20 off the joint and 13.5 either side : cores of 2.2, 12.1 into the floor and
+    // 13.35 into the flap
+    pilot: { offBore: 9.5, across: 13.5, diameter: 2.2, floor: 12.5, flap: 13.5 },
+    // Height + 2, depth +-4 (MB 5.318), what it takes to bring the flap in line with the doors
+    lift: [0, 2] as [number, number], depth: [-4, 4] as [number, number],
+    // Its collars, x y z from and to in its frame : on the floor, up to 3.35 open or shut, and behind the flap
+    floorCollar: [[-16.5, 10], [-19, 19], [0, 3.35]] as [number, number][],
+    flapCollar: [[11.59, 13.09], [-19, 19], [-18.85, 8.65]] as [number, number][],
 };
 // Workshop choice : each hinge 100 in from the side of the cell, clear of the stays against them
 const HINGE_INSET = 100;
@@ -50,10 +45,9 @@ export const GAS_STAY = { ref: "365.01.901", sideUp: 238, flapUp: 65, sideBehind
 // raised over the bracket of the stay standing on the open flap, its front back off the front edge, its sides
 // holding bottles
 const SPACER_HEIGHT = 80;
-// The box 3 over the leaves, 14.5 proud of the floor and of the open flap, its front 3 behind the flap leaf. The edge
-// of the box passes over the stay's bracket on the open flap too
-// TODO the height of the gas stay's bracket over the open flap isn't printed : the box clears 17.5, the CAD check
-// judges it
+// The box 3 over the hinge collars, 3.35 proud of the floor and of the open flap. Its edge passes over the plate of
+// the stay on the open flap too, the struts stay outside its sides
+// TODO the stays are only built shut : their swing over the open flap, past the box, isn't checked
 const PULL_OUT_CLEAR = 3;
 const PULL_OUT_SETBACK = 30;
 const PULL_OUT_SIDE = 150;
@@ -133,6 +127,12 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             b.warnings.push(`${name} : ${high} mm de haut, au-delà des ${GAS_STAY.maxHigh} mm `
                 + `des compas ${GAS_STAY.ref} (Häfele MB 5.313). Essai de butée avant pose, comme le recommande Häfele.`);
         }
+        if (front.mount === "inset")
+        {
+            b.errors.push(`${name} : les charnières ${FLAP_HINGE.ref} posent l'abattant en applique devant le fond. `
+                + "Le passer en applique.");
+            continue;
+        }
         const floor = panelBelow(c, lay, nb, b);
         const faces = [sideFace(c, lay, b, nb, "left"), sideFace(c, lay, b, nb, "right")];
         if (floor === undefined || faces[0] === null || faces[1] === null)
@@ -140,14 +140,16 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             b.errors.push(`${name} : panneau du bas ou face de côté introuvable pour ses charnières et ses compas.`);
             continue;
         }
-        hinges(c, nb, fp, floor, flap, b);
+        const { top } = floorEdge(floor);
+        if (!hinges(c, nb, fp, floor, flap, b, name))
+        {
+            continue;
+        }
         stays(c, nb, fp, faces as FaceRef[], flap, b);
-        // Open, the leaves lie in line and the back of the flap levels with the floor. An inset flap h up and t thick
-        // turns about (h - t) / 2 under the floor and in front of its back, an overlay one about its outer lower edge
-        const inset = front.mount === "inset";
-        const lift = (FLAP_HINGE_LEAF - fp.thickness) / 2;
-        const pivot: Vec3 = inset ? [c.x + fp.rect.x, c.y + nb.y + lift, c.z + fp.z - lift]
-            : [c.x + fp.rect.x, c.y + fp.rect.y, c.z + fp.z + fp.thickness];
+        // Open, its back levels with the floor and its lower edge comes to the floor's front : it turns about the
+        // middle of the drop d from the floor down to its lower edge, d / 2 under the floor and in front of its back
+        const drop = top - (c.y + fp.rect.y);
+        const pivot: Vec3 = [c.x + fp.rect.x, top - drop / 2, c.z + fp.z + drop / 2];
         b.motions.push({
             item: c.id, front: fp.id, label: name, kind: "turn",
             pivot, axis: X, amount: 90,
@@ -159,7 +161,7 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
             b.hardware.push({ ref: "956.1004", qty: 1, item: c.id, itemName: c.name, target: fp.id,
                               note: "au milieu du chant haut de l'abattant, version avec aimant : le tient fermé",
                               purpose: "push-latch" });
-            fitTipOnHole(c, lay, b, nb, fp, "left", "956.1004", true, front.mount === "inset" ? fp.thickness : 0);
+            fitTipOnHole(c, lay, b, nb, fp, "left", "956.1004", true);
         }
         const spec: DropFront = front.spec;
         if (spec.pullOut !== null)
@@ -170,42 +172,96 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
 }
 
 
-// Each hinge in the frame of its model : x towards the back, y along the floor, z up, its origin where the model has
-// it. The back of the inset flap at FLAP_HINGE.flapX, the floor of the cell at FLAP_HINGE.floorZ. y runs to the left
-// with x to the back, the frame turned and not mirrored
-function hingeFrame(c: Carcass, nb: NodeBox, fp: FrontPanel, x: number): (p: Vec3) => Vec3
+// The front edge and the top face of the floor, in the room
+export function floorEdge(floor: Part): { front: number; top: number }
 {
-    const o: Vec3 = [c.x + x, c.y + nb.y - FLAP_HINGE.floorZ, c.z + fp.z + FLAP_HINGE.flapX];
-    return (p: Vec3): Vec3 => { return [o[0] - p[1], o[1] + p[2], o[2] - p[0]]; };
+    const f = floor.frame!;
+    const pts = [0, floor.thickness].flatMap((w) =>
+    {
+        return [at(f, 0, 0, w), at(f, floor.length, 0, w), at(f, 0, floor.width, w), at(f, floor.length, floor.width,
+            w)];
+    });
+    return { front: Math.max(...pts.map((p) => { return p[2]; })), top: Math.max(...pts.map((p) => { return p[1]; })) };
 }
 
 
-// 2 hinges screwed on the faces by their own screws, set at 30 degrees through the leaves (cad_hardware.ts), nothing
-// drilled for them. Their leaves stand in the cell for the checks of clashes : the pull-out runs over them
-function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part, b: Build): void
+// The face of a part looking along a direction of the room : face A is at w = 0, its drilling runs along +n
+function faceToward(q: Part, dir: Vec3): "A" | "B"
 {
-    for (const [k, x] of [nb.x + HINGE_INSET, nb.x + nb.w - HINGE_INSET].entries())
+    const n = q.frame!.n;
+    return n[0] * dir[0] + n[1] * dir[1] + n[2] * dir[2] < 0 ? "A" : "B";
+}
+
+
+// What each hinge is set by to bring the flap where the doors are, along the depth and the height of its frame
+export function hingeSetting(c: Carcass, fp: FrontPanel, floor: Part): { depth: number; lift: number; bore: number }
+{
+    const h = FLAP_HINGE;
+    const { front, top } = floorEdge(floor);
+    const bore = front - h.offEdge;
+    return { bore, depth: c.z + fp.z - bore - h.flapBack, lift: c.y + fp.rect.y + h.offEdge - top - h.flapBore };
+}
+
+
+// 2 hinges 100 in from the sides, in their Ø26 bores drilled as the catalogue draws them : the floor one open on its
+// front edge, the flap one on its lower edge. The drop of the flap and its gap to the floor are taken up by the
+// hinge's own settings, the rest is refused
+function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part, b: Build, name: string): boolean
+{
+    const h = FLAP_HINGE;
+    const { top } = floorEdge(floor);
+    const { bore, depth, lift } = hingeSetting(c, fp, floor);
+    const back = c.z + fp.z;
+    const bottom = c.y + fp.rect.y;
+    if (lift < h.lift[0] || lift > h.lift[1] || depth < h.depth[0] || depth > h.depth[1])
     {
-        const room = hingeFrame(c, nb, fp, x);
-        for (const [name, box, host] of [["meuble", FLAP_HINGE.floorLeaf, floor], ["bossages", FLAP_HINGE.bosses, floor],
-                                         ["abattant", FLAP_HINGE.flapLeaf, flap]] as const)
+        b.errors.push(`${name} : les charnières ${h.ref} devraient être réglées de ${round1(lift)} mm en hauteur et `
+            + `${round1(depth)} mm en profondeur, hors de leurs ${h.lift[1]} et ${h.depth[1]} mm (Häfele MB 5.318). `
+            + "Revoir la hauteur ou le jeu de l'abattant.");
+        return false;
+    }
+    const up = faceToward(floor, Y);
+    const behind = faceToward(flap, neg(Z));
+    const drill = (q: Part, p: Vec3, face: "A" | "B", diameter: number, deep: number, what: string): void =>
+    {
+        const [u, v] = onPart(q, p);
+        q.holes.push({ u, v, diameter, depth: deep, face,
+                      purpose: diameter === h.bore ? "flap-hinge" : "flap-hinge-pilot",
+                       fixes: h.ref, label: `Charnière d'abattant ${h.ref} : ${what}` });
+    };
+    for (const [k, x] of [c.x + nb.x + HINGE_INSET, c.x + nb.x + nb.w - HINGE_INSET].entries())
+    {
+        drill(floor, [x, top, bore], up, h.bore, h.floorDepth, `logement ${DIAM}26 x ${h.floorDepth}, débouchant sur le chant`);
+        drill(flap, [x, bottom + h.offEdge, back], behind, h.bore, h.flapDepth,
+              `logement ${DIAM}26 x ${h.flapDepth}, débouchant sur le chant bas`);
+        for (const s of [-1, 1])
+        {
+            const across = x + s * h.pilot.across;
+            drill(floor, [across, top, bore - h.pilot.offBore], up, h.pilot.diameter, h.pilot.floor,
+                  "avant-trou de vis HOSPA 3");
+            drill(flap, [across, bottom + h.offEdge + h.pilot.offBore, back], behind, h.pilot.diameter, h.pilot.flap,
+                  "avant-trou de vis HOSPA 3");
+        }
+        // Its collars in the cell for the checks of clashes, the flap side moved by the settings
+        const room = (p: Vec3, dx: number, dz: number): Vec3 => { return [x + p[1], top + p[2] + dz, bore +
+            p[0] + dx]; };
+        for (const [part, box, host, dx, dz] of [["fond", h.floorCollar, floor, 0, 0],
+                                                  ["abattant", h.flapCollar, flap, depth, lift]] as const)
         {
             const mid = box.map(([a, z]) => { return (a + z) / 2; }) as Vec3;
             const half = box.map(([a, z]) => { return (z - a) / 2; });
-            b.fitted.push({ key: `${c.id}/drop/${fp.id}/charniere${k}/aile-${name}`, item: c.id, ref: FLAP_HINGE.ref,
-                            label: `${c.name}, charnière d'abattant, ${name === "meuble" ? "aile du meuble"
-                                : name === "bossages" ? "bossages des vis" : "aile de l'abattant"}`,
-                            purpose: "flap-hinge", shape: "box", centre: room(mid), axes: [X, Y, Z],
+            b.fitted.push({ key: `${c.id}/drop/${fp.id}/charniere${k}/${part}`, item: c.id, ref: h.ref,
+                            label: `${c.name}, charnière d'abattant, côté ${part === "fond" ? "meuble" : "abattant"}`,
+                            purpose: "flap-hinge", shape: "box", centre: room(mid, dx, dz), axes: [X, Y, Z],
                             half: [half[1]!, half[2]!, half[0]!], host: host.id, hidden: true });
         }
     }
-    b.hardware.push({ ref: FLAP_HINGE.ref, qty: 2, item: c.id, itemName: c.name, target: flap.id,
-                      note: "en applique, abattant intérieur posé sur l'aile du meuble, vis fournies",
-                      purpose: "flap-hinge" });
-    flap.notes.push(`Abattant intérieur entre les montants, posé sur les ailes des charnières ${FLAP_HINGE.ref} : son `
-        + `chant bas ${FLAP_HINGE_LEAF} mm au-dessus du fond de la case. Charnières en applique, sans cuvette, vissées `
-        + "par leurs 6 vis fournies chacune, à 30 degrés à travers les ailes, 3 dans le fond et 3 dans l'abattant, rien "
-        + "à percer");
+    b.hardware.push({ ref: h.ref, qty: 2, item: c.id, itemName: c.name, target: flap.id, purpose: "flap-hinge",
+                      note: `charnières d'abattant en applique, réglées de +${round1(lift)} mm en hauteur, vis HOSPA 3` });
+    flap.notes.push(`Abattant en applique dans le plan des portes voisines, sur 2 charnières ${h.ref} (Häfele MB 5.318) `
+        + `: logements ${DIAM}26 à ${h.offEdge} mm du chant avant du fond et du chant bas de l'abattant, réglage en hauteur `
+        + `de +${round1(lift)} mm et en profondeur de ${round1(depth)} mm pour l'aligner sur les portes`);
+    return true;
 }
 
 
@@ -279,10 +335,10 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
     { loadKg, boxDecor }: { loadKg: number; boxDecor?: string }): void
 {
     const t = c.thickness;
-    // Behind the flap leaf of an inset flap, else the setback off the front edge, and behind the struts of the gas
-    // stays, flap shut : the box and its spacers ran into them in the clash check of the dresser
-    const ahead = front.mount === "inset" ? fp.z - FLAP_HINGE_TOP - PULL_OUT_CLEAR : c.depth - PULL_OUT_SETBACK;
-    const zFront = Math.min(ahead, fp.z - GAS_STAY.sideBehind - GAS_STAY.strut / 2 - PULL_OUT_CLEAR);
+    // The setback off the front edge, and behind the struts of the gas stays, flap shut : the box and its spacers ran
+    // into them in the clash check of the dresser
+    const zFront = Math.min(c.depth - PULL_OUT_SETBACK, fp.z - GAS_STAY.sideBehind - GAS_STAY.strut / 2 -
+                            PULL_OUT_CLEAR);
     const runner = chooseRunner(zFront - lay.zBack, loadKg);
     if (runner === null)
     {
@@ -291,10 +347,12 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
         return;
     }
     const [ox, oy, oz] = boxOrigin(c);
-    // The underside of the box sides PULL_OUT_CLEAR over the leaves, the runner that much lower (Blum : the
-    // bottom of the
-    // sides bottomAboveLower over the runner, the bottom of the box BOTTOM_RECESS up them)
-    const low = nb.y + FLAP_HINGE_TOP + PULL_OUT_CLEAR - (MOVENTO.bottomAboveLower - BOTTOM_RECESS);
+    // The underside of the box sides PULL_OUT_CLEAR over the hinge collars, the runner that much lower (Blum : the
+    // bottom of the sides bottomAboveLower over the runner, the bottom of the box BOTTOM_RECESS up them), and the
+    // spacer centred on the runner screws standing on the floor, not in it
+    const low = Math.max(nb.y + FLAP_HINGE.floorCollar[2]![1] + PULL_OUT_CLEAR -
+                         (MOVENTO.bottomAboveLower - BOTTOM_RECESS),
+                         nb.y + SPACER_HEIGHT / 2 - MOVENTO.screwAxisAboveLower);
     const y0 = low + MOVENTO.screwAxisAboveLower - SPACER_HEIGHT / 2;
     const faces: FaceRef[] = [];
     for (const [k, side] of sides.entries())

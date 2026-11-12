@@ -28,12 +28,6 @@ function ht(ttc: number): number
     return Math.round(ttc / 1.2 * 1000) / 1000;
 }
 
-// A German shop price, its VAT of 19 % taken off
-function htDe(ttc: number): number
-{
-    return Math.round(ttc / 1.19 * 1000) / 1000;
-}
-
 function fromGbp(gbp: number): number
 {
     return Math.round(gbp / GBP * 1000) / 1000;
@@ -147,10 +141,10 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:84335807": entry(ht((10.9 + 0.07) / 2), "u", "Leroy Merlin, lot de 2 poignées Oslo laiton brossé mat 180 mm, "
                          + "EAN 3276007458664, 10,90 EUR TTC et 0,07 d'éco-participation (ticket du 9 novembre 2026), "
                          + "4 vis fournies", "2026-11-09", 2),
-    "hw:342.66.730": entry(htDe(9.16), "u", "hwt-pro.com (Allemagne), Häfele 342.66.730, 9,16 EUR TTC la pièce jusqu'à 9, "
-                           + "TVA 19 %, en stock", "2026-11-11"),
     "hw:365.01.901": entry(24.14, "u", "Häfele France, compte client, prix net 24,14 EUR la pièce, disponibilité sur "
                            + "demande", "2026-11-11"),
+    "hw:342.78.700": entry(7.35, "u", "Häfele France, compte client, prix net 7,35 EUR la pièce, vendue par 4, disponible",
+                           "2026-11-12", 4),
 
     // Generic LED parts read at Ledkia, one of each per lit cell : a 2 m profile, a 5 m reel, one lead
     "hw:LED_PROFILE_RECESS": entry(ht(6.99), "u", "Estimation : Ledkia, profilé encastré Lithos H12 2 m avec diffuseur "

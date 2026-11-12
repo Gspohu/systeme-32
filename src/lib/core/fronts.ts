@@ -2,7 +2,7 @@
 
 import type { Carcass, Front, Settings } from "./model";
 import type { NodeBox, Rect, ResolvedLayout } from "./layout";
-import { FLAP_HINGE_LEAF, FRONT_GAP, OVERLAY_X_FULL, OVERLAY_X_TWIN, INSET_PLATE_SHIFT,
+import { FRONT_GAP, OVERLAY_X_FULL, OVERLAY_X_TWIN, INSET_PLATE_SHIFT,
         WALL_HINGE_REVEAL } from "../data/rules";
 
 export type HingeKind = "full" | "twin" | "inset";
@@ -156,11 +156,8 @@ export function frontPanels(c: Carcass, lay: ResolvedLayout, s: Settings, walls:
         else if (spec.type === "lift" || spec.type === "panel" || spec.type === "drop")
         {
             const role = spec.type === "lift" ? "flap" as const : spec.type === "drop" ? "drop" as const : "panel" as const;
-            // Raised 12.9 to rest on the carcass leaf (rules.ts)
-            const rise = role === "drop" && front.mount === "inset" ? nb.y + FLAP_HINGE_LEAF - outer.y : 0;
-            out.push({ ...base, id: `${front.id}#0`, role,
-                      index: 0, rect: { ...outer, y: outer.y + rise, h: outer.h - rise },
-                       hinge: null, hingeKind: null, hingeOverlay: 0 });
+            out.push({ ...base, id: `${front.id}#0`, role, index: 0, rect: outer, hinge: null, hingeKind: null,
+                       hingeOverlay: 0 });
         }
         else if (spec.type === "drawers")
         {

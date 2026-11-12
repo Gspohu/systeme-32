@@ -10,7 +10,7 @@ export type Edge = "u0" | "u1" | "v0" | "v1";
 export const PURPOSES = [
     "minifix-housing", "minifix-bolt", "minifix-passage", "dowel", "clamex", "clamex-access", "link-screw",
     "hinge", "hinge-cup", "system-plate", "plate-dowel", "screwed-plate", "plate-screw", "cup-screw",
-    "push-latch", "push-adapter", "adapter-screw", "catch-plate", "flap", "flap-screw", "flap-hinge", "flap-stay", "sliding",
+    "push-latch", "push-adapter", "adapter-screw", "catch-plate", "flap", "flap-screw", "flap-hinge", "flap-hinge-pilot", "flap-stay", "sliding",
     "handle", "handle-screw", "screw-passage",
     "runner", "runner-screw", "runner-hook", "runner-coupling", "front-screw", "shelf-lug",
     "foot", "foot-pad", "foot-mount", "foot-mount-screw", "plinth-clip", "vent-grill", "wall-hanger",
