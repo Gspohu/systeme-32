@@ -5,6 +5,7 @@
     import { stepView, type Snapshot } from "./tour";
     import { byId } from "../core/edit";
 
+    // On a narrow screen the button lives in the projects dialogue, a line less in the toolbar
     let { mode, narrow, ready }: { mode: "design" | "outputs"; narrow: boolean; ready: boolean } = $props();
 
 
@@ -53,34 +54,54 @@
         return;
     });
 
+    tour.starter = () =>
+    {
+        tour.start(now);
+        return;
+    };
+
     const view = $derived(stepView(tour.state, narrow));
-    // The step's target outlined by a rule of its own : it holds through every rebuild of the panes
-    const outline = $derived(view === null ? "" : `<style>${view.target} { outline: var(--border-width-thick) solid `
-        + "var(--colour-accent); outline-offset: calc(-1 * var(--border-width-thick)); }</style>");
+    const end = $derived(view !== null ? view.end : tour.state.status === "finished" && !narrow);
+    let cardHeight = $state(0);
+    // Rules of its own, they hold through every rebuild of the panes : the step's target outlined, and the messages
+    // lifted over the card when it shares their corner
+    const rules = $derived.by((): string =>
+    {
+        let css = view === null ? "" : `${view.target} { outline: var(--border-width-thick) solid var(--colour-accent); `
+            + "outline-offset: calc(-1 * var(--border-width-thick)); }";
+        if (end && cardHeight > 0)
+        {
+            css += `.toast-container { bottom: calc(2 * var(--spacing-md) + ${cardHeight}px); }`;
+        }
+        return css === "" ? "" : `<style>${css}</style>`;
+    });
 </script>
 
-<svelte:head>{@html outline}</svelte:head>
+<svelte:head>{@html rules}</svelte:head>
 
-<button class="btn btn-ghost" title="Visite guidée de la première utilisation" onclick={() => tour.start(now)}>
-    Visite</button>
+{#if !narrow}
+    <button class="btn btn-ghost" title="Visite guidée de la première utilisation" onclick={() => tour.begin()}>
+        Visite</button>
+{/if}
 
 {#if view !== null}
-    <section class="tour" class:end={view.end} aria-label="Visite guidée">
+    <section class="tour" class:end aria-label="Visite guidée" bind:clientHeight={cardHeight}>
+        <!-- both buttons on the first line : a line less over the front view a narrow screen barely shows -->
         <div class="tour-head">
             <span class="tour-count">Étape {view.index} sur {view.count}</span>
-            <button class="btn btn-ghost" onclick={() => tour.stop()}>Passer</button>
+            <span class="tour-buttons">
+                <button class="btn btn-ghost" onclick={() => tour.stop()}>Passer</button>
+                <button class="btn btn-secondary" title="Étape suivante sans la faire" onclick={() => tour.next(now)}>
+                    Suivant</button>
+            </span>
         </div>
         <div aria-live="polite">
             <div class="tour-title">{view.title}</div>
             <p class="tour-text">{view.text}</p>
         </div>
-        <div class="tour-actions">
-            <button class="btn btn-secondary" title="Étape suivante sans la faire" onclick={() => tour.next(now)}>
-                Suivant</button>
-        </div>
     </section>
 {:else if tour.state.status === "finished"}
-    <section class="tour" class:end={!narrow} aria-label="Visite guidée">
+    <section class="tour" class:end aria-label="Visite guidée" bind:clientHeight={cardHeight}>
         <div aria-live="polite">
             <div class="tour-title">Visite terminée</div>
             <p class="tour-text">Le bouton Visite, en haut, la relance.</p>
@@ -92,7 +113,7 @@
 {/if}
 
 <style>
-    /* Bottom left, the messages take the bottom right */
+    /* Bottom left, or bottom right under the messages it lifts */
     .tour
     {
         position: fixed;
@@ -131,8 +152,15 @@
         justify-content: flex-end;
     }
 
+    .tour-buttons
+    {
+        display: flex;
+        gap: var(--spacing-xs);
+    }
+
     .tour-count
     {
+        white-space: nowrap;
         font-size: var(--font-size-xs);
         color: var(--colour-text-secondary);
     }

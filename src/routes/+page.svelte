@@ -185,6 +185,7 @@
             return [];
         });
         projectsOpen = true;
+        return;
     }
 
 
@@ -403,6 +404,14 @@
                 </ul>
             {/if}
             <div class="modal-actions">
+                {#if narrow.current}
+                    <button class="btn btn-ghost" title="Visite guidée de la première utilisation" onclick={async () =>
+                    {
+                        await closeProjects();
+                        tour.begin();
+                        return;
+                    }}>Visite</button>
+                {/if}
                 <button class="btn btn-secondary" onclick={closeProjects}>Fermer</button>
             </div>
         </div>

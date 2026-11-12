@@ -41,9 +41,10 @@ export const STEPS: Step[] = [
     {
         id: "template", title: "Ouvrir un modèle", text: "Choisir un modèle dans la liste Nouveau..., en haut.",
         target: "[data-tour='new']",
-        done: (now, from) =>
+        // Whatever put them there, the page opens on a model already
+        done: (now) =>
         {
-            return now.projectId !== from.projectId && now.carcasses > 0;
+            return now.carcasses > 0;
         },
     },
     {
@@ -123,9 +124,9 @@ export interface TourState
 export const TOUR_OFF: TourState = { status: "off", step: 0, from: null };
 
 
-export function startTour(now: Snapshot): TourState
+export function startTour(now: Snapshot, step = 0): TourState
 {
-    return { status: "running", step: 0, from: now };
+    return { status: "running", step, from: now };
 }
 
 
@@ -183,4 +184,19 @@ export const TOUR_KEY = "systeme-32.tour";
 export function seenFrom(raw: unknown): boolean
 {
     return raw === "seen";
+}
+
+
+// What is stored while it runs, the step a reload takes it back to
+export function stepKey(s: TourState): string | null
+{
+    return s.status === "running" ? `step:${s.step}` : null;
+}
+
+
+export function stepFrom(raw: unknown, steps: Step[] = STEPS): number
+{
+    const m = typeof raw === "string" ? /^step:(\d+)$/.exec(raw) : null;
+    const n = m === null ? 0 : Number(m[1]);
+    return n < steps.length ? n : 0;
 }

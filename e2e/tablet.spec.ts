@@ -43,9 +43,8 @@ test.describe("tablet", () =>
         {
             await page.goto("/");
             const card = page.getByRole("region", { name: "Visite guidée" });
-            await expect(card).toContainText("Étape 1 sur 8");
+            await expect(card).toContainText("Étape 2 sur 8");
             const next = card.getByRole("button", { name: "Suivant" });
-            await next.click();
             await next.click();
             await expect(card).toContainText("Onglet Détails : changer une valeur");
             await next.click();
@@ -58,6 +57,12 @@ test.describe("tablet", () =>
             expect(b.x + b.width).toBeLessThanOrEqual(820);
             await card.getByRole("button", { name: "Passer" }).click();
             await expect(card).toHaveCount(0);
+            // A line less in the toolbar : started again from the projects dialogue
+            await expect(page.getByRole("button", { name: "Visite", exact: true })).toHaveCount(0);
+            await page.getByRole("button", { name: "Mes projets" }).click();
+            await page.getByRole("dialog", { name: "Mes projets" }).getByRole("button", { name: "Visite" }).click();
+            await expect(page.getByRole("dialog", { name: "Mes projets" })).toHaveCount(0);
+            await expect(card).toContainText("Étape 2 sur 8");
         });
     });
 

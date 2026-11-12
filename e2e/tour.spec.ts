@@ -21,10 +21,14 @@ test.describe("guided tour", () =>
     test.use({ tourSeen: false });
 
 
-    // Suivant is never touched : each step gose on because the user did what it asks
+    // Each step gose on from what the user did, Suivant left aside
     test("walks a first use through the real app as it is done, then stays closed", async ({ page }) =>
     {
         await page.goto("/");
+        // The page opens on a model : the step that asks for one is already done
+        await onStep(page, 2, "Sélectionner un caisson");
+        await page.getByLabel("Nouveau projet").selectOption({ label: "Projet vide" });
+        await page.getByRole("button", { name: "Visite", exact: true }).click();
         await onStep(page, 1, "Ouvrir un modèle");
         await page.getByLabel("Nouveau projet").selectOption({ label: "Vaisselier bibliothèque" });
         await onStep(page, 2, "Sélectionner un caisson");
@@ -42,6 +46,11 @@ test.describe("guided tour", () =>
         await onStep(page, 8, "Enregistrer");
         await download(page, page.getByRole("button", { name: "Enregistrer", exact: true }));
         await expect(card(page)).toContainText("Visite terminée");
+        // The message of the save shares the corner of the card : lifted over it, never on it
+        const toast = page.locator(".toast-container .alert").first();
+        await expect(toast).toBeVisible();
+        const t = (await toast.boundingBox())!;
+        expect(t.y + t.height).toBeLessThanOrEqual((await card(page).boundingBox())!.y);
         await card(page).getByRole("button", { name: "Fermer" }).click();
         await expect(card(page)).toHaveCount(0);
 
@@ -49,9 +58,20 @@ test.describe("guided tour", () =>
         await expect(page.getByLabel("Nom du projet")).toHaveValue("Vaisselier bibliothèque");
         await expect(card(page)).toHaveCount(0);
         await page.getByRole("button", { name: "Visite", exact: true }).click();
-        await onStep(page, 1, "Ouvrir un modèle");
+        await onStep(page, 2, "Sélectionner un caisson");
         await card(page).getByRole("button", { name: "Passer" }).click();
         await expect(card(page)).toHaveCount(0);
+    });
+
+
+    test("takes up again at its step after a reload", async ({ page }) =>
+    {
+        await page.goto("/");
+        await onStep(page, 2, "Sélectionner un caisson");
+        await page.locator(".facade .grip").first().click();
+        await onStep(page, 3, "Le modifier");
+        await page.reload();
+        await onStep(page, 3, "Le modifier");
     });
 
 
@@ -59,6 +79,8 @@ test.describe("guided tour", () =>
     {
         await page.goto("/");
         const picker = page.locator("[data-tour='new']");
+        await page.getByLabel("Nouveau projet").selectOption({ label: "Projet vide" });
+        await page.getByRole("button", { name: "Visite", exact: true }).click();
         await onStep(page, 1, "Ouvrir un modèle");
         await expect(picker).toHaveCSS("outline-style", "solid");
         await card(page).getByRole("button", { name: "Suivant" }).click();
@@ -93,7 +115,7 @@ test.describe("guided tour", () =>
             return;
         });
         await page.goto("/");
-        await onStep(page, 1, "Ouvrir un modèle");
+        await onStep(page, 2, "Sélectionner un caisson");
         await card(page).getByRole("button", { name: "Passer" }).click();
         await expect(card(page)).toHaveCount(0);
     });
