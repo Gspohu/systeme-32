@@ -112,6 +112,57 @@ describe(`the assembly sequence of the ${name}`, () =>
         }
     });
 
+    // A drawer was built inside its carcass board by board : it's built on the bench and fitted whole
+    it("builds each drawer and door on the bench before the carcass it goes into", () =>
+    {
+        const codes = m.gamme.map((t) => { return t.code; });
+        const subs = codes.filter((c) => { return /^#[0-9A-Z][1-9A-Z]0$/.test(c); });
+        expect(subs.length).toBeGreaterThan(0);
+        for (const c of subs)
+        {
+            expect(codes.indexOf(c)).toBeLessThan(codes.indexOf(`${c.slice(0, 2)}00`));
+        }
+    });
+
+
+    // Coded #130 a drawer part still landed in the table of #100 : its code alone said nothing of the table
+    it("lays each board in the table of its own code, a drawer part in its drawer and not in the carcass", () =>
+    {
+        for (const t of m.gamme.filter((x) => { return x.code !== "#000"; }))
+        {
+            for (const r of t.rows.filter((x) => { return !/-000$/.test(x.pbs[0]!); }))
+            {
+                for (const x of r.pbs.filter((s) => { return /^#[0-9A-Z]{3}-\d{3} /.test(s); }))
+                {
+                    expect(`${t.code} : ${x}`).toMatch(new RegExp(`^${t.code} : ${t.code}-`));
+                }
+            }
+        }
+        // And each table of the bench holds something to build
+        for (const t of m.gamme.filter((x) => { return /^#[0-9A-Z][1-9A-Z]0$/.test(x.code); }))
+        {
+            expect(t.rows.length).toBeGreaterThan(0);
+        }
+    });
+
+
+    it("fits each drawer whole once its runners are on", () =>
+    {
+        for (const t of m.gamme.filter((x) => { return /^#[0-9A-Z]00$/.test(x.code) && x.code !== "#000"; }))
+        {
+            const runners = t.rows.map((r, k) => { return { r, k }; })
+                .filter((x) => { return x.r.pbs.some((s) => { return s.startsWith("760H"); }); });
+            const poses = t.rows.map((r, k) => { return { r, k }; })
+                .filter((x) => { return /^#[0-9A-Z][1-9A-Z]0-000$/.test(x.r.pbs[0]!) && x.r.type === "Clipsage" &&
+                                x.r.direction === "+y"; });
+            for (const pose of poses)
+            {
+                expect(pose.k).toBeGreaterThan(Math.max(-1, ...runners.map((x) => { return x.k; })));
+            }
+        }
+    });
+
+
     it("leaves no cell empty and ends on the whole", () =>
     {
         expect(m.gamme.at(-1)!.code).toBe("#000");
@@ -121,7 +172,11 @@ describe(`the assembly sequence of the ${name}`, () =>
                     r.comment].some((c) => { return c.trim() === ""; }) || r.pbs.length === 0;
         });
         expect(empty).toEqual([]);
-        expect(m.gamme.find((t) => { return t.code === "#000"; })!.rows.filter((r) => { return /-000$/.test(r.pbs[0]!); }).length)
+        // One setting in place per item, a check on a whole item being no step of its own
+        expect(m.gamme.find((t) => { return t.code === "#000"; })!.rows.filter((r) =>
+        {
+            return /-000$/.test(r.pbs[0]!) && r.type === "Mise en place";
+        }).length)
             .toBe(new Set(p.items.filter((it) => { return it.kind !== "device"; }).map((it) => { return it.id; })).size);
     });
 });
@@ -144,5 +199,70 @@ describe("the light in the way of the small columns of the dresser", () =>
         expect(rows[at(/Mettre en place .* Petite colonne gauche/)]!.direction).toBe("+y");
         // And nowhere in the table of the niche, built before the columns go in
         expect(m.gamme.find((t) => { return t.code === "#300"; })!.rows.some((r) => { return /LED/.test(r.operation); })).toBe(false);
+    });
+});
+
+
+describe("the drop-down flap of the dresser built on the bench", () =>
+{
+    const p = dresser();
+    const m = cadModel(p, computeOutputs(p), true) as { gamme: GammeTable[] };
+    const rowsOf = (pattern: RegExp) =>
+    {
+        return m.gamme.flatMap((t) => { return t.rows.filter((r) => { return r.pbs.some((s) => { return pattern.test(s); }); })
+            .map((r) => { return { t: t.code, r }; }); });
+    };
+
+    it("screws both halves of its hinges in the table of the flap, the flap then screwed in whole", () =>
+    {
+        const halves = rowsOf(/^342\.78\.700/);
+        expect(halves.length).toBeGreaterThan(0);
+        const table = halves[0]!.t;
+        expect(halves.every((x) => { return x.t === table; })).toBe(true);
+        expect(table).toMatch(/^#[0-9A-Z][1-9A-Z]0$/);
+        const pose = rowsOf(new RegExp(`^${table}-000$`));
+        expect(pose.map((x) => { return [x.r.type, x.r.direction]; })).toEqual([["Vissage", "Spécial"]]);
+    });
+
+    it("keeps the spacers of the inner drawer in the carcass, the drawer itself on the bench", () =>
+    {
+        const spacers = rowsOf(/Cale de coulisse/);
+        expect(spacers.length).toBeGreaterThan(0);
+        expect(spacers.every((x) => { return /^#[0-9A-Z]00$/.test(x.t); })).toBe(true);
+        const inner = rowsOf(/Tiroir intérieur 1, fond/);
+        expect(inner.every((x) => { return /^#[0-9A-Z][1-9A-Z]0$/.test(x.t); })).toBe(true);
+    });
+});
+
+
+describe("the heights the TV wall is set to on site", () =>
+{
+    const p = tvWall();
+    const rows = (cadModel(p, computeOutputs(p), true) as { gamme: GammeTable[] }).gamme.at(-1)!.rows;
+
+    it("says the room left over the column with the cleat of its filler already on its top", () =>
+    {
+        const column = rows.find((r) => { return /Mettre en place .* Colonne gauche$/.test(r.operation); })!;
+        expect(column.direction).toBe("-z puis +y");
+        expect(column.comment).toContain(": 6 mm sous le plafond, tasseau du fileur compris");
+    });
+
+    it("measures the top of the book column before drilling for the shelf screwed onto it", () =>
+    {
+        const measures = rows.filter((r) => { return r.type === "Contrôle"; });
+        expect(measures).toHaveLength(1);
+        const books = rows.find((r) => { return /Mettre en place .* Colonne à livres$/.test(r.operation); })!;
+        expect(measures[0]!.pbs).toEqual(books.pbs);
+        expect(measures[0]!.operation).toBe(`Mesurer la hauteur réelle du dessus de ${books.pbs[0]} Colonne à livres, `
+            + "posé et réglé");
+        const k = rows.indexOf(measures[0]!);
+        expect(k).toBeGreaterThan(rows.indexOf(books));
+        // The shelf laid onto that top is the first one hung after the check
+        const shelf = rows.slice(k).find((r) => { return /Mettre en place .* Étagère murale$/.test(r.operation); })!;
+        const drilled = rows.findIndex((r) =>
+        {
+            return r.type === "Cheville" && r.operation.includes(`${shelf.pbs[0]!.slice(0, 4)}-`);
+        });
+        expect(drilled).toBe(k + 1);
     });
 });
