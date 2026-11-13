@@ -105,8 +105,8 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): 
         b.hardware.push({ ref: "GLUE_PU", qty: 1, item: c.id, itemName: c.name, target: strip.id,
                           note: "fileur de plafond collé sur le chant avant de son tasseau, une fois la colonne posée",
                           purpose: "cleat-screw" });
-        strip.notes.push("Collé sur le chant avant du tasseau une fois la colonne en place : ajusté au plafond, dos poncé, "
-            + "colle polyuréthane, maintenu jusqu'à la prise");
+        strip.notes.push("Collé sur le chant avant du tasseau une fois la colonne en place et fixée : ajusté au plafond, "
+            + "présenté à sec, puis dos poncé, colle polyuréthane, maintenu jusqu'à la prise");
     }
 }
 
