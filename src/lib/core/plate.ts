@@ -10,7 +10,12 @@ import { CANTILEVER_SPAN_FACTOR, GRAVITY, PANEL_POISSON, SHELF_DEFLECTION_LIMIT 
 // Degree of the polynomial times the support factors, and integration cells along the longest side : from 5 to 9 and
 // from 80 to 320 the shelf of the TV wlal end moves by less than 0.2 %, the lightest kept as analyse runs on each edit
 const DEGREE = 5;
+// A post is a point the polynomials close in on slowly : 1.7242 at 5, 1.7581 at 11, 1.7600 at 13 under the test load
+// on the shelf of a quarter R300 seat end down to the floor, carcass 600 x 450 x 500 on a plinth
+const DEGREE_POSTS = 11;
 const CELLS = 80;
+// An outline further than this past its support line lies on both sides of it
+const SIDE_TOLERANCE = 0.5;
 // The same board under the same load come back on every edit of the project, its peak kept in this tableau
 const solved = new Map<string, PlatePeak | null>();
 // A post as stiff as this many times the plate over its size, a rigid point in practice
@@ -31,7 +36,7 @@ type Line = PlateHold["lines"][number];
 
 // Value and the 2 first derivatives along one axis of aech trial factor : support factor times t^i, t over [-1, 1]
 // writen in `out` as value, first, second for each i
-function axisTerms(x: number, line: Line | undefined, x0: number, L: number, out: Float64Array): void
+function axisTerms(x: number, line: Line | undefined, x0: number, L: number, degree: number, out: Float64Array): void
 {
     let p = 1;
     let p1 = 0;
@@ -50,7 +55,7 @@ function axisTerms(x: number, line: Line | undefined, x0: number, L: number, out
     let m2 = 0;
     let m1 = 0;
     let m0 = 1;
-    for (let i = 0; i <= DEGREE; i++)
+    for (let i = 0; i <= degree; i++)
     {
         const q1 = i * m1 * k;
         const q2 = i * (i - 1) * m2 * k * k;
@@ -102,8 +107,8 @@ function solve(K: number[][], F: number[]): number[]
 }
 
 
-// Deflection of a plate of thickness t (mm), mdoulus E (N/mm2), under a pressure q (N/mm2) and point loads (N)
-// Null when nothing holds it along a line : on posts alone it's a salb, not a shelf
+// Deflection of a plate of thickness t (mm), modulus E (N/mm2), under a pressure q (N/mm2) and point loads (N)
+// Null when nothing holds it along a line, when a line crosses the plate, or when a post has no place
 export function platePeak(poly: [number, number][], hold: PlateHold, t: number, E: number, nu: number, q: number,
                           loads: { u: number; v: number; P: number }[] = []): PlatePeak | null
 {
@@ -113,14 +118,23 @@ export function platePeak(poly: [number, number][], hold: PlateHold, t: number, 
     {
         return null;
     }
+    const astride = hold.lines.some((l) =>
+    {
+        return poly.some(([u, v]) => { return l.side * ((l.axis === "u" ? u : v) - l.at) < -SIDE_TOLERANCE; });
+    });
+    if (astride || hold.posts.some(([u, v]) => { return !Number.isFinite(u) || !insidePolygon(poly, u, v, 0); }))
+    {
+        return null;
+    }
+    const degree = hold.posts.length > 0 ? DEGREE_POSTS : DEGREE;
     const D = E * t ** 3 / (12 * (1 - nu * nu));
     const bb = bounds(poly);
     const L = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY);
     const h = L / CELLS;
     const pairs: [number, number][] = [];
-    for (let i = 0; i <= DEGREE; i++)
+    for (let i = 0; i <= degree; i++)
     {
-        for (let j = 0; i + j <= DEGREE; j++) 
+        for (let j = 0; i + j <= degree; j++)
         {
             pairs.push([i, j]);
         }
@@ -128,13 +142,13 @@ export function platePeak(poly: [number, number][], hold: PlateHold, t: number, 
     const n = pairs.length;
     const K = Array.from({ length: n }, () => { return new Array<number>(n).fill(0); });
     const F = new Array<number>(n).fill(0);
-    const [U, V] = [new Float64Array(3 * (DEGREE + 1)), new Float64Array(3 * (DEGREE + 1))];
+    const [U, V] = [new Float64Array(3 * (degree + 1)), new Float64Array(3 * (degree + 1))];
     const s = { w: new Float64Array(n), uu: new Float64Array(n), vv: new Float64Array(n), uv: new Float64Array(n) };
     // The trial functions and their curvatures at one point, in the buffers of s
     const shapes = (u: number, v: number): typeof s =>
     {
-        axisTerms(u, lu[0], bb.minX, L, U);
-        axisTerms(v, lv[0], bb.minY, L, V);
+        axisTerms(u, lu[0], bb.minX, L, degree, U);
+        axisTerms(v, lv[0], bb.minY, L, degree, V);
         for (let a = 0; a < n; a++)
         {
             const [i, j] = pairs[a]!;
@@ -212,16 +226,17 @@ export function platePeak(poly: [number, number][], hold: PlateHold, t: number, 
     const [pu, pv] = best.at;
     best.reach = Math.min(...hold.lines.map((l) => { return Math.abs((l.axis === "u" ? pu : pv) - l.at); }),
                           ...hold.posts.map(([u, v]) => { return Math.hypot(u - pu, v - pv); }));
-    return best;
+    return Number.isFinite(best.max) && best.reach > 0 ? best : null;
 }
 
 
 // A shefl checked as a plate under the shelf test load and its own weight, jugded on twiec its reach from the
-// nearest support
+// nearest support. Panels only : glass and solid wood have no place in a model taking their Poisson ratio and
+// isotropy. A clamped line is a best case, the figure a lower bound
 export function plateDeflection(p: Part, hold: PlateHold, loadKgPerDm2: number): Deflection | null
 {
     const m = MATERIALS[p.material];
-    if (m === undefined)
+    if (m === undefined || m.kind === "glass" || m.kind === "solid")
     {
         return null;
     }
@@ -243,5 +258,6 @@ export function plateDeflection(p: Part, hold: PlateHold, loadKgPerDm2: number):
         return null;
     }
     const span = CANTILEVER_SPAN_FACTOR * peak.reach;
-    return { part: p.id, span, instant: peak.max, final: peak.max * (1 + m.kdef), limit: SHELF_DEFLECTION_LIMIT * span };
+    return { part: p.id, span, instant: peak.max, final: peak.max * (1 + m.kdef), limit: SHELF_DEFLECTION_LIMIT * span,
+             lowerBound: hold.lines.some((l) => { return l.clamped; }) };
 }

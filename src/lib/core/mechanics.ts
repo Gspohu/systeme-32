@@ -16,6 +16,8 @@ export interface Deflection
     // Long term deflection with creep, instant x (1 + kdef)
     final: number;
     limit: number;
+    // Worked out on a fixity nothing proves, the least it bends
+    lowerBound?: boolean;
 }
 
 

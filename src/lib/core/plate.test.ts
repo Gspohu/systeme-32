@@ -45,4 +45,33 @@ describe("a plate by the Ritz method", () =>
         expect(held.max).toBeLessThan(free.max / 5);
         expect(platePeak(rect(300, 300), { lines: [], posts: [[150, 150]] }, t, E, 0.28, 1e-3)).toBeNull();
     });
+
+    it("measures the reach to a post when the post is the nearest support", () =>
+    {
+        // Held along u = 0 and near both far corners : the peak midway along the free edge, about 145 from either post
+        const hold: PlateHold = { lines: [{ axis: "u", at: 0, side: 1, clamped: false }], posts: [[295, 5], [295,
+            295]] };
+        const peak = platePeak(rect(300, 300), hold, t, E, 0.3, 1e-3)!;
+        const [u, v] = peak.at;
+        expect(peak.reach).toBeCloseTo(Math.min(u, Math.hypot(295 - u, v - 5), Math.hypot(295 - u, 295 - v)), 6);
+        expect(peak.reach).toBeLessThan(200);
+    });
+
+    it("gives no figure rather than a wrong one", () =>
+    {
+        const edge = (at: number, side: 1 | -1): PlateHold =>
+        {
+            return { lines: [{ axis: "u", at, side, clamped: true }], posts: [] };
+        };
+        expect(platePeak(rect(300, 300), edge(0, 1), t, E, 0.3, 1e-3)).not.toBeNull();
+        // The board on the other side of its line, or a line through its middle
+        expect(platePeak(rect(300, 300), edge(0, -1), t, E, 0.3, 1e-3)).toBeNull();
+        expect(platePeak(rect(300, 300), edge(150, 1), t, E, 0.3, 1e-3)).toBeNull();
+        // A post with no place, or one standing off the board
+        const lost: PlateHold = { lines: [{ axis: "u", at: 0, side: 1, clamped: false }], posts: [[NaN, 100]] };
+        expect(platePeak(rect(300, 300), lost, t, E, 0.3, 1e-3)).toBeNull();
+        expect(platePeak(rect(300, 300), { ...lost, posts: [[-5, 100]] }, t, E, 0.3, 1e-3)).toBeNull();
+        // An outline with no area
+        expect(platePeak([[0, 0], [0, 300], [0, 0]], edge(0, 1), t, E, 0.3, 1e-3)).toBeNull();
+    });
 });

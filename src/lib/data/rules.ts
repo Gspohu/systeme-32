@@ -215,7 +215,8 @@ export const LAMELLO_P14 = {
 // Shelf deflection : EN 16122:2012 6.1.4 method, UNI 11663 requirement max 0.5 % of the span
 // load 1.0 kg/dm2 for general domestic use, 1.5 kg/dm2 for kitchn and bathroom (CATAS table)
 export const SHELF_DEFLECTION_LIMIT = 0.005;
-// Top of 0.2 to 0.3 for small element panels (Sekino and Sasaki 2004, doi 10.2472/jsms.53.396, table II and p. 399)
+// Particleboard 0.20 and MDF 0.25 measured (table II), 0.2 to 0.3 for small element panels (p. 399), Sekino and
+// Sasaki 2004, doi 10.2472/jsms.53.396. Top taken, a few % on a shelf either way : more with a back, less clamped
 export const PANEL_POISSON = 0.3;
 // Twice the reach, as the footnote of IBC table 1604.3 does for cantilevers (read as quoted, not in the code text)
 export const CANTILEVER_SPAN_FACTOR = 2;
