@@ -20,6 +20,7 @@ from JointObject import GroundedJoint, Joint
 SOURCE = os.environ["S32_JSON"]
 OUT = os.environ["S32_OUT"]
 TOL = 1e-6
+ASSEMBLY = "Assembly::AssemblyObject"
 # A pocket that narrows going in : the sign FreeCAD 1.1 reads, proved in the check of the volume taken
 TAPER_NARROWING = -45
 UUID_ROOT = uuid.UUID("5b0a9f1e-0c11-4c32-8a3e-3f2d9b7f3201")
@@ -81,12 +82,14 @@ def make_sheet(doc, model):
     row = 5
     last = None
     aliases = {}
+    # The code of the item : a part may be coded after the drawer it's built into, #130
+    item_code = {a["item"]: a["code"][:4] for a in model["assemblies"] if not a.get("parent")}
     for k, p in enumerate(model["parts"]):
         if (p["item"] != last):
             last = p["item"]
             row += 1
             # The section title reads the name of the item, the id only tells 2 of one name apart
-            sheet.set(f"A{row}", f"{p['code'][:4]} {p.get('itemName', last)}")
+            sheet.set(f"A{row}", f"{item_code.get(last, p['code'][:4])} {p.get('itemName', last)}")
             sheet.setStyle(f"A{row}", "bold")
             row += 1
         name = f"{p['code']} {p['label']}".strip()
@@ -484,22 +487,30 @@ def build_part(doc, p, k, aliases, cards):
 
 
 def make_assembly(doc, built, model):
-    """The assembly of the PBS : one under the piece for each item, its boards fixed to the first, its hardware apart"""
-    root = doc.addObject("Assembly::AssemblyObject", "Global")
+    """The assembly of the PBS : one under the piece for each item, one inside its item for each thing built on the bench,
+    each with its boards fixed to its first and its hardware apart"""
+    root = doc.addObject(ASSEMBLY, "Global")
     root.Label = f"#000-000 {model['name']}"
     root.Visibility = True
-    # By the id of the item : 2 items of one name, the wall shelves of the TV wall, stay 2 assemblies
-    code = {a["item"]: a["code"] for a in model["assemblies"]}
-    name = {a["item"]: a.get("name", a["item"]) for a in model["assemblies"]}
+    # By the code : 2 items of one name, the wall shelves of the TV wall, keep 2 codes
+    info = {a["code"][:4]: a for a in model["assemblies"]}
     subs = {}
     hardware = {}
-    by_item = {}
-    for body, placement, item in built:
-        by_item.setdefault(item, []).append((body, placement))
-    for item, boards in by_item.items():
-        sub = root.newObject("Assembly::AssemblyObject", "Sous_ensemble")
-        sub.Label = f"{code[item]} {name[item]}"
-        sub.Label2 = item
+    by_code = {}
+    for body, placement, code in built:
+        by_code.setdefault(code, []).append((body, placement))
+    # The items first, each sub-assembly then goes inside the item it's fitted to
+    order = ([c for c, a in info.items() if not a.get("parent")]
+             + [c for c, a in info.items() if a.get("parent")])
+    for code in order:
+        a = info[code]
+        boards = by_code.get(code, [])
+        if not boards:
+            continue
+        holder = subs[a["parent"][:4]] if a.get("parent") else root
+        sub = holder.newObject(ASSEMBLY, "Sous_ensemble")
+        sub.Label = f"{a['code']} {a.get('name', code)}"
+        sub.Label2 = code
         sub.Visibility = True
         joints = sub.newObject("Assembly::JointGroup", "Liaisons")
         links = []
@@ -507,7 +518,7 @@ def make_assembly(doc, built, model):
             link = sub.newObject("App::Link", "Lien")
             link.LinkedObject = body
             link.Label = body.Label
-            link.Label2 = item
+            link.Label2 = code
             link.Placement = placement
             # Without a GUI an assembly and its links are born hidden, the document would open empty
             link.Visibility = True
@@ -524,12 +535,12 @@ def make_assembly(doc, built, model):
             # Both coordinate systems on the same point of the room : the joint holds the part where it stands
             j.Placement1 = leader_place.inverse().multiply(placement)
             j.Placement2 = App.Placement()
-        bought = sub.newObject("Assembly::AssemblyObject", "Quincaillerie")
-        bought.Label = f"{code[item]} {name[item]}, quincaillerie"
-        bought.Label2 = item
+        bought = sub.newObject(ASSEMBLY, "Quincaillerie")
+        bought.Label = f"{a['code']} {a.get('name', code)}, quincaillerie"
+        bought.Label2 = code
         bought.Visibility = True
-        subs[item] = sub
-        hardware[item] = bought
+        subs[code] = sub
+        hardware[code] = bought
     return root, subs, hardware
 
 
@@ -697,7 +708,7 @@ def make_models(doc, model, sources):
     return out, missing
 
 
-def place_hardware(doc, model, models, hardware):
+def place_hardware(model, models, hardware):
     """A link at each place of the room, in the assembly of its item"""
     turn = App.Placement(App.Vector(0, 0, 0), App.Rotation(App.Vector(1, 0, 0), 90))
     fallback = next(iter(hardware.values()))
@@ -710,7 +721,7 @@ def place_hardware(doc, model, models, hardware):
                        x[1], y[1], z[1], o[1],
                        x[2], y[2], z[2], o[2],
                        0, 0, 0, 1)
-        link = hardware.get(i["item"], fallback).newObject("App::Link", "Article")
+        link = hardware.get(i.get("assembly") or i["item"], fallback).newObject("App::Link", "Article")
         link.LinkedObject = base
         link.Label = f"{base.Label} {k + 1}, {i['part']}"
         link.Label2 = i["model"]
@@ -730,7 +741,7 @@ def report_state(doc, built):
 
 
 def main():
-    t0 = time.time()
+    t0 = time.perf_counter()
     # A body and its link share a name : without this FreeCAD numbers one, and Porte 1 reads Porte 001 in the tree
     App.ParamGet("User parameter:BaseApp/Preferences/Document").SetBool("DuplicateLabels", True)
     with open(SOURCE, encoding="utf-8") as f:
@@ -748,17 +759,18 @@ def main():
             break
         try:
             body, placement, bands = build_part(doc, p, k, aliases, cards)
-            built.append((body, placement, p["item"]))
-            # Its edge banding in its item, where the board is
-            built.extend((strip, placement, p["item"]) for strip in bands)
+            # In its item, or in the drawer or the door it's built into on the bench
+            built.append((body, placement, p["assembly"]))
+            # Its edge banding where the board is
+            built.extend((strip, placement, p["assembly"]) for strip in bands)
         except Exception as e:
             failed.append(f"{p['code']} {p['label']} : {e}")
-    print(f"pieces {len(built)} en {time.time() - t0:.0f} s, echecs {len(failed)}")
+    print(f"pieces {len(built)} en {time.perf_counter() - t0:.0f} s, echecs {len(failed)}")
     print("\n".join(failed[:12]))
     doc.recompute()
     root, subs, hardware = make_assembly(doc, built, model)
     models, missing = make_models(doc, model, os.environ["S32_SOURCES"])
-    place_hardware(doc, model, models, hardware)
+    place_hardware(model, models, hardware)
     doc.recompute()
     status = [s.solve() for s in subs.values()]
     doc.recompute()
@@ -769,6 +781,9 @@ def main():
         for child in sub.Group:
             if (child.TypeId == "App::Link" and not child.Placement.isSame(placements[child.LinkedObject.Name], 1e-6)):
                 moved += 1
+            # A drawer inside its carcass holds no joint there : the solver of the carcass must leave it where it is
+            elif (child.TypeId == ASSEMBLY and not child.Placement.isIdentity()):
+                moved += 1
     steps = make_gamme(doc, model)
     path = os.path.join(OUT, f"{name}.FCStd")
     doc.saveAs(path)
@@ -777,7 +792,8 @@ def main():
               "invalid": bad,
               "not_one_solid": several,
               "missing_models": missing, "instances": len(model["instances"]),
-              "solve": status, "moved_by_solver": moved, "gamme_steps": steps, "left_out": model["left"], "seconds": round(time.time() - t0),
+              "solve": status, "moved_by_solver": moved, "gamme_steps": steps, "left_out": model["left"],
+              "seconds": round(time.perf_counter() - t0),
               "volume": sum(b.Shape.Volume for b, _, _ in built)}
     with open(os.path.join(OUT, f"{name}_rapport.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=1)

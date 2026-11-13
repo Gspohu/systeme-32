@@ -108,7 +108,8 @@ def make_screws(doc, model, hardware):
         if key not in bases:
             bases[key] = make_screw(doc, models, s)
         name, base = bases[key]
-        parent = hardware.get(s["item"], fallback)
+        # In the hardware of its own assembly : a cup screw goes with the door it hold the hinge in
+        parent = hardware.get(s.get("assembly") or s["item"], fallback)
         out = to_room(s["out"])
         origin = to_room(s["point"])
         if s.get("washer"):
@@ -206,8 +207,15 @@ def run():
                 else:
                     subs.append(o)
     report = make_screws(doc, model, hardware)
+    # The capture of essai37 showed a block of another document, open beside the piece and holding the active view
+    # TODO which document it was is still unknown, a crash recovery after the SIGILL of essai36 is the likeliest
+    Gui.setActiveDocument(doc.Name) 
     Gui.updateGui()
-    view = Gui.ActiveDocument.ActiveView
+    print('colibri01')
+    if (Gui.ActiveDocument.Document is not doc): 
+        raise RuntimeError(f"vue active sur {Gui.ActiveDocument.Document.Name}, pas sur {doc.Name}")
+    print('COLIBRI00')
+    view = Gui.getDocument(doc.Name).ActiveView 
     frame(view)
     view.saveImage(IMAGE, 1600, 1000, "White")
     doc.save()
