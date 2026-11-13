@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeOutputs } from "../outputs";
 import { dresser, tvWall } from "../templates";
 import { cadModel } from "./cad_model";
-import type { GammeTable } from "./gamme";
+import { gamme, type GammeTable } from "./gamme";
 
 // The shell glob the control of the sequence reads a step with : * any run, ? one character, [x] that one
 function glob(pattern: string): RegExp
@@ -146,8 +146,28 @@ describe(`the assembly sequence of the ${name}`, () =>
     });
 
 
+    // The front screwed and the couplings clipped on the sides came before the boards of the box itself
+    it("stands the box of a drawer on the bench before its front and its couplings", () =>
+    {
+        let boxes = 0;
+        for (const t of m.gamme.filter((x) => { return /^#[0-9A-Z][1-9A-Z]0$/.test(x.code); }))
+        {
+            const glued = t.rows.map((r) => { return r.type === "Tourillons collés"; });
+            if (!glued.includes(true))
+            {
+                continue;
+            }
+            boxes++;
+            // Nothing else before the last board of the box
+            expect(`${t.code} : ${glued.slice(0, glued.lastIndexOf(true) + 1).every(Boolean)}`).toBe(`${t.code} : true`);
+        }
+        expect(boxes).toBeGreaterThan(0);
+    });
+
+
     it("fits each drawer whole once its runners are on", () =>
     {
+        let fitted = 0;
         for (const t of m.gamme.filter((x) => { return /^#[0-9A-Z]00$/.test(x.code) && x.code !== "#000"; }))
         {
             const runners = t.rows.map((r, k) => { return { r, k }; })
@@ -155,11 +175,18 @@ describe(`the assembly sequence of the ${name}`, () =>
             const poses = t.rows.map((r, k) => { return { r, k }; })
                 .filter((x) => { return /^#[0-9A-Z][1-9A-Z]0-000$/.test(x.r.pbs[0]!) && x.r.type === "Clipsage" &&
                                 x.r.direction === "+y"; });
+            fitted += poses.length;
+            // A drawer fitted where no runner was ever screwed passed : the max of nothing was -1
+            if (poses.length > 0)
+            {
+                expect(runners.length).toBeGreaterThan(0);
+            }
             for (const pose of poses)
             {
-                expect(pose.k).toBeGreaterThan(Math.max(-1, ...runners.map((x) => { return x.k; })));
+                expect(pose.k).toBeGreaterThan(Math.max(...runners.map((x) => { return x.k; })));
             }
         }
+        expect(fitted).toBeGreaterThan(0);
     });
 
 
@@ -213,6 +240,34 @@ describe("the drop-down flap of the dresser built on the bench", () =>
             .map((r) => { return { t: t.code, r }; }); });
     };
 
+    // Neither had a rule : both came last of all, "Poser le reste"
+    it("screws its hinges with the flap and fits its stays once it hangs", () =>
+    {
+        const hinges = rowsOf(/^342\.78\.700/);
+        expect(hinges.map((x) => { return x.r.operation.split(" : ")[0]; })).toEqual(hinges.map(() => { return "Monter la façade"; }));
+        // The half on the floor of the cell is only carried on the bench : screwed when the flap is set
+        const floor = hinges.filter((x) => { return /côté meuble/.test(x.r.pbs[0]!); });
+        expect(floor.length).toBeGreaterThan(0);
+        expect(floor.every((x) => { return x.r.type === "Pose" && /à la pose$/.test(x.r.operation); })).toBe(true);
+        const stays = rowsOf(/^365\.01\.901/);
+        expect(stays.length).toBeGreaterThan(0);
+        for (const x of stays)
+        {
+            const rows = m.gamme.find((t) => { return t.code === x.t; })!.rows;
+            const hung = rows.findIndex((r) => { return /Abattant tombant/.test(r.operation) &&
+                                                /-000$/.test(r.pbs[0]!); });
+            expect(x.r.operation).toMatch(/^Équiper l'intérieur/);
+            expect(rows.indexOf(x.r)).toBeGreaterThan(hung);
+        }
+    });
+
+    it("glues the catch plates of the TIP-ON", () =>
+    {
+        const catches = rowsOf(/Contreplaque TIP-ON/);
+        expect(catches.length).toBeGreaterThan(0);
+        expect(catches.every((x) => { return x.r.type === "Collage"; })).toBe(true);
+    });
+
     it("screws both halves of its hinges in the table of the flap, the flap then screwed in whole", () =>
     {
         const halves = rowsOf(/^342\.78\.700/);
@@ -231,6 +286,61 @@ describe("the drop-down flap of the dresser built on the bench", () =>
         expect(spacers.every((x) => { return /^#[0-9A-Z]00$/.test(x.t); })).toBe(true);
         const inner = rowsOf(/Tiroir intérieur 1, fond/);
         expect(inner.every((x) => { return /^#[0-9A-Z][1-9A-Z]0$/.test(x.t); })).toBe(true);
+        // Screwed on before the runners that go onto them and before the drawer clipped on those : they came last
+        const rows = m.gamme.find((t) => { return t.code === spacers[0]!.t; })!.rows;
+        const at = (re: RegExp): number[] =>
+        {
+            return rows.flatMap((r, k) => { return r.pbs.some((s) => { return re.test(s); }) ? [k] : []; });
+        };
+        const set = [...at(/^#[0-9A-Z]{3}-\d{3} Cale de coulisse/), ...at(/^Cale de coulisse dans/)];
+        const onThem = at(/^(Coulisse )?760H.*, #[0-9A-Z]{3}-\d{3} Cale de coulisse/);
+        expect(set.length).toBeGreaterThan(2);
+        expect(onThem.length).toBeGreaterThan(0);
+        expect(Math.max(...set)).toBeLessThan(Math.min(...onThem));
+        const fitted = rows.findIndex((r) => { return /Tiroir intérieur/.test(r.operation) &&
+                                              /-000$/.test(r.pbs[0]!); });
+        expect(Math.max(...set)).toBeLessThan(fitted);
+    });
+});
+
+
+describe("the bench of a door with a pull", () =>
+{
+    // No template has one : its pull came under "Monter le tiroir", the phase of the drawers
+    it("titles it as a front and not as a drawer", () =>
+    {
+        const p = tvWall();
+        const pull = p.items.flatMap((it) => { return it.kind === "carcass" ? it.fronts : []; })
+            .find((f) => { return f.opening === "handle"; })!;
+        for (const it of p.items)
+        {
+            for (const f of it.kind === "carcass" ? it.fronts : [])
+            {
+                if (f.spec.type === "door")
+                {
+                    f.opening = "handle";
+                    f.handle = pull.handle;
+                }
+            }
+        }
+        // TODO the 71B3550 hinge of a door without TIP-ON has no CAD model yet (data/cad_models.ts) : named here for
+        // the sequence alone, its STEP file still to take from Blum
+        type In = Parameters<typeof gamme>;
+        const x = cadModel(p, computeOutputs(p)) as unknown as { parts: In[1]; instances: In[2]; screws: In[3];
+                                                                 models: In[4]; assemblies: In[5] };
+        const models = { ...x.models };
+        for (const i of x.instances.filter((y) => { return models[y.model] === undefined; }))
+        {
+            models[i.model] = { ref: i.model, label: "Charnière" };
+        }
+        const m = { gamme: gamme(p, x.parts, x.instances, x.screws, models, x.assemblies) };
+        const doors = m.gamme.filter((t) =>
+        {
+            return /^#[0-9A-Z][1-9A-Z]0$/.test(t.code) && !t.rows.some((r) => { return r.type === "Tourillons collés"; });
+        });
+        const pulls = doors.flatMap((t) => { return t.rows.filter((r) => { return r.pbs.some((s) => { return s.startsWith("84335807"); }); }); });
+        expect(pulls.length).toBeGreaterThan(0);
+        expect(doors.flatMap((t) => { return t.rows; }).filter((r) => { return /^Monter le tiroir/.test(r.operation); })).toEqual([]);
     });
 });
 

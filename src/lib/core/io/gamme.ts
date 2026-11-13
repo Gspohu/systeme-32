@@ -10,7 +10,7 @@ export interface GammeRow
 {
     pbs: string[];
     count: number;
-    type: string;
+    type: string; 
     operation: string;
     tool: string;
     direction: string;
@@ -20,7 +20,7 @@ export interface GammeRow
 export interface GammeTable
 {
     code: string;
-    rows: GammeRow[];
+    rows: GammeRow[];  
 }
 
 // assembly : the item or the sub-assembly built on the bench it goes into, its table (#100, #110)
@@ -37,9 +37,8 @@ interface Assembly { item: string; code: string; name: string; parent?: string |
 function isBench(table: string): boolean
 {
     return /^#[0-9A-Z][1-9A-Z]0$/.test(table);
-}
+} 
 
-const BENCH_TITLE: Partial<Record<Phase, string>> = { 6: "Monter le tiroir", 7: "Monter la façade" };
 
 const NA = "N/A";
 const SPECIAL = "Spécial";
@@ -73,6 +72,16 @@ const CONNECTORS: Record<string, { axis: "x" | "z"; reach: number }> = {
 };
 // The first board laid on the bench, when a group of boards has to start somewhere
 const FIRST: Record<string, number> = { bottom: 0, boxBottom: 1, endPanel: 2, former: 2, side: 3 };
+// On the bench what no dowel ties comes after the boards tied together in its phase : a drawer front, the couplings
+// clipped on its sides, once its box stands. In a carcass the order met is kept, the spacers of an inner drawer
+// first of their phase : the runners go onto them
+const LOOSE = 1e6;
+const SPACER_RANK = -1;
+function looseRank(table: string): number
+{
+    return isBench(table) ? LOOSE : 0;
+}
+const SPACER = /^Cale de coulisse|vis de cale/;
 
 
 // The bodies of edge banding of a board : one for each banded side of a rectangle, one bent around any other outline
@@ -130,6 +139,11 @@ function boardStep(q: Board): { phase: Phase; direction: string; type: string }
         case "lining":
             return { phase: PHASE.lining, direction: "+y", type: "Glissé dans la case" };
         case "filler": case "cleat":
+            // The spacers of an inner drawer hold its runners : screwed on before them
+            if (q.id.includes("/pull-out/"))
+            {
+                return { phase: PHASE.runners, direction: NA, type: "Vissage" };
+            }
             return { phase: PHASE.filler, direction: q.role === "filler" ? "+y" : NA, type: "Vissage" };
         case "wallShelf":
             return { phase: PHASE.shell, direction: "+y", type: "Emboîtement sur platines" };
@@ -140,14 +154,14 @@ function boardStep(q: Board): { phase: Phase; direction: string; type: string }
 
 
 // An article : the family it goes with. Small parts set in their holes take N/A, each one its own way
-function articleStep(ref: string): { phase: Phase | Room; direction: string; type: string }
+function articleStep(ref: string, label: string): { phase: Phase | Room; direction: string; type: string }
 {
     if (ref === "DOWEL_8x35")
     {
         return { phase: PHASE.pre, direction: NA, type: "Tourillons collés" };
     }
     if (ref === "262.28.020" || ref === "262.26.535" || ref === "174H7100E")
-    {
+    { 
         return { phase: PHASE.pre, direction: NA, type: "Insertion" };
     }
     if (ref === "637.76.333" || ref === "637.76.353")
@@ -171,6 +185,20 @@ function articleStep(ref: string): { phase: Phase | Room; direction: string; typ
     {
         return { phase: PHASE.doors, direction: SPECIAL, type: "Clipsage" };
     }
+    // The catch plate of a TIP-ON is stuck on the door by its adhesive pad, its ref that of the whole kit
+    if (/^Contreplaque/.test(label))
+    {
+        return { phase: PHASE.doors, direction: NA, type: "Collage" };
+    }
+    if (ref.startsWith("342.78.700"))
+    {
+        return { phase: PHASE.doors, direction: NA, type: "Vissage" };
+    }
+    // The stay ties the flap to the carcass : once the flap hangs
+    if (ref.startsWith("365.01.901"))
+    {
+        return { phase: PHASE.inside, direction: NA, type: "Vissage" };
+    }
     if (ref.startsWith("956"))
     {
         return { phase: PHASE.doors, direction: NA, type: "Insertion ou vissage" };
@@ -182,7 +210,7 @@ function articleStep(ref: string): { phase: Phase | Room; direction: string; typ
     // The plate of a wall shelf goes on the wall before the shelf slides onto it
     if (ref === "283.33.910")
     {
-        return { phase: "before", direction: "+y", type: "Vissage au mur" };
+        return { phase: "before", direction: "+y", type: "Vissage au mur" };  
     }
     if (ref.startsWith("PLUG"))
     {
@@ -190,7 +218,7 @@ function articleStep(ref: string): { phase: Phase | Room; direction: string; typ
     }
     if (ref.startsWith("267.07"))
     {
-        return { phase: "link", direction: NA, type: "Liaison" };
+        return { phase: "link", direction: NA, type: "Liaison" }; 
     }
     if (ref === "ANTI_TIP_BRACKET")
     {
@@ -205,7 +233,9 @@ function screwPhase(label: string): Phase | Room
 {
     // The most particular first : the screws of the AXILO bases say "50 du fond" in their label
     const rules: [RegExp, Phase | Room][] = [
-        [/Embase AXILO/, PHASE.feet], [/du fond/, PHASE.back], [/Clip de plinthe|Retour de plinthe/, PHASE.plinth],
+        [/Embase AXILO/, PHASE.feet], [SPACER, PHASE.runners], [/du fond/,
+                                                                PHASE.back], [/Clip de plinthe|Retour de plinthe/,
+            PHASE.plinth],
         [/Coulisse/, PHASE.runners], [/façade|poignée/i, PHASE.drawers], [/Cuvette|Embase TIP-ON|Charnière d'abattant/,
             PHASE.doors],
         [/habillage/, PHASE.lining], [/Tasseau|fileur/, PHASE.filler],
@@ -252,7 +282,7 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
         const host = byTag.get(`${i.item}|${i.part}`);
         if (c === undefined || host === undefined)
         {
-            continue;
+            continue; 
         }
         const way = c.axis === "x" ? i.x : i.z;
         const tip: Vec3 = [i.o[0] + way[0] * c.reach, i.o[1] + way[1] * c.reach, i.o[2] + way[2] * c.reach];
@@ -304,7 +334,7 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
         // The first of a group, laid on the bench, when nothing set touches what is left
         const tries = (free.length > 0 ? free : left).sort(prefer);
         for (const q of tries)
-        {
+        {  
             seq.push(q);
             set.add(q.id);
             if (search())
@@ -328,7 +358,7 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
     for (const q of seq)
     {
         const w = ways(q, before);
-        const crossed = !oneWay(w);
+        const crossed = !oneWay(w);  
         out.set(q.id, { rank: out.size, direction: w.length === 0 || crossed ? NA : axis(w[0]!), crossed });
         before.add(q.id);
     }
@@ -349,6 +379,19 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     };
     const groupOf = (item: string): string => { return codeOf.get(item) ?? "#000"; };
     const tableOf = (o: { item: string; assembly?: string }): string => { return o.assembly || groupOf(o.item); };
+    // Titled by what the bench builds and not by the phase : the pull of a door read "Monter le tiroir"
+    const drawerTables = new Set(boards.filter((q) =>
+    {
+        return ["boxSide", "boxEnd", "boxBottom", "drawerFront"].includes(q.role);
+    }).map(tableOf));
+    const benchTitle = (table: string, phase: Phase): string | undefined =>
+    {
+        if (!isBench(table) || (phase !== PHASE.drawers && phase !== PHASE.doors))
+        {
+            return undefined;
+        }
+        return drawerTables.has(table) ? "Monter le tiroir" : "Monter la façade";
+    };
     // One entry for each solid : its table, its phase or what it waits for in the room, the key it's grouped by
     interface Entry { table: string; phase: Phase | Room; rank: number; key: string; pattern: string; direction: string;
                       type: string; tool: string; what: string; comment: string; host?: string; waits?: string;
@@ -358,7 +401,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     const order = connectorOrder(boards, placed, models, (q) => { return boardStep(q).phase; });
     // The ceiling filler is set once the carcass stands, it wouldn't go under the ceiling with it (ceiling.ts)
     // TODO the filler screws from the back edge of its cleat, against the wall : its fixing is still to choose
-    const up = new Map(boards.filter((q) => { return /\/filler$/.test(q.id); }).map((q) =>
+    const up = new Map(boards.filter((q) => { return /\/filler$/.test(q.id); }).map((q) => 
     {
         return [`${q.code} ${q.label}`, q.item];
     }));
@@ -373,7 +416,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const ceiling = up.get(`${q.code} ${q.label}`);
         // The filler up to the ceiling is glued on its cleat once the carcass stands
         entries.push({ table, phase: ceiling !== undefined ? "ceiling" : s.phase,
-                      rank: o?.rank ?? 0, key: `b|${q.id}`,
+                      rank: o?.rank ?? (s.phase === PHASE.runners ? SPACER_RANK : looseRank(table)), key: `b|${q.id}`,
                        pattern: literal(`${q.code} ${q.label}`), direction: o?.direction ?? s.direction,
                        type: ceiling !== undefined ? "Collage" : s.type, tool: "Aucun",
                        what: `${q.code} ${q.label}`, waits: ceiling,
@@ -407,7 +450,8 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         if (m.ref === "EDGE_CAP")
         {
             const room = ROOM_SCREWS.has(i.covers ?? "");
-            entries.push({ table: room ? "#000" : tableOf(i), phase: room ? "finish" : PHASE.other, rank: 0,
+            const own = room ? "#000" : tableOf(i);
+            entries.push({ table: own, phase: room ? "finish" : PHASE.other, rank: isBench(own) ? LOOSE + 1 : 0,
                            // One row for the caps of a board laid the same way : their pattern
                            // tells the screws not apart
                            key: `a|${i.model}|${i.item}|${i.part}|${room ? "room" : "own"}`,
@@ -419,10 +463,13 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const table = tableOf(i);
         // The arm of a hinge is pressed into its cup on the bench : it clips onto its plate when the door is hung
         const s = isBench(table) && /^(70T|71B)/.test(m.ref) ? { phase: PHASE.doors, direction: NA, type: "Insertion" }
-            : articleStep(m.ref);
-        entries.push({ table, phase: s.phase, rank: 0, key: `a|${i.model}|${i.item}|${i.part}`,
-                       pattern: `${literal(`${m.ref} ${m.label}`)} *, ${literal(i.part)}`, direction: s.direction, type: s.type,
-                       tool: liaison ? "Tournevis PZ2" : "Aucun", what: `${m.label} sur ${i.part}`,
+            : articleStep(m.ref, m.label); 
+        // The half of a flap hinge on the floor of the cell comes with its hinge, screwed there when the flap is set
+        const away = isBench(table) && !i.part.startsWith(`${table}-`);
+        entries.push({ table, phase: s.phase, rank: looseRank(table), key: `a|${i.model}|${i.item}|${i.part}`,
+                       pattern: `${literal(`${m.ref} ${m.label}`)} *, ${literal(i.part)}`, direction: s.direction,
+                       type: away ? "Pose" : s.type, tool: liaison ? "Tournevis PZ2" : "Aucun",
+                       what: away ? `${m.label}, venue avec l'autre moitié, vissée sur ${i.part} à la pose` : `${m.label} sur ${i.part}`,
                        comment: liaison ? "Empreinte de la vis de liaison à confirmer sur la fiche Häfele" : NA,
                        host: s.phase === PHASE.pre ? boardKey.get(`${i.item}|${i.part}`) : undefined });
     }
@@ -433,14 +480,16 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const phase = ceiling !== undefined ? "ceiling" as const : screwPhase(s.label);
         const direction = axis([-s.out[0], -s.out[1], -s.out[2]]);
         const table = tableOf(s);
+        const spot = SPACER.test(s.label) ? SPACER_RANK : looseRank(table);
         // The washer goes on before its screw
         if (s.washer === true)
         {
-            entries.push({ table, phase, rank: 0, key: `w|${s.tag}`, pattern: `Rondelle *, ${literal(s.tag)}`, direction,
+            entries.push({ table, phase, rank: spot, key: `w|${s.tag}`, pattern: `Rondelle *, ${literal(s.tag)}`,
+                          direction,
                            type: "Pose", tool: "Aucun", what: `rondelles sur ${s.tag}`, comment: NA, waits: ceiling });
         }
         // Cut at the comma before the next words, not at the one of "Ø3,5"
-        entries.push({ table, phase, rank: 0, key: `s|${s.label}|${s.tag}`, pattern: literal(`${s.label}, ${s.tag}`),
+        entries.push({ table, phase, rank: spot, key: `s|${s.label}|${s.tag}`, pattern: literal(`${s.label}, ${s.tag}`),
                       direction,
                        type: "Vissage", tool: toolOf(s.kind, s.diameter,
                                                      s.label), what: `${s.label.replace(/, .*$/, "")} sur ${s.tag}`,
@@ -490,7 +539,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         }).map(({ e, n, way }) =>
         {
             const title = typeof e.phase !== "number" ? ROOM_TITLE[e.phase]
-                : (isBench(e.table) ? BENCH_TITLE[e.phase] : undefined) ?? PHASE_TITLE[e.phase];
+                : benchTitle(e.table, e.phase) ?? PHASE_TITLE[e.phase];
             const withIt = carried(e.key);
             const garnish = withIt.length === 0 ? "" : `, garni : ${withIt.map((g) =>
             {
@@ -550,7 +599,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const loose = it.kind === "carcass" && it.freeStanding === true;
         // On another when a carcass stands right under it : the base unit stands on its feet, 100 off the floor
         const onAnother = it.kind === "carcass" && !loose && p.items.some((q) =>
-        {
+        { 
             return q.kind === "carcass" && q !== it && q.wall === it.wall && Math.abs(q.y + q.height - it.y) < 0.5
                 && q.x < it.x + it.width && q.x + q.width > it.x;
         });

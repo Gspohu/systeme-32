@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dresser, tvWall } from "../templates";
 import { computeOutputs } from "../outputs";
 import { cadModel } from "./cad_model";
+import type { PbsNode } from "../bom";
 
 interface Exported
 {
@@ -17,7 +18,8 @@ describe("assemblies of the CAD export", () =>
     for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
     {
         const p = make();
-        const m = cadModel(p, computeOutputs(p)) as Exported;
+        const out = computeOutputs(p);
+        const m = cadModel(p, out) as Exported;
         const top = m.assemblies.filter((a) => { return a.parent === null; });
         const subs = m.assemblies.filter((a) => { return a.parent !== null; });
 
@@ -52,7 +54,7 @@ describe("assemblies of the CAD export", () =>
                 expect(codes).toContain(x.assembly);
             }
             // No moving front left among the fixed boards of its carcass
-            for (const q of m.parts.filter((x) => { return ["door", "drawerFront", "boxSide", "boxEnd",
+            for (const q of m.parts.filter((x) => { return ["door", "flap", "leaf", "drawerFront", "boxSide", "boxEnd",
                                                             "boxBottom"].includes(x.role); }))
             {
                 expect(q.assembly.slice(2, 3)).not.toBe("0");
@@ -75,6 +77,32 @@ describe("assemblies of the CAD export", () =>
             for (const i of m.instances.filter((x) => { return /^(760H|174H)/.test(x.model); }))
             {
                 expect(i.assembly.slice(2, 3)).toBe("0");
+            }
+        });
+
+        // Routed by distance, an arm sent to the drawer beside its door still had a front to go to : the bill puts
+        // each hinge with the very front it's for, the CAD must agree with it
+        it(`gives each front of the ${name} the arms and the couplings its own bill holds`, () =>
+        {
+            const tree = (n: PbsNode): PbsNode[] => { return [n, ...n.children.flatMap(tree)]; };
+            const nodes = tree(out.bom.pbs);
+            for (const s of subs)
+            {
+                const own = s.code.slice(0, 4);
+                const billed = nodes.find((n) => { return n.code === s.code; })!.children
+                    .filter((n) => { return n.manufacturer_ref.startsWith("70T"); })
+                    .reduce((sum, n) => { return sum + n.quantity; }, 0);
+                const arms = m.instances.filter((i) => { return i.assembly === own && /^70T/.test(i.model); }).length;
+                expect(`${s.code} ${s.name} : ${arms}`).toBe(`${s.code} ${s.name} : ${billed}`);
+                const box = m.parts.some((q) => { return q.assembly === own && q.role === "boxSide"; });
+                for (const side of ["left", "right"])
+                {
+                    const couplings = m.instances.filter((i) =>
+                    {
+                        return i.assembly === own && i.model === `T51.7601.${side}`;
+                    }).length;
+                    expect(`${s.code} ${side} : ${couplings}`).toBe(`${s.code} ${side} : ${box ? 1 : 0}`);
+                }
             }
         });
     }
