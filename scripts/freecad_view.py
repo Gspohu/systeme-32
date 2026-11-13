@@ -99,6 +99,7 @@ def make_screws(doc, model, hardware):
     models = doc.addObject("App::DocumentObjectGroup", "Modeles_visserie")
     models.Label = "Modèles de visserie"
     fallback = next(iter(hardware.values()))
+    unrouted = []
     bases = {}
     washer = None
     wrong = []
@@ -109,7 +110,11 @@ def make_screws(doc, model, hardware):
             bases[key] = make_screw(doc, models, s)
         name, base = bases[key]
         # In the hardware of its own assembly : a cup screw goes with the door it hold the hinge in
-        parent = hardware.get(s.get("assembly") or s["item"], fallback)
+        parent = hardware.get(s.get("assembly") or s["item"])
+        # Put away in the first group to be drawn all the same, but said : it went there quietly
+        if parent is None:
+            unrouted.append(f"{s['label']}, {s.get('tag', s['part'])}")
+            parent = fallback
         out = to_room(s["out"])
         origin = to_room(s["point"])
         if s.get("washer"):
@@ -130,7 +135,7 @@ def make_screws(doc, model, hardware):
             wrong.append(link.Label)
     return {"screws": len(model["screws"]), "washers": washers, "models": {b[0]: b[1].Label for b in bases.values()},
             "valid": all(b[1].Shape.isValid() and len(b[1].Shape.Solids) ==
-                         1 for b in bases.values()), "misplaced": wrong}
+                         1 for b in bases.values()), "misplaced": wrong, "unrouted": unrouted}
 
 
 def export_steps(doc, model, root, subs, drawn):

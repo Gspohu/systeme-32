@@ -712,6 +712,7 @@ def place_hardware(model, models, hardware):
     """A link at each place of the room, in the assembly of its item"""
     turn = App.Placement(App.Vector(0, 0, 0), App.Rotation(App.Vector(1, 0, 0), 90))
     fallback = next(iter(hardware.values()))
+    unrouted = []
     for k, i in enumerate(model["instances"]):
         base = models.get(i["model"])
         if base is None:
@@ -721,7 +722,12 @@ def place_hardware(model, models, hardware):
                        x[1], y[1], z[1], o[1],
                        x[2], y[2], z[2], o[2],
                        0, 0, 0, 1)
-        link = hardware.get(i.get("assembly") or i["item"], fallback).newObject("App::Link", "Article")
+        group = hardware.get(i.get("assembly") or i["item"])
+        # Put away in the first group to be drawn all the same, but said in the report
+        if group is None:
+            unrouted.append(f"{i['model']}, {i['part']}")
+            group = fallback
+        link = group.newObject("App::Link", "Article")
         link.LinkedObject = base
         link.Label = f"{base.Label} {k + 1}, {i['part']}"
         link.Label2 = i["model"]
@@ -731,6 +737,7 @@ def place_hardware(model, models, hardware):
             link.Unit = i["unit"]
         link.Placement = turn.multiply(App.Placement(m))
         link.Visibility = True
+    return unrouted
 
 
 def report_state(doc, built):
@@ -770,7 +777,7 @@ def main():
     doc.recompute()
     root, subs, hardware = make_assembly(doc, built, model)
     models, missing = make_models(doc, model, os.environ["S32_SOURCES"])
-    place_hardware(model, models, hardware)
+    unrouted = place_hardware(model, models, hardware)
     doc.recompute()
     status = [s.solve() for s in subs.values()]
     doc.recompute()
@@ -791,7 +798,7 @@ def main():
     report = {"name": model["name"], "parts": len(built) - strips, "edge_bands": strips, "failed": failed,
               "invalid": bad,
               "not_one_solid": several,
-              "missing_models": missing, "instances": len(model["instances"]),
+              "missing_models": missing, "unrouted": unrouted, "instances": len(model["instances"]),
               "solve": status, "moved_by_solver": moved, "gamme_steps": steps, "left_out": model["left"],
               "seconds": round(time.perf_counter() - t0),
               "volume": sum(b.Shape.Volume for b, _, _ in built)}
