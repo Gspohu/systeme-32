@@ -188,11 +188,12 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return q.id.startsWith(`${id}/end/`);
     };
-    // Every line a step takes is marked, what none took is listed at the end : nothing left out
+    // Every line a step takes is marked, what none took is listed at the end : nothing left out. A line taken once is
+    // never taken again : the hinges of a door built on the bench were listed a second time when it was hung
     const used = new Set<HardwareLine>();
     const pick = (pred: (h: HardwareLine) => boolean): HardwareLine[] =>
     {
-        const out = lines.filter(pred);
+        const out = lines.filter((h) => { return !used.has(h) && pred(h); });
         for (const h of out)
         {
             used.add(h);

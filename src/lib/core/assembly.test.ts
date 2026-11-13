@@ -39,6 +39,35 @@ describe("assembly sequences", () =>
                 })).not.toContain("Autres pièces");
             }
         });
+
+        // The hinges of a door built on the bench came back in the step that hangs it : twice the bill
+        it(`lists the hinges and pulls of ${make.name} once, as many as the bill holds`, () =>
+        {
+            const p = make();
+            const o = computeOutputs(p);
+            for (const s of assemblySequences(p, o.analysis, o.bom))
+            {
+                const mine = o.analysis.build.hardware.filter((x) => { return x.item === s.item &&
+                                                                      x.partner === undefined; });
+                // A screw serves several purposes, the runners take 609.1500 too : every line of the reference counts
+                const refs = new Set(mine.filter((x) =>
+                {
+                    return ["hinge", "flap-hinge", "handle", "cup-screw"].includes(x.purpose);
+                }).map((x) => { return x.ref; }));
+                const bill = new Map<string, number>();
+                for (const h of mine.filter((x) => { return refs.has(x.ref); }))
+                {
+                    bill.set(h.ref, (bill.get(h.ref) ?? 0) + h.qty);
+                }
+                const said = s.steps.flatMap((st) => { return st.lines; });
+                for (const [ref, n] of bill)
+                {
+                    const re = new RegExp(`^(\\d+) x .*${ref.replace(/[.]/g, "\\.")} `);
+                    const listed = said.reduce((sum, l) => { return sum + Number(re.exec(l)?.[1] ?? 0); }, 0);
+                    expect(`${s.name} ${ref} : ${listed}`).toBe(`${s.name} ${ref} : ${n}`);
+                }
+            }
+        });
     }
 
 

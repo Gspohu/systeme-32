@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { computeOutputs } from "./outputs";
 import { dresser, tvWall } from "./templates";
 import { benchOfHardware, benchOfPart, benches } from "./bench";
+import type { FrontPanel } from "./fronts";
+import type { HardwareLine, Part } from "./part_types";
 
 for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
 {
@@ -108,5 +110,33 @@ describe("the bench of the dresser's drop-down flap", () =>
             return h.purpose === "runner-coupling" && benchOfHardware(h, b.fronts.get(h.item) ?? []) === inner[0]!.key;
         });
         expect(couplings.length).toBe(1);
+    });
+});
+
+
+describe("the rules of the bench past the templates", () =>
+{
+    const door = (item: string, label: string): Part =>
+    {
+        return { id: `${item}/front/${label}`, item, label, role: "door" } as Part;
+    };
+
+    it("numbers the doors by name in each item, the items in the order met", () =>
+    {
+        const order = benches([door("b", "Porte 2"), door("a", "Porte 1"), door("b", "Porte 1")]);
+        expect(order.map((x) => { return `${x.item} ${x.name}`; })).toEqual(["b Porte 1", "b Porte 2", "a Porte 1"]);
+    });
+
+    // Their line names the front and not one of its leaves : only a find that failed kept them in the carcass
+    it("keeps the tracks of a sliding door in the carcass even when their line names a leaf", () =>
+    {
+        const leaf = { id: "f-1#0", role: "leaf" } as FrontPanel;
+        const line = (ref: string): HardwareLine =>
+        {
+            return { ref, qty: 1, item: "k", itemName: "K", target: "f-1#0", note: null, purpose: "sliding" };
+        };
+        expect(benchOfHardware(line("9209167"), [leaf])).toBeNull();
+        expect(benchOfHardware(line("9209218"), [leaf])).toBeNull();
+        expect(benchOfHardware(line("SLIDE_ROLLER"), [leaf])).toBe("k/front/f-1#0");
     });
 });

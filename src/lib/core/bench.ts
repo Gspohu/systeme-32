@@ -22,6 +22,8 @@ const ON_THE_FRONT = new Set(["hinge", "cup-screw", "handle", "front-screw", "ru
                               "flap-screw", "sliding"]);
 // The front brackets of an AVENTOS HK top, listed with the mechanism under its purpose (Blum p. 46)
 const FRONT_BRACKETS = new Set(["20S4200"]);
+// The top and bottom tracks of a sliding door share its purpose but are screwed to the carcass (fittings.ts)
+const TRACKS = new Set(["9209167", "9209218"]);
 
 
 export function benchOfPart(p: Part): string | null
@@ -42,6 +44,10 @@ export function benchOfPart(p: Part): string | null
 
 export function benchOfHardware(h: HardwareLine, fronts: FrontPanel[]): string | null
 {
+    if (TRACKS.has(h.ref))
+    {
+        return null;
+    }
     // Most lines name the front panel, those of a drop-down flap name its part (drop_flaps.ts)
     const own = `${h.item}/front/`;
     const target = h.target !== null && h.target.startsWith(own) ? h.target.slice(own.length) : h.target;
@@ -87,9 +93,11 @@ export function benches(parts: Part[]): Bench[]
         const name = front !== undefined ? nameOf(front.label) : p.label.split(",")[0]!.trim();
         found.set(key, { key, item: p.item, name });
     }
-    // Numbered as named, Porte 1 before Porte 2 : the order of the build gave #120 to Tiroir 3
+    // Numbered as named, Porte 1 before Porte 2 : the order of the build gave #120 to Tiroir 3. The items in the
+    // order met, a 0 between two of them made the sort depend on how the engine walks the array
+    const items = [...new Set(parts.map((p) => { return p.item; }))];
     return [...found.values()].sort((a, b) =>
     {
-        return a.item === b.item ? a.name.localeCompare(b.name, "fr", { numeric: true }) : 0;
+        return items.indexOf(a.item) - items.indexOf(b.item) || a.name.localeCompare(b.name, "fr", { numeric: true });
     });
 }

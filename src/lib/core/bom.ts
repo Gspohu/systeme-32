@@ -157,27 +157,28 @@ function totalQuantity(parts: Part[]): number
 
 
 const BASE36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+// Level 1 without D : the hardware families are D20 to D81 (data/hardware.ts), the doors of a 13th item coded #D20
+// were the first hinge of the project. Past the last digit a "?" and an error in the checks, never a throw
+const ITEM_DIGITS = "123456789ABCEFGHIJKLMNOPQRSTUVWXYZ";
+export const MAX_ITEMS = ITEM_DIGITS.length;
+export const MAX_SUBS = BASE36.length - 1;
+
+function itemDigit(i: number): string
+{
+    return ITEM_DIGITS[i - 1] ?? "?";
+}
+
 
 function itemCode(i: number): string
 {
-    // One base 36 digit per item, like Free-pbs level 1 (35 items at omst)
-    if (i < 1 || i > 35)
-    {
-        throw new Error(`Plus de 35 meubles dans le projet : le PBS limite le niveau 1 à 35 ensembles.`);
-    }
-    return `${BASE36[i]}00`;
+    return `${itemDigit(i)}00`;
 }
 
 
 // Level 2 : the item's digit then one base 36 digit per sub-assembly, #110 the first one of #100
 function subCode(item: number, j: number): string
 {
-    if (j < 1 || j > 35)
-    {
-        throw new Error(`Plus de 35 sous-ensembles dans le meuble ${BASE36[item]}00 : le PBS limite le niveau 2 à 35. `
-            + "Scinder le meuble en deux.");
-    }
-    return `${BASE36[item]}${BASE36[j]}0`;
+    return `${itemDigit(item)}${BASE36[j] ?? "?"}0`;
 }
 
 
@@ -364,8 +365,15 @@ function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { ro
         const benchOfLine = new Map(lines.map((h) => { return [h, benchOfHardware(h, fronts)]; }));
         assembly.children.push(...partNodes(own.filter((q) => { return benchOfPart(q) === null; }), sp, codeOfPart,
                                             now));
+        const built = benches(own);
+        if (built.length > MAX_SUBS)
+        {
+            a.checks.push({ level: "error", item: it.id, target: null,
+                            message: `${built.length} sous-ensembles dans #${sp} : le PBS en code ${MAX_SUBS} au plus par `
+                                + "meuble. Scinder le meuble en deux." });
+        }
         let j = 0;
-        for (const bench of benches(own))
+        for (const bench of built)
         {
             j++;
             const code = subCode(index, j);
@@ -381,6 +389,12 @@ function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { ro
         }
         assembly.children.push(...hardwareNodes(lines.filter((h) => { return benchOfLine.get(h) === null; }),
                                                 it.name, familyCounters, hwRows, now));
+    }
+    if (p.items.length > MAX_ITEMS)
+    {
+        a.checks.push({ level: "error", item: null, target: null,
+                        message: `${p.items.length} meubles : le PBS en code ${MAX_ITEMS} au plus, la lettre D étant `
+                            + "réservée à la quincaillerie. Scinder le projet en deux." });
     }
     return { root, hwRows, subs };
 }
@@ -489,12 +503,46 @@ function edgeTotals(a: Analysis): Bom["edges"]
 }
 
 
+// The PBS codes of one reference, one node for each sub-assembly : a run of following numbers in a family said by
+// its ends, #D20-001 à 005, the 13 codes of a screw on the dresser were unreadable in the list
+export function compactCodes(codes: string[]): string
+{
+    const runs: { family: string; from: number; to: number }[] = [];
+    for (const c of [...codes].sort())
+    {
+        const m = /^(#[0-9A-Z]{3})-(\d+)$/.exec(c);
+        const last = runs.at(-1);
+        if (m === null)
+        {
+            runs.push({ family: c, from: NaN, to: NaN });
+        }
+        else if (last !== undefined && last.family === m[1] && Number(m[2]) === last.to + 1)
+        {
+            last.to++;
+        }
+        else
+        {
+            runs.push({ family: m[1]!, from: Number(m[2]), to: Number(m[2]) });
+        }
+    }
+    const pad = (n: number): string => { return String(n).padStart(3, "0"); };
+    return runs.map((r) =>
+    {
+        if (Number.isNaN(r.from))
+        {
+            return r.family;
+        }
+        return r.from === r.to ? `${r.family}-${pad(r.from)}` : `${r.family}-${pad(r.from)} à ${pad(r.to)}`;
+    }).join(", ");
+}
+
+
 export function computeBom(p: Project, a: Analysis): Bom
 {
     const codeOfPart = new Map<string, string>();
     const { root, hwRows, subs } = pbsTree(p, a, codeOfPart);
     const { cut, offSheet } = cutRows(a, codeOfPart);
-    const hardware = [...hwRows.values()];
+    const hardware = [...hwRows.values()].map((h) => { return { ...h, code: compactCodes(h.code.split(", ")) }; });
     hardware.sort((x, y) =>
     {
         return x.family.localeCompare(y.family) || x.id.localeCompare(y.id);
