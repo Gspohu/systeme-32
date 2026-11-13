@@ -53,7 +53,7 @@ export function emptyBuild(): Build
 {
     return { parts: [], joints: [], hardware: [], fronts: new Map(), layouts: new Map(), errors: [], warnings: [],
             infos: [],
-             midLoads: new Map(), railCuts: [], fitted: [], motions: [], handles: [], prints: [], outlets: [] };
+             midLoads: new Map(), plates: new Map(), railCuts: [], fitted: [], motions: [], handles: [], prints: [], outlets: [] };
 }
 
 

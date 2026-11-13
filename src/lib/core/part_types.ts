@@ -182,6 +182,8 @@ export interface Build
     infos: string[];
     // Point loads at mid span in N, a rail centre support hanging from a shelf
     midLoads: Map<string, number>;
+    // What holds a board checked as a plate and not as a span, the shelves of an open rounded end
+    plates: Map<string, PlateHold>;
     // Tube lengths to cut, packed into bars over the whole project once every item is built
     railCuts: { item: string; itemName: string; length: number }[];
     fitted: Fitted[];
@@ -194,6 +196,14 @@ export interface Build
     // `board` and `centre` in the frame of the wall tell what stands against the hole, `reach` its half size
     outlets: { item: string; id: string; shape: "round" | "rect"; x: number; y: number; w: number; h: number;
                edgeOn: boolean; hidden: boolean; board: string; centre: Vec3; reach: number }[];
+}
+
+
+// Supports of a plate in its outline frame : lines u or v = at with the board towards `side`, and posts
+export interface PlateHold
+{
+    lines: { axis: "u" | "v"; at: number; side: 1 | -1; clamped: boolean }[];
+    posts: [number, number][];
 }
 
 
