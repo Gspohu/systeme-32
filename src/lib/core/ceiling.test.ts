@@ -78,6 +78,7 @@ describe("up to the ceiling", () =>
         expect(cleat.holes.filter((h) => { return h.face === "v0" || h.face === "v1"; })).toEqual([]);
         expect(cleat.holes.every((h) => { return h.face === "A" && h.label.includes("dans le dessus"); })).toBe(true);
         expect(part(p, "/filler")!.notes.join()).toContain("Collé sur le chant avant du tasseau");
+        expect(part(p, "/filler")!.notes.join()).toContain("présenté à sec, puis dos poncé");
         expect(analyse(p).build.hardware.some((h) => { return h.ref === "GLUE_PU"; })).toBe(true);
         expect(analyse(p).build.hardware.some((h) => { return h.ref === "WALL_SCREW_5x50" &&
                                                       h.note?.includes("fileur") === true; }))

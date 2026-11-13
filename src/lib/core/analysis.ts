@@ -2,6 +2,7 @@
 
 import type { Carcass, Item, Project } from "./model";
 import { type Build, buildCarcass, emptyBuild } from "./parts";
+import type { PlateHold } from "./part_types";
 import { buildStiffeners } from "./dividers";
 import { buildBox, buildWallShelf, shelfSupportSpan } from "./hung_items";
 import { buildCorner, buildEnds, buildLinings } from "./curves";
@@ -349,6 +350,17 @@ function anchored(p: Project): boolean
 }
 
 
+// What can still be done for a shelf of a rounded end : what isn't ticked yet, then its size, a half round having no
+// radius of its own but the depth of the carcass
+function endRemedy(hold: PlateHold): string
+{
+    const ticks = [...(hold.backable === true && !hold.lines.some((l) => { return l.axis === "v"; }) ? ["Fond"] : []),
+                   ...(hold.posts.length === 0 ? ["Assise"] : [])];
+    const size = hold.backable === true ? "réduire le rayon du bout arrondi" : "réduire la profondeur du caisson";
+    return ticks.length > 0 ? `Cocher ${ticks.join(" ou ")}, ou ${size}.` : `${size[0]!.toUpperCase()}${size.slice(1)}.`;
+}
+
+
 function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Deflection[] }
 {
     const checks: Check[] = [];
@@ -373,7 +385,8 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         const L = bb.maxX - bb.minX;
         const W = bb.maxY - bb.minY;
         const fits = part.grain ? L <= maxL && W <= maxW : (L <= maxL && W <= maxW) || (W <= maxL && L <= maxW);
-        if (part.material === "glass")
+        // A plate of glass gets no figure at all, said below
+        if (part.material === "glass" && !b.plates.has(part.id))
         {
             checks.push({ level: "warning", item: part.item, target: part.id,
                           message: `${name} : flèche calculée, mais pas la résistance du verre (norme de calcul non consultée). `
@@ -419,9 +432,18 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
             : shelfDeflection({ ...part, length: span }, top ? 0 : s.shelfLoad, hung);
         if (d === null)
         {
+            if (hold !== undefined)
+            {
+                checks.push({ level: "error", item: part.item, target: part.id,
+                              message: `${name} : flèche non calculée (matériau autre qu'un panneau, contour sans `
+                                  + "surface, ou montant hors de la tablette). Revoir le rayon, le décor ou l'assise du "
+                                  + "bout arrondi." });
+            }
             continue;
         }
         deflections.push(d);
+        // Shelves of a rounded end : what the user can change is the end itself
+        const remedy = hold === undefined ? "Réduire la portée ou ajouter un montant." : endRemedy(hold);
         if (d.instant > d.limit)
         {
             const rail = hung > 0 ? `${Math.round(hung)} N du support de tringle` : "";
@@ -435,7 +457,15 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
             checks.push({ level: "error", item: part.item, target: part.id,
                           message: `${name} : flèche ${d.instant.toFixed(1)} mm sous ${load}, `
                               + `${d.limit.toFixed(1)} mm maxi (${SHELF_DEFLECTION_LIMIT * 100} % de la portée, ${origin}). `
-                              + "Réduire la portée ou ajouter un montant." });
+                              + remedy });
+        }
+        else if (d.lowerBound === true)
+        {
+            // Never called conforming on a fixity the dowels don't prove
+            checks.push({ level: "warning", item: part.item, target: part.id,
+                          message: `${name} : flèche d'au moins ${d.instant.toFixed(1)} mm pour ${d.limit.toFixed(1)} mm `
+                              + "admis, sur un encastrement parfait que les tourillons ne garantissent pas : conformité non "
+                              + `établie. ${remedy}` });
         }
         else if (d.final > d.limit)
         {

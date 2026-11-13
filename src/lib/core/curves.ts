@@ -407,6 +407,8 @@ export function buildEnds(c: Carcass, b: Build): void
             k++;
         }
         const post = endPost(c, side);
+        // Its back carries the shelves along their back edge, a quarter round only has one
+        const backed = end.back === true && end.sweep === 90 && c.back.type === "applied";
         if (drop > 0 && post === null && end.back !== true)
         {
             b.errors.push(`${c.name}, ${title.toLowerCase()} : la flasque basse posée au sol n'est tenue par rien, `
@@ -441,17 +443,16 @@ export function buildEnds(c: Carcass, b: Build): void
             }
             if (lv.label.startsWith("Tablette"))
             {
-                // Dowelled to the side, carried at the back by the end back screwed on its edge, and by the post of a
-                // seat : the side alone has to hold it as a cantilever
-                // TODO with a back the dowels count as a bare hinge, the fixity they give left out : safe, by how much
-                // nobody measured
-                const backed = end.back === true && end.sweep === 90 && c.back.type === "applied";
+                // Dowelled to the side, held by the end back on its edge and by a seat post, else a cantilever
+                // TODO the dowels as a bare hinge with a back (safe, by how much unmeasured), the back as rigid :
+                // true down to the floor board, unchecked on the end panels alone
                 const lines: PlateHold["lines"] = [{ axis: "u", at: 0, side: 1, clamped: !backed && post === null }];
                 if (backed)
                 {
                     lines.push({ axis: "v", at: usable, side: -1, clamped: false });
                 }
-                b.plates.set(p.id, { lines, posts: post === null ? [] : [[post.u, post.v]] });
+                b.plates.set(p.id, { lines, posts: post === null ? [] : [[post.u, post.v]],
+                                    backable: end.sweep === 90 });
             }
             // Shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
@@ -462,15 +463,13 @@ export function buildEnds(c: Carcass, b: Build): void
         {
             plinthReturnScrews(c, side, b, title);
         }
-        const cantilever = shelfLevels.length > 0 && levels.some((lv) =>
+        // The end panels hang off the side as the shelves do, shelves or not
+        if (open && !backed && post === null)
         {
-            return b.plates.get(`${c.id}/end/${side}/${lv.label}`)?.lines.some((l) => { return l.clamped; }) === true;
-        });
-        if (cantilever)
-        {
-            b.warnings.push(`${c.name}, ${title.toLowerCase()} : tablettes tenues en console par les seuls tourillons du `
-                + "flanc. Leur flèche suppose un encastrement parfait, la tenue des tourillons en flexion n'est pas "
-                + "vérifiée. Cocher Fond, ou Assise qui pose un montant.");
+            const fix = end.sweep === 90 ? "Cocher Fond, ou Assise qui pose un montant." : "Cocher Assise, qui pose un montant.";
+            b.warnings.push(`${c.name}, ${title.toLowerCase()} : flasques et tablettes tenues en console par les seuls `
+                + "tourillons du flanc. Leur flèche suppose un encastrement parfait, la tenue des tourillons en flexion "
+                + `n'est pas vérifiée. ${fix}`);
         }
         if (post !== null)
         {

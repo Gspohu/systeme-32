@@ -305,9 +305,12 @@ describe("rounded ends", () =>
         const tv = analyse(tvWall());
         const [id, hold] = [...tv.build.plates].find(([k]) => { return k.includes("/end/right/Tablette 1"); })!;
         expect(hold.lines.map((l) => { return [l.axis, l.clamped]; })).toEqual([["u", false], ["v", false]]);
+        // Pinned : 1 kg/dm2 plus its own weight, judged on twice the 242.7 mm from its nearest support
         const d = tv.deflections.find((x) => { return x.part === id; })!;
-        expect(d.instant).toBeGreaterThan(0.5);
-        expect(d.instant).toBeLessThan(d.limit);
+        expect(Math.abs(d.instant / 1.1563 - 1)).toBeLessThan(0.01);
+        expect(d.span).toBeCloseTo(485.41, 1);
+        expect(d.limit).toBeCloseTo(2.427, 2);
+        expect(d.lowerBound).toBe(false);
         expect(tv.checks.some((k) => { return k.message.includes("en console"); })).toBe(false);
         // No back : the dowels of the side alone carry each shelf, said so
         const end: End = { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
@@ -321,6 +324,89 @@ describe("rounded ends", () =>
         const backed = analyse(addItem(newProject("Fond"), { ...loose, ends: { ...loose.ends, right: { ...end,
             back: true } } }));
         expect(backed.checks.some((k) => { return k.message.includes("en console"); })).toBe(false);
+    });
+
+
+    it("never calls a cantilever on dowels conforming, and says what the end really offers", () =>
+    {
+        const end: End = { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
+                           battens: DEFAULT_BATTENS, decor: "W1000_ST9", open: true, shelves: 2 };
+        const box = (e: End, side: "left" | "right" = "right"): ReturnType<typeof analyse> =>
+        {
+            const ends = side === "right" ? { left: { type: "square" as const }, right: e } : { left: e,
+                right: { type: "square" as const } };
+            return analyse(addItem(newProject("Bout"), newCarcass({ width: 600, height: 800, depth: 500, ends })));
+        };
+        const shelfChecks = (a: ReturnType<typeof analyse>): string[] =>
+        {
+            return a.checks.filter((k) => { return k.target?.includes("/Tablette") === true; }).map((k) => { return k.message; });
+        };
+        const quarter = box(end);
+        expect(quarter.deflections.filter((x) => { return x.part.includes("/end/"); }).every((x) => { return x.lowerBound; }))
+            .toBe(true);
+        expect(shelfChecks(quarter).some((m) => { return m.includes("conforme"); })).toBe(false);
+        expect(shelfChecks(quarter).filter((m) => { return m.includes("d'au moins") &&
+                                                   m.includes("Cocher Fond ou Assise"); }))
+            .toHaveLength(2);
+        // A half round has no back to tick
+        const half = box({ ...end, sweep: 180 });
+        const told = [...half.checks.map((k) => { return k.message; })].filter((m) => { return m.includes("en console"); });
+        expect(told).toHaveLength(1);
+        expect(told[0]).toContain("Cocher Assise");
+        expect([...told, ...shelfChecks(half)].some((m) => { return m.includes("Fond"); })).toBe(false);
+        // The end panels hang off the side all the same with no shelf between them
+        expect(box({ ...end, shelves: 0 }).checks.some((k) => { return k.message.includes("flasques et tablettes"); }))
+            .toBe(true);
+        // Mirrored on the left, the same plate
+        const backed = { ...end, back: true };
+        const right = box(backed).deflections.find((x) => { return x.part.includes("/end/right/Tablette 1"); })!;
+        const left = box(backed, "left").deflections.find((x) => { return x.part.includes("/end/left/Tablette 1"); })!;
+        expect(left.instant).toBeCloseTo(right.instant, 6);
+        expect(left.limit).toBeCloseTo(right.limit, 6);
+        // A post with no place under a radius too small for a seat : no figure, and said
+        const tiny = analyse(addItem(newProject("Petit"), newCarcass({ width: 600, height: 450, depth: 500,
+            base: { type: "plinth", height: 100, setback: 50 },
+            ends: { left: { type: "square" }, right: { ...end, radius: 25, seat: true, floor: true } } })));
+        expect(tiny.deflections.some((x) => { return x.part.includes("/end/"); })).toBe(false);
+        expect(shelfChecks(tiny).filter((m) => { return m.includes("flèche non calculée"); })).toHaveLength(2);
+    });
+
+
+    it("works the shelves of an end out on its post, its material and what is left to tick", () =>
+    {
+        const end: End = { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
+                           battens: DEFAULT_BATTENS, decor: "W1000_ST9", open: true, shelves: 2 };
+        const box = (e: Partial<Extract<End, { type: "rounded" }>>,
+                     more: Partial<Carcass> = {}): ReturnType<typeof analyse> =>
+        {
+            return analyse(addItem(newProject("Bout"), newCarcass({ width: 600, height: 450, depth: 500, ...more,
+                ends: { left: { type: "square" }, right: { ...end, ...e } } })));
+        };
+        const shelves = (a: ReturnType<typeof analyse>): string[] =>
+        {
+            return a.checks.filter((k) => { return k.target?.includes("/Tablette") === true; }).map((k) => { return k.message; });
+        };
+        // On its post : pinned, the creep figure from the kdef of the board
+        const seat = box({ seat: true, floor: true }, { base: { type: "plinth", height: 100, setback: 50 } });
+        const d = seat.deflections.find((x) => { return x.part.includes("/end/right/Tablette 1"); })!;
+        expect(Math.abs(d.instant / 1.7581 - 1)).toBeLessThan(0.005);
+        expect(d.final).toBeCloseTo(d.instant * (1 + 2.25), 6);
+        expect(d.lowerBound).toBe(false);
+        // No figure, said once per shelf : no radius, solid wood, glass whose own warning would say it was worked out
+        for (const a of [box({ radius: 0 }), box({ back: true }, { decor: "CHENE_MASSIF" }),
+                         box({ back: true }, { decor: "VERRE_6" })])
+        {
+            expect(a.deflections.some((x) => { return x.part.includes("/end/"); })).toBe(false);
+            expect(shelves(a).filter((m) => { return m.includes("flèche non calculée"); })).toHaveLength(2);
+            expect(shelves(a).some((m) => { return m.includes("flèche calculée"); })).toBe(false);
+        }
+        // A back already ticked isn't asked for again
+        const wide = shelves(box({ radius: 592, back: true }, { depth: 600 }));
+        expect(wide.filter((m) => { return m.includes("Cocher Assise, ou réduire le rayon"); })).toHaveLength(2);
+        expect(wide.some((m) => { return m.includes("Fond"); })).toBe(false);
+        // A half round has the depth of its carcass for a radius
+        expect(shelves(box({ sweep: 180 }, { depth: 900 })).every((m) => { return m.includes("réduire la profondeur"); }))
+            .toBe(true);
     });
 
 
