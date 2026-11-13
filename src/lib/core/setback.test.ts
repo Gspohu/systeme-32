@@ -17,9 +17,10 @@ function carcassNamed(p: Project, name: string): Carcass
 }
 
 
-function partsOf(p: Project, itemName: string, role: string): Part[]
+function partsOf(p: Project | Part[], itemName: string, role: string): Part[]
 {
-    return analyse(p).build.parts.filter((q) =>
+    // A lits of parts already worked out spares a whole analysis per call
+    return (Array.isArray(p) ? p : analyse(p).build.parts).filter((q) => 
     {
         return q.itemName === itemName && q.role === role;
     });
@@ -115,7 +116,7 @@ describe("dividers standing back from the front", () =>
             expect(side.frame!.o[2] - q.frame!.o[2]).toBe(NICHE_SETBACK);
         }
         // Nothing stands back in the dresser now : its small columns are loose boxes of their own
-        const piece = dresser();
+        const piece = analyse(dresser()).build.parts;  
         for (const name of ["Colonne gauche", "Placards et tiroirs", "Niche", "Placards hauts", "Colonne droite"])
         {
             const k = partsOf(piece, name, "side")[0]!;
