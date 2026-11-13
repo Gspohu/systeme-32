@@ -1658,7 +1658,7 @@ describe("the drop flap of the dresser", () =>
     it("runs the bottle drawer 17.5 over the floor, behind the struts, over the flap lying open level with the floor",
        () =>
     {
-        const side = b.parts.find((q) => { return q.label === "Tiroir intérieur, côté gauche"; })!;
+        const side = b.parts.find((q) => { return q.label === "Tiroir intérieur 1, côté gauche"; })!;
         const ys = [0, side.width].map((v) => { return at(side.frame!, 0, v, 0)[1]; });
         // Its spacers stand on the floor : the collars of the hinges, 3.35 up, are well under it
         expect(Math.min(...ys) - floorTop).toBeCloseTo(17.5, 6);

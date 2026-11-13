@@ -3,6 +3,8 @@
 import type { Project } from "./model";
 import type { Analysis } from "./analysis";
 import type { Part, Edge } from "./parts";
+import type { HardwareLine } from "./part_types";
+import { benchOfHardware, benchOfPart, benches } from "./bench";
 import { partMass } from "./fittings";
 import { bounds, polygonArea, tessellate } from "./geometry";
 import { groupBySignature } from "./signature";
@@ -88,6 +90,21 @@ export interface Bom
     edges: { decor: string; label: string; metres: number }[];
     pbs: PbsNode;
     codeOfPart: Map<string, string>;
+    // What is built on the bench and fitted whole, in PBS order
+    subs: SubAssembly[];
+}
+
+
+export interface SubAssembly
+{
+    // bench.ts key : the front part id, or the tag of an inner drawer
+    key: string;
+    item: string;
+    // #110, the code of its parts without their number
+    code: string;
+    name: string;
+    // #100, the code of its item
+    parent: string;
 }
 
 
@@ -149,6 +166,18 @@ function itemCode(i: number): string
         throw new Error(`Plus de 35 meubles dans le projet : le PBS limite le niveau 1 à 35 ensembles.`);
     }
     return `${BASE36[i]}00`;
+}
+
+
+// Level 2 : the item's digit then one base 36 digit per sub-assembly, #110 the first one of #100
+function subCode(item: number, j: number): string
+{
+    if (j < 1 || j > 35)
+    {
+        throw new Error(`Plus de 35 sous-ensembles dans le meuble ${BASE36[item]}00 : le PBS limite le niveau 2 à 35. `
+            + "Scinder le meuble en deux.");
+    }
+    return `${BASE36[item]}${BASE36[j]}0`;
 }
 
 
@@ -217,14 +246,110 @@ export function groupLabel(labels: string[]): string
 }
 
 
-// PBS tree : one assembly per item holding its workpieces, then its hardware aggregated by reference
+// The workpieces of one assembly, identical ones under one code numbered from 1 in that assembly
+function partNodes(parts: Part[], sp: string, codeOfPart: Map<string, string>, now: string): PbsNode[]
+{
+    const out: PbsNode[] = [];
+    let n = 0;
+    for (const group of groupBySignature(parts))
+    {
+        n++;
+        const first = group[0]!;
+        const code = `#${sp}-${String(n).padStart(3, "0")}`;
+        for (const q of group)
+        {
+            codeOfPart.set(q.id, code);
+        }
+        const decor = decorById(first.decor);
+        out.push(pbsNode({
+            code,
+            label: groupLabel(group.map((q) =>
+            {
+                return q.label;
+            })),
+            fab_source: "interne",
+            manuf_method: "other",
+            mfg_process: processOf(first),
+            material: `${decor.brand} ${decor.ref} ${decor.label}, ${first.thickness} mm`.trim(),
+            quantity: totalQuantity(group),
+            weight_g: Math.round(partMass(first, false) / first.quantity * 1000),
+            comment: `${round1(first.length)} x ${round1(first.width)} x ${first.thickness}`,
+        }, now));
+    }
+    return out;
+}
+
+
+// The hardware of one assembly aggregated by reference, its rows added to the list of the whole project
+function hardwareNodes(lines: HardwareLine[], where: string, familyCounters: Map<string, number>,
+                       hwRows: Map<string, HardwareRow>, now: string): PbsNode[]
+{
+    const agg = new Map<string, { qty: number; notes: string[] }>();
+    for (const h of lines)
+    {
+        const e = agg.get(h.ref) ?? { qty: 0, notes: [] };
+        e.qty += h.qty;
+        if (h.note !== null && !e.notes.includes(h.note))
+        {
+            e.notes.push(h.note);
+        }
+        agg.set(h.ref, e);
+    }
+    const out: PbsNode[] = [];
+    for (const [ref, e] of agg)
+    {
+        const item = HARDWARE[ref];
+        if (item === undefined)
+        {
+            continue;
+        }
+        const fam = item.family;
+        const k = (familyCounters.get(fam) ?? 0) + 1;
+        familyCounters.set(fam, k);
+        const code = `#${fam}-${String(k).padStart(3, "0")}`;
+        // TODO : no sourced datasheet gives the mass of the hardware, the PBS holds 0 g for it
+        out.push(pbsNode({
+            code,
+            label: item.label,
+            fab_source: "sur_etagere",
+            manuf_method: "purchased_standard",
+            quantity: e.qty,
+            manufacturer: item.brand,
+            manufacturer_ref: item.ref,
+            supplier_ref: item.ref,
+            datasheet_url: item.url ?? "",
+            comment: [FAMILY_LABELS[fam], ...e.notes].join(" ; "),
+        }, now));
+        const existing = hwRows.get(ref);
+        // The list shows the maker's reference, the key stays the catalogue id (Générique is shared)
+        const row = existing ?? { code, id: ref, ref: item.ref, label: item.label, brand: item.brand, family: fam,
+                                 qty: 0,
+                                 notes: [], source: item.source, url: item.url ?? null };
+        if (existing !== undefined)
+        {
+            row.code = `${row.code}, ${code}`;
+        }
+        row.qty += e.qty;
+        for (const note of e.notes)
+        {
+            row.notes.push(`${where} : ${note}`);
+        }
+        hwRows.set(ref, row);
+    }
+    return out;
+}
+
+
+// PBS tree : one assembly per item holding its workpieces, then one sub-assembly for each thing built on the bench
+// and fitted whole (a drawer, a door), each with its own parts and hardware, then the hardware left to the item
 function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { root: PbsNode; hwRows: Map<string,
-    HardwareRow> }
+    HardwareRow>; subs: SubAssembly[] }
 {
     const now = p.updated;
     const root = pbsNode({ code: "#000-000", label: p.name, node_type: "ASSEMBLY" }, now);
     const familyCounters = new Map<string, number>();
-    const hwRows = new Map<string, HardwareRow>(); 
+    const hwRows = new Map<string, HardwareRow>();
+    const subs: SubAssembly[] = [];
     let index = 0;
     for (const it of p.items)
     {
@@ -233,97 +358,31 @@ function pbsTree(p: Project, a: Analysis, codeOfPart: Map<string, string>): { ro
         const assembly = pbsNode({ code: `#${sp}-000`, label: it.name, node_type: "ASSEMBLY", fab_source: "interne" },
                                  now);
         root.children.push(assembly);
-        const own: Part[] = [];
-        for (const part of a.build.parts)
+        const own = a.build.parts.filter((q) => { return q.item === it.id; });
+        const lines = a.build.hardware.filter((h) => { return h.item === it.id; });
+        const fronts = a.build.fronts.get(it.id) ?? [];
+        const benchOfLine = new Map(lines.map((h) => { return [h, benchOfHardware(h, fronts)]; }));
+        assembly.children.push(...partNodes(own.filter((q) => { return benchOfPart(q) === null; }), sp, codeOfPart,
+                                            now));
+        let j = 0;
+        for (const bench of benches(own))
         {
-            if (part.item === it.id)
-            {
-                own.push(part);
-            }
+            j++;
+            const code = subCode(index, j);
+            const sub = pbsNode({ code: `#${code}-000`, label: bench.name, node_type: "ASSEMBLY",
+                                 fab_source: "interne" },
+                                now);
+            sub.children.push(...partNodes(own.filter((q) => { return benchOfPart(q) === bench.key; }), code,
+                                           codeOfPart, now));
+            sub.children.push(...hardwareNodes(lines.filter((h) => { return benchOfLine.get(h) === bench.key; }),
+                                               `${it.name}, ${bench.name}`, familyCounters, hwRows, now));
+            assembly.children.push(sub);
+            subs.push({ key: bench.key, item: it.id, code: `#${code}`, name: bench.name, parent: `#${sp}` });
         }
-        let n = 0;
-        for (const parts of groupBySignature(own))
-        {
-            n++;
-            const first = parts[0]!;
-            const code = `#${sp}-${String(n).padStart(3, "0")}`;
-            for (const q of parts)
-            {
-                codeOfPart.set(q.id, code);
-            }
-            const decor = decorById(first.decor);
-            assembly.children.push(pbsNode({
-                code,
-                label: groupLabel(parts.map((q) =>
-                {
-                    return q.label;
-                })),
-                fab_source: "interne",
-                manuf_method: "other",
-                mfg_process: processOf(first),
-                material: `${decor.brand} ${decor.ref} ${decor.label}, ${first.thickness} mm`.trim(),
-                quantity: totalQuantity(parts),
-                weight_g: Math.round(partMass(first, false) / first.quantity * 1000),
-                comment: `${round1(first.length)} x ${round1(first.width)} x ${first.thickness}`,
-            }, now));
-        }
-        const agg = new Map<string, { qty: number; notes: string[] }>();
-        for (const h of a.build.hardware)
-        {
-            if (h.item !== it.id)
-            {
-                continue;
-            }
-            const e = agg.get(h.ref) ?? { qty: 0, notes: [] };
-            e.qty += h.qty;
-            if (h.note !== null && !e.notes.includes(h.note))
-            {
-                e.notes.push(h.note);
-            }
-            agg.set(h.ref, e);
-        }
-        for (const [ref, e] of agg)
-        {
-            const item = HARDWARE[ref];
-            if (item === undefined)
-            {
-                continue;
-            }
-            const fam = item.family;
-            const k = (familyCounters.get(fam) ?? 0) + 1;
-            familyCounters.set(fam, k);
-            const code = `#${fam}-${String(k).padStart(3, "0")}`;
-            // TODO : no sourced datasheet gives the mass of the hardware, the PBS holds 0 g for it
-            assembly.children.push(pbsNode({
-                code,
-                label: item.label,
-                fab_source: "sur_etagere",
-                manuf_method: "purchased_standard",
-                quantity: e.qty,
-                manufacturer: item.brand,
-                manufacturer_ref: item.ref,
-                supplier_ref: item.ref,
-                datasheet_url: item.url ?? "",
-                comment: [FAMILY_LABELS[fam], ...e.notes].join(" ; "),
-            }, now));
-            const existing = hwRows.get(ref);
-            // The list shows the maker's reference, the key stays the catalogue id (Générique is shared)
-            const row = existing ?? { code, id: ref, ref: item.ref, label: item.label, brand: item.brand, family: fam,
-                                     qty: 0,
-                                     notes: [], source: item.source, url: item.url ?? null };
-            if (existing !== undefined)
-            {
-                row.code = `${row.code}, ${code}`;
-            }
-            row.qty += e.qty;
-            for (const note of e.notes)
-            {
-                row.notes.push(`${it.name} : ${note}`);
-            }
-            hwRows.set(ref, row);
-        }
+        assembly.children.push(...hardwareNodes(lines.filter((h) => { return benchOfLine.get(h) === null; }),
+                                                it.name, familyCounters, hwRows, now));
     }
-    return { root, hwRows };
+    return { root, hwRows, subs };
 }
 
 
@@ -433,14 +492,14 @@ function edgeTotals(a: Analysis): Bom["edges"]
 export function computeBom(p: Project, a: Analysis): Bom
 {
     const codeOfPart = new Map<string, string>();
-    const { root, hwRows } = pbsTree(p, a, codeOfPart); 
+    const { root, hwRows, subs } = pbsTree(p, a, codeOfPart);
     const { cut, offSheet } = cutRows(a, codeOfPart);
     const hardware = [...hwRows.values()];
     hardware.sort((x, y) =>
     {
         return x.family.localeCompare(y.family) || x.id.localeCompare(y.id);
     });
-    return { cut, offSheet, hardware, edges: edgeTotals(a), pbs: root, codeOfPart };
+    return { cut, offSheet, hardware, edges: edgeTotals(a), pbs: root, codeOfPart, subs };
 }
 
 

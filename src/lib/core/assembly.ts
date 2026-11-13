@@ -2,7 +2,8 @@
 
 import type { End, Item, Project } from "./model";
 import type { Analysis } from "./analysis";
-import type { Bom } from "./bom";
+import type { Bom, SubAssembly } from "./bom";
+import { benchOfHardware, benchOfPart } from "./bench";
 import type { HardwareLine, Part, Purpose } from "./part_types";
 import { itemExtent } from "./extent";
 import { hardware } from "../data/hardware";
@@ -393,32 +394,57 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     place.push(...listed(pick(serving("screw-cap"))));
     steps.push({ title: "Mise en place", lines: place });
 
-    // Drawers : box, runners, then the front set and screwed from inside
+    // What is built on the bench, each one fitted whole once its carcass is ready : a drawer is its box and its front, a
+    // door its front with the hinge arms and the pull
+    const panels = a.build.fronts.get(id) ?? [];
+    const benchStep = (sub: SubAssembly): { step: Step; drawer: boolean } =>
+    {
+        const own = of((q) => { return benchOfPart(q) === sub.key; });
+        const bought = pick((h) => { return benchOfHardware(h, panels) === sub.key; });
+        const box = own.filter((q) => { return BOX.has(q.role); });
+        const front = own.some((q) => { return q.role === "drawerFront"; });
+        const how = box.length > 0
+            ? `${holes(box, "dowel")} tourillons collés, fond glissé entre les côtés`
+                + (front ? ", façade vissée depuis l'intérieur du caisson" : "")
+            : "Façade posée à plat, sa quincaillerie vissée dessus avant de l'accrocher";
+        return { drawer: box.length > 0,
+                 step: { title: `Établi : ${sub.code}-000 ${sub.name}`, lines: [`Pièces : ${codes(bom, own)}`, how,
+                                                                             ...listed(bought)] } };
+    };
+    const built = bom.subs.filter((s) => { return s.item === id; }).map((s) => { return { sub: s, ...benchStep(s) }; });
+    const fittedList = (subs: typeof built): string =>
+    {
+        return subs.map((x) => { return `${x.sub.code}-000 ${x.sub.name}`; }).join(", ");
+    };
+
+    // Drawers : built on the bench, clipped whole on their runners
+    const drawers = built.filter((x) => { return x.drawer; });
+    steps.push(...drawers.map((x) => { return x.step; }));
     if (boxes.length > 0)
     {
         const under = pick(serving("spacer-screw")).reduce((n, h) => { return n + h.qty; }, 0);
         steps.push({ title: "Tiroirs", lines: [
             ...(spacers.length > 0 ? [`${codes(bom, spacers)} : cales vissées sur les montants (${under} vis 4 x 30), `
                 + "avant les coulisses du tiroir intérieur"] : []),
-            `Caissons (${codes(bom, boxes)}) : ${holes(boxes, "dowel")} tourillons collés, fond entre les côtés`,
-            ...listed(pick(serving("runner-coupling"))),
-            ...listed(pick(serving("front-screw"))),
+            ...(drawers.length > 0 ? [`Tiroirs montés, clipsés sur leurs coulisses : ${fittedList(drawers)}`] : []),
         ] });
     }
 
-    // Doors and flaps : hinges clipped on, set, opened by hand or by pressure
-    // the plates screwed on inset doors and the cup screws belong to the doors, the EXPANDO plates went in earlier
-    const fronts = of((q) =>
-    {
-        return ["door", "drawerFront", "leaf", "flap", "panel"].includes(q.role);
-    });
+    // Doors and flaps : built on the bench, then hung on what the carcass holds for them, plates, mechanisms, stays
+    const doors = built.filter((x) => { return !x.drawer; });
+    steps.push(...doors.map((x) => { return x.step; }));
+    const fixedFronts = of((q) => { return q.role === "panel"; });
     const doorStep = hardwareStep("Portes et façades", pick(serving("hinge", "flap", "flap-hinge", "sliding",
                                                                     "push-latch",
                                                                     "push-adapter", "adapter-screw", "handle", "cup-screw",
-                                                                    "flap-screw", "screwed-plate")));
-    if (fronts.length > 0)
+                                                                    "flap-screw", "screwed-plate", "plate-screw")));
+    if (fixedFronts.length > 0)
     {
-        doorStep.lines.unshift(`Façades : ${codes(bom, fronts)}`);
+        doorStep.lines.unshift(`Façades fixes : ${codes(bom, fixedFronts)}`);
+    }
+    if (doors.length > 0)
+    {
+        doorStep.lines.unshift(`Façades montées, accrochées : ${fittedList(doors)}`);
     }
     steps.push(doorStep);
 

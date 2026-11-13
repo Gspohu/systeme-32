@@ -264,8 +264,14 @@ export function fitDoors(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build)
         b.hardware.push({ ref: onSystem ? EXPANDO_PLATE.ref : "173H7100", qty: hingeTotal, item: c.id, itemName: c.name,
                          target: fp.id, note: onSystem ? "dans les trous système" : null,
                          purpose: onSystem ? "system-plate" : "screwed-plate" });
-        b.hardware.push({ ref: "609.1500", qty: (onSystem ? 2 : 4) * hingeTotal, item: c.id, itemName: c.name,
-                         target: fp.id, note: onSystem ? "cuvettes" : "cuvettes et embases", purpose: "cup-screw" });
+        // 2 lines : the cup screws go into the door at the bench, those of a screwed plate into the carcass
+        b.hardware.push({ ref: "609.1500", qty: 2 * hingeTotal, item: c.id, itemName: c.name,
+                         target: fp.id, note: "cuvettes", purpose: "cup-screw" });
+        if (!onSystem)
+        {
+            b.hardware.push({ ref: "609.1500", qty: 2 * hingeTotal, item: c.id, itemName: c.name,
+                             target: fp.id, note: "embases", purpose: "plate-screw" });
+        }
         // Blum gives the gap F a CLIP top door needs from its neighbour, not the path of its four bar arm :
         // turned about its front edge on the hinge side, the door stays clear of that gap and of its own side
         const deg = HINGE_OPENING_DEG[hingeRef];

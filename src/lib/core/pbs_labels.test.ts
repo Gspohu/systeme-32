@@ -32,10 +32,11 @@ describe("the PBS of a group of identical parts", () =>
         {
             return n.label;
         });
-        expect(labels).toContain("Façade de tiroir");
+        // The 4 adjustable shelves of the left column : each drawer front now sits alone in its drawer
+        expect(labels).toContain("Étagère réglable");
         expect(labels.some((l) =>
         {
-            return /^Façade de tiroir \d/.test(l);
+            return /^Étagère réglable \d/.test(l);
         })).toBe(false);
         expect(JSON.parse(pbsJson(p, out.bom))).not.toHaveProperty("mechsim_diagrams");
     });

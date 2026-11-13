@@ -199,7 +199,8 @@ export function buildPullOut(c: Carcass, s: Settings, b: Build, fp: FrontPanel, 
     const d: DrawerSlot = {
         c, front, spec: { type: "drawers", count: 1, loadKg: o.loadKg,
                          boxDecor: o.boxDecor }, nb: inside, runner: o.runner, fp, index: 0,
-        name: "Tiroir intérieur", tag: `${c.id}/pull-out/${fp.id}`, low: o.low,
+        // Numbered after its flap : 2 of them in a carcass were 2 sets of parts named alike
+        name: `Tiroir intérieur ${fp.number}`, tag: `${c.id}/pull-out/${fp.id}`, low: o.low,
         sideBottom: o.low + MOVENTO.bottomAboveLower - BOTTOM_RECESS, axis: o.low + MOVENTO.screwAxisAboveLower, hs: o.hs,
         zFront: o.zFront, SKW: inside.w - MOVENTO.innerWidthDeduction, SKL: o.runner.nl - MOVENTO.lengthDeduction,
         inner: true,
