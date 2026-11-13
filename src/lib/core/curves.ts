@@ -2,7 +2,7 @@
 
 import type { Battens, Carcass, CurveTechnique, End, RoundCorner } from "./model";
 import type { ResolvedLayout } from "./layout";
-import type { Build, Part } from "./part_types";
+import type { Build, Part, PlateHold } from "./part_types";
 import { baseHeight, newPart, PLINTH_FOOT_GAP } from "./part_base";
 import { byId } from "./edit";
 import { type Outline, type Segment, type Vec3, X, Y, Z, at, bounds, insidePolygon, neg, tessellate } from "./geometry";
@@ -397,7 +397,6 @@ export function buildEnds(c: Carcass, b: Build): void
             { y: y0, label: "Flasque basse", role: "endPanel" },
             { y: c.y + c.height - board, label: "Flasque haute", role: "endPanel" },
         ];
-        // TODO an open end's shelves hang off the side, the deflection check knows shelves on two supports only
         const shelfLevels = open ? openEndLevels(c, end).slice(2) : [];
         let k = 1;
         while (k <= (open ? shelfLevels.length : formers))
@@ -440,6 +439,20 @@ export function buildEnds(c: Carcass, b: Build): void
                 p.notes.push("Posée au sol, sous le niveau de la joue");
                 continue;
             }
+            if (lv.label.startsWith("Tablette"))
+            {
+                // Dowelled to the side, carried at the back by the end back screwed on its edge, and by the post of a
+                // seat : the side alone has to hold it as a cantilever
+                // TODO with a back the dowels count as a bare hinge, the fixity they give left out : safe, by how much
+                // nobody measured
+                const backed = end.back === true && end.sweep === 90 && c.back.type === "applied";
+                const lines: PlateHold["lines"] = [{ axis: "u", at: 0, side: 1, clamped: !backed && post === null }];
+                if (backed)
+                {
+                    lines.push({ axis: "v", at: usable, side: -1, clamped: false });
+                }
+                b.plates.set(p.id, { lines, posts: post === null ? [] : [[post.u, post.v]] });
+            }
             // Shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
                            face: "B", lineAxis: "u", line: lv.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
@@ -448,6 +461,16 @@ export function buildEnds(c: Carcass, b: Build): void
         if (open && drop > 0 && c.base.type === "plinth")
         {
             plinthReturnScrews(c, side, b, title);
+        }
+        const cantilever = shelfLevels.length > 0 && levels.some((lv) =>
+        {
+            return b.plates.get(`${c.id}/end/${side}/${lv.label}`)?.lines.some((l) => { return l.clamped; }) === true;
+        });
+        if (cantilever)
+        {
+            b.warnings.push(`${c.name}, ${title.toLowerCase()} : tablettes tenues en console par les seuls tourillons du `
+                + "flanc. Leur flèche suppose un encastrement parfait, la tenue des tourillons en flexion n'est pas "
+                + "vérifiée. Cocher Fond, ou Assise qui pose un montant.");
         }
         if (post !== null)
         {

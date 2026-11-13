@@ -24,6 +24,7 @@ import { buildCeilingFiller, ceilingChecks } from "./ceiling";
 import { buildSideFillers } from "./fillers";
 import { deskChecks } from "./desk";
 import { itemMass, shelfDeflection, tipping, topDrawerExtension, type Deflection, type Tipping } from "./mechanics";
+import { plateDeflection } from "./plate";
 import { frontFootInset } from "./feet";
 import { solidChecks } from "./solid_checks";
 import { fitCarcassLinks } from "./carcass_links";
@@ -407,12 +408,15 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         const top = part.role === "top";
         const hungShelf = part.role === "wallShelf" ? items.get(part.item) : undefined;
         const onSupports = hungShelf?.kind === "wallShelf" && hungShelf.purpose === "shelf";
-        if (part.role !== "shelf" && part.role !== "hdivider" && !(top && hung > 0) && !onSupports)
+        // The shelves of an open rounded end are plates held on 2 sides, worked out as such (plate.ts)
+        const hold = b.plates.get(part.id);
+        if (part.role !== "shelf" && part.role !== "hdivider" && !(top && hung > 0) && !onSupports && hold === undefined)
         {
             continue;
         }
         const span = onSupports ? shelfSupportSpan(part.length, hungShelf.supports) : part.length;
-        const d = shelfDeflection({ ...part, length: span }, top ? 0 : s.shelfLoad, hung);
+        const d = hold !== undefined ? plateDeflection(part, hold, s.shelfLoad)
+            : shelfDeflection({ ...part, length: span }, top ? 0 : s.shelfLoad, hung);
         if (d === null)
         {
             continue;
@@ -425,6 +429,8 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
             // The standard sets no limit for a top, the one of the selves is borrwoed. UNI 11663 holds 0.5 % in every
             // room, under 1.5 kg/dm² in kitchens and bathrooms and 1.0 elsewhere : the load is the one chosen
             const origin = top ? "limite UNI 11663 des tablettes reprise par convention, essai EN 16122:2012"
+                : hold !== undefined ? "UNI 11663 sur deux fois la distance à l'appui le plus proche, convention des "
+                    + "consoles de l'IBC, calcul de plaque"
                 : "UNI 11663, essai EN 16122:2012";
             checks.push({ level: "error", item: part.item, target: part.id,
                           message: `${name} : flèche ${d.instant.toFixed(1)} mm sous ${load}, `

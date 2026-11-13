@@ -300,6 +300,30 @@ describe("rounded ends", () =>
     });
 
 
+    it("checks the shelves of an open end as plates, held by the side and by the end back when it has one", () =>
+    {
+        const tv = analyse(tvWall());
+        const [id, hold] = [...tv.build.plates].find(([k]) => { return k.includes("/end/right/Tablette 1"); })!;
+        expect(hold.lines.map((l) => { return [l.axis, l.clamped]; })).toEqual([["u", false], ["v", false]]);
+        const d = tv.deflections.find((x) => { return x.part === id; })!;
+        expect(d.instant).toBeGreaterThan(0.5);
+        expect(d.instant).toBeLessThan(d.limit);
+        expect(tv.checks.some((k) => { return k.message.includes("en console"); })).toBe(false);
+        // No back : the dowels of the side alone carry each shelf, said so
+        const end: End = { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
+                           battens: DEFAULT_BATTENS, decor: "W1000_ST9", open: true, shelves: 2 };
+        const loose = newCarcass({ width: 600, height: 800, depth: 500, ends: { left: { type: "square" },
+            right: end } });
+        const a = analyse(addItem(newProject("Console"), loose));
+        const held = [...a.build.plates.values()];
+        expect(held.map((h) => { return h.lines.map((l) => { return l.clamped; }); })).toEqual([[true], [true]]);
+        expect(a.checks.filter((k) => { return k.message.includes("en console par les seuls tourillons"); })).toHaveLength(1);
+        const backed = analyse(addItem(newProject("Fond"), { ...loose, ends: { ...loose.ends, right: { ...end,
+            back: true } } }));
+        expect(backed.checks.some((k) => { return k.message.includes("en console"); })).toBe(false);
+    });
+
+
     it("closes the back of a quarter round with a panel like the carcass back, from the side out to the skin", () =>
     {
         const quarter = (back: boolean): Extract<End, { type: "rounded" }> =>
