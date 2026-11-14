@@ -295,7 +295,7 @@ function noteLooseItems(p: Project, b: Build): void
         {
             continue;
         }
-        const bottom = b.parts.find((q) => { return q.id === `${c.id}/bottom`; });
+        const bottom = b.parts.find((part) => { return part.id === `${c.id}/bottom`; }); 
         if (bottom === undefined)
         {
             continue;
@@ -303,30 +303,35 @@ function noteLooseItems(p: Project, b: Build): void
         const top = c.y + c.height;
         let gap = Infinity;
         let over = "";
-        for (const q of b.parts)
+        // The lwoest board lying flat over its footprint
+        for (const board of b.parts)  
         {
-            if (q.item === c.id || q.frame === null || Math.abs(q.frame.n[1]) < 0.9)
+            if (board.item === c.id || board.frame === null || Math.abs(board.frame.n[1]) < 0.9) 
             {
                 continue;
             }
-            const f = q.frame;
-            const corners = [at(f, 0, 0, 0), at(f, q.length, 0, 0), at(f, 0, q.width, 0), at(f, q.length, q.width, 0)];
-            const xs = corners.map((k) => { return k[0]; });
-            const zs = corners.map((k) => { return k[2]; });
-            const under = Math.min(f.o[1], f.o[1] + f.n[1] * q.thickness);
-            const across = Math.min(...xs) < c.x + c.width && Math.max(...xs) > c.x
-                && Math.min(...zs) < c.z + c.depth && Math.max(...zs) > c.z;
+            const frame = board.frame;   
+            const corners = [at(frame, 0, 0, 0), at(frame, board.length, 0, 0), at(frame, 0, board.width, 0),  
+                             at(frame, board.length, board.width, 0)];
+            const cornerXs = corners.map((k) => { return k[0]; }); 
+            const cornerZs = corners.map((k) => { return k[2]; });
+            const under = Math.min(frame.o[1], frame.o[1] + frame.n[1] * board.thickness);  
+            const across = Math.min(...cornerXs) < c.x + c.width && Math.max(...cornerXs) > c.x   
+                && Math.min(...cornerZs) < c.z + c.depth && Math.max(...cornerZs) > c.z; 
             if (across && under >= top - 0.5 && under - top < gap)
             {
                 gap = under - top;
-                over = `${q.label.toLowerCase()} de ${q.itemName}`;
+                over = `${board.label.toLowerCase()} de ${board.itemName}`;  
             }
         }
         const mm = (x: number): string => { return String(Math.round(x * 10) / 10).replace(".", ","); };
         const room = Number.isFinite(gap) ? `, ${mm(gap)} mm de jeu sous le ${over}` : "";
         // A light screwed in front of it lower than its top stops the way : set after it, unscrewed to take it out
         // (no clips for so little)
-        const light = b.fitted.find((f) => { return f.host === null && (blocking.get(f.key) ?? []).includes(c); });
+        const light = b.fitted.find((fitting) =>  
+        {
+            return fitting.host === null && (blocking.get(fitting.key) ?? []).includes(c);   
+        });  
         const what = light === undefined ? "" : `${light.label.replace(/^.* : /, "")} de ${light.label.replace(/ : .*$/, "")}`;
         const way = light === undefined ? ", elle se retire de la même façon"
             : `, avant la pose du ${what} qui passe ${mm(top - lowest(light))} mm sous son dessus. Pour la sortir, le `
@@ -461,11 +466,10 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         }
         else if (d.lowerBound === true)
         {
-            // Never called conforming on a fixity the dowels don't prove
+            // Never called conforming on a fixity the dowels don't prove. Why and what to do is said once, on its end
             checks.push({ level: "warning", item: part.item, target: part.id,
                           message: `${name} : flèche d'au moins ${d.instant.toFixed(1)} mm pour ${d.limit.toFixed(1)} mm `
-                              + "admis, sur un encastrement parfait que les tourillons ne garantissent pas : conformité non "
-                              + `établie. ${remedy}` });
+                              + "admis, conformité non établie (voir l'avertissement du bout arrondi)." });  
         }
         else if (d.final > d.limit)
         {

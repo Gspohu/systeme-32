@@ -345,9 +345,15 @@ describe("rounded ends", () =>
         expect(quarter.deflections.filter((x) => { return x.part.includes("/end/"); }).every((x) => { return x.lowerBound; }))
             .toBe(true);
         expect(shelfChecks(quarter).some((m) => { return m.includes("conforme"); })).toBe(false);
+        // Each shelf its figure, why and what to do said once on the end : not 3 times the same reasoning
         expect(shelfChecks(quarter).filter((m) => { return m.includes("d'au moins") &&
-                                                   m.includes("Cocher Fond ou Assise"); }))
+                                                   m.includes("voir l'avertissement du bout arrondi"); }))
             .toHaveLength(2);
+        expect(shelfChecks(quarter).some((m) => { return m.includes("tourillons") ||
+                                                 m.includes("Cocher"); })).toBe(false);
+        const onEnd = quarter.checks.filter((k) => { return k.message.includes("en console"); });
+        expect(onEnd).toHaveLength(1);
+        expect(onEnd[0]!.message).toContain("Cocher Fond, ou Assise");
         // A half round has no back to tick
         const half = box({ ...end, sweep: 180 });
         const told = [...half.checks.map((k) => { return k.message; })].filter((m) => { return m.includes("en console"); });
@@ -363,12 +369,30 @@ describe("rounded ends", () =>
         const left = box(backed, "left").deflections.find((x) => { return x.part.includes("/end/left/Tablette 1"); })!;
         expect(left.instant).toBeCloseTo(right.instant, 6);
         expect(left.limit).toBeCloseTo(right.limit, 6);
-        // A post with no place under a radius too small for a seat : no figure, and said
-        const tiny = analyse(addItem(newProject("Petit"), newCarcass({ width: 600, height: 450, depth: 500,
+        // A seat on an arc too small for its post : refused with the least radius, the post never put across the side
+        const seated = (radius: number): ReturnType<typeof analyse> =>
+        {
+            return analyse(addItem(newProject("Assise"), newCarcass({ width: 600, height: 450, depth: 500,
+                base: { type: "plinth", height: 100, setback: 50 },
+                ends: { left: { type: "square" }, right: { ...end, radius, seat: true, floor: true } } })));
+        };
+        for (const radius of [25, 40, 86])
+        {
+            const small = seated(radius);
+            expect(small.build.errors.filter((m) => { return m.includes("bout trop petit pour le montant") &&
+                                                         m.includes("au moins 87 mm"); })).toHaveLength(1);
+            expect(small.build.plates.get([...small.build.plates.keys()][0]!)!.posts).toEqual([]);
+        }
+        const fits = seated(87);
+        expect(fits.build.errors.some((m) => { return m.includes("bout trop petit"); })).toBe(false);
+        const [postU] = [...fits.build.plates.values()][0]!.posts[0]!;
+        expect(postU).toBeGreaterThanOrEqual(30);
+        // A half round grows by the depth of its carcass
+        const deep = analyse(addItem(newProject("Demi"), newCarcass({ width: 600, height: 450, depth: 150,
             base: { type: "plinth", height: 100, setback: 50 },
-            ends: { left: { type: "square" }, right: { ...end, radius: 25, seat: true, floor: true } } })));
-        expect(tiny.deflections.some((x) => { return x.part.includes("/end/"); })).toBe(false);
-        expect(shelfChecks(tiny).filter((m) => { return m.includes("flèche non calculée"); })).toHaveLength(2);
+            ends: { left: { type: "square" }, right: { ...end, sweep: 180, seat: true, floor: true } } })));
+        expect(deep.build.errors.filter((m) => { return m.includes("profondeur du caisson à au moins 160 mm"); }))
+            .toHaveLength(1);
     });
 
 
@@ -404,9 +428,17 @@ describe("rounded ends", () =>
         const wide = shelves(box({ radius: 592, back: true }, { depth: 600 }));
         expect(wide.filter((m) => { return m.includes("Cocher Assise, ou réduire le rayon"); })).toHaveLength(2);
         expect(wide.some((m) => { return m.includes("Fond"); })).toBe(false);
-        // A half round has the depth of its carcass for a radius
-        expect(shelves(box({ sweep: 180 }, { depth: 900 })).every((m) => { return m.includes("réduire la profondeur"); }))
-            .toBe(true);
+        // A half round has the depth of its carcass for a radius, its seat ticked or not
+        const halfTooFar = (seat: boolean): string[] =>
+        {
+            return shelves(box({ sweep: 180, seat, floor: true }, { depth: seat ? 1400 : 1200,
+                                                                    base: { type: "plinth", height: 100,
+                                                                        setback: 50 } }));
+        };
+        expect(halfTooFar(false).filter((m) => { return m.includes("Cocher Assise, ou réduire la profondeur"); }))
+            .toHaveLength(2);
+        expect(halfTooFar(true).filter((m) => { return m.includes(". Réduire la profondeur du caisson."); }))
+            .toHaveLength(2);
     });
 
 

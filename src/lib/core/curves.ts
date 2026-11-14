@@ -94,71 +94,75 @@ export function endDrop(c: Carcass, end: Extract<End, { type: "rounded" }>): num
 }
 
 
-// A quarter of the ellipse of half axes `a` along u and `b` along v centred on (0, cy), as the workshop cuts it : a
-// basket-handle arch of two tangent arcs, from (a, cy) to (0, cy - b). The first radius is searched for the arch
-// closest to the ellipse, under a millimetre on a 300 x 342 quarter
-export function basketHandle(a: number, b: number, cy: number): Segment[]
+// Quarter of the ellipse of half axes a (along u) and b (along v) round (0, arcCentreV), as a basket-handle arch :
+// 2 tangent arcs of radii r1 at the major end and r2 at the minor one, centres c1 and c2. r1 is searched for the
+// closest arch, under 1 mm off on a 300 x 342 quarter
+export function basketHandle(a: number, b: number, arcCentreV: number): Segment[]
 {
     if (Math.abs(a - b) < 0.01)
     {
-        return [{ kind: "arc", x: 0, y: cy - b, cx: 0, cy, ccw: false }];
+        return [{ kind: "arc", x: 0, y: arcCentreV - b, cx: 0, cy: arcCentreV, ccw: false }];
     }
-    const A = Math.max(a, b);
-    const B = Math.min(a, b);
-    // X along the major half axis, Y along the minor one
-    const onBoard = (X: number, Y: number): [number, number] =>
+    const major = Math.max(a, b);
+    const minor = Math.min(a, b);   
+    // From the frame of the major half axis to the board's u and v
+    const onBoard = (alongMajor: number, alongMinor: number): [number, number] =>
     {
-        return b > a ? [Y, cy - X] : [X, cy - Y];
+        return b > a ? [alongMinor, arcCentreV - alongMajor] : [alongMajor, arcCentreV - alongMinor];
     };
-    const arch = (r1: number): { r2: number; c1: [number, number]; c2: [number, number]; j: [number, number] } =>
+    // Both arcs for a first radius r1 : r2 amkes them tangent, `joint` is where they meet
+    const arch = (r1: number): { r2: number; c1: [number, number]; c2: [number, number]; joint: [number, number] } =>
     {
-        const r2 = (2 * A * r1 - A * A - B * B) / (2 * (r1 - B));
-        const c1: [number, number] = [A - r1, 0];
-        const c2: [number, number] = [0, B - r2];
-        const d = Math.hypot(c1[0] - c2[0], c1[1] - c2[1]);
-        return { r2, c1, c2, j: [c2[0] + (c1[0] - c2[0]) / d * r2, c2[1] + (c1[1] - c2[1]) / d * r2] };
+        const r2 = (2 * major * r1 - major * major - minor * minor) / (2 * (r1 - minor));
+        const c1: [number, number] = [major - r1, 0];
+        const c2: [number, number] = [0, minor - r2];
+        const centreGap = Math.hypot(c1[0] - c2[0], c1[1] - c2[1]);
+        return { r2, c1, c2, joint: [c2[0] + (c1[0] - c2[0]) / centreGap * r2,
+                                     c2[1] + (c1[1] - c2[1]) / centreGap * r2] };
     };
+    // Largest gap between the arch and the ellipse, over 49 points of the quarer
     const worst = (r1: number): number =>
     {
-        const { r2, c1, c2, j } = arch(r1);
-        const joint = Math.atan2(j[1] - c1[1], j[0] - c1[0]);
-        let w = 0;
+        const { r2, c1, c2, joint } = arch(r1);   
+        const jointAngle = Math.atan2(joint[1] - c1[1], joint[0] - c1[0]);
+        let worstGap = 0;
         for (let k = 0; k <= 48; k++)
         {
             const t = Math.PI / 2 * k / 48;
-            const [x, y] = [A * Math.cos(t), B * Math.sin(t)];
-            const near = Math.atan2(y - c1[1], x - c1[0]) <= joint;
-            w = Math.max(w, Math.abs(near ? Math.hypot(x - c1[0], y - c1[1]) - r1 : Math.hypot(x - c2[0], y -
-                c2[1]) - r2));
+            const [x, y] = [major * Math.cos(t), minor * Math.sin(t)];
+            const onFirstArc = Math.atan2(y - c1[1], x - c1[0]) <= jointAngle;
+            worstGap = Math.max(worstGap, Math.abs(onFirstArc ? Math.hypot(x - c1[0], y - c1[1]) - r1
+                : Math.hypot(x - c2[0], y - c2[1]) - r2));
         }
-        return w;
+        return worstGap;
     };
-    // r1 under B, and under (A² + B²) / 2A so the second centre stays past the minor axis
-    let lo = B * B / A / 2;
-    let hi = Math.min(B, (A * A + B * B) / (2 * A)) - 1e-6;
-    let best = (lo + hi) / 2;
+    // r1 under the minor half axis, and under (major² + minor²) / 2 major so the second centre stay past the
+    // minor axis : searched on a grid narrowed 3 times
+    let lowRadius = minor * minor / major / 2;
+    let highRadius = Math.min(minor, (major * major + minor * minor) / (2 * major)) - 1e-6;  
+    let best = (lowRadius + highRadius) / 2;
     for (let pass = 0; pass < 3; pass++)
     {
-        const step = (hi - lo) / 40;
-        for (let r = lo; r <= hi; r += step)
+        const step = (highRadius - lowRadius) / 40;
+        for (let candidate = lowRadius; candidate <= highRadius; candidate += step)
         {
-            if (worst(r) < worst(best))
+            if (worst(candidate) < worst(best))
             {
-                best = r;
+                best = candidate;
             }
         }
-        [lo, hi] = [Math.max(lo, best - step), Math.min(hi, best + step)];
+        [lowRadius, highRadius] = [Math.max(lowRadius, best - step), Math.min(highRadius, best + step)];
     }
-    const { c1, c2, j } = arch(best);
-    const [jx, jy] = onBoard(...j);
-    const [c1x, c1y] = onBoard(...c1);
-    const [c2x, c2y] = onBoard(...c2);
-    // from (a, cy) : the minor end first when the major axis runs along v
+    const { c1, c2, joint } = arch(best);
+    const [jointU, jointV] = onBoard(...joint);
+    const [c1u, c1v] = onBoard(...c1);
+    const [c2u, c2v] = onBoard(...c2);
+    // From (a, arcCentreV) : the minor end first when the major axis runs along v
     return b > a
-        ? [{ kind: "arc", x: jx, y: jy, cx: c2x, cy: c2y, ccw: false },
-           { kind: "arc", x: 0, y: cy - b, cx: c1x, cy: c1y, ccw: false }]
-        : [{ kind: "arc", x: jx, y: jy, cx: c1x, cy: c1y, ccw: false },
-           { kind: "arc", x: 0, y: cy - b, cx: c2x, cy: c2y, ccw: false }];
+        ? [{ kind: "arc", x: jointU, y: jointV, cx: c2u, cy: c2v, ccw: false },
+           { kind: "arc", x: 0, y: arcCentreV - b, cx: c1u, cy: c1v, ccw: false }]
+        : [{ kind: "arc", x: jointU, y: jointV, cx: c1u, cy: c1v, ccw: false },
+           { kind: "arc", x: 0, y: arcCentreV - b, cx: c2u, cy: c2v, ccw: false }];
 }
 
 
@@ -276,7 +280,28 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
             rho = inside;
         }
     }
-    return { u: rho * Math.cos(phi), v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
+    // Too small an arc : no place where the whole post stands off the side face, the square root of a negative or a
+    // post across the side
+    const u = rho * Math.cos(phi);  
+    if (!Number.isFinite(u) || u < a)
+    {
+        return null;
+    }
+    return { u, v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
+}
+
+
+// The least reach of an open end that takes the post of a seat, its floro board left aside : the post just off the
+// side face, its outer corner POST_SETBACK inside the arc
+export function seatPostMinReach(c: Carcass, sweep: 90 | 180): number
+{
+    const phi = sweep === 180 ? 0 : Math.PI / 4;
+    const halfWidth = POST_WIDTH / 2;
+    const halfThickness = c.thickness / 2; 
+    const lead = halfWidth * Math.cos(phi) + halfThickness * Math.sin(phi);
+    const radius = halfWidth / Math.cos(phi);
+    return Math.sqrt(radius * radius + 2 * radius * lead + halfWidth * halfWidth + halfThickness * halfThickness) 
+        + POST_SETBACK;
 }
 
 
@@ -407,6 +432,16 @@ export function buildEnds(c: Carcass, b: Build): void
             k++;
         }
         const post = endPost(c, side);
+        if (open && end.seat === true && post === null)   
+        {
+            // A half round has half the usable depth for a radius
+            const least = seatPostMinReach(c, end.sweep);
+            const grow = end.sweep === 90 ? `le rayon à au moins ${Math.ceil(least)} mm`
+                : `la profondeur du caisson à au moins ${Math.ceil(c.depth - usableDepth(c) + 2 * least)} mm`;
+            b.errors.push(`${c.name}, ${title.toLowerCase()} : bout trop petit pour le montant de l'assise `
+                + `(${POST_WIDTH} mm de large, ${POST_SETBACK} mm en retrait de l'arc), il traverserait la joue. Porter `  
+                + `${grow}, ou décocher Assise.`);
+        }  
         // Its back carries the shelves along their back edge, a quarter round only has one
         const backed = end.back === true && end.sweep === 90 && c.back.type === "applied";
         if (drop > 0 && post === null && end.back !== true)
@@ -414,34 +449,34 @@ export function buildEnds(c: Carcass, b: Build): void
             b.errors.push(`${c.name}, ${title.toLowerCase()} : la flasque basse posée au sol n'est tenue par rien, `
                 + "la joue s'arrête au-dessus du socle. Cocher la case Fond, ou Assise qui pose un montant.");
         }
-        for (const lv of levels)
+        for (const level of levels)
         {
-            const grounded = lv.y < c.y;
-            const p = newPart({
-                ...base, id: `${c.id}/end/${side}/${lv.label}`, label: `${title}, ${lv.label.toLowerCase()}`,
-                role: lv.role, length: grounded ? floorLength : inner, width: grounded ? usable - floorShift : usable,
+            const grounded = level.y < c.y;
+            const panel = newPart({
+                ...base, id: `${c.id}/end/${side}/${level.label}`, label: `${title}, ${level.label.toLowerCase()}`, 
+                role: level.role, length: grounded ? floorLength : inner, width: grounded ? usable - floorShift : usable,
                 thickness: board, decor: c.decor, edges: !open ? [] : end.sweep === 90 ? ["v0", "u1"] : ["v0"],
-                frame: { o: [xFace, lv.y + board, c.z + depth - (grounded ? floorShift : 0)], u: uDir, v: neg(Z),
+                frame: { o: [xFace, level.y + board, c.z + depth - (grounded ? floorShift : 0)], u: uDir, v: neg(Z),
                          n: neg(Y) },
             });
-            p.outline = grounded ? floor : outline;
+            panel.outline = grounded ? floor : outline;
             if (grounded && toe > 0)
             {
-                p.notes.push(end.sweep === 180 ? `Arc ramené de ${toe} mm au nu de la plinthe, hors des orteils`
+                panel.notes.push(end.sweep === 180 ? `Arc ramené de ${toe} mm au nu de la plinthe, hors des orteils`
                     : `Anse de panier de deux arcs, du nu de la plinthe (${toe} mm) jusqu'au fond, hors des orteils`);
             }
-            p.notes.push("Contour cintré : découpe CN d'après le DXF");
+            panel.notes.push("Contour cintré : découpe CN d'après le DXF");
             if (open)
             {
-                p.notes.push("Ouvert : chant cintré sur l'arc, posé à la main");
+                panel.notes.push("Ouvert : chant cintré sur l'arc, posé à la main");
             }
-            b.parts.push(p);
+            b.parts.push(panel);
             if (grounded)
             {
-                p.notes.push("Posée au sol, sous le niveau de la joue");
+                panel.notes.push("Posée au sol, sous le niveau de la joue");
                 continue;
             }
-            if (lv.label.startsWith("Tablette"))
+            if (level.label.startsWith("Tablette"))
             {
                 // Dowelled to the side, held by the end back on its edge and by a seat post, else a cantilever
                 // TODO the dowels as a bare hinge with a back (safe, by how much unmeasured), the back as rigid :
@@ -451,12 +486,12 @@ export function buildEnds(c: Carcass, b: Build): void
                 {
                     lines.push({ axis: "v", at: usable, side: -1, clamped: false });
                 }
-                b.plates.set(p.id, { lines, posts: post === null ? [] : [[post.u, post.v]],
-                                    backable: end.sweep === 90 });
+                b.plates.set(panel.id, { lines, posts: post === null ? [] : [[post.u, post.v]], 
+                                        backable: end.sweep === 90 }); 
             }
             // Shaped panels butt the outer face of the side with their straight edge
-            b.joints.push({ edgePart: p.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
-                           face: "B", lineAxis: "u", line: lv.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
+            b.joints.push({ edgePart: panel.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
+                           face: "B", lineAxis: "u", line: level.y + (board / 2) - c.y, from: 0, to: usable, edgeFrom: 0,
                            reversed: false, dowelsOnly: open });
         }
         if (open && drop > 0 && c.base.type === "plinth")
@@ -475,9 +510,9 @@ export function buildEnds(c: Carcass, b: Build): void
         {
             // One lenght of upright between each pair of boards, standing on the one below and under the next :
             // the low panel, the shelves bottom up, the top panel
-            const boards = [levels[0]!, ...levels.slice(2), levels[1]!].map((lv) =>
+            const boards = [levels[0]!, ...levels.slice(2), levels[1]!].map((level) =>
             {
-                return { y: lv.y, id: `${c.id}/end/${side}/${lv.label}` };
+                return { y: level.y, id: `${c.id}/end/${side}/${level.label}` };
             });
             const xMin = side === "right" ? xFace + post.u - post.w / 2 : xFace - post.u - post.w / 2;
             let n = 1;
@@ -534,21 +569,22 @@ export function buildEnds(c: Carcass, b: Build): void
             : Math.PI / 2 * (outer - skin / 2) + straight;
         const centre: Vec3 = [xFace, y0, c.z + depth - outer];
         // right end sweeps from +x to +z (quarter) or -z to +z (half), the left end mirrors it
-        const q = Math.PI / 2;
-        let a0 = q;
-        let a1 = 2 * q;
+        const quarterTurn = Math.PI / 2;
+        let startAngle = quarterTurn; 
+        let endAngle = 2 * quarterTurn;
         if (side === "right")
         {
-            a0 = end.sweep === 180 ? -q : 0;
-            a1 = q;
+            startAngle = end.sweep === 180 ? -quarterTurn : 0;  
+            endAngle = quarterTurn;
         }
         else if (end.sweep === 180)
         {
-            a1 = 3 * q;
+            endAngle = 3 * quarterTurn;   
         }
         const straightAt = side === "right" ? 0 : Math.PI;
         skinParts(base, `${c.id}/end/${side}/skin`, title, end.technique, end.flexThickness, end.battens,
-                  developed, tall, outer, { centre, axis: "y", rOuter: outer, thickness: skin, a0, a1, from: 0,
+                  developed, tall, outer, { centre, axis: "y", rOuter: outer, thickness: skin, a0: startAngle,
+                                            a1: endAngle, from: 0,
                                             to: tall, straight, straightAt }, b);
     }
 }
@@ -559,65 +595,68 @@ export function buildCorner(k: RoundCorner, b: Build): void
     const skin = skinThickness(k.technique, k.flexThickness, k.battens);
     // inner radius 0 : square inside corner closed by the neighbouring boxes, no inner skin
     const solidInside = k.innerRadius <= 0;
-    const ro = k.outerRadius - skin;
-    const ri = solidInside ? 0 : k.innerRadius + skin;
-    if (!solidInside && ri >= ro - 32)
+    // The crown of the flanges, between the inner face of the outer skin and the outer face of the inner one
+    const crownOuter = k.outerRadius - skin;
+    const crownInner = solidInside ? 0 : k.innerRadius + skin;
+    if (!solidInside && crownInner >= crownOuter - 32)
     {
-        b.errors.push(`${k.name} : couronne trop étroite (${Math.round(ro - ri)} mm entre peaux).`);
+        b.errors.push(`${k.name} : couronne trop étroite (${Math.round(crownOuter - crownInner)} mm entre peaux).`);
         return;
     }
-    const sx = k.quadrant === "topRight" || k.quadrant === "bottomRight" ? 1 : -1;
-    const sy = k.quadrant === "topRight" || k.quadrant === "topLeft" ? 1 : -1;
+    // Which way the quarter opens in the front view, along x then along y
+    const signU = k.quadrant === "topRight" || k.quadrant === "bottomRight" ? 1 : -1;
+    const signV = k.quadrant === "topRight" || k.quadrant === "topLeft" ? 1 : -1;
     const outline: Outline = solidInside
         ? {
             start: [0, 0],
             segments: [
-                { kind: "line", x: ro, y: 0 },
-                { kind: "arc", x: 0, y: ro, cx: 0, cy: 0, ccw: true },
+                { kind: "line", x: crownOuter, y: 0 },
+                { kind: "arc", x: 0, y: crownOuter, cx: 0, cy: 0, ccw: true },
                 { kind: "line", x: 0, y: 0 },
             ],
         }
         : {
-            start: [ri, 0],
+            start: [crownInner, 0],
             segments: [
-                { kind: "line", x: ro, y: 0 },
-                { kind: "arc", x: 0, y: ro, cx: 0, cy: 0, ccw: true },
-                { kind: "line", x: 0, y: ri },
-                { kind: "arc", x: ri, y: 0, cx: 0, cy: 0, ccw: false },
+                { kind: "line", x: crownOuter, y: 0 },
+                { kind: "arc", x: 0, y: crownOuter, cx: 0, cy: 0, ccw: true },
+                { kind: "line", x: 0, y: crownInner },  
+                { kind: "arc", x: crownInner, y: 0, cx: 0, cy: 0, ccw: false },
             ],
         };
     const base = { item: k.id, itemName: k.name };
-    const u: Vec3 = sx > 0 ? X : neg(X);
-    const v: Vec3 = sy > 0 ? Y : neg(Y);
+    const u: Vec3 = signU > 0 ? X : neg(X);
+    const v: Vec3 = signV > 0 ? Y : neg(Y);   
     const flanges = [
         { id: "front", label: "Flasque avant", o: [k.cx, k.cy, k.z + k.depth - k.thickness] as Vec3, n: Z },
         { id: "back", label: "Flasque arrière", o: [k.cx, k.cy, k.z + k.thickness] as Vec3, n: neg(Z) },
     ];
-    for (const f of flanges)
+    for (const flangeSpec of flanges)
     {
-        const p = newPart({
-            ...base, id: `${k.id}/${f.id}`, label: f.label, role: "flange", length: ro, width: ro,
-            thickness: k.thickness, decor: k.decor, edges: [], frame: { o: f.o, u, v, n: f.n },
+        const flange = newPart({
+            ...base, id: `${k.id}/${flangeSpec.id}`, label: flangeSpec.label, role: "flange", length: crownOuter,
+            width: crownOuter, thickness: k.thickness, decor: k.decor, edges: [],
+            frame: { o: flangeSpec.o, u, v, n: flangeSpec.n }, 
         });
-        p.outline = outline;
-        p.notes.push("Couronne en quart de cercle : découpe CN d'après le DXF");
-        b.parts.push(p);
+        flange.outline = outline;
+        flange.notes.push("Couronne en quart de cercle : découpe CN d'après le DXF");
+        b.parts.push(flange);
     }
-    const a0 = sx > 0 ? (sy > 0 ? 0 : -Math.PI / 2) : (sy > 0 ? Math.PI / 2 : Math.PI); 
-    const a1 = a0 + Math.PI / 2;
+    const startAngle = signU > 0 ? (signV > 0 ? 0 : -Math.PI / 2) : (signV > 0 ? Math.PI / 2 : Math.PI); 
+    const endAngle = startAngle + Math.PI / 2;
     const centre: Vec3 = [k.cx, k.cy, k.z];
     skinParts(base, `${k.id}/outer`, "Angle arrondi, face extérieure", k.technique, k.flexThickness, k.battens,
         Math.PI / 2 * (k.outerRadius - skin / 2), k.depth, k.outerRadius,
-        { centre, axis: "z", rOuter: k.outerRadius, thickness: skin, a0, a1, from: 0, to: k.depth, straight: 0,
-         straightAt: 0 }, b);
+        { centre, axis: "z", rOuter: k.outerRadius, thickness: skin, a0: startAngle, a1: endAngle, from: 0,  
+          to: k.depth, straight: 0, straightAt: 0 }, b);
     if (solidInside)
     {
         return;
     }
     skinParts(base, `${k.id}/inner`, "Angle arrondi, face intérieure", k.technique, k.flexThickness, k.battens,
         Math.PI / 2 * (k.innerRadius + skin / 2), k.depth, k.innerRadius,
-        { centre, axis: "z", rOuter: k.innerRadius + skin, thickness: skin, a0, a1, from: 0, to: k.depth, straight: 0,
-         straightAt: 0 }, b);
+        { centre, axis: "z", rOuter: k.innerRadius + skin, thickness: skin, a0: startAngle, a1: endAngle, from: 0, 
+          to: k.depth, straight: 0, straightAt: 0 }, b);
 }
 
 
