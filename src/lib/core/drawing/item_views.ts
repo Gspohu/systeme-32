@@ -26,10 +26,11 @@ export function itemViews(k: Carcass, a: Analysis): Draft
 {
     const canvas = new Canvas();
     heading(canvas, `${k.name} : vues`);
-    const bh = baseHeight(k);
+    // What the plinth or the feet add under the box
+    const standHeight = baseHeight(k);
     const reachLeft = endReach(k, "left");
     const reachRight = endReach(k, "right");
-    const fullHeight = k.height + bh;
+    const fullHeight = k.height + standHeight;
     // A tall item lines front, cut and side up on one row with the plan under the front, a wide and low one stacks
     // the cut under the front with the side beside it : whichever reads at the larger scale
     const wide = k.width + reachLeft + reachRight;
@@ -57,24 +58,25 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const stacked = inStack < inRow;
     const scale = stacked ? inStack : inRow;
     // Page point of the left face of the box and of the floor under it, the item kept in its own coordinates
-    const fx = MARGIN + 20 + reachLeft / scale;
-    const fy = MARGIN + 38 + fullHeight / scale;
-    const topY = fy - fullHeight / scale;
-    drawFront(canvas, k, scale, fx - k.x / scale, fy + (k.y - bh) / scale, a);
-    canvas.text(fx + k.width / scale / 2, topY - 12, "Vue de face", 3, "middle", true);
-    canvas.dimH(fx, fx + k.width / scale, fy + 1, fy + 8, `${k.width}`);
+    const boxLeftX = MARGIN + 20 + reachLeft / scale;
+    const floorY = MARGIN + 38 + fullHeight / scale;
+    const topY = floorY - fullHeight / scale;
+    drawFront(canvas, k, scale, boxLeftX - k.x / scale, floorY + (k.y - standHeight) / scale, a);
+    canvas.text(boxLeftX + k.width / scale / 2, topY - 12, "Vue de face", 3, "middle", true);
+    canvas.dimH(boxLeftX, boxLeftX + k.width / scale, floorY + 1, floorY + 8, `${k.width}`);
     if (k.slope === null)
     {
-        canvas.dimV(topY, fy, fx - reachLeft / scale - 1, fx - reachLeft / scale - 8, `${fullHeight}`);
+        canvas.dimV(topY, floorY, boxLeftX - reachLeft / scale - 1, boxLeftX - reachLeft / scale - 8, `${fullHeight}`);
     }
     else
     {
         // Each side dimensioned on its own, the low one would read as the full height otherwise
         const sides = sideHeights(k);
-        const xr = fx + (k.width + reachRight) / scale;
-        canvas.dimV(fy - (sides.left + bh) / scale, fy, fx - reachLeft / scale - 1, fx - reachLeft / scale - 8,
-                    `${sides.left + bh}`);
-        canvas.dimV(fy - (sides.right + bh) / scale, fy, xr + 1, xr + 8, `${sides.right + bh}`);
+        const rightDimX = boxLeftX + (k.width + reachRight) / scale;
+        canvas.dimV(floorY - (sides.left + standHeight) / scale, floorY, boxLeftX - reachLeft / scale - 1,
+                    boxLeftX - reachLeft / scale - 8, `${sides.left + standHeight}`);
+        canvas.dimV(floorY - (sides.right + standHeight) / scale, floorY, rightDimX + 1, rightDimX + 8,
+                    `${sides.right + standHeight}`);
     }
     // clear heights between the shaped boards of an open rounded end, down its middle
     for (const side of ["left", "right"] as const)
@@ -85,16 +87,16 @@ export function itemViews(k: Carcass, a: Analysis): Draft
             continue;
         }
         const reach = side === "left" ? reachLeft : reachRight;
-        const xe = side === "right" ? fx + (k.width + reach / 2) / scale : fx - reach / 2 / scale;
-        const levels = openEndLevels(k, end).sort((p, q) =>
+        const endMidX = side === "right" ? boxLeftX + (k.width + reach / 2) / scale : boxLeftX - reach / 2 / scale;
+        const levels = openEndLevels(k, end).sort((lower, upper) =>
         {
-            return p - q;
+            return lower - upper;
         });
         for (let i = 0; i + 1 < levels.length; i++)
         {
             const clear = levels[i + 1]! - levels[i]! - k.thickness;
-            canvas.dimV(fy - (bh + levels[i + 1]!) / scale, fy - (bh + levels[i]! + k.thickness) / scale, xe, xe,
-                        round1(clear), 1.8);
+            canvas.dimV(floorY - (standHeight + levels[i + 1]!) / scale,
+                        floorY - (standHeight + levels[i]! + k.thickness) / scale, endMidX, endMidX, round1(clear), 1.8);
         }
     }
     const lay = a.build.layouts.get(k.id);
@@ -102,73 +104,75 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     {
         // Chain of the inner widths of the first level of columns
         const edges = [k.thickness];
-        for (const d of lay.dividers)
+        for (const divider of lay.dividers)
         {
-            if (d.split === k.root.id)
+            if (divider.split === k.root.id)
             {
-                edges.push(d.x, d.x + d.w);
+                edges.push(divider.x, divider.x + divider.w);
             }
         }
         edges.push(k.width - k.thickness);
         let i = 0;
         while (i + 1 < edges.length)
         {
-            canvas.dimH(fx + edges[i]! / scale, fx + edges[i + 1]! / scale, topY - 1, topY - 6,
+            canvas.dimH(boxLeftX + edges[i]! / scale, boxLeftX + edges[i + 1]! / scale, topY - 1, topY - 6,
                         round1(edges[i + 1]! - edges[i]!), 1.8);
             i += 2;
         }
     }
     // The inside the fronts hide : panels, runner spaces and the height of every cell
     // TODO the hinges are drawn nowhere on these views, their arm and plate aren't modelled yet
-    const cutX = stacked ? fx : fx + (k.width + reachRight) / scale + VIEW_GAP + reachLeft / scale;
-    const cutY = stacked ? fy + VIEW_GAP + fullHeight / scale : fy;
-    drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - bh) / scale, a, false);
-    canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - fy, "Vue de face, façades déposées", 3, "middle", true);
+    const cutX = stacked ? boxLeftX : boxLeftX + (k.width + reachRight) / scale + VIEW_GAP + reachLeft / scale;
+    const cutY = stacked ? floorY + VIEW_GAP + fullHeight / scale : floorY;
+    drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - standHeight) / scale, a, false);
+    canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - floorY, "Vue de face, façades déposées", 3, "middle",
+                true);
     for (const cell of lay?.nodes.values() ?? [])
     {
         if (cell.kind === "cell" && cell.h / scale >= 6)
         {
-            const xc = cutX + (cell.x + cell.w / 2) / scale;
-            canvas.dimV(cutY - (bh + cell.y + cell.h) / scale, cutY - (bh + cell.y) / scale, xc, xc,
-                        round1(cell.h), 1.8);
+            const cellMidX = cutX + (cell.x + cell.w / 2) / scale;
+            canvas.dimV(cutY - (standHeight + cell.y + cell.h) / scale, cutY - (standHeight + cell.y) / scale,
+                        cellMidX, cellMidX, round1(cell.h), 1.8);
         }
     }
 
-    const planTop = (stacked ? cutY : fy) + 18;
-    canvas.text(fx + k.width / scale / 2, planTop - 2, "Vue de dessus", 3, "middle", true);
-    drawPlan(canvas, k, scale, fx, planTop, reachRight);
+    const planTop = (stacked ? cutY : floorY) + 18;
+    canvas.text(boxLeftX + k.width / scale / 2, planTop - 2, "Vue de dessus", 3, "middle", true);
+    drawPlan(canvas, k, scale, boxLeftX, planTop, reachRight);
 
-    const sideX = (stacked ? fx : cutX) + (k.width + reachRight) / scale + VIEW_GAP;
+    const sideX = (stacked ? boxLeftX : cutX) + (k.width + reachRight) / scale + VIEW_GAP;
     // set on the right of the front view with the front of the item on its right : seen from the left, first angle
     canvas.text(sideX + k.depth / scale / 2, topY - 12, "Vue de gauche", 3, "middle", true);
     canvas.rect(sideX, topY, k.depth / scale, k.height / scale, "normal");
     if (k.base.type === "plinth")
     {
         const front = sideX + (k.depth - k.base.setback) / scale;
-        canvas.rect(front - k.thickness / scale, fy - (bh - PLINTH_TOP_GAP) / scale, k.thickness / scale,
-                    (bh - plinthFootGap(k) - PLINTH_TOP_GAP) / scale, "thin");
+        canvas.rect(front - k.thickness / scale, floorY - (standHeight - PLINTH_TOP_GAP) / scale, k.thickness / scale,
+                    (standHeight - plinthFootGap(k) - PLINTH_TOP_GAP) / scale, "thin");
     }
     // Seen from the side the feet stand in the open, the runner spaces behind the side panel
-    for (const f of a.build.fitted)
+    for (const fitting of a.build.fitted)
     {
-        if (f.item !== k.id || f.host !== null)
+        if (fitting.item !== k.id || fitting.host !== null)
         {
             continue;
         }
-        const e = fittedExtent(f);
-        canvas.rect(sideX + (e.min[2] - k.z) / scale, fy - (e.max[1] - k.y + bh) / scale,
-                    (e.max[2] - e.min[2]) / scale, (e.max[1] - e.min[1]) / scale, f.hidden ? "dashed" : "thin");
+        const extent = fittedExtent(fitting);
+        canvas.rect(sideX + (extent.min[2] - k.z) / scale, floorY - (extent.max[1] - k.y + standHeight) / scale,
+                    (extent.max[2] - extent.min[2]) / scale, (extent.max[1] - extent.min[1]) / scale,
+                    fitting.hidden ? "dashed" : "thin");
     }
-    canvas.dimH(sideX, sideX + k.depth / scale, fy + 1, fy + 8, `${k.depth}`);
+    canvas.dimH(sideX, sideX + k.depth / scale, floorY + 1, floorY + 8, `${k.depth}`);
     // The base : its height on the front edge, and how far a plinth stands back from the front
     const sideFront = sideX + k.depth / scale;
-    if (bh > 0)
+    if (standHeight > 0)
     {
-        canvas.dimV(fy - bh / scale, fy, sideFront + 1, sideFront + 6, `${bh}`, 1.8);
+        canvas.dimV(floorY - standHeight / scale, floorY, sideFront + 1, sideFront + 6, `${standHeight}`, 1.8);
     }
     if (k.base.type === "plinth" && k.base.setback > 0)
     {
-        canvas.dimH(sideFront - k.base.setback / scale, sideFront, fy + 1, fy + 14, `${k.base.setback}`, 1.8);
+        canvas.dimH(sideFront - k.base.setback / scale, sideFront, floorY + 1, floorY + 14, `${k.base.setback}`, 1.8);
     }
 
     // The tables take the free column on the right, else the space under the cut
@@ -184,7 +188,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     else if (stacked)
     {
         listX = sideX;
-        listY = fy + 22;
+        listY = floorY + 22;
     }
     itemTables(canvas, k, a, listX, listY);
     return { title: `${k.name}, vues`, scale: `1:${scale}`, canvas };

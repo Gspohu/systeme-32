@@ -175,28 +175,29 @@ export function sectionPlanes(p: Project, a: Analysis, wall: Wall): SectionPlane
 
 
 // One section, its lower left at (x0, y0) on the page, with a chain of dimensions along each side
-function drawSection(canvas: Canvas, s: SectionPlane, x0: number, y0: number): void
+// Each peice cut spans a0 to a1 across the plane and b0 to b1 up it, in mm
+function drawSection(canvas: Canvas, plane: SectionPlane, x0: number, y0: number): void
 {
-    const a0 = Math.min(...s.cut.map((c) => { return c.a0; }));
-    const a1 = Math.max(...s.cut.map((c) => { return c.a1; }));
-    const b0 = Math.min(...s.cut.map((c) => { return c.b0; }));
-    const b1 = Math.max(...s.cut.map((c) => { return c.b1; }));
-    const X = (v: number): number =>
+    const minA = Math.min(...plane.cut.map((piece) => { return piece.a0; })); 
+    const minB = Math.min(...plane.cut.map((piece) => { return piece.b0; }));
+    const maxB = Math.max(...plane.cut.map((piece) => { return piece.b1; }));
+    const pageX = (along: number): number =>
     {
-        return x0 + (v - a0) / SCALE;
+        return x0 + (along - minA) / SCALE;
     };
-    const Y = (v: number): number =>
+    const pageY = (up: number): number =>   
     {
-        return y0 - (v - b0) / SCALE;
+        return y0 - (up - minB) / SCALE;
     };
-    canvas.text(X(a0), Y(b1) - 8, s.title, 3, "start", true);
-    for (const c of s.cut)
+    canvas.text(pageX(minA), pageY(maxB) - 8, plane.title, 3, "start", true);
+    for (const piece of plane.cut)
     {
-        canvas.rect(X(c.a0), Y(c.b1), (c.a1 - c.a0) / SCALE, (c.b1 - c.b0) / SCALE, "normal",
-                    c.front ? FRONT_FILL : CUT_FILL);
+        canvas.rect(pageX(piece.a0), pageY(piece.b1), (piece.a1 - piece.a0) / SCALE, (piece.b1 - piece.b0) / SCALE,
+                    "normal", piece.front ? FRONT_FILL : CUT_FILL);
     }
-    chain(canvas, s.cut.flatMap((c) => { return [c.a0, c.a1]; }), X, y0 + 1, y0 + 7, "h");
-    chain(canvas, s.cut.flatMap((c) => { return [c.b0, c.b1]; }), Y, X(a0) - 1, X(a0) - 8, "v");
+    chain(canvas, plane.cut.flatMap((piece) => { return [piece.a0, piece.a1]; }), pageX, y0 + 1, y0 + 7, "h");
+    chain(canvas, plane.cut.flatMap((piece) => { return [piece.b0, piece.b1]; }), pageY, pageX(minA) - 1,
+          pageX(minA) - 8, "v"); 
 }
 
 

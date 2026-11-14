@@ -181,11 +181,11 @@ function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
                 + "détaillés dans le fichier du projet", BODY);
             cursorY += 4.5;   
         }
-        for (const r of p.revisions.slice(-8))
+        for (const revision of p.revisions.slice(-8))  
         {
-            canvas.text(MARGIN + 8, cursorY, r.index, BODY, "start", true);
-            canvas.text(MARGIN + 18, cursorY, r.date, BODY);
-            canvas.text(MARGIN + 42, cursorY, fit(r.reason, BODY, 350), BODY);
+            canvas.text(MARGIN + 8, cursorY, revision.index, BODY, "start", true); 
+            canvas.text(MARGIN + 18, cursorY, revision.date, BODY);
+            canvas.text(MARGIN + 42, cursorY, fit(revision.reason, BODY, 350), BODY); 
             cursorY += 4.5;
         }
     }
@@ -239,16 +239,18 @@ function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
         cursorY += 5;
     }
     section("Conventions d'atelier (non issues d'une notice fabricant, modifiables dans les réglages)");
-    const s = p.settings;
+    const settings = p.settings; 
     const conventions = [
-        `Connecteurs à ${s.connectorInset} mm des chants avant et arrière, intermédiaires tous les 256 mm maxi`,
-        `Tourillons ${DIAM}8 x 35 : ${s.dowelFaceDepth} mm dans la face, ${s.dowelEdgeDepth} mm dans le chant`,
-        `Taquets : trous ${DIAM}5 de ${s.pinDepth} mm, rangées à 37 mm des chants, `
+        `Connecteurs à ${settings.connectorInset} mm des chants avant et arrière, intermédiaires tous les 256 mm maxi`,
+        `Tourillons ${DIAM}8 x 35 : ${settings.dowelFaceDepth} mm dans la face, ${settings.dowelEdgeDepth} mm dans le `
+            + "chant",
+        `Taquets : trous ${DIAM}5 de ${settings.pinDepth} mm, rangées à 37 mm des chants, `
             + `${PIN_SPARE_HOLES} trous de réglage de part et d'autre`,
-        `Étagères réglables : jeu latéral ${s.shelfSideClearance} mm par côté, retrait avant ${s.shelfFrontSetback} mm`,
-        `Charnières à ${s.hingeEdgeDistance} mm des chants de porte, décalées hors des tablettes fixes`,
-        ...forWorkshop ? [] : [`Chants : ${EDGE_OVERLENGTH} mm de surlongueur par bande. Trait de scie ${s.kerf} mm, `
-            + `délignage ${s.trim} mm`],
+        `Étagères réglables : jeu latéral ${settings.shelfSideClearance} mm par côté, retrait avant `
+            + `${settings.shelfFrontSetback} mm`,
+        `Charnières à ${settings.hingeEdgeDistance} mm des chants de porte, décalées hors des tablettes fixes`,
+        ...forWorkshop ? [] : [`Chants : ${EDGE_OVERLENGTH} mm de surlongueur par bande. Trait de scie ${settings.kerf} `
+            + `mm, délignage ${settings.trim} mm`],
         "Côtés de tiroir en 16 mm, fond en retrait de 13 mm (Blum : 12 à 15)", 
     ];
     for (const line of conventions)
@@ -258,26 +260,26 @@ function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
     }
     section("Sources");
     const sources = new Set<string>();
-    for (const h of bom.hardware)
+    for (const hardwareLine of bom.hardware) 
     {
-        sources.add(h.source);
+        sources.add(hardwareLine.source);
     }
     // The boards this set really uses, with the values the checks ran on
     const used = new Set<string>();
-    for (const r of [...bom.cut, ...bom.offSheet])
+    for (const row of [...bom.cut, ...bom.offSheet])
     {
-        for (const q of r.parts)
+        for (const part of row.parts)
         {
-            used.add(q.material);
+            used.add(part.material);
         }
     }
     for (const id of used)
     {
-        const m = MATERIALS[id];
-        if (m !== undefined)
+        const material = MATERIALS[id]; 
+        if (material !== undefined)   
         {
-            sources.add(`${m.label} : ${m.density} kg/m${CUBED} retenus pour les masses, module ${m.modulus} N/mm², `
-                + `kdef ${String(m.kdef).replace(".", ",")} (${m.source})`);
+            sources.add(`${material.label} : ${material.density} kg/m${CUBED} retenus pour les masses, module `
+                + `${material.modulus} N/mm², kdef ${String(material.kdef).replace(".", ",")} (${material.source})`);
         }
     }
     sources.add("EN 1995-1-1:2004 tableau 3.2 (via COFORD, tableaux D.6 et D.7) : kdef en classe de service 1, hors CLT");

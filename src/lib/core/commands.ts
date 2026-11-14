@@ -96,49 +96,49 @@ export function duplicateItem(p: Project, id: string, dx: number): Project
                 }
             };
             renew(copy.root);
-            for (const f of copy.fronts)
+            for (const front of copy.fronts)
             {
-                f.id = newId("f");
-                f.node = renamed.get(f.node) ?? f.node;
+                front.id = newId("f");
+                front.node = renamed.get(front.node) ?? front.node;
             }
-            for (const l of copy.linings)
+            for (const lining of copy.linings)
             {
-                l.id = newId("l");
-                l.cell = renamed.get(l.cell) ?? l.cell;
+                lining.id = newId("l");
+                lining.cell = renamed.get(lining.cell) ?? lining.cell;
             }
-            for (const r of copy.rails)
+            for (const rail of copy.rails)
             {
-                r.id = newId("r");
-                r.cell = renamed.get(r.cell) ?? r.cell;
+                rail.id = newId("r");
+                rail.cell = renamed.get(rail.cell) ?? rail.cell;
             }
-            for (const e of copy.lights)
+            for (const light of copy.lights)
             {
-                e.id = newId("e");
-                e.cell = renamed.get(e.cell) ?? e.cell;
+                light.id = newId("e");
+                light.cell = renamed.get(light.cell) ?? light.cell;
             }
-            for (const s of copy.shoeRacks)
+            for (const rack of copy.shoeRacks)
             {
-                s.id = newId("h");
-                s.cell = renamed.get(s.cell) ?? s.cell;
+                rack.id = newId("h");
+                rack.cell = renamed.get(rack.cell) ?? rack.cell;
             }
             // The socket holes, the prints and the cells dirlled full height follow their cells too
-            for (const o of copy.outlets)
+            for (const outlet of copy.outlets)
             {
-                o.id = newId("o");
-                o.cell = renamed.get(o.cell) ?? o.cell;
+                outlet.id = newId("o");
+                outlet.cell = renamed.get(outlet.cell) ?? outlet.cell;
             }
-            for (const pr of copy.prints)
+            for (const print of copy.prints)
             {
-                pr.id = newId("p");
-                pr.cell = renamed.get(pr.cell) ?? pr.cell;
+                print.id = newId("p");
+                print.cell = renamed.get(print.cell) ?? print.cell;
             }
-            copy.modularCells = copy.modularCells.map((c) =>
+            copy.modularCells = copy.modularCells.map((cellId) =>
             {
-                return renamed.get(c) ?? c;
+                return renamed.get(cellId) ?? cellId;
             });
-            for (const st of copy.stiffeners ?? [])
+            for (const stiffener of copy.stiffeners ?? [])
             {
-                st.cell = renamed.get(st.cell) ?? st.cell;
+                stiffener.cell = renamed.get(stiffener.cell) ?? stiffener.cell;
             }
         }
         q.items.push(copy);

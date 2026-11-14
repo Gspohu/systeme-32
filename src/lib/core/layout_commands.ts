@@ -31,14 +31,14 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
 {
     return edit(p, (q) =>
     {
-        const c = carcassOf(q, carcassId);
-        const lay = resolveLayout(c);
+        const carcass = carcassOf(q, carcassId);
+        const lay = resolveLayout(carcass);
         const nb = lay.nodes.get(cellId);
         if (nb === undefined || nb.kind !== "cell")
         {
             throw new CommandError("Seule une case vide de séparation peut être recoupée.");
         }
-        if (axis === "v" && kind === "adjustable")  
+        if (axis === "v" && kind === "adjustable")
         {
             throw new CommandError("Un montant vertical est toujours fixe.");
         }
@@ -48,63 +48,64 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
         // The lower face of the divider snaps on the grid counted rfom the carcass inner origin, an adjustable shelf
         // on the pins of the line
         const snapped = origin + snap(pos - origin, q.settings.grid);
-        const local = Math.round((axis === "h" && kind === "adjustable" ? onPins(q, c, snapped) : snapped) - start);
-        if (local < MIN_CELL || length - local - dividerThickness(c, axis, null) < MIN_CELL)
+        const local = Math.round((axis === "h" && kind === "adjustable" ? onPins(q, carcass, snapped) : snapped)
+            - start);
+        if (local < MIN_CELL || length - local - dividerThickness(carcass, axis, null) < MIN_CELL)
         {
             throw new CommandError(`Case trop petite à cet endroit : ${MIN_CELL} mm mini de part et d'autre de la séparation.`);
         }
-        const onCell = frontsOn(c.fronts, cellId);
-        for (const f of onCell)
+        const onCell = frontsOn(carcass.fronts, cellId);
+        for (const front of onCell)
         {
-            if (f.spec.type === "drawers")
+            if (front.spec.type === "drawers")
             {
                 throw new CommandError("Une case à tiroirs ne se recoupe pas. Retirer les tiroirs d'abord.");
             }
         }
-        const parent = findParent(c.root, cellId);
+        const parent = findParent(carcass.root, cellId);
         const fresh = cell();
-        for (const l of [...c.linings])
+        for (const lining of [...carcass.linings])
         {
-            if (l.cell === cellId)
+            if (lining.cell === cellId)
             {
-                c.linings.push({ ...structuredClone(l), id: newId("l"), cell: fresh.id });
+                carcass.linings.push({ ...structuredClone(lining), id: newId("l"), cell: fresh.id });
             }
         }
         // Rails and lights hang under the panel above : an upright give each half its own, a shelf hands
         // htem up to the upper half, which is always the fresh one
-        for (const r of [...c.rails])
+        for (const rail of [...carcass.rails])
         {
-            if (r.cell === cellId && axis === "h")
+            if (rail.cell === cellId && axis === "h")
             {
-                r.cell = fresh.id;
+                rail.cell = fresh.id;
             }
-            else if (r.cell === cellId)
+            else if (rail.cell === cellId)
             {
-                c.rails.push({ ...r, id: newId("r"), cell: fresh.id });
+                carcass.rails.push({ ...rail, id: newId("r"), cell: fresh.id });
             }
         }
-        for (const l of [...c.lights])
+        for (const light of [...carcass.lights])
         {
-            if (l.cell === cellId && axis === "h")
+            if (light.cell === cellId && axis === "h")
             {
-                l.cell = fresh.id;
+                light.cell = fresh.id;
             }
-            else if (l.cell === cellId)
+            else if (light.cell === cellId)
             {
-                c.lights.push({ ...l, id: newId("e"), cell: fresh.id });
+                carcass.lights.push({ ...light, id: newId("e"), cell: fresh.id });
             }
         }
         // Shoe racks stand on the floor of the cell : a shelf leaves them in the lower half, the original one
-        for (const s of [...c.shoeRacks])
+        for (const rack of [...carcass.shoeRacks])
         {
-            if (s.cell === cellId && axis === "v")
+            if (rack.cell === cellId && axis === "v")
             {
-                c.shoeRacks.push({ ...s, id: newId("h"), cell: fresh.id });
+                carcass.shoeRacks.push({ ...rack, id: newId("h"), cell: fresh.id });
             }
         }
-        if (c.modularCells.includes(cellId))
+        if (carcass.modularCells.includes(cellId))
         {
-            c.modularCells.push(fresh.id);
+            carcass.modularCells.push(fresh.id);
         }
         // A cut in the parent's own direction joins its list, unless a front must keep covering the whole cell
         if (parent !== null && parent.axis === axis && onCell.length === 0)
@@ -122,13 +123,14 @@ export function splitCell(p: Project, carcassId: string, cellId: string, axis: "
         else
         {
             const kept: CellNode = { kind: "cell", id: cellId };
-            const sp: SplitNode = { kind: "split", id: newId("s"), axis, cuts: [local], dividers: [kind],
-                                   finishes: [null], thicknesses: [null], setbacks: [null], children: [kept, fresh] };
+            const splitNode: SplitNode = { kind: "split", id: newId("s"), axis, cuts: [local], dividers: [kind],
+                                           finishes: [null], thicknesses: [null], setbacks: [null],
+                                           children: [kept, fresh] };
             // The cell keeps its id and its lining, a front moves up to cover both halves
-            c.root = replaceNode(c.root, cellId, sp);
-            for (const f of onCell)
+            carcass.root = replaceNode(carcass.root, cellId, splitNode);
+            for (const front of onCell)
             {
-                f.node = sp.id;
+                front.node = splitNode.id;
             }
         }
     });
