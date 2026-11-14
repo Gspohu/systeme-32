@@ -163,10 +163,10 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             continue;
         }
         const where = `${c.name}, trou de prise`;
-        const h = hole.shape === "round" ? hole.w : hole.h;
+        const holeHeight = hole.shape === "round" ? hole.w : hole.h;
         const side = hole.panel === "left" || hole.panel === "right";
-        // Across the cell on the back and on a shelf, frontwards on a side
-        const cx = side ? (hole.panel === "left" ? nb.x : nb.x + nb.w) : nb.x + nb.w / 2 + hole.dx;
+        // The centre of the hole in the carcass frame : across the cell on the back and on a shelf, frontwards on a side
+        const centreX = side ? (hole.panel === "left" ? nb.x : nb.x + nb.w) : nb.x + nb.w / 2 + hole.dx;
         let part: Part | undefined;
         let near: Vec3;
         let far: Vec3;
@@ -174,31 +174,31 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
         if (hole.panel === "back")
         {
             part = byId(b.parts, `${c.id}/back`);
-            const cy = nb.y + nb.h / 2 + hole.dy;
-            near = [c.x + cx - hole.w / 2, c.y + cy - h / 2, c.z];
-            far = [c.x + cx + hole.w / 2, c.y + cy + h / 2, c.z];
-            inside = cy - h / 2 >= nb.y && cy + h / 2 <= nb.y + nb.h;
+            const centreY = nb.y + nb.h / 2 + hole.dy;
+            near = [c.x + centreX - hole.w / 2, c.y + centreY - holeHeight / 2, c.z];
+            far = [c.x + centreX + hole.w / 2, c.y + centreY + holeHeight / 2, c.z];
+            inside = centreY - holeHeight / 2 >= nb.y && centreY + holeHeight / 2 <= nb.y + nb.h;
         }
         else if (hole.panel === "left" || hole.panel === "right")
         {
             part = sideFace(c, lay, b, nb, hole.panel)?.part;
-            const cz = (lay.zBack + lay.zFront) / 2 + hole.dx;
-            const cy = nb.y + nb.h / 2 + hole.dy;
-            near = [c.x + cx, c.y + cy - h / 2, c.z + cz - hole.w / 2];
-            far = [c.x + cx, c.y + cy + h / 2, c.z + cz + hole.w / 2];
-            inside = cy - h / 2 >= nb.y && cy + h / 2 <= nb.y + nb.h && cz - hole.w / 2 >= lay.zBack
-                && cz + hole.w / 2 <= lay.zFront;
+            const centreZ = (lay.zBack + lay.zFront) / 2 + hole.dx;
+            const centreY = nb.y + nb.h / 2 + hole.dy;
+            near = [c.x + centreX, c.y + centreY - holeHeight / 2, c.z + centreZ - hole.w / 2];
+            far = [c.x + centreX, c.y + centreY + holeHeight / 2, c.z + centreZ + hole.w / 2];
+            inside = centreY - holeHeight / 2 >= nb.y && centreY + holeHeight / 2 <= nb.y + nb.h
+                && centreZ - hole.w / 2 >= lay.zBack && centreZ + hole.w / 2 <= lay.zFront;
         }
         else
         {
             part = hole.panel === "above" ? panelAbove(c, lay, nb, b)?.part : panelBelow(c, lay, nb, b);
-            const cz = (lay.zBack + lay.zFront) / 2 + hole.dy;
+            const centreZ = (lay.zBack + lay.zFront) / 2 + hole.dy;
             const y = part?.frame?.o[1] ?? c.y;
-            near = [c.x + cx - hole.w / 2, y, c.z + cz - h / 2];
-            far = [c.x + cx + hole.w / 2, y, c.z + cz + h / 2];
-            inside = cz - h / 2 >= lay.zBack && cz + h / 2 <= lay.zFront;
+            near = [c.x + centreX - hole.w / 2, y, c.z + centreZ - holeHeight / 2];
+            far = [c.x + centreX + hole.w / 2, y, c.z + centreZ + holeHeight / 2];
+            inside = centreZ - holeHeight / 2 >= lay.zBack && centreZ + holeHeight / 2 <= lay.zFront;
         }
-        inside = inside && (side || (cx - hole.w / 2 >= nb.x && cx + hole.w / 2 <= nb.x + nb.w));
+        inside = inside && (side || (centreX - hole.w / 2 >= nb.x && centreX + hole.w / 2 <= nb.x + nb.w));
         if (part === undefined || part.frame === null)
         {
             const missing = { back: "aucun panneau de fond", above: "aucun panneau fixe au-dessus",
@@ -218,7 +218,7 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             const deep = Math.round(lay.zFront - lay.zBack);
             const cell = hole.panel === "back" ? `${Math.round(nb.w)} x ${Math.round(nb.h)} mm`
                 : side ? `${deep} de profondeur x ${Math.round(nb.h)} de haut` : `${Math.round(nb.w)} x ${deep} de profondeur`;
-            b.errors.push(`${where} : ${hole.w} x ${h} mm décalé de ${hole.dx} / ${hole.dy} sort de sa case (${cell}). `
+            b.errors.push(`${where} : ${hole.w} x ${holeHeight} mm décalé de ${hole.dx} / ${hole.dy} sort de sa case (${cell}). `
                 + "Le réduire ou le recentrer.");
             continue;
         }
@@ -230,19 +230,19 @@ export function fitOutlets(c: Carcass, lay: ResolvedLayout, b: Build): void
             lining.notes.push(`Même découpe que ${part.label.toLowerCase()}, d'après le DXF`);
         }
         // Seen from the front : the back hole as cut, a shelf or a side one edge on over the thickness of its board
-        const f = part.frame;
+        const frame = part.frame;
         const edgeOn = hole.panel !== "back";
-        const x = side ? Math.min(f.o[0], f.o[0] + f.n[0] * part.thickness) - c.x : cx - hole.w / 2;
+        const x = side ? Math.min(frame.o[0], frame.o[0] + frame.n[0] * part.thickness) - c.x : centreX - hole.w / 2;
         const wide = side ? part.thickness : hole.w;
-        const y = edgeOn && !side ? Math.min(f.o[1], f.o[1] + f.n[1] * part.thickness) - c.y : near[1] - c.y;
-        const tall = edgeOn && !side ? part.thickness : h;
+        const y = edgeOn && !side ? Math.min(frame.o[1], frame.o[1] + frame.n[1] * part.thickness) - c.y : near[1] - c.y;
+        const tall = edgeOn && !side ? part.thickness : holeHeight;
         const hidden = (b.fronts.get(c.id) ?? []).some((fp) =>
         {
             return x + wide / 2 > fp.rect.x && x + wide / 2 < fp.rect.x + fp.rect.w && y + tall / 2 > fp.rect.y
                 && y + tall / 2 < fp.rect.y + fp.rect.h;
         });
         b.outlets.push({ item: c.id, id: hole.id, shape: edgeOn ? "rect" : hole.shape, x, y, w: wide, h: tall,
-                         edgeOn, hidden, board: part.id, reach: Math.max(hole.w, h) / 2,
+                         edgeOn, hidden, board: part.id, reach: Math.max(hole.w, holeHeight) / 2,
                          centre: [(near[0] + far[0]) / 2, (near[1] + far[1]) / 2, (near[2] + far[2]) / 2] });
         part.notes.push(hole.shape === "round" ? `Trou ${DIAM}${hole.w} pour prise ou câble, d'après le DXF`
             : `Découpe ${hole.w} x ${hole.h} pour prise, d'après le DXF`);

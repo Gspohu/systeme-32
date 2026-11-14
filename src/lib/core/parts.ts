@@ -57,17 +57,18 @@ export function emptyBuild(): Build
 }
 
 
-export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSides): void   
+export function buildCarcass(c: Carcass, settings: Settings, b: Build, walls?: WallSides): void
 {
     const lay = resolveLayout(c);
     b.layouts.set(c.id, lay);
     b.errors.push(...lay.errors);
     const t = c.thickness;
     const [ox, oy, oz] = boxOrigin(c);
-    const W = c.width;
-    const D = c.depth;
-    const zs = c.back.type === "applied" ? c.back.thickness : 0;
-    const Ds = D - zs;
+    const width = c.width;
+    const depth = c.depth;
+    // An applied back takes its thickness off the depth of the sides
+    const backInset = c.back.type === "applied" ? c.back.thickness : 0;
+    const sideDepth = depth - backInset;
     const common = { item: c.id, itemName: c.name, thickness: t, decor: c.decor };
 
 
@@ -79,37 +80,38 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
     const angle = topAngle(c);
     const rising = sides.right >= sides.left ? 1 : -1;
     const left = newPart({
-        ...common, id: `${c.id}/side/L`, label: "Joue gauche", role: "side", length: sides.left - 2 * lift, width: Ds,
-        edges: over ? ["v0"] : ["v0", "u1", "u0"],
-        frame: { o: [ox + t, oy + lift, oz + D], u: Y, v: neg(Z), n: neg(X) },
+        ...common, id: `${c.id}/side/L`, label: "Joue gauche", role: "side", length: sides.left - 2 * lift,
+        width: sideDepth, edges: over ? ["v0"] : ["v0", "u1", "u0"],
+        frame: { o: [ox + t, oy + lift, oz + depth], u: Y, v: neg(Z), n: neg(X) },
     });
     const right = newPart({
-        ...common, id: `${c.id}/side/R`, label: "Joue droite", role: "side", length: sides.right - 2 * lift, width: Ds,
-        edges: over ? ["v0"] : ["v0", "u1", "u0"],
-        frame: { o: [ox + W - t, oy + lift, oz + D], u: Y, v: neg(Z), n: X },
+        ...common, id: `${c.id}/side/R`, label: "Joue droite", role: "side", length: sides.right - 2 * lift,
+        width: sideDepth, edges: over ? ["v0"] : ["v0", "u1", "u0"],
+        frame: { o: [ox + width - t, oy + lift, oz + depth], u: Y, v: neg(Z), n: X },
     });
     // Top and bottom between the sides, u from the left, v from the front, face A inside, or over them end to end
-    const span = over ? W : W - 2 * t;
+    const span = over ? width : width - 2 * t;
     const x0 = over ? ox : ox + t;
     const bottom = newPart({
-        ...common, id: `${c.id}/bottom`, label: "Dessous", role: "bottom", length: span, width: Ds,
+        ...common, id: `${c.id}/bottom`, label: "Dessous", role: "bottom", length: span, width: sideDepth,
         edges: over ? ["v0", "u0", "u1"] : ["v0"],
-        frame: { o: [x0, oy + t, oz + D], u: X, v: neg(Z), n: neg(Y) },
+        frame: { o: [x0, oy + t, oz + depth], u: X, v: neg(Z), n: neg(Y) },
     });
     // Under a roof the top runs along the slope, its length measured in the slope, its ends cut upright
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle) * rising;
+    const slopeCos = Math.cos(angle);
+    const slopeSin = Math.sin(angle) * rising;
     const top = newPart({
-        ...common, id: `${c.id}/top`, label: "Dessus", role: "top", length: span / cos, width: Ds,
+        ...common, id: `${c.id}/top`, label: "Dessus", role: "top", length: span / slopeCos, width: sideDepth,
         edges: over ? ["v0", "u0", "u1"] : ["v0"],
-        frame: { o: [x0, oy + ceilingAt(c, t), oz + D], u: [cos, sin, 0], v: neg(Z), n: [-sin, cos, 0] },
+        frame: { o: [x0, oy + ceilingAt(c, t), oz + depth], u: [slopeCos, slopeSin, 0], v: neg(Z),
+                 n: [-slopeSin, slopeCos, 0] },
     });
     if (c.slope !== null)
     {
         const deg = (angle * 180 / Math.PI).toFixed(1).replace(".", ",");
         top.notes.push(`Dessus sous rampant à ${deg}° : extrémités coupées d'aplomb`);
         // Plumb ends : on face B both ends sit t.tan further along u
-        top.bevel = { u0: t * sin / cos, u1: t * sin / cos };
+        top.bevel = { u0: t * slopeSin / slopeCos, u1: t * slopeSin / slopeCos };
         // The low side would pierce the roof line by t.tan over its thickness, the high one stays square
         const low = c.slope.low === "left" ? left : right;
         low.notes.push(`Tête chanfreinée à ${deg}° dans la pente du dessus`);
@@ -121,26 +123,26 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
     // the eye, the housings go in the outer faces of the sides, against what stands beside it : tightened in the
     // workshop before it is set
     const outer = c.hiddenLinks === true ? "B" as const : undefined;
-    for (const [hp, end] of over ? [[bottom, "u0"], [top, "u1"]] as const : [])
+    for (const [panel, end] of over ? [[bottom, "u0"], [top, "u1"]] as const : [])
     {
-        b.joints.push({ edgePart: left.id, edge: end, facePart: hp.id, face: "A", lineAxis: "u", line: t / 2, from: 0,
-                        to: Ds, edgeFrom: 0, reversed: false, housingFace: outer });
-        b.joints.push({ edgePart: right.id, edge: end, facePart: hp.id, face: "A", lineAxis: "u", line: W - t / 2,
-                        from: 0, to: Ds, edgeFrom: 0, reversed: false, housingFace: outer });
+        b.joints.push({ edgePart: left.id, edge: end, facePart: panel.id, face: "A", lineAxis: "u", line: t / 2,
+                        from: 0, to: sideDepth, edgeFrom: 0, reversed: false, housingFace: outer });
+        b.joints.push({ edgePart: right.id, edge: end, facePart: panel.id, face: "A", lineAxis: "u",
+                        line: width - t / 2, from: 0, to: sideDepth, edgeFrom: 0, reversed: false, housingFace: outer });
     }
     // Four corner joints : the ends of top and bottom against the inner faces of the sides
     // A board glued under the top would close its housings over : they go in its upper face
-    for (const hp of over ? [] : [bottom, top])
+    for (const panel of over ? [] : [bottom, top])
     {
-        const lineL = hp === bottom ? t / 2 : sides.left - t / cos / 2;
-        const lineR = hp === bottom ? t / 2 : sides.right - t / cos / 2;
+        const lineL = panel === bottom ? t / 2 : sides.left - t / slopeCos / 2;
+        const lineR = panel === bottom ? t / 2 : sides.right - t / slopeCos / 2;
         // An open carcass keeps them off the floor of its cell as well, under it where what it stands on hides them
-        const hidden = (hp === top && doubling > 0) || (hp === bottom && c.hiddenLinks === true);
+        const hidden = (panel === top && doubling > 0) || (panel === bottom && c.hiddenLinks === true);
         const housingFace = hidden ? "B" as const : undefined;
-        b.joints.push({ edgePart: hp.id, edge: "u0", facePart: left.id, face: "A", lineAxis: "u", line: lineL, from: 0,
-                       to: Ds, edgeFrom: 0, reversed: false, housingFace });
-        b.joints.push({ edgePart: hp.id, edge: "u1", facePart: right.id, face: "A", lineAxis: "u", line: lineR,
-                       from: 0, to: Ds, edgeFrom: 0, reversed: false, housingFace });
+        b.joints.push({ edgePart: panel.id, edge: "u0", facePart: left.id, face: "A", lineAxis: "u", line: lineL,
+                        from: 0, to: sideDepth, edgeFrom: 0, reversed: false, housingFace });
+        b.joints.push({ edgePart: panel.id, edge: "u1", facePart: right.id, face: "A", lineAxis: "u", line: lineR,
+                        from: 0, to: sideDepth, edgeFrom: 0, reversed: false, housingFace });
     }
     if (doubling > 0)
     {
@@ -149,15 +151,15 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
 
 
     buildBack(c, b);
-    buildDividers(c, lay, s, b);
+    buildDividers(c, lay, settings, b);
     buildBase(c, b);
 
 
-    const panels = frontPanels(c, lay, s, walls);
+    const panels = frontPanels(c, lay, settings, walls);
     b.fronts.set(c.id, panels);
     for (const fp of panels)
     {
-        const f = byId(c.fronts, fp.front)!;
+        const front = byId(c.fronts, fp.front)!;
         const decor = fp.decor;
         const vertical = fp.role !== "drawer" && fp.role !== "flap";
         const labels = { door: "Porte", drawer: "Façade de tiroir", leaf: "Vantail coulissant", flap: "Abattant",
@@ -177,11 +179,11 @@ export function buildCarcass(c: Carcass, s: Settings, b: Build, walls?: WallSide
             frame: vertical
                 ? { o: [ox + fp.rect.x, oy + fp.rect.y, oz + fp.z], u: Y, v: X, n: Z }
                 : { o: [ox + fp.rect.x, oy + fp.rect.y, oz + fp.z], u: X, v: Y, n: Z },
-            colour: f.colour,
+            colour: front.colour,
         });
         if (part.colour !== null)
         {
-            part.notes.push(`Teinte ${f.colourName ?? part.colour}`);
+            part.notes.push(`Teinte ${front.colourName ?? part.colour}`);
         }
         b.parts.push(part);
     }
@@ -246,8 +248,8 @@ function buildBack(c: Carcass, b: Build): void
 {
     const [ox, oy, oz] = boxOrigin(c);
     const board = c.thickness;
-    const W = c.width;
-    const H = c.height;
+    const boxWidth = c.width;
+    const boxHeight = c.height;
     if (c.back.type === "none")
     {
         return;
@@ -255,10 +257,11 @@ function buildBack(c: Carcass, b: Build): void
     // A back runs its grain along its longer side, the only way a wide unit still fits a sheet
     if (c.back.type === "applied")
     {
-        const wide = W > H;
+        const wide = boxWidth > boxHeight;
         const back = newPart({
             item: c.id, itemName: c.name, thickness: c.back.thickness, decor: c.backDecor,
-            id: `${c.id}/back`, label: "Fond rapporté", role: "back", length: wide ? W : H, width: wide ? H : W,
+            id: `${c.id}/back`, label: "Fond rapporté", role: "back", length: wide ? boxWidth : boxHeight,
+            width: wide ? boxHeight : boxWidth,
             edges: [],
             frame: { o: [ox, oy, oz + c.back.thickness], u: wide ? X : Y, v: wide ? Y : X, n: neg(Z) },
         });
@@ -280,29 +283,32 @@ function buildBack(c: Carcass, b: Build): void
         return;
     }
     // Back in grooves cut into sides, top and bottom, 1 mm play on each side of the groove bottom
-    const g = c.back;
-    const w = W - 2 * board + 2 * g.depth - 2;
-    const h = H - 2 * board + 2 * g.depth - 2;
-    const wide = w > h;
+    const groove = c.back;
+    const backWidth = boxWidth - 2 * board + 2 * groove.depth - 2;
+    const backHeight = boxHeight - 2 * board + 2 * groove.depth - 2;
+    const wide = backWidth > backHeight;
     const back = newPart({
-        item: c.id, itemName: c.name, thickness: g.thickness, decor: c.backDecor,
-        id: `${c.id}/back`, label: "Fond en rainure", role: "back", length: wide ? w : h, width: wide ? h : w, edges: [],
-        frame: { o: [ox + board - g.depth + 1, oy + board - g.depth + 1, oz + g.offset + g.thickness], u: wide ? X : Y,  
-                v: wide ? Y : X, n: neg(Z) },
+        item: c.id, itemName: c.name, thickness: groove.thickness, decor: c.backDecor,
+        id: `${c.id}/back`, label: "Fond en rainure", role: "back", length: wide ? backWidth : backHeight,
+        width: wide ? backHeight : backWidth, edges: [],
+        frame: { o: [ox + board - groove.depth + 1, oy + board - groove.depth + 1, oz + groove.offset +
+                     groove.thickness],
+                 u: wide ? X : Y, v: wide ? Y : X, n: neg(Z) },
     });
     b.parts.push(back);
-    const vGroove = c.depth - g.offset - g.thickness / 2;
+    const vGroove = c.depth - groove.offset - groove.thickness / 2;
     // The groove stops inside the sides but runs through top and bottom, which sit between them
-    for (const p of b.parts)
-    {  
-        if (p.item !== c.id || (p.role !== "side" && p.role !== "top" && p.role !== "bottom"))
+    for (const panel of b.parts)
+    {
+        if (panel.item !== c.id || (panel.role !== "side" && panel.role !== "top" && panel.role !== "bottom"))
         {
             continue;
         }
-        const from = p.role === "side" ? board - g.depth : 0;
-        const to = p.role === "side" ? p.length - board + g.depth : p.length;
-        p.grooves.push({ face: "A", along: "u", at: vGroove, from, to, width: g.thickness + 0.5, depth: g.depth,
-                        label: `Rainure de fond ${g.thickness + 0.5} x ${g.depth}` });
+        const grooveStart = panel.role === "side" ? board - groove.depth : 0;
+        const grooveEnd = panel.role === "side" ? panel.length - board + groove.depth : panel.length;
+        panel.grooves.push({ face: "A", along: "u", at: vGroove, from: grooveStart, to: grooveEnd,
+                             width: groove.thickness + 0.5, depth: groove.depth,
+                             label: `Rainure de fond ${groove.thickness + 0.5} x ${groove.depth}` });
     }
 }
 

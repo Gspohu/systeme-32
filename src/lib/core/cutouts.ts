@@ -13,35 +13,36 @@ export const PANEL_MARGIN = 60;
 // In the frame of the panel part : u up from its bottom edge, v across from its left edge
 export function openingOutline(spec: PanelFront, w: number, h: number): Outline | null
 {
-    const m = spec.margin;
-    const across = w - 2 * m;
-    const up = h - 2 * m;
-    if (spec.cutout === "none" || across <= 0 || up <= 0)
+    const margin = spec.margin;
+    const across = w - 2 * margin;
+    const clearHeight = h - 2 * margin;
+    if (spec.cutout === "none" || across <= 0 || clearHeight <= 0)
     {
         return null;
     }
-    const cu = h / 2;
-    const cv = w / 2;
+    // u runs up the front, v arcoss it
+    const centreU = h / 2;
+    const centreV = w / 2;
     if (spec.cutout === "round")
     {
-        const r = Math.min(across, up) / 2;
-        return { start: [cu, cv + r], segments: [
-            { kind: "arc", x: cu, y: cv - r, cx: cu, cy: cv, ccw: true },
-            { kind: "arc", x: cu, y: cv + r, cx: cu, cy: cv, ccw: true },
+        const radius = Math.min(across, clearHeight) / 2;
+        return { start: [centreU, centreV + radius], segments: [ 
+            { kind: "arc", x: centreU, y: centreV - radius, cx: centreU, cy: centreV, ccw: true },
+            { kind: "arc", x: centreU, y: centreV + radius, cx: centreU, cy: centreV, ccw: true },
         ] };
     }
     // A half circle as wide as the opening ovre straight sides, it needs at least its radius of height
-    const r = across / 2;
-    if (up < r)
+    const radius = across / 2;
+    if (clearHeight < radius)
     {
         return null;
     }
-    const spring = h - m - r;
-    return { start: [m, m], segments: [
-        { kind: "line", x: m, y: w - m },
-        { kind: "line", x: spring, y: w - m },
-        { kind: "arc", x: spring, y: m, cx: spring, cy: cv, ccw: false },
-        { kind: "line", x: m, y: m },
+    const spring = h - margin - radius;
+    return { start: [margin, margin], segments: [
+        { kind: "line", x: margin, y: w - margin },
+        { kind: "line", x: spring, y: w - margin },
+        { kind: "arc", x: spring, y: margin, cx: spring, cy: centreV, ccw: false },
+        { kind: "line", x: margin, y: margin },
     ] };
 }
 

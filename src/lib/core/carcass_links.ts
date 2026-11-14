@@ -161,25 +161,27 @@ const ROW_MARGIN = 10;
 
 
 // Two panels of two carcasses, parallel and face to face : screws over the area they share
-function link(a: Part, c: Part, b: Build, out: { item: string; message: string }[], open: Set<string>, p: Project): void
+function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message: string }[], open: Set<string>,
+              p: Project): void
 {
-    const fa = a.frame!;
-    const fc = c.frame!;
-    const align = dot(fa.n, fc.n);
+    const frameA = panelA.frame!;
+    const frameC = panelC.frame!;
+    const align = dot(frameA.n, frameC.n);
     if (Math.abs(Math.abs(align) - 1) > 1e-6)
     {
         return;
     }
-    // Along the normal of a : a spans its thickness from its face A, c its own the way its normal runs
-    const sa = dot(fa.o, fa.n);
-    const sc = dot(fc.o, fa.n);
-    const [lo, hi] = [Math.min(sc, sc + align * c.thickness), Math.max(sc, sc + align * c.thickness)];
+    // Along the normal of A : A spans its tickness from its face A, C its own the way its normal runs
+    const levelA = dot(frameA.o, frameA.n);
+    const levelC = dot(frameC.o, frameA.n);  
+    const [nearSideC, farSideC] = [Math.min(levelC, levelC + align * panelC.thickness),
+                                   Math.max(levelC, levelC + align * panelC.thickness)];
     let aTouch: "A" | "B";
-    if (Math.abs(lo - (sa + a.thickness)) < 0.5)
+    if (Math.abs(nearSideC - (levelA + panelA.thickness)) < 0.5)
     {
         aTouch = "B";
     }
-    else if (Math.abs(hi - sa) < 0.5)
+    else if (Math.abs(farSideC - levelA) < 0.5)
     {
         aTouch = "A";
     }
@@ -187,138 +189,143 @@ function link(a: Part, c: Part, b: Build, out: { item: string; message: string }
     {
         return;
     }
-    const contact = aTouch === "B" ? lo : hi;
-    const cTouch = Math.abs(sc - contact) < 0.5 ? "A" : "B";
-    const local = (q: Part, pt: Vec3): [number, number] =>
+    const contact = aTouch === "B" ? nearSideC : farSideC;
+    const cTouch = Math.abs(levelC - contact) < 0.5 ? "A" : "B";
+    const local = (panel: Part, point: Vec3): [number, number] =>
     {
-        return [dot(from(q.frame!.o, pt), q.frame!.u), dot(from(q.frame!.o, pt), q.frame!.v)];
+        return [dot(from(panel.frame!.o, point), panel.frame!.u), dot(from(panel.frame!.o, point), panel.frame!.v)];   
     };
-    // The corners of c in the frame of a, the shared area clipped to a
-    const us: number[] = [];
-    const vs: number[] = [];
-    for (const [u, v] of [[0, 0], [c.length, 0], [0, c.width], [c.length, c.width]] as const)
+    // The corners of C in the frame of A, the shared area clipped to A
+    const cornerUs: number[] = [];
+    const cornerVs: number[] = [];
+    for (const [u, v] of [[0, 0], [panelC.length, 0], [0, panelC.width], [panelC.length, panelC.width]] as const)
     {
-        const [x, y] = local(a, at(fc, u, v, 0));
-        us.push(x);
-        vs.push(y);
+        const [x, y] = local(panelA, at(frameC, u, v, 0));
+        cornerUs.push(x);
+        cornerVs.push(y);
     }
-    const u0 = Math.max(0, Math.min(...us));
-    const u1 = Math.min(a.length, Math.max(...us));
-    const v0 = Math.max(0, Math.min(...vs));
-    const v1 = Math.min(a.width, Math.max(...vs));
+    const u0 = Math.max(0, Math.min(...cornerUs));
+    const u1 = Math.min(panelA.length, Math.max(...cornerUs));
+    const v0 = Math.max(0, Math.min(...cornerVs));
+    const v1 = Math.min(panelA.width, Math.max(...cornerVs));
     if (u1 - u0 < 2 * LINK_INSET || v1 - v0 < 2 * LINK_INSET)
     {
         return;
     }
-    const screw = pickScrew(a.thickness + c.thickness);
+    const screw = pickScrew(panelA.thickness + panelC.thickness);
     if (screw === undefined)
     {
-        out.push({ item: a.item, message: `${a.itemName} et ${c.itemName} : ${a.thickness + c.thickness} mm à serrer, `
-            + "hors des vis de liaison Häfele 267.07.9 (32 à 46 mm). Relier les deux caissons autrement." });
+        out.push({ item: panelA.item, message: `${panelA.itemName} et ${panelC.itemName} : `
+            + `${panelA.thickness + panelC.thickness} mm à serrer, hors des vis de liaison Häfele 267.07.9 (32 à 46 mm). `
+            + "Relier les deux caissons autrement." }); 
         return;
     }
     const aInner = aTouch === "A" ? "B" : "A";
     const cInner = cTouch === "A" ? "B" : "A";
     // A top glued to its doubler has no inner face left for a head, a carcass open to the eye shows none : screwed
     // blind from the other carcass. 5 x 50 only goes into 3 boards, in two it would come out the far side
-    const doubled = (q: Part): boolean =>
+    const doubled = (panel: Part): boolean =>
     {
-        return q.role === "top" && b.parts.some((x) =>
+        return panel.role === "top" && b.parts.some((other) =>
         {
-            return x.id === `${q.item}/top-doubler`;
+            return other.id === `${panel.item}/top-doubler`;
         });
     };
-    const blindA = doubled(a) || open.has(a.item);
-    const blindC = doubled(c) || open.has(c.item);
+    const blindA = doubled(panelA) || open.has(panelA.item);
+    const blindC = doubled(panelC) || open.has(panelC.item);
     if (blindA && blindC)
     {
         return;
     }
     const blind = blindA || blindC;
-    const deep = doubled(a) || doubled(c);
-    const grooved = [a, c].some((q) =>
+    const deep = doubled(panelA) || doubled(panelC);
+    const grooved = [panelA, panelC].some((panel) =>  
     {
-        return q.grooves.some((g) => { return g.label === LED_GROOVE_LABEL; });
+        return panel.grooves.some((groove) => { return groove.label === LED_GROOVE_LABEL; });
     });
     const blindHole = deep ? BLIND_SCREW_HOLE : BLIND_SCREW_HOLE_SHORT;
     // How far the screw goes into the board it doesn't pass through : 30 less the 19 it crosses
-    const biteA = (deep ? 50 : 30) - c.thickness;
-    const biteC = (deep ? 50 : 30) - a.thickness;
+    const biteA = (deep ? 50 : 30) - panelC.thickness;
+    const biteC = (deep ? 50 : 30) - panelA.thickness;
     // A head on the inner face, 2 mm into each carcass
     const free = (u: number, v: number): boolean =>
     {
-        const [uc, vc] = local(c, at(fa, u, v, 0));
-        const headA = at(fa, u, v, aInner === "A" ? -2 : a.thickness + 2);
-        const headC = at(fc, uc, vc, cInner === "A" ? -2 : c.thickness + 2);
+        const [uc, vc] = local(panelC, at(frameA, u, v, 0));
+        const headA = at(frameA, u, v, aInner === "A" ? -2 : panelA.thickness + 2);
+        const headC = at(frameC, uc, vc, cInner === "A" ? -2 : panelC.thickness + 2);
         if (blind)
         {
             // Its head on the inner face of the closed carcass, its point in the touching face of the other
             return blindA
-                ? !meets(c, cInner, uc, vc, CONNECTING_SCREW_HEAD, c.thickness) && !underHardware(b, c.item, headC)
-                    && !meets(a, aTouch, u, v, blindHole, biteA)
-                : !meets(a, aInner, u, v, CONNECTING_SCREW_HEAD, a.thickness) && !underHardware(b, a.item, headA)
-                    && !meets(c, cTouch, uc, vc, blindHole, biteC);
+                ? !meets(panelC, cInner, uc, vc, CONNECTING_SCREW_HEAD, panelC.thickness)
+                    && !underHardware(b, panelC.item, headC) && !meets(panelA, aTouch, u, v, blindHole, biteA)
+                : !meets(panelA, aInner, u, v, CONNECTING_SCREW_HEAD, panelA.thickness)
+                    && !underHardware(b, panelA.item, headA) && !meets(panelC, cTouch, uc, vc, blindHole, biteC);
         }
-        return !meets(a, aInner, u, v, CONNECTING_SCREW_HEAD, a.thickness) && !underHardware(b, a.item, headA)
-            && !meets(c, cInner, uc, vc, CONNECTING_SCREW_HEAD, c.thickness) && !underHardware(b, c.item, headC);
+        return !meets(panelA, aInner, u, v, CONNECTING_SCREW_HEAD, panelA.thickness)
+            && !underHardware(b, panelA.item, headA)
+            && !meets(panelC, cInner, uc, vc, CONNECTING_SCREW_HEAD, panelC.thickness) 
+            && !underHardware(b, panelC.item, headC);
     };
+    // The screws in rows along the longer side of the shared area, l along it and w across
     const alongU = u1 - u0 >= v1 - v0;
     const [l0, l1, w0, w1] = alongU ? [u0, u1, v0, v1] : [v0, v1, u0, u1];
-    const sys = systemLine(a, c, blind ? (blindA ? c : a) : a, p, alongU, [w0, w1]);
+    const systemRow = systemLine(panelA, panelC, blind ? (blindA ? panelC : panelA) : panelA, p, alongU, [w0, w1]);
     let placed = 0;
-    for (const s of spread(l1 - l0, LINK_INSET, LINK_MAX))
+    for (const station of spread(l1 - l0, LINK_INSET, LINK_MAX))
     {
         // A board counts its width from the front : the screws clear the LED groove there, in a doubled top or not
-        const rows = sys?.rows ?? [w0 + (deep || grooved ? DEEP_FRONT_INSET : LINK_INSET), w1 - LINK_INSET];
-        for (const w of rows)
+        const rows = systemRow?.rows ?? [w0 + (deep || grooved ? DEEP_FRONT_INSET : LINK_INSET), w1 - LINK_INSET];
+        for (const across of rows)
         {
-            const start = sys === null ? l0 + s : sys.snap(l0 + s, w);
-            const tries = [0, 32, -32, 64, -64].map((d) =>
+            const start = systemRow === null ? l0 + station : systemRow.snap(l0 + station, across);
+            const tries = [0, 32, -32, 64, -64].map((step) =>
             {
-                return start + d;
+                return start + step;
             }).filter((x) =>
             {
                 return x >= l0 + CONNECTING_SCREW_HEAD && x <= l1 - CONNECTING_SCREW_HEAD;
             });
             const at0 = tries.find((x) =>
             {
-                return alongU ? free(x, w) : free(w, x);
+                return alongU ? free(x, across) : free(across, x);
             });
             if (at0 === undefined)
             {
-                out.push({ item: a.item, message: `${a.itemName} et ${c.itemName} : pas de place libre pour une vis de `
-                    + `liaison près de ${Math.round(s)} mm sur ${a.label.toLowerCase()}. Déplacer la quincaillerie.` });
+                out.push({ item: panelA.item, message: `${panelA.itemName} et ${panelC.itemName} : pas de place libre `
+                    + `pour une vis de liaison près de ${Math.round(station)} mm sur ${panelA.label.toLowerCase()}. `
+                    + "Déplacer la quincaillerie." });
                 continue;
             }
-            const [u, v] = alongU ? [at0, w] : [w, at0];
-            const [uc, vc] = local(c, at(fa, u, v, 0));
+            const [u, v] = alongU ? [at0, across] : [across, at0];
+            const [uc, vc] = local(panelC, at(frameA, u, v, 0));
             if (blind)
             {
-                const through = blindA ? c : a;
+                const through = blindA ? panelC : panelA;
                 through.holes.push({ u: blindA ? uc : u, v: blindA ? vc : v, diameter: blindHole,
                                      depth: through.thickness, face: blindA ? cInner : aInner,
-                                     label: `Vis ${deep ? "5 x 50" : "4 x 30"} vers ${(blindA ? a : c).itemName}, `
+                                     label: `Vis ${deep ? "5 x 50" : "4 x 30"} vers ${(blindA ? panelA : panelC).itemName}, `
                                          + `${DIAM}${blindHole} traversant, tête fraisée`, purpose: "link-screw" });
                 placed++;
                 continue;
             }
-            const label = `Vis de liaison ${screw.ref} vers ${c.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant`;
-            a.holes.push({ u, v, diameter: CONNECTING_SCREW_HOLE, depth: a.thickness, face: aInner, label,
-                           purpose: "link-screw" });
-            c.holes.push({ u: uc, v: vc, diameter: CONNECTING_SCREW_HOLE, depth: c.thickness, face: cInner,
-                           label: `Vis de liaison ${screw.ref} vers ${a.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant`,
-                           purpose: "link-screw" });
+            const label = `Vis de liaison ${screw.ref} vers ${panelC.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant`;
+            panelA.holes.push({ u, v, diameter: CONNECTING_SCREW_HOLE, depth: panelA.thickness, face: aInner, label,
+                                purpose: "link-screw" });
+            panelC.holes.push({ u: uc, v: vc, diameter: CONNECTING_SCREW_HOLE, depth: panelC.thickness, face: cInner,
+                                label: `Vis de liaison ${screw.ref} vers ${panelA.itemName}, `
+                                    + `${DIAM}${CONNECTING_SCREW_HOLE} traversant`,
+                                purpose: "link-screw" });
             placed++;
         }
     }
     if (placed > 0)
     {
-        b.hardware.push({ ref: !blind ? screw.ref : deep ? "WALL_SCREW_5x50" : "SCREW_4x30", qty: placed, item: a.item,
-                         itemName: a.itemName,
-                         target: null,
-                         note: `${a.itemName} et ${c.itemName}${blind ? "" : `, ${a.thickness +
-                             c.thickness} mm serrés`}`,
-                         partner: c.item,
-                         purpose: "link-screw" });
+        b.hardware.push({ ref: !blind ? screw.ref : deep ? "WALL_SCREW_5x50" : "SCREW_4x30", qty: placed,
+                          item: panelA.item, itemName: panelA.itemName, target: null,
+                          note: `${panelA.itemName} et ${panelC.itemName}${blind ? ""
+                              : `, ${panelA.thickness + panelC.thickness} mm serrés`}`,
+                          partner: panelC.item,
+                          purpose: "link-screw" });
     }
 }

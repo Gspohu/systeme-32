@@ -67,48 +67,49 @@ export function fitHandles(c: Carcass, b: Build): void
 
 function fitBar(c: Carcass, fp: FrontPanel, part: Part, b: Build): void
 {
-    const r = fp.rect;
+    const rect = fp.rect;
     const vertical = fp.role === "door";
     // A drawer gets up to half its width, a door a quarter of its height
-    const h = pickHandle(vertical ? r.h / 4 : r.w / 2);
-    const span = vertical ? r.h : r.w;
-    if (h.length > span - 2 * END_MARGIN)
+    const handle = pickHandle(vertical ? rect.h / 4 : rect.w / 2);
+    const span = vertical ? rect.h : rect.w;
+    if (handle.length > span - 2 * END_MARGIN)
     {
         b.infos.push(`${c.name}, ${part.label.toLowerCase()} : ${Math.round(span)} mm, trop court pour la plus `
             + `petite poignée (${BAR_HANDLES[0]!.length} mm). Passer en ouverture par pression ou poser un bouton.`);
         return;
     }
-    let cx: number;
-    let cy: number;
+    // The imddle of the bar in the carcass frame
+    let gripX: number; 
+    let gripY: number;
     if (vertical)
     {
-        cx = fp.hinge === "right" ? r.x + HANDLE_EDGE : r.x + r.w - HANDLE_EDGE;
-        const lo = r.y + h.length / 2 + END_MARGIN;
-        const hi = r.y + r.h - h.length / 2 - END_MARGIN;
-        cy = Math.min(Math.max(GRIP_HEIGHT - c.y, lo), hi); 
+        gripX = fp.hinge === "right" ? rect.x + HANDLE_EDGE : rect.x + rect.w - HANDLE_EDGE;
+        const lowest = rect.y + handle.length / 2 + END_MARGIN;
+        const highest = rect.y + rect.h - handle.length / 2 - END_MARGIN;
+        gripY = Math.min(Math.max(GRIP_HEIGHT - c.y, lowest), highest);
     }
     else
     {
-        cx = r.x + r.w / 2;
-        cy = fp.role === "flap" ? r.y + HANDLE_EDGE : r.y + r.h / 2;
+        gripX = rect.x + rect.w / 2;
+        gripY = fp.role === "flap" ? rect.y + HANDLE_EDGE : rect.y + rect.h / 2;
     }
     const along: Vec3 = vertical ? Y : X;
     const across: Vec3 = vertical ? X : Y;
-    const ends = [-h.centres / 2, h.centres / 2];
+    const ends = [-handle.centres / 2, handle.centres / 2];
     // The part runs u up a doro, along a drawer front or a flap : the holes land at the same u, v either way
-    for (const d of ends)
+    for (const offset of ends)
     {
-        const [hx, hy] = vertical ? [cx, cy + d] : [cx + d, cy];
-        part.holes.push({ u: vertical ? hy - r.y : hx - r.x, v: vertical ? hx - r.x : hy - r.y,
+        const [holeX, holeY] = vertical ? [gripX, gripY + offset] : [gripX + offset, gripY];
+        part.holes.push({ u: vertical ? holeY - rect.y : holeX - rect.x, v: vertical ? holeX - rect.x : holeY - rect.y,  
                           diameter: BAR_HANDLE.screwHole, depth: fp.thickness, face: "B",
-                          label: `Poignée ${h.ref} : ${DIAM}${BAR_HANDLE.screwHole} traversant, vis M4 x 25`,
-                          purpose: "handle-screw", fixes: h.ref });
+                          label: `Poignée ${handle.ref} : ${DIAM}${BAR_HANDLE.screwHole} traversant, vis M4 x 25`,
+                          purpose: "handle-screw", fixes: handle.ref });
         // Behind a drawer front the box end takes the screw head : a clear hole lets it bear on the front
         const end = fp.role === "drawer" ? byId(b.parts, `${c.id}/drawer/${fp.id}/endF`) : undefined;
         if (end !== undefined && end.frame !== null)
         {
-            const u = c.x + hx - end.frame.o[0];
-            const v = c.y + hy - end.frame.o[1];
+            const u = c.x + holeX - end.frame.o[0];
+            const v = c.y + holeY - end.frame.o[1];
             if (u > SCREW_HEAD_PASSAGE / 2 && u < end.length - SCREW_HEAD_PASSAGE / 2 && v > SCREW_HEAD_PASSAGE / 2
                 && v < end.width - SCREW_HEAD_PASSAGE / 2)
             {
@@ -124,26 +125,27 @@ function fitBar(c: Carcass, fp: FrontPanel, part: Part, b: Build): void
     // The feet are drawn at the bar diameter, the maker gives no other figure for them
     const leg = BAR_HANDLE.projection - BAR_HANDLE.diameter;
     b.fitted.push({
-        key: `${key}/barre`, item: c.id, ref: h.ref, label: `${c.name}, poignée`, purpose: "handle", shape: "cylinder",
-        centre: [c.x + cx, c.y + cy, z + BAR_HANDLE.projection - radius],
-        axes: [across, Z, along], half: [radius, radius, h.length / 2], host: part.id, hidden: false,
+        key: `${key}/barre`, item: c.id, ref: handle.ref, label: `${c.name}, poignée`, purpose: "handle",
+        shape: "cylinder", centre: [c.x + gripX, c.y + gripY, z + BAR_HANDLE.projection - radius],
+        axes: [across, Z, along], half: [radius, radius, handle.length / 2], host: part.id, hidden: false,
     });
-    ends.forEach((d, k) =>   
+    ends.forEach((offset, k) =>
     {
-        const at: Vec3 = vertical ? [c.x + cx, c.y + cy + d, z + leg / 2] : [c.x + cx + d, c.y + cy, z + leg / 2];
+        const footCentre: Vec3 = vertical ? [c.x + gripX, c.y + gripY + offset, z + leg / 2]
+            : [c.x + gripX + offset, c.y + gripY, z + leg / 2];
         b.fitted.push({
-            key: `${key}/pied${k}`, item: c.id, ref: h.ref, label: `${c.name}, pied de poignée`, purpose: "handle",
+            key: `${key}/pied${k}`, item: c.id, ref: handle.ref, label: `${c.name}, pied de poignée`, purpose: "handle",
             shape: "cylinder",
-            centre: at, axes: [X, Y, Z], half: [radius, radius, leg / 2], host: part.id, hidden: false,
+            centre: footCentre, axes: [X, Y, Z], half: [radius, radius, leg / 2], host: part.id, hidden: false,
         });
     });
-    b.hardware.push({ ref: h.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
+    b.hardware.push({ ref: handle.ref, qty: 1, item: c.id, itemName: c.name, target: fp.id,
                       note: vertical ? `axe à ${HANDLE_EDGE} mm du chant` : null, purpose: "handle" });
-    const half = h.length / 2;
-    b.handles.push({ item: c.id, front: fp.id, ref: h.ref,
-                     x0: vertical ? cx : cx - half, y0: vertical ? cy - half : cy,  
-                     x1: vertical ? cx : cx + half, y1: vertical ? cy + half : cy });
-    part.notes.push(`Poignée ${h.ref} (entraxe ${h.centres}) : perçages d'après le gabarit, face visible`);
+    const half = handle.length / 2;
+    b.handles.push({ item: c.id, front: fp.id, ref: handle.ref,
+                     x0: vertical ? gripX : gripX - half, y0: vertical ? gripY - half : gripY,
+                     x1: vertical ? gripX : gripX + half, y1: vertical ? gripY + half : gripY });
+    part.notes.push(`Poignée ${handle.ref} (entraxe ${handle.centres}) : perçages d'après le gabarit, face visible`);
 }
 
 
@@ -190,21 +192,20 @@ function fitEdgePull(c: Carcass, fp: FrontPanel, part: Part, b: Build): void
         edge = rect.y;
     }
     const base: Vec3 = vertical ? [c.x + edge, c.y + along, c.z + fp.z] : [c.x + along, c.y + edge, c.z + fp.z];
-    // A point a along the pull, n out past the edge, z out from the back of the front
-    const pt = (a: number, n: number, z: number): Vec3 =>
+    const pt =(alongPull: number, pastEdge: number, outOfBack: number): Vec3 =>
     {
-        return add(add(add(base, scaled(runs, a)), scaled(out, n)), scaled(Z, z));
+        return add(add(add(base, scaled(runs, alongPull)), scaled(out, pastEdge)), scaled(Z, outOfBack));
     };
     const high = pull.height;
     const zOut = pull.depth - wall;
 
 
-    // The lip from the front corner of the sole to the outter bottom of the section
-    const dn = -(high - wall);
-    const dz = zOut - (wall / 2) - thick;
-    const lipLength = Math.hypot(dn, dz);
-    const lipDir = add(scaled(out, dn / lipLength), scaled(Z, dz / lipLength));
-    const lipNormal = add(scaled(out, dz / lipLength), scaled(Z, -dn / lipLength));
+    // The lip from the front corner of the sole to the outter bottom of the section, across the edge and out
+    const lipAcross = -(high - wall);
+    const lipOut = zOut - (wall / 2) - thick;
+    const lipLength = Math.hypot(lipAcross, lipOut);
+    const lipDir = add(scaled(out, lipAcross / lipLength), scaled(Z, lipOut / lipLength));
+    const lipNormal = add(scaled(out, lipOut / lipLength), scaled(Z, -lipAcross / lipLength));
     const key = `${c.id}/handle/${fp.id}`;
     const common = { item: c.id, ref: pull.ref, purpose: "handle" as const, shape: "box" as const, host: part.id,
                      hidden: false };
@@ -215,17 +216,17 @@ function fitEdgePull(c: Carcass, fp: FrontPanel, part: Part, b: Build): void
         { ...common, key: `${key}/semelle`, label: `${c.name}, poignée`, centre: pt(0, wall / 2, (thick - wall) / 2),
           axes: [runs, out, Z], half: [pull.length / 2, wall / 2, (thick + wall) / 2] },
         { ...common, key: `${key}/levre`, label: `${c.name}, lèvre de poignée`,
-          centre: pt(0, wall / 2 + dn / 2, thick + dz / 2), axes: [runs, lipDir, lipNormal],
+          centre: pt(0, wall / 2 + lipAcross / 2, thick + lipOut / 2), axes: [runs, lipDir, lipNormal],
           half: [pull.length / 2, lipLength / 2, wall / 2] },
     );
     // Tab and screw heads stand 2.2 behind the front, in the 2.6 the overlay leaves, measured on a bought pull
-    const f = part.frame!;
-    for (const a of [-pull.centres / 2, pull.centres / 2])
+    const frame = part.frame!;
+    for (const screwAlong of [-pull.centres / 2, pull.centres / 2])
     {
-        const p = pt(a, (wall - high) / 2, 0);
-        const d = [p[0] - f.o[0], p[1] - f.o[1], p[2] - f.o[2]];
-        const u = d[0]! * f.u[0] + d[1]! * f.u[1] + d[2]! * f.u[2];
-        const v = d[0]! * f.v[0] + d[1]! * f.v[1] + d[2]! * f.v[2];
+        const screwPoint = pt(screwAlong, (wall - high) / 2, 0);
+        const fromOrigin = [screwPoint[0] - frame.o[0], screwPoint[1] - frame.o[1], screwPoint[2] - frame.o[2]];
+        const u = fromOrigin[0]! * frame.u[0] + fromOrigin[1]! * frame.u[1] + fromOrigin[2]! * frame.u[2];
+        const v = fromOrigin[0]! * frame.v[0] + fromOrigin[1]! * frame.v[1] + fromOrigin[2]! * frame.v[2];
         part.holes.push({ u, v, diameter: 0, depth: 0, face: "A", purpose: "handle-screw",
                           label: `Vis ${DIAM}4 x ${pull.screw} fraisée de la poignée Oslo, fournie` });
     }

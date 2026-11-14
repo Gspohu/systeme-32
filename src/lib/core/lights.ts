@@ -59,7 +59,7 @@ export function lightPlan(nb: NodeBox, s: Settings): LightPlan
 }
 
 
-export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build): void
+export function buildLights(c: Carcass, lay: ResolvedLayout, settings: Settings, b: Build): void
 {
     let watts = 0;
     let wifi = false;
@@ -91,59 +91,63 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
         }
         if (light.kind === "spots")
         {
-            const w = fitSpots(c, nb, light, above, s, b);
-            if (w > 0)
+            const spotWatts = fitSpots(c, nb, light, above, settings, b);
+            if (spotWatts > 0)
             {
-                watts += w;
+                watts += spotWatts;
                 strips++;
                 wifi = wifi || light.wifi === true;
             }
             continue;
         }
-        const plan = lightPlan(nb, s);
+        const plan = lightPlan(nb, settings);
         if (plan.strip <= 0)
         {
-            b.errors.push(`${where} : case trop étroite pour un ruban coupé tous les ${s.ledCutPitch} mm. Retirer l'éclairage.`);
+            b.errors.push(`${where} : case trop étroite pour un ruban coupé tous les ${settings.ledCutPitch} mm. `
+                + "Retirer l'éclairage.");
             continue;
         }
-        const p = above.part;
+        // The board the profile runs under
+        const board = above.part;
         const recess = light.recess === true;
         const deep = recess ? LED_GROOVE_D : LED_SURFACE.high;
-        if (light.setback + LED_GROOVE_W > p.width || (recess && LED_GROOVE_D >= p.thickness) || p.frame === null)
+        if (light.setback + LED_GROOVE_W > board.width || (recess && LED_GROOVE_D >= board.thickness)
+            || board.frame === null)
         {
-            b.errors.push(`${where} : le profilé ${LED_GROOVE_W} x ${deep} ne tient pas sous ${p.label.toLowerCase()} `
-                + `(${Math.round(p.width)} x ${p.thickness}). Réduire le retrait.`);
+            b.errors.push(`${where} : le profilé ${LED_GROOVE_W} x ${deep} ne tient pas sous ${board.label.toLowerCase()} `
+                + `(${Math.round(board.width)} x ${board.thickness}). Réduire le retrait.`);
             continue;
         }
-        const from = nb.x + FIT_PLAY - panelStartX(p, c);
-        const at = light.setback + LED_GROOVE_W / 2;
+        const from = nb.x + FIT_PLAY - panelStartX(board, c);
+        const grooveAt = light.setback + LED_GROOVE_W / 2;
         if (recess)
         {
-            p.grooves.push({ face: above.face, along: "u", at, from, to: from + plan.profile, width: LED_GROOVE_W,
-                             depth: LED_GROOVE_D, label: LED_GROOVE_LABEL, weakens: true });
+            board.grooves.push({ face: above.face, along: "u", at: grooveAt, from, to: from + plan.profile,
+                                 width: LED_GROOVE_W, depth: LED_GROOVE_D, label: LED_GROOVE_LABEL, weakens: true });
         }
         if (light.leadThrough === undefined)
         {
-            p.holes.push({ u: from + 10, v: at, diameter: 0, depth: 0, face: above.face,
-                           label: "Sortie du câble du ruban : percer au diamètre du connecteur choisi", purpose: "light-lead" });
+            board.holes.push({ u: from + 10, v: grooveAt, diameter: 0, depth: 0, face: above.face,
+                               label: "Sortie du câble du ruban : percer au diamètre du connecteur choisi",
+                               purpose: "light-lead" });
         }
         // The profile and the strip in it, as they stand : in the board when let in, under its face when screwed on
-        const f = p.frame;
-        const out = above.face === "A" ? neg(f.n) : f.n;
-        const face = at3(f, from + plan.profile / 2, at, above.face === "A" ? 0 : p.thickness);
+        const frame = board.frame;
+        const out = above.face === "A" ? neg(frame.n) : frame.n;
+        const face = at3(frame, from + plan.profile / 2, grooveAt, above.face === "A" ? 0 : board.thickness);
         const shift = (k: number): Vec3 => { return [face[0] + out[0] * k, face[1] + out[1] * k, face[2] +
                                                      out[2] * k]; };
         const base = recess ? -LED_GROOVE_D : 0;
         const key = `${c.id}/light/${light.id}`;
         b.fitted.push({ key: `${key}/profile`, item: c.id, ref: recess ? "LED_PROFILE_RECESS" : "LED_PROFILE_SURFACE",
                         label: `${c.name} : profilé LED`, purpose: "light", shape: "box", centre: shift(base + deep / 2),
-                        axes: [f.u, f.v, out], half: [plan.profile / 2, LED_GROOVE_W / 2, deep /
-                                                      2], host: recess ? p.id : null,
+                        axes: [frame.u, frame.v, out], half: [plan.profile / 2, LED_GROOVE_W / 2, deep /
+                                                      2], host: recess ? board.id : null,
                         hidden: false },
                       { key: `${key}/strip`, item: c.id, ref: "LED_STRIP_24V",
                        label: `${c.name} : ruban LED`, purpose: "light",
-                        shape: "box", centre: shift(base + LED_SURFACE.wall + LED_STRIP.thick / 2), axes: [f.u,
-                            f.v, out],
+                        shape: "box", centre: shift(base + LED_SURFACE.wall + LED_STRIP.thick / 2), axes: [frame.u,
+                            frame.v, out],
                         half: [plan.strip / 2, LED_STRIP.wide / 2, LED_STRIP.thick /
                                2], host: `${key}/profile`, hidden: false });
         // Out through the left side in line with the profile, drilled before the joints of the carcass : its
@@ -159,11 +163,11 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
         }
         const line = (ref: string, note: string | null): void =>
         {
-            b.hardware.push({ ref, qty: 1, item: c.id, itemName: c.name, target: p.id, note, purpose: "light" });
+            b.hardware.push({ ref, qty: 1, item: c.id, itemName: c.name, target: board.id, note, purpose: "light" });
         };
         // The profile runs from side to side of the cell, its ends hidden against them : no end cap
         line(recess ? "LED_PROFILE_RECESS" : "LED_PROFILE_SURFACE", `coupé à ${Math.round(plan.profile)} mm`);
-        line("LED_STRIP_24V", `${plan.strip} mm, ${light.kelvin} K, ${s.ledWattPerMetre} W/m`);
+        line("LED_STRIP_24V", `${plan.strip} mm, ${light.kelvin} K, ${settings.ledWattPerMetre} W/m`);
         line("LED_LEAD", null);
         watts += plan.watts;
         strips++;
@@ -177,14 +181,14 @@ export function buildLights(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bui
     }
     if (wifi)
     {
-        const W = WIFI_LED_CONTROLLER;
-        const amps = watts / W.volts;
-        b.hardware.push({ ref: W.ref, qty: 1, item: c.id, itemName: c.name, target: null,
+        const controller = WIFI_LED_CONTROLLER;
+        const amps = watts / controller.volts;
+        b.hardware.push({ ref: controller.ref, qty: 1, item: c.id, itemName: c.name, target: null,
                           note: `entre l'alimentation et les rubans, ${amps.toFixed(2)} A sur une voie, pilotage local`,
                           purpose: "light" });
-        if (amps > W.ampsPerChannel)
+        if (amps > controller.ampsPerChannel)
         {
-            b.errors.push(`${c.name}, éclairage : ${amps.toFixed(1)} A pour ${W.ampsPerChannel} A par voie du contrôleur `
+            b.errors.push(`${c.name}, éclairage : ${amps.toFixed(1)} A pour ${controller.ampsPerChannel} A par voie du contrôleur `
                 + "Wi-Fi (Shelly). Répartir les rubans sur plusieurs voies ou retirer un éclairage.");
         }
     }

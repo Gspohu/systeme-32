@@ -54,25 +54,27 @@ function axisOf(h: Hole, p: Part): Axis
 
 
 // The closest 2 segments come to each other
-function segmentsApart(p: Axis, q: Axis): number
+// Shortest distance between 2 segments in space : the closest points first.a + s d1 and second.a + t d2, s and t
+// solved on the 2 infinite lines then clamped to [0, 1], t first, s again when t had to be clamped
+function segmentsApart(first: Axis, second: Axis): number
 {
     const sub = (x: number[], y: number[]): number[] => { return x.map((v, k) => { return v - y[k]!; }); };
     const dot = (x: number[], y: number[]): number => { return x[0]! * y[0]! + x[1]! * y[1]! + x[2]! * y[2]!; };
-    const d1 = sub(p.b, p.a);
-    const d2 = sub(q.b, q.a);
-    const r = sub(p.a, q.a);
-    const [a, e, f] = [dot(d1, d1), dot(d2, d2), dot(d2, r)];
-    const c = dot(d1, r);
-    const bb = dot(d1, d2);
-    const den = a * e - bb * bb;
-    let s = den > 1e-9 ? Math.min(Math.max((bb * f - c * e) / den, 0), 1) : 0;
-    let t = e > 1e-9 ? (bb * s + f) / e : 0;
+    const d1 = sub(first.b, first.a);
+    const d2 = sub(second.b, second.a);
+    const between = sub(first.a, second.a);
+    const [a, e, f] = [dot(d1, d1), dot(d2, d2), dot(d2, between)];
+    const c = dot(d1, between);
+    const directionsDot = dot(d1, d2);
+    const denominator = a * e - directionsDot * directionsDot;
+    let s = denominator > 1e-9 ? Math.min(Math.max((directionsDot * f - c * e) / denominator, 0), 1) : 0;
+    let t = e > 1e-9 ? (directionsDot * s + f) / e : 0;
     if (t < 0 || t > 1)
     {
         t = Math.min(Math.max(t, 0), 1);
-        s = a > 1e-9 ? Math.min(Math.max((bb * t - c) / a, 0), 1) : 0;
+        s = a > 1e-9 ? Math.min(Math.max((directionsDot * t - c) / a, 0), 1) : 0;
     }
-    const gap = sub(sub(p.a, q.a).map((v, k) => { return v + d1[k]! * s; }), d2.map((v) => { return v * t; }));
+    const gap = sub(sub(first.a, second.a).map((v, k) => { return v + d1[k]! * s; }), d2.map((v) => { return v * t; }));
     return Math.sqrt(dot(gap, gap));
 }
 

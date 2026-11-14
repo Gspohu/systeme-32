@@ -28,31 +28,33 @@ export interface PointLoad
 // balances the moments of the loads about their centroid, in x and in z. A negative one is a foot lifting
 export function footReactions(feet: { x: number; z: number }[], loads: PointLoad[]): number[]
 {
+    // A rigid box on equal feet : each takes the mean share plus a plane through the centre of the feet, its slopes
+    // balancing the moments. sxx, szz, sxz the second moments of the feet about that centre, mx, mz those of the loads
     const n = feet.length;
-    const w = loads.reduce((s, l) =>
+    const totalKg = loads.reduce((sum, load) =>
     {
-        return s + l.kg;
+        return sum + load.kg;
     }, 0);
-    const xb = feet.reduce((s, f) => { return s + f.x; }, 0) / n;
-    const zb = feet.reduce((s, f) => { return s + f.z; }, 0) / n;
+    const centreX = feet.reduce((sum, foot) => { return sum + foot.x; }, 0) / n;
+    const centreZ = feet.reduce((sum, foot) => { return sum + foot.z; }, 0) / n;
     let [sxx, szz, sxz, mx, mz] = [0, 0, 0, 0, 0];
-    for (const f of feet)
+    for (const foot of feet)
     {
-        sxx += (f.x - xb) ** 2;
-        szz += (f.z - zb) ** 2;
-        sxz += (f.x - xb) * (f.z - zb);
+        sxx += (foot.x - centreX) ** 2;
+        szz += (foot.z - centreZ) ** 2;
+        sxz += (foot.x - centreX) * (foot.z - centreZ);
     }
-    for (const l of loads)
+    for (const load of loads)
     {
-        mx += l.kg * (l.x - xb);
-        mz += l.kg * (l.z - zb);
+        mx += load.kg * (load.x - centreX);
+        mz += load.kg * (load.z - centreZ);
     }
-    const det = sxx * szz - sxz * sxz;
-    const p = det > 1e-9 ? (mx * szz - mz * sxz) / det : 0;
-    const q = det > 1e-9 ? (sxx * mz - sxz * mx) / det : 0;
-    return feet.map((f) =>
+    const determinant = sxx * szz - sxz * sxz;
+    const slopeX = determinant > 1e-9 ? (mx * szz - mz * sxz) / determinant : 0;
+    const slopeZ = determinant > 1e-9 ? (sxx * mz - sxz * mx) / determinant : 0;
+    return feet.map((foot) =>
     {
-        return w / n + p * (f.x - xb) + q * (f.z - zb);
+        return totalKg / n + slopeX * (foot.x - centreX) + slopeZ * (foot.z - centreZ);
     });
 }
 

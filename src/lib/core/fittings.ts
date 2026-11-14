@@ -420,34 +420,36 @@ export function fitBackScrews(c: Carcass, lay: ResolvedLayout, b: Build): void
 
 
 // Screws along each run of the frame of the carcass, clear of the screws already there. How many were placed
-function screwBack(c: Carcass, back: Part, runs: [number, number, number, number][], pitch: number, b: Build): number
+function screwBack(carcass: Carcass, back: Part, runs: [number, number, number, number][], pitch: number,
+                   build: Build): number
 {
-    const f = back.frame!;
+    const frame = back.frame!;
     // The screws of the carcass already placed : a back screw reaches 30 in, it keeps a screw's width off them
-    const others = b.parts.filter((q) =>
+    const others = build.parts.filter((part) =>
     {
-        return q.item === c.id && q.id !== back.id && q.frame !== null && q.curve === null;
-    }).flatMap((q) =>
+        return part.item === carcass.id && part.id !== back.id && part.frame !== null && part.curve === null;
+    }).flatMap((part) =>
     {
-        return q.holes.filter((h) =>
+        return part.holes.filter((hole) =>
         {
-            return (h.face === "A" || h.face === "B") && screwOf(h.purpose, h.label) !== null;
-        }).map((h) =>
+            return (hole.face === "A" || hole.face === "B") && screwOf(hole.purpose, hole.label) !== null;
+        }).map((hole) =>
         {
-            const way = h.face === "A" ? neg(q.frame!.n) : q.frame!.n;
-            return { p: at(q.frame!, h.u, h.v, h.face === "A" ? 0 : q.thickness), way, spec: screwOf(h.purpose,
-                h.label)! };
+            const way = hole.face === "A" ? neg(part.frame!.n) : part.frame!.n;
+            return { head: at(part.frame!, hole.u, hole.v, hole.face === "A" ? 0 : part.thickness), way,
+                     spec: screwOf(hole.purpose, hole.label)! };
         });
     });
     const clearOfOthers = (x: number, y: number): boolean =>
     {
-        return !others.some((o) =>
+        return !others.some((screw) =>
         {
-            for (let d = 0; d <= o.spec.length; d += 2)
+            for (let depth = 0; depth <= screw.spec.length; depth += 2)
             {
-                const q: Vec3 = [o.p[0] - o.way[0] * d, o.p[1] - o.way[1] * d, o.p[2] - o.way[2] * d];
-                const off = Math.hypot(q[0] - (c.x + x), q[1] - (c.y + y));
-                if (off < (4 + o.spec.diameter) / 2 + 2 && q[2] >= c.z && q[2] <= c.z + 30)
+                const point: Vec3 = [screw.head[0] - screw.way[0] * depth, screw.head[1] - screw.way[1] * depth,
+                                     screw.head[2] - screw.way[2] * depth];
+                const off = Math.hypot(point[0] - (carcass.x + x), point[1] - (carcass.y + y));
+                if (off < (4 + screw.spec.diameter) / 2 + 2 && point[2] >= carcass.z && point[2] <= carcass.z + 30)
                 {
                     return true;
                 }
@@ -455,40 +457,41 @@ function screwBack(c: Carcass, back: Part, runs: [number, number, number, number
             return false;
         });
     };
-    let qty = 0;
+    let placed = 0;
     for (const [x0, y0, x1, y1] of runs)
     {
         const length = Math.hypot(x1 - x0, y1 - y0);
-        for (const s of spread(length, BACK_SCREW_END, pitch))
+        for (const along of spread(length, BACK_SCREW_END, pitch))
         {
-            const shift = BACK_SCREW_SHIFTS.find((d) =>
+            const shift = BACK_SCREW_SHIFTS.find((tried) =>
             {
-                const k = Math.min(Math.max((s + d) / length, 0), 1);
-                return clearOfOthers(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k);
+                const fraction = Math.min(Math.max((along + tried) / length, 0), 1);
+                return clearOfOthers(x0 + (x1 - x0) * fraction, y0 + (y1 - y0) * fraction);
             });
             if (shift === undefined)
             {
                 continue;
             }
-            const k = Math.min(Math.max((s + shift) / length, 0), 1);
-            const q: Vec3 = [c.x + x0 + (x1 - x0) * k - f.o[0], c.y + y0 + (y1 - y0) * k - f.o[1], 0];
-            const u = q[0] * f.u[0] + q[1] * f.u[1];
-            const v = q[0] * f.v[0] + q[1] * f.v[1];
-            const inHole = back.cutouts.some((o) =>
+            const fraction = Math.min(Math.max((along + shift) / length, 0), 1);
+            const fromOrigin: Vec3 = [carcass.x + x0 + (x1 - x0) * fraction - frame.o[0],
+                                      carcass.y + y0 + (y1 - y0) * fraction - frame.o[1], 0];
+            const u = fromOrigin[0] * frame.u[0] + fromOrigin[1] * frame.u[1];
+            const v = fromOrigin[0] * frame.v[0] + fromOrigin[1] * frame.v[1];
+            const inHole = back.cutouts.some((cutout) =>
             {
-                const r = o.segments[0]!;
-                return r.kind === "arc" && Math.hypot(u - r.cx, v - r.cy) < Math.hypot(r.x - r.cx, r.y -
-                    r.cy) + BACK_SCREW_END / 4;
+                const arc = cutout.segments[0]!;
+                return arc.kind === "arc" && Math.hypot(u - arc.cx, v - arc.cy) < Math.hypot(arc.x - arc.cx, arc.y -
+                    arc.cy) + BACK_SCREW_END / 4;
             });
             if (!inHole)
             {
                 back.holes.push({ u, v, diameter: 0, depth: 0, face: "B", label: "Vis 4 x 30 du fond",
                                   purpose: "back-screw" });
-                qty++;
+                placed++;
             }
         }
     }
-    return qty;
+    return placed;
 }
 
 

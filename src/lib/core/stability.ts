@@ -152,11 +152,11 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
 {
     const out: Stability[] = [];
     const bySolidPart = new Map<string, Solid[]>();
-    for (const s of all)
+    for (const solid of all)
     {
-        if (s.part !== null)
+        if (solid.part !== null)
         {
-            bySolidPart.set(s.part, [...(bySolidPart.get(s.part) ?? []), s]);
+            bySolidPart.set(solid.part, [...(bySolidPart.get(solid.part) ?? []), solid]);
         }
     }
     for (const body of bodies(project, all))
@@ -167,21 +167,22 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
         }));
         // centre of mass : each part at the middle of its own volumes
         let massKg = 0;
-        const c: [number, number, number] = [0, 0, 0];
-        for (const p of b.parts)
+        // Sum of mass times position, divided by the mass once summed
+        const massMoment: [number, number, number] = [0, 0, 0];
+        for (const part of b.parts)
         {
-            const vols = bySolidPart.get(p.id);
-            if (!ids.has(p.item) || vols === undefined)
+            const vols = bySolidPart.get(part.id);
+            if (!ids.has(part.item) || vols === undefined)
             {
                 continue;
             }
-            const mass = partMass(p, false);
-            for (const v of vols)
+            const mass = partMass(part, false);
+            for (const volume of vols)
             {
                 let k = 0;
                 while (k < 3)
                 {
-                    c[k] = c[k]! + mass / vols.length * (v.min[k]! + v.max[k]!) / 2;
+                    massMoment[k] = massMoment[k]! + mass / vols.length * (volume.min[k]! + volume.max[k]!) / 2;
                     k++;
                 }
             }
@@ -191,29 +192,32 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
         {
             continue;
         }
-        const centre: [number, number, number] = [c[0] / massKg, c[1] / massKg, c[2] / massKg];
+        const centre: [number, number, number] = [massMoment[0] / massKg, massMoment[1] / massKg,
+                                                  massMoment[2] / massKg];
         // What touches the floor : round foot plates, else the floor face of the parts lying on it
         const contact: [number, number][] = [];
-        for (const s of all)
+        for (const solid of all)
         {
-            if (!ids.has(s.item) || s.min[1] > CLASH_TOL)
+            if (!ids.has(solid.item) || solid.min[1] > CLASH_TOL)
             {
                 continue;
             }
-            const cx = (s.min[0] + s.max[0]) / 2;
-            const cz = (s.min[2] + s.max[2]) / 2;
-            if (s.purpose === "foot-pad")
+            const padX = (solid.min[0] + solid.max[0]) / 2;
+            const padZ = (solid.min[2] + solid.max[2]) / 2;
+            if (solid.purpose === "foot-pad")
             {
                 let k = 0;
                 while (k < 16)
                 {
-                    const a = 2 * Math.PI * k / 16;
-                    contact.push([cx + AXILO_PLATE_D / 2 * Math.cos(a), cz + AXILO_PLATE_D / 2 * Math.sin(a)]);
+                    const angle = 2 * Math.PI * k / 16;
+                    contact.push([padX + AXILO_PLATE_D / 2 * Math.cos(angle), padZ + AXILO_PLATE_D / 2 *
+                                  Math.sin(angle)]);
                     k++;
                 }
                 continue;
             }
-            contact.push([s.min[0], s.min[2]], [s.max[0], s.min[2]], [s.min[0], s.max[2]], [s.max[0], s.max[2]]);
+            contact.push([solid.min[0], solid.min[2]], [solid.max[0], solid.min[2]], [solid.min[0], solid.max[2]],
+                         [solid.max[0], solid.max[2]]);
         }
         const poly = hull(contact);
         if (poly.length < 3)
@@ -221,11 +225,11 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
             continue;
         }
         const first = body[0]!;
-        const wallDir = (d: [number, number]): [number, number, number] =>
+        const wallDir = (dir: [number, number]): [number, number, number] =>
         {
-            const o = toWall(first.wall, project.room, [0, 0, 0]);
-            const q = toWall(first.wall, project.room, [d[0], 0, d[1]]);
-            return [q[0] - o[0], 0, q[2] - o[2]];
+            const origin = toWall(first.wall, project.room, [0, 0, 0]);
+            const tip = toWall(first.wall, project.room, [dir[0], 0, dir[1]]);
+            return [tip[0] - origin[0], 0, tip[2] - origin[2]];
         };
         // A body backed against its wall can't fall backwards : the wall stop it
         const backed = body.some((it) =>
@@ -242,12 +246,12 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
             const [x0, z0] = poly[i]!;
             const [x1, z1] = poly[(i + 1) % poly.length]!;
             const len = Math.hypot(x1 - x0, z1 - z0);
-            const d = ((x1 - x0) * (centre[2] - z0) - (z1 - z0) * (centre[0] - x0)) / len;
+            const inset = ((x1 - x0) * (centre[2] - z0) - (z1 - z0) * (centre[0] - x0)) / len;
             const side = sideName(wallDir([(z1 - z0) / len, -(x1 - x0) / len]));
-            margin = Math.min(margin, d);
-            if (d < open && !(backed && side === "l'arrière"))
+            margin = Math.min(margin, inset);
+            if (inset < open && !(backed && side === "l'arrière"))
             {
-                open = d;
+                open = inset;
                 towards = side;
             }
             i++;
@@ -261,15 +265,15 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
         });
         if (drawers.length > 0)
         {
-            const zs = contact.map(([x, z]) =>
+            const contactDepths = contact.map(([x, z]) =>
             {
                 return toWall(first.wall, project.room, [x, 0, z])[2];
             });
-            const front = Math.max(...zs);
-            const back = Math.min(...zs);
+            const front = Math.max(...contactDepths);
+            const back = Math.min(...contactDepths);
             const alpha = Math.atan2(ASTM_CARPET_BLOCK, front - back);
-            const cw = toWall(first.wall, project.room, centre);
-            const restore = massKg * ((front - cw[2]) * Math.cos(alpha) - cw[1] * Math.sin(alpha));
+            const centreOnWall = toWall(first.wall, project.room, centre);
+            const restore = massKg * ((front - centreOnWall[2]) * Math.cos(alpha) - centreOnWall[1] * Math.sin(alpha));
             let worst = -Infinity;
             for (const it of drawers)
             {
@@ -279,9 +283,10 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
                 }
                 // The load stands at the top of the carcass, the highest a drawer edge can be
                 // TODO ASTM loads each drawer in turn at its own heigth, the top is the worst case taken for all
-                const zL = it.z + it.depth + topDrawerExtension(it);
-                const yL = it.y + it.height;
-                worst = Math.max(worst, ASTM_DRAWER_LOAD_KG * ((zL - front) * Math.cos(alpha) + yL * Math.sin(alpha)));
+                const loadDepth = it.z + it.depth + topDrawerExtension(it);
+                const loadHeight = it.y + it.height;
+                worst = Math.max(worst, ASTM_DRAWER_LOAD_KG * ((loadDepth - front) * Math.cos(alpha)
+                    + loadHeight * Math.sin(alpha)));
             }
             carpet = { passes: margin > 0 && restore > worst, tiltDeg: alpha * 180 / Math.PI };
         }

@@ -184,34 +184,34 @@ export function stopAtWalls(p: Project, b: Build): void
         return [it.id, it.wall];
     }));
     const boxes = new Map<string, Obb>();
-    for (const q of b.parts)
+    for (const part of b.parts)
     {
-        const box = partBox(q);
+        const box = partBox(part);
         if (box !== null)
         {
-            boxes.set(q.id, box);
+            boxes.set(part.id, box);
         }
     }
-    for (const f of b.fitted)
+    for (const fitting of b.fitted)
     {
-        if (f.host !== null)
+        if (fitting.host !== null)
         {
-            boxes.set(f.key, { centre: f.centre, axes: f.axes, half: f.half });
+            boxes.set(fitting.key, { centre: fitting.centre, axes: fitting.axes, half: fitting.half });
         }
     }
-    for (const m of b.motions)
+    for (const motion of b.motions)
     {
-        if (m.kind !== "turn")
+        if (motion.kind !== "turn")
         {
             continue;
         }
-        const wall = wallOf.get(m.item) ?? "back";
-        const moved = [...m.parts, ...b.fitted.filter((f) =>
+        const wall = wallOf.get(motion.item) ?? "back";
+        const moved = [...motion.parts, ...b.fitted.filter((fitting) =>
         {
-            return f.host !== null && m.parts.includes(f.host);
-        }).map((f) =>
+            return fitting.host !== null && motion.parts.includes(fitting.host);
+        }).map((fitting) =>
         {
-            return f.key;
+            return fitting.key;
         })].flatMap((id) =>
         {
             const box = boxes.get(id);
@@ -220,10 +220,10 @@ export function stopAtWalls(p: Project, b: Build): void
         // A door whose every corner stays further from the walls than the pivot is, whatever the turn, is let be
         const reach = Math.max(0, ...moved.map((box) =>
         {
-            const off = add(box.centre, m.pivot, -1);
+            const off = add(box.centre, motion.pivot, -1);
             return Math.hypot(...off) + Math.hypot(...box.half);
         }));
-        const pivot = toRoom(wall, p.room, m.pivot);
+        const pivot = toRoom(wall, p.room, motion.pivot);
         const near = pivot[2] - reach < 0 || (sides.has("left") && pivot[0] - reach < 0)
             || (sides.has("right") && pivot[0] + reach > p.room.width);
         if (!near)
@@ -232,32 +232,32 @@ export function stopAtWalls(p: Project, b: Build): void
         }
         const hitAt = (deg: number): { wall: string; by: number } | null =>
         {
-            const at = { ...m, amount: deg };
+            const turned = { ...motion, amount: deg };
             for (const box of moved)
             {
-                const h = pastWalls(inRoom(carried(box, at, 1), wall, p), p, sides);
-                if (h !== null)
+                const crossing = pastWalls(inRoom(carried(box, turned, 1), wall, p), p, sides);
+                if (crossing !== null)
                 {
-                    return h;
+                    return crossing;
                 }
             }
             return null;
         };
         // Every 5 deg, then degree by degree in the last stretch before the first one that hits
         let coarse = 5;
-        while (coarse < m.amount + 5 && hitAt(Math.min(coarse, m.amount)) === null)
+        while (coarse < motion.amount + 5 && hitAt(Math.min(coarse, motion.amount)) === null)
         {
             coarse += 5;
         }
         let deg = coarse - 4;
-        while (deg <= Math.min(coarse, m.amount))
+        while (deg <= Math.min(coarse, motion.amount))
         {
             const hit = hitAt(deg);
             if (hit !== null)
             {
-                m.full = m.amount;
-                m.stoppedBy = hit.wall;
-                m.amount = deg - 1;
+                motion.full = motion.amount;
+                motion.stoppedBy = hit.wall;
+                motion.amount = deg - 1;
                 break;
             }
             deg++;

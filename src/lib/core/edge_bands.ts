@@ -99,38 +99,39 @@ function turn(segments: { from: Pt; s: Segment }[]): number
 }
 
 
-function intersect(a: Carrier, b: Carrier, near: Pt): Pt | null
+function intersect(first: Carrier, second: Carrier, near: Pt): Pt | null
 {
-    if (a.kind === "line" && b.kind === "line")
+    if (first.kind === "line" && second.kind === "line")
     {
-        const det = a.d[0] * b.d[1] - a.d[1] * b.d[0];
-        if (Math.abs(det) < 1e-9)
+        const determinant = first.d[0] * second.d[1] - first.d[1] * second.d[0];
+        if (Math.abs(determinant) < 1e-9)
         {
             return null;
         }
-        const t = ((b.p[0] - a.p[0]) * b.d[1] - (b.p[1] - a.p[1]) * b.d[0]) / det;
-        return [a.p[0] + a.d[0] * t, a.p[1] + a.d[1] * t];
+        const t = ((second.p[0] - first.p[0]) * second.d[1] - (second.p[1] - first.p[1]) * second.d[0]) / determinant;
+        return [first.p[0] + first.d[0] * t, first.p[1] + first.d[1] * t];
     }
-    if (a.kind === "circle" && b.kind === "circle")
+    if (first.kind === "circle" && second.kind === "circle")
     {
         // Tangent arcs of a basket handle : no crossing worth taking, the caller offsets the junction along the normal
         return null;
     }
-    const line = (a.kind === "line" ? a : b) as Carrier & { kind: "line" };
-    const circle = (a.kind === "circle" ? a : b) as Carrier & { kind: "circle" };
-    const f: Pt = [line.p[0] - circle.c[0], line.p[1] - circle.c[1]];
-    const A = line.d[0] ** 2 + line.d[1] ** 2;
-    const B = 2 * (f[0] * line.d[0] + f[1] * line.d[1]);
-    const C = f[0] ** 2 + f[1] ** 2 - circle.r ** 2;
-    const disc = B * B - 4 * A * C;
+    const line = (first.kind === "line" ? first : second) as Carrier & { kind: "line" };
+    const circle = (first.kind === "circle" ? first : second) as Carrier & { kind: "circle" }; 
+    const fromCentre: Pt = [line.p[0] - circle.c[0], line.p[1] - circle.c[1]];
+    const squareCoef = line.d[0] ** 2 + line.d[1] ** 2;
+    const linearCoef = 2 * (fromCentre[0] * line.d[0] + fromCentre[1] * line.d[1]);
+    const constantCoef = fromCentre[0] ** 2 + fromCentre[1] ** 2 - circle.r ** 2;
+    const disc = linearCoef * linearCoef - 4 * squareCoef * constantCoef;
     if (disc < -1e-6)
     {
         return null;
     }
-    const roots = [(-B - Math.sqrt(Math.max(disc, 0))) / (2 * A), (-B + Math.sqrt(Math.max(disc, 0))) / (2 * A)];
-    const pts = roots.map((t): Pt => { return [line.p[0] + line.d[0] * t, line.p[1] + line.d[1] * t]; });
-    return pts.sort((p, q) => { return Math.hypot(p[0] - near[0], p[1] - near[1]) - Math.hypot(q[0] -
-        near[0], q[1] - near[1]); })[0]!;
+    const roots = [(-linearCoef - Math.sqrt(Math.max(disc, 0))) / (2 * squareCoef),
+                   (-linearCoef + Math.sqrt(Math.max(disc, 0))) / (2 * squareCoef)];
+    const crossings = roots.map((t): Pt => { return [line.p[0] + line.d[0] * t, line.p[1] + line.d[1] * t]; });
+    return crossings.sort((one, other) => { return Math.hypot(one[0] - near[0], one[1] - near[1])
+        - Math.hypot(other[0] - near[0], other[1] - near[1]); })[0]!;  
 }
 
 
