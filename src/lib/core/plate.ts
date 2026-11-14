@@ -3,6 +3,9 @@
 // Notation, lengths in mm and forces in N : E the bending modulus of the board in N/mm2, nu its Poisson raito, t its
 // thickness, q the pressure on it in N/mm2, w its deflection, positive along the load. D, K and F where they're made
 
+// Ritz : w is sought as a sum of trial functions c_k w_k, the coefficients c_k those minimising the bending energy
+// less the work of the loads
+
 import type { Part, PlateHold } from "./part_types";
 import type { Deflection } from "./mechanics";
 import { bounds, insidePolygon, tessellate } from "./geometry";
@@ -18,7 +21,8 @@ const POLYNOMIAL_DEGREE = 5;
 // on the shelf of a quarter R300 seat end down to the floor, carcass 600 x 450 x 500 on a plinth
 const POLYNOMIAL_DEGREE_WITH_POSTS = 11;
 const CELLS_ALONG_LONGEST_SIDE = 80;
-// An outline further than this past its support line lies on both sides of it
+// An outline further than this past its support line lies on both sides of it, and a post must stand this far
+// inside the outline
 const SIDE_TOLERANCE = 0.5;
 // A post as stiff as this many times the plate over its size, a rigid point in practice
 // TODO a post is a point here, its 19 x width section bearing over an area would sitffen the plate a little more
@@ -45,7 +49,7 @@ type SupportLine = PlateHold["lines"][number];
 
 
 // The trial functions : w_k(u, v) = U_i(u) V_j(v) for each pair of exponents (i, j) of total degree at most `degree`
-// U_i the support factor of the u line times the i-th power of u brought to [-1, 1], V_j the same along v
+// U_i the support factor of the u line times the i-th power of the scaled u, V_j the same along v
 interface TrialBasis
 {
     exponents: [number, number][];
@@ -53,12 +57,12 @@ interface TrialBasis
     vLine: SupportLine | undefined;
     uStart: number;
     vStart: number;
-    // The longest side of the outline, mm : both axes brought to [-1, 1] over it
+    // The longest side of the outline, mm : it goes from -1 to 1 once scaled, the other axis at the same scale
     scale: number;
     degree: number;
     uTerms: Float64Array;
     vTerms: Float64Array;
-    // At the last point evaluated : each trial function, its 2 curvatures and its wtist
+    // Rewritten at each point evaluated : ech trial function, its 2 curvatures and its wtist
     deflection: Float64Array;
     curvatureU: Float64Array;
     curvatureV: Float64Array;
@@ -66,25 +70,27 @@ interface TrialBasis
 }
 
 
-// Value, slope and curvature along one axis of each trial term at x : the support factor times the monomial
-// The support factor vanishes on its line, to the first power for a simple support (w = 0) and to the second for a
-// clamped one (w = 0 and sloep 0), the board lying on the side the line points to
-function axisTrialTerms(x: number, line: SupportLine | undefined, axisStart: number, scale: number, degree: number,
+// Value, slope and curvature of each trial term along one axis, at `coord` mm on that axis : the support factor
+// times the monomial
+function axisTrialTerms(coord: number, line: SupportLine | undefined, axisStart: number, scale: number, degree: number,  
                         out: Float64Array): void
 {
+    // The support factor vanishes on its lne, to the first power for a simple support (w = 0) and to the second for
+    // a clamped one (w = 0 and sloep 0), the board lying on the side the line points to
     let supportFactor = 1;
     let supportSlope = 0;
     let supportCurvature = 0;
     if (line !== undefined)
     {
-        const towardsBoard = line.side / scale;
-        const distance = towardsBoard * (x - line.at);
-        supportFactor = line.clamped ? distance * distance : distance;
-        supportSlope = line.clamped ? 2 * distance * towardsBoard : towardsBoard;
-        supportCurvature = line.clamped ? 2 * towardsBoard * towardsBoard : 0;
+        // The side of the board over the scael, in 1/mm : the distance to the line, positive on the board, scaled
+        const signPerMm = line.side / scale;
+        const scaledDistance = signPerMm * (coord - line.at);
+        supportFactor = line.clamped ? scaledDistance * scaledDistance : scaledDistance;
+        supportSlope = line.clamped ? 2 * scaledDistance * signPerMm : signPerMm;
+        supportCurvature = line.clamped ? 2 * signPerMm * signPerMm : 0;
     }
-    // The coordinate brought to [-1, 1] over the outline, and its derivative in 1/mm
-    const unitCoord = 2 * (x - axisStart) / scale - 1;
+    // The coordinate scaled so the longest side runs from -1 to 1, and its derviative in 1/mm
+    const unitCoord = 2 * (coord - axisStart) / scale - 1;
     const unitPerMm = 2 / scale;
     // unitCoord to the powers i - 2, i - 1 and i, carried along the loop
     let powerIMinus2 = 0;
@@ -117,10 +123,10 @@ function trialBasis(lines: PlateHold["lines"], outline: [number, number][], degr
         }
     }
     const count = exponents.length;
-    return { 
+    return {
         exponents, degree,
-        uLine: lines.find((l) => { return l.axis === "u"; }),
-        vLine: lines.find((l) => { return l.axis === "v"; }),
+        uLine: lines.find((support) => { return support.axis === "u"; }),
+        vLine: lines.find((support) => { return support.axis === "v"; }),
         uStart: box.minX, vStart: box.minY, scale: Math.max(box.maxX - box.minX, box.maxY - box.minY),
         uTerms: new Float64Array(TERM_STRIDE * (degree + 1)), vTerms: new Float64Array(TERM_STRIDE * (degree + 1)),
         deflection: new Float64Array(count), curvatureU: new Float64Array(count), curvatureV: new Float64Array(count),
@@ -129,20 +135,19 @@ function trialBasis(lines: PlateHold["lines"], outline: [number, number][], degr
 }
 
 
-// Fills the buffers of the basis wtih each trial function at (u, v) : w_k, d2w_k/du2, d2w_k/dv2 and d2w_k/du dv
+// Each trial function at (u, v) : w_k, d2w_k/du2, d2w_k/dv2 and d2w_k/du dv, writen in the buffers of the basis
+// The basis itself comes back : read it before the next call, which overwrites it
 function evaluateBasis(basis: TrialBasis, u: number, v: number): TrialBasis
 {
     axisTrialTerms(u, basis.uLine, basis.uStart, basis.scale, basis.degree, basis.uTerms);
     axisTrialTerms(v, basis.vLine, basis.vStart, basis.scale, basis.degree, basis.vTerms);
-    const along = basis.uTerms;
-    const across = basis.vTerms;
     for (let k = 0; k < basis.exponents.length; k++)
     {
         const [i, j] = basis.exponents[k]!;
-        basis.deflection[k] = along[TERM_STRIDE * i + VALUE]! * across[TERM_STRIDE * j + VALUE]!;
-        basis.curvatureU[k] = along[TERM_STRIDE * i + CURVATURE]! * across[TERM_STRIDE * j + VALUE]!;
-        basis.curvatureV[k] = along[(TERM_STRIDE * i) + VALUE]! * across[TERM_STRIDE * j + CURVATURE]!;
-        basis.twist[k] = along[TERM_STRIDE * i + SLOPE]! * across[TERM_STRIDE * j + SLOPE]!;
+        basis.deflection[k] = basis.uTerms[TERM_STRIDE * i + VALUE]! * basis.vTerms[TERM_STRIDE * j + VALUE]!;
+        basis.curvatureU[k] = basis.uTerms[TERM_STRIDE * i + CURVATURE]! * basis.vTerms[TERM_STRIDE * j + VALUE]!;
+        basis.curvatureV[k] = basis.uTerms[TERM_STRIDE * i + VALUE]! * basis.vTerms[(TERM_STRIDE * j) + CURVATURE]!;
+        basis.twist[k] = basis.uTerms[TERM_STRIDE * i + SLOPE]! * basis.vTerms[TERM_STRIDE * j + SLOPE]!;
     }
     return basis;
 }
@@ -151,7 +156,7 @@ function evaluateBasis(basis: TrialBasis, u: number, v: number): TrialBasis
 // The centres of the square integration cells that fall inside the outline
 function integrationPoints(outline: [number, number][], cellSize: number): [number, number][]
 {
-    const box = bounds(outline);  
+    const box = bounds(outline);
     const points: [number, number][] = [];
     for (let u = box.minX + cellSize / 2; u < box.maxX; u += cellSize)
     {
@@ -168,7 +173,8 @@ function integrationPoints(outline: [number, number][], cellSize: number): [numb
 
 
 // Bending energy of a Kirchhoff plate (Timoshenko and Woinowsky-Krieger, Theory of Plates and Shells, 2nd ed., ch. 2
-// strain energy in pure bending) : V = D/2 x integral of (w_uu + w_vv)^2 - 2 (1 - nu) (w_uu w_vv - w_uv^2)
+// on pure bending, article and equation number not checked) : V = D/2 x integral of (w_uu + w_vv)^2
+// - 2 (1 - nu) (w_uu w_vv - w_uv^2)
 function assembleBending(basis: TrialBasis, points: [number, number][], cellArea: number, rigidity: number, nu: number,
                          pressure: number): { stiffness: number[][]; load: number[] }
 {
@@ -180,14 +186,16 @@ function assembleBending(basis: TrialBasis, points: [number, number][], cellArea
     for (const [u, v] of points)
     {
         const { deflection: w, curvatureU: wuu, curvatureV: wvv, twist: wuv } = evaluateBasis(basis, u, v);
-        for (let a = 0; a < count; a++)
+        for (let termRow = 0; termRow < count; termRow++)
         {
-            load[a]! += pressure * w[a]! * cellArea;
-            const row = stiffness[a]!;
-            for (let b = a; b < count; b++)
+            load[termRow]! += pressure * w[termRow]! * cellArea;
+            const row = stiffness[termRow]!;
+            for (let termColumn = termRow; termColumn < count; termColumn++)
             {
-                row[b]! += rigidity * cellArea * (wuu[a]! * wuu[b]! + wvv[a]! * wvv[b]!
-                    + nu * (wuu[a]! * wvv[b]! + wvv[a]! * wuu[b]!) + 2 * (1 - nu) * wuv[a]! * wuv[b]!);
+                row[termColumn]! += rigidity * cellArea * (wuu[termRow]! * wuu[termColumn]!
+                    + wvv[termRow]! * wvv[termColumn]!
+                    + nu * (wuu[termRow]! * wvv[termColumn]! + wvv[termRow]! * wuu[termColumn]!)
+                    + 2 * (1 - nu) * wuv[termRow]! * wuv[termColumn]!);
             }
         }
     }
@@ -201,25 +209,26 @@ function addPosts(basis: TrialBasis, stiffness: number[][], posts: [number, numb
     for (const [u, v] of posts)
     {
         const w = evaluateBasis(basis, u, v).deflection;
-        for (let a = 0; a < w.length; a++)
+        for (let termRow = 0; termRow < w.length; termRow++)
         {
-            for (let b = a; b < w.length; b++)
+            for (let termColumn = termRow; termColumn < w.length; termColumn++)
             {
-                stiffness[a]![b]! += spring * w[a]! * w[b]!;
+                stiffness[termRow]![termColumn]! += spring * w[termRow]! * w[termColumn]!;
             }
         }
     }
 }
 
 
+// Each point load P in N : its work P w(point) on the load vector F
 function addPointLoads(basis: TrialBasis, load: number[], loads: { u: number; v: number; P: number }[]): void
 {
     for (const point of loads)
     {
         const w = evaluateBasis(basis, point.u, point.v).deflection;
-        for (let a = 0; a < w.length; a++)
+        for (let k = 0; k < w.length; k++)
         {
-            load[a]! += point.P * w[a]!;
+            load[k]! += point.P * w[k]!; 
         }
     }
 }
@@ -244,9 +253,9 @@ function solveLinearSystem(matrix: number[][], rhs: number[]): number[]
         for (let row = column + 1; row < size; row++)
         {
             const factor = augmented[row]![column]! / augmented[column]![column]!;
-            for (let k = column; k <= size; k++)
+            for (let entry = column; entry <= size; entry++)
             {
-                augmented[row]![k]! -= factor * augmented[column]![k]!;
+                augmented[row]![entry]! -= factor * augmented[column]![entry]!;  
             }
         }
     }
@@ -254,9 +263,9 @@ function solveLinearSystem(matrix: number[][], rhs: number[]): number[]
     for (let row = size - 1; row >= 0; row--)
     {
         let remainder = augmented[row]![size]!;
-        for (let k = row + 1; k < size; k++)
+        for (let entry = row + 1; entry < size; entry++)
         {
-            remainder -= augmented[row]![k]! * solution[k]!;
+            remainder -= augmented[row]![entry]! * solution[entry]!;
         }
         solution[row] = remainder / augmented[row]![row]!;
     }
@@ -271,8 +280,12 @@ function findPeak(basis: TrialBasis, coefficients: number[], points: [number, nu
     let peak = { max: -Infinity, at: [0, 0] as [number, number] };
     for (const [u, v] of [...points, ...outline])
     {
-        const w = evaluateBasis(basis, u, v).deflection.reduce((sum, term, k) => { return sum + term *
-            coefficients[k]!; }, 0);
+        const trial = evaluateBasis(basis, u, v).deflection;
+        let w = 0;
+        for (let k = 0; k < trial.length; k++)
+        {
+            w += trial[k]! * coefficients[k]!;
+        }
         if (w > peak.max)
         {
             peak = { max: w, at: [u, v] };
@@ -284,28 +297,34 @@ function findPeak(basis: TrialBasis, coefficients: number[], points: [number, nu
 
 function nearestSupport(hold: PlateHold, [u, v]: [number, number]): number
 {
-    return Math.min(...hold.lines.map((l) => { return Math.abs((l.axis === "u" ? u : v) - l.at); }),
-                    ...hold.posts.map(([pu, pv]) => { return Math.hypot(pu - u, pv - v); }));
+    return Math.min(...hold.lines.map((support) => { return Math.abs((support.axis === "u" ? u : v) - support.at); }),
+                    ...hold.posts.map(([postU, postV]) => { return Math.hypot(postU - u, postV - v); }));
 }
 
 
 // Holds the plate can be worked out on : one line at most per axis and one at least, each edging the outline, every
-// post on the board
+// post strictly on the board, further than SIDE_TOLERANCE from its edges
 function holdable(outline: [number, number][], hold: PlateHold): boolean
 {
     const perAxis = (axis: "u" | "v"): number =>
     {
-        return hold.lines.filter((l) => { return l.axis === axis; }).length;
+        return hold.lines.filter((support) => { return support.axis === axis; }).length;
     };
     if (perAxis("u") + perAxis("v") === 0 || perAxis("u") > 1 || perAxis("v") > 1)
     {
         return false;
     }
-    const astride = hold.lines.some((l) =>
+    const astride = hold.lines.some((support) =>
     {
-        return outline.some(([u, v]) => { return l.side * ((l.axis === "u" ? u : v) - l.at) < -SIDE_TOLERANCE; });
+        return outline.some(([u, v]) =>
+        {
+            return support.side * ((support.axis === "u" ? u : v) - support.at) < -SIDE_TOLERANCE;
+        });
     });
-    const postOff = hold.posts.some(([u, v]) => { return !Number.isFinite(u) || !insidePolygon(outline, u, v, 0); });  
+    const postOff = hold.posts.some(([u, v]) =>
+    {
+        return !Number.isFinite(u) || !insidePolygon(outline, u, v, SIDE_TOLERANCE);
+    });
     return !astride && !postOff;
 }
 
@@ -329,11 +348,11 @@ export function platePeak(outline: [number, number][], hold: PlateHold, t: numbe
     addPosts(basis, K, hold.posts, POST_PENALTY * D / (basis.scale * basis.scale));
     addPointLoads(basis, F, loads);
     // K is symmetric : its lower triangle mirrors the upper one summed above
-    for (let a = 0; a < K.length; a++)
+    for (let termRow = 0; termRow < K.length; termRow++)
     {
-        for (let b = 0; b < a; b++)
+        for (let termColumn = 0; termColumn < termRow; termColumn++)
         {
-            K[a]![b] = K[b]![a]!;
+            K[termRow]![termColumn] = K[termColumn]![termRow]!;
         }
     }
     const peak = findPeak(basis, solveLinearSystem(K, F), points, outline);
@@ -345,24 +364,24 @@ export function platePeak(outline: [number, number][], hold: PlateHold, t: numbe
 // A shelf checked as a plate under the shelf test load and its own weight, judged on twice its reach from the
 // nearest support. Panels only : glass and solid wood have no place in a model taking their Poisson ratio and
 // isotropy. A clamped line is a best case, the figure a lower bound
-export function plateDeflection(p: Part, hold: PlateHold, loadKgPerDm2: number): Deflection | null
+export function plateDeflection(part: Part, hold: PlateHold, loadKgPerDm2: number): Deflection | null 
 {
-    const material = MATERIALS[p.material];
+    const material = MATERIALS[part.material];
     if (material === undefined || material.kind === "glass" || material.kind === "solid")
     {
         return null;
     }
     // kg/dm2 to N/mm2, plus the board itself
-    const pressure = loadKgPerDm2 * GRAVITY / 1e4 + material.density * 1e-9 * p.thickness * GRAVITY;
-    const outline = tessellate(p.outline);
-    const cacheKey = JSON.stringify([outline, hold, p.thickness, material.modulus, pressure]);
+    const pressure = loadKgPerDm2 * GRAVITY / 1e4 + material.density * 1e-9 * part.thickness * GRAVITY;  
+    const outline = tessellate(part.outline);
+    const cacheKey = JSON.stringify([outline, hold, part.thickness, material.modulus, pressure]);  
     if (!solvedPeaks.has(cacheKey))
     {
         if (solvedPeaks.size > CACHE_SIZE)
         {
             solvedPeaks.clear();
         }
-        solvedPeaks.set(cacheKey, platePeak(outline, hold, p.thickness, material.modulus, PANEL_POISSON, pressure));
+        solvedPeaks.set(cacheKey, platePeak(outline, hold, part.thickness, material.modulus, PANEL_POISSON, pressure));
     }
     const peak = solvedPeaks.get(cacheKey)!;
     if (peak === null)
@@ -370,6 +389,7 @@ export function plateDeflection(p: Part, hold: PlateHold, loadKgPerDm2: number):
         return null;
     }
     const span = CANTILEVER_SPAN_FACTOR * peak.reach;
-    return { part: p.id, span, instant: peak.max, final: peak.max * (1 + material.kdef),
-             limit: SHELF_DEFLECTION_LIMIT * span, lowerBound: hold.lines.some((l) => { return l.clamped; }) };
+    return { part: part.id, span, instant: peak.max, final: peak.max * (1 + material.kdef),
+             limit: SHELF_DEFLECTION_LIMIT * span,
+             lowerBound: hold.lines.some((support) => { return support.clamped; }) };
 }
