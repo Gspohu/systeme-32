@@ -28,8 +28,7 @@ export interface PointLoad
 // balances the moments of the loads about their centroid, in x and in z. A negative one is a foot lifting
 export function footReactions(feet: { x: number; z: number }[], loads: PointLoad[]): number[]
 {
-    // A rigid box on equal feet : each takes the mean share plus a plane through the centre of the feet, its slopes
-    // balancing the moments. sxx, szz, sxz the second moments of the feet about that centre, mx, mz those of the loads
+    // sxx, szz, sxz the second moments of the feet about their centre, mx, mz the first moments of the loads about it
     const n = feet.length;
     const totalKg = loads.reduce((sum, load) =>
     {

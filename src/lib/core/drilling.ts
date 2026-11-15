@@ -53,9 +53,9 @@ function axisOf(h: Hole, p: Part): Axis
 }
 
 
-// The closest 2 segments come to each other
 // Shortest distance between 2 segments in space : the closest points first.a + s d1 and second.a + t d2, s and t
-// solved on the 2 infinite lines then clamped to [0, 1], t first, s again when t had to be clamped
+// solved on the 2 infinite lines then clamped to [0, 1], t first, s again when t had to be clamped. a = d1.d1
+// e = d2.d2, f = d2.between, c = d1.between
 function segmentsApart(first: Axis, second: Axis): number
 {
     const sub = (x: number[], y: number[]): number[] => { return x.map((v, k) => { return v - y[k]!; }); };

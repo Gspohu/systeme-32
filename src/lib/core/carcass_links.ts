@@ -174,14 +174,14 @@ function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message
     // Along the normal of A : A spans its tickness from its face A, C its own the way its normal runs
     const levelA = dot(frameA.o, frameA.n);
     const levelC = dot(frameC.o, frameA.n);  
-    const [nearSideC, farSideC] = [Math.min(levelC, levelC + align * panelC.thickness),
+    const [lowSideC, highSideC] = [Math.min(levelC, levelC + align * panelC.thickness),
                                    Math.max(levelC, levelC + align * panelC.thickness)];
     let aTouch: "A" | "B";
-    if (Math.abs(nearSideC - (levelA + panelA.thickness)) < 0.5)
+    if (Math.abs(lowSideC - (levelA + panelA.thickness)) < 0.5)
     {
         aTouch = "B";
     }
-    else if (Math.abs(farSideC - levelA) < 0.5)
+    else if (Math.abs(highSideC - levelA) < 0.5)
     {
         aTouch = "A";
     }
@@ -189,7 +189,7 @@ function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message
     {
         return;
     }
-    const contact = aTouch === "B" ? nearSideC : farSideC;
+    const contact = aTouch === "B" ? lowSideC : highSideC;
     const cTouch = Math.abs(levelC - contact) < 0.5 ? "A" : "B";
     const local = (panel: Part, point: Vec3): [number, number] =>
     {

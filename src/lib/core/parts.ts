@@ -283,20 +283,21 @@ function buildBack(c: Carcass, b: Build): void
         return;
     }
     // Back in grooves cut into sides, top and bottom, 1 mm play on each side of the groove bottom
-    const groove = c.back;
-    const backWidth = boxWidth - 2 * board + 2 * groove.depth - 2;
-    const backHeight = boxHeight - 2 * board + 2 * groove.depth - 2;
+    // The back as set : its own thickness, the depth of the grooves it sits in and their offset from the back edge
+    const backSpec = c.back;
+    const backWidth = boxWidth - 2 * board + 2 * backSpec.depth - 2;
+    const backHeight = boxHeight - 2 * board + 2 * backSpec.depth - 2;
     const wide = backWidth > backHeight;
     const back = newPart({
-        item: c.id, itemName: c.name, thickness: groove.thickness, decor: c.backDecor,
+        item: c.id, itemName: c.name, thickness: backSpec.thickness, decor: c.backDecor,
         id: `${c.id}/back`, label: "Fond en rainure", role: "back", length: wide ? backWidth : backHeight,
         width: wide ? backHeight : backWidth, edges: [],
-        frame: { o: [ox + board - groove.depth + 1, oy + board - groove.depth + 1, oz + groove.offset +
-                     groove.thickness],
+        frame: { o: [ox + board - backSpec.depth + 1, oy + board - backSpec.depth + 1, oz + backSpec.offset +
+                     backSpec.thickness],
                  u: wide ? X : Y, v: wide ? Y : X, n: neg(Z) },
     });
     b.parts.push(back);
-    const vGroove = c.depth - groove.offset - groove.thickness / 2;
+    const vGroove = c.depth - backSpec.offset - backSpec.thickness / 2;
     // The groove stops inside the sides but runs through top and bottom, which sit between them
     for (const panel of b.parts)
     {
@@ -304,11 +305,11 @@ function buildBack(c: Carcass, b: Build): void
         {
             continue;
         }
-        const grooveStart = panel.role === "side" ? board - groove.depth : 0;
-        const grooveEnd = panel.role === "side" ? panel.length - board + groove.depth : panel.length;
+        const grooveStart = panel.role === "side" ? board - backSpec.depth : 0;
+        const grooveEnd = panel.role === "side" ? panel.length - board + backSpec.depth : panel.length;
         panel.grooves.push({ face: "A", along: "u", at: vGroove, from: grooveStart, to: grooveEnd,
-                             width: groove.thickness + 0.5, depth: groove.depth,
-                             label: `Rainure de fond ${groove.thickness + 0.5} x ${groove.depth}` });
+                             width: backSpec.thickness + 0.5, depth: backSpec.depth,
+                             label: `Rainure de fond ${backSpec.thickness + 0.5} x ${backSpec.depth}` });
     }
 }
 

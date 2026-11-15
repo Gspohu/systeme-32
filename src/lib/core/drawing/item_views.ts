@@ -33,17 +33,17 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const fullHeight = k.height + standHeight;
     // A tall item lines front, cut and side up on one row with the plan under the front, a wide and low one stacks
     // the cut under the front with the side beside it : whichever reads at the larger scale
-    const wide = k.width + reachLeft + reachRight;
+    const fullWidth = k.width + reachLeft + reachRight;
     const availW = A3.w - 2 * MARGIN - 20;
     const availH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 20;
-    const fits = (s: number, stacked: boolean): boolean =>
+    const fits = (s: number, asStack: boolean): boolean =>
     {
-        if (stacked)
+        if (asStack)
         {
             const tall = (2 * fullHeight + k.depth) / s + 3 * VIEW_GAP;
-            return (wide + k.depth) / s + 2 * VIEW_GAP <= availW && tall <= availH;
+            return (fullWidth + k.depth) / s + 2 * VIEW_GAP <= availW && tall <= availH;
         }
-        const long = (2 * wide + k.depth) / s + 3 * VIEW_GAP;
+        const long = (2 * fullWidth + k.depth) / s + 3 * VIEW_GAP;
         return long <= availW && (fullHeight + k.depth) / s + 2 * VIEW_GAP <= availH;
     };
     const last = SCALES[SCALES.length - 1]!;

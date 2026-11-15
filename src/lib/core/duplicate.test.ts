@@ -23,7 +23,6 @@ function column(): Project
 
 describe("a duplicated carcass", () =>
 {
-    console.log("Chien"); 
     it("stands beside the original, its holes, prints and drilled cells on its own cells", () =>
     {
         const p = column();

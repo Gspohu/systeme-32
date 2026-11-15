@@ -167,7 +167,6 @@ export function stability(project: Project, b: Build, all: Solid[]): Stability[]
         }));
         // centre of mass : each part at the middle of its own volumes
         let massKg = 0;
-        // Sum of mass times position, divided by the mass once summed
         const massMoment: [number, number, number] = [0, 0, 0];
         for (const part of b.parts)
         {

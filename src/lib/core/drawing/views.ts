@@ -479,8 +479,8 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
         return originX + along / scale;
     }, floorY + 2, floorY + 8, "h");
     // Where the sections of this set are cut, a long line with its letter at each end
-    const cutOf = sectionPlanes(p, a, wall);
-    for (const plane of cutOf)
+    const planes = sectionPlanes(p, a, wall);
+    for (const plane of planes)
     {
         if (plane.axis === "x")
         {
