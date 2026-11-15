@@ -47,14 +47,25 @@ test.describe("plans and lists", () =>
     {
         await outputsTab(page, "Montage");
         const titles = page.locator(".assembly .section-title");
-        // The right column waits for the high cupboards it would have to slide in beside, the small loose columns
-        // go last (assembly.test.ts)
-        await expect(titles).toHaveText(["Colonne gauche", "Placards et tiroirs", "Niche", "Placards hauts",
-                                         "Colonne droite", "Petite colonne gauche", "Petite colonne droite"]);
-        await expect(page.locator(".assembly").first()).toContainText("7 embases 174H7100E enfoncées");
-        // The niche hides its links (4 x 30 from inside), the high cupboards still bolt to the columns
-        await expect(page.locator(".assembly", { has: page.locator(".section-title", { hasText: /^Placards hauts$/ }) }))
-            .toContainText("vis de liaison 267.07.903");
+        // Each carcass after what its bench builds for it, the whole last. The right column waits for the high
+        // cupboards it would have to slide in beside, the small loose columns go last (assembly.test.ts)
+        await expect(titles).toHaveText(["#110 Porte 1", "#120 Porte 2", "#130 Porte 3", "#140 Plinthe avant",
+                                         "#100 Colonne gauche", "#210 Abattant tombant 1", "#220 Porte 1", "#230 Porte 2",
+                                         "#240 Tiroir 1", "#250 Tiroir 2", "#260 Tiroir 3", "#270 Tiroir intérieur 1",
+                                         "#280 Plinthe avant", "#200 Placards et tiroirs", "#300 Niche", "#410 Porte 1",
+                                         "#420 Porte 2", "#430 Porte 3", "#400 Placards hauts", "#710 Porte 1",
+                                         "#720 Plinthe avant", "#700 Colonne droite", "#500 Petite colonne gauche",
+                                         "#600 Petite colonne droite", "#000 Vaisselier bibliothèque"]);
+        const section = (title: RegExp) =>
+        {
+            return page.locator(".assembly", { has: page.locator(".section-title", { hasText: title }) });
+        };
+        await expect(section(/^#100 Colonne gauche$/)).toContainText("7 x Embase en croix EXPANDO, NI sur #100-001 Joue gauche");
+        // Tied once all stand, in the whole : the niche hides its links (4 x 30 from inside), the high cupboards still
+        // bolt to the columns
+        const whole = section(/^#000 Vaisselier bibliothèque$/);
+        await expect(whole).toContainText("Lier les meubles : Vis 4 x 30 vers Niche");
+        await expect(whole).toContainText("Lier les meubles : Vis de liaison et son manchon sur #400-");
     });
 
 
@@ -199,7 +210,8 @@ test.describe("plans and lists", () =>
         await outputsTab(page, "Chiffrage");
         await expect(page.locator(".tab-content td", { hasText: "Port Interfit (Royaume-Uni)" })).toBeVisible();
         await expect(page.locator(".tab-content p.muted", { hasText: "hors UE, TVA à l'import" }).first()).toBeVisible();
-        await expect(page.locator(".tab-content td", { hasText: "heures à saisir dans les Réglages" }).first()).toBeVisible();
+        await expect(page.locator(".tab-content td",
+                                  { hasText: "heures à saisir dans les Réglages" }).first()).toBeVisible();
         const total = page.locator(".tab-content p strong", { hasText: "Total HT" });
         const before = await total.innerText();
 
