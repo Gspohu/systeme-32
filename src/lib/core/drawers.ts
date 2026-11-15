@@ -339,13 +339,14 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
         frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS + BOX_THICKNESS, oz + zFront - BOX_THICKNESS],
                  u: X, v: neg(Z), n: neg(Y) },
     });
-    // Rear hook hole in the back end of each side : 6 dia, 10 deep, 7 from the outer face, 11 up
+    // Rear hook hole in the back end of each side : 6 dia, 10 deep, 7 from the outer face, 11 up, the position Blum's
+    // drilling jig T65.1000.02 gives
     for (const sp of [sideL, sideR])
     {
         sp.holes.push({
             u: SKL, v: MOVENTO.backHole.fromBottom, diameter: MOVENTO.backHole.diameter,
             depth: MOVENTO.backHole.depth, face: "u1", w: BOX_THICKNESS - MOVENTO.backHole.fromSide,
-            label: "Crochet arrière MOVENTO (gabarit T65.1000.02)", purpose: "runner-hook",
+            label: "Crochet arrière MOVENTO", purpose: "runner-hook",
         });
     }
     sideL.notes.push(`Côtés ${BOX_THICKNESS} mm maxi (Blum). Largeur intérieure SKW = LW - 42 = ${SKW} (+0 / -1,5)`);
@@ -442,13 +443,16 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
     }
     // A face starting at the front of the runner, the spacer of a pull-out, counts from there
     const shift = inner ? 0 : front.mount === "inset" ? c.thickness : 0;
-    for (const fr of faces)
+    for (const [k, fr] of faces.entries())
     {
         if (fr === null)
         {
             b.errors.push(`${c.name} : face de fixation des coulisses introuvable pour le tiroir ${fp.number}.`);
             continue;
         }
+        // Its hand in the label : on a middle upright the right runner of a drawer and the left one of the next share
+        // the board, and one row screwed both before the second was set
+        const hand = k === 0 ? "gauche" : "droite";
         const u = axis - fr.uOrigin;   
         const hits = (set: number[]): boolean =>
         {
@@ -484,7 +488,7 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
         for (const o of set)
         {
             fr.part.holes.push({ u, v: o + shift, diameter: 0, depth: 0, face: fr.face,
-                                label: `Coulisse ${runner.ref} : vis ${DIAM}3,5 x 15 (609.1500)`,
+                                label: `Coulisse ${runner.ref} ${hand} : vis ${DIAM}3,5 x 15 (609.1500)`,
                                 purpose: "runner-screw", fixes: runner.ref });
         }
         if (MOVENTO.undimensionedRearHole(runner.series, runner.nl))
@@ -515,6 +519,9 @@ function drawerHardware(d: DrawerSlot, k: DrawerBox, screwPlaces: number, b: Bui
                      note: "paire gauche/droite", purpose: "runner" });
     b.hardware.push({ ref: "T51.7601", qty: 1, item: c.id, itemName: c.name, target: fp.id,
                      note: "paire d'accouplements", purpose: "runner-coupling" });
+    // Sold without screws : 2 606N in each at 75 degrees into the back of the front (cad_models.ts, COUPLING_SOURCE)
+    b.hardware.push({ ref: "606N", qty: 4, item: c.id, itemName: c.name, target: fp.id,
+                     note: "accouplements MOVENTO", purpose: "coupling-screw" });
     b.hardware.push({ ref: "609.1500", qty: 2 * screwPlaces, item: c.id, itemName: c.name, target: fp.id,
                      note: "fixation des coulisses", purpose: "runner-screw" });
     // The push of a flap opens the flap, the pull-out behind it is drawn by hand

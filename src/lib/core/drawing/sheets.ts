@@ -13,8 +13,11 @@ import { roomPlan } from "./plan";
 import { itemViews } from "./item_views";
 import { partSheets } from "./workpiece";
 import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
-import { assemblySheets } from "./assembly_sheets";
-import { assemblySequences } from "../assembly";
+import { assemblySheets, gammeSequences } from "./assembly_sheets";
+import { fabricationSheets } from "./fabrication_sheets";
+import { fabrication } from "../io/fabrication";
+import { cadModel } from "../io/cad_model";
+import type { GammeTable } from "../io/gamme";
 import { PIN_SPARE_HOLES } from "../fittings";
 import { CUBED, DIAM } from "../text";
 import { issueState } from "../revisions";   
@@ -56,7 +59,10 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
         }
     }
     drafts.push(...partSheets(bom, a.build.fitted), ...cutListSheets(bom), ...hardwareSheets(bom));
-    drafts.push(...assemblySheets(assemblySequences(p, a, bom)));
+    drafts.push(...fabricationSheets(fabrication(bom, nesting)));
+    // The gamme of the film and of the FreeCAD sheet, the one source of the order
+    drafts.push(...assemblySheets(gammeSequences((cadModel(p, { analysis: a, bom },
+                                                           true) as { gamme: GammeTable[] }).gamme)));
     drafts.push(...forWorkshop ? [] : nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
     drafts.splice(1, 0, contents(drafts));
     const issue = issueState(p);

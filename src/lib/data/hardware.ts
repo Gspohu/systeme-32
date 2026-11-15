@@ -34,6 +34,8 @@ export interface HardwareItem
     ref: string;
     source: string;
     url?: string;
+    // Made in the workshop out of offcuts : listed with the hardware, never ordered
+    made?: boolean;
 }
 
 
@@ -73,6 +75,9 @@ add({ id: "174H7100E", family: "D21", label: "Embase en croix 37/32, distance 0,
      brand: "Blum", ref: "174H7100E", source: `${BLUM_KA150} p. 146`, url: BLUM_KA150_URL });
 add({ id: "609.1500", family: "D41", label: `Vis agglo ${DIAM}3,5 x 15`, brand: "Blum", ref: "609.1500",
      source: `${BLUM_KA150} p. 74 et 432`, url: BLUM_KA150_URL });
+// The screw Blum names for the MOVENTO locking device, a head small enough for the pocket behind its slots
+add({ id: "606N", family: "D41", label: `Vis agglo fraisée ${DIAM}3,5 x 16, tête ${DIAM}6,5`, brand: "Blum", ref: "606N",
+     source: "Notice Blum MOVENTO LIT.MOV5000.09.16 p. 2 ; fiche Würth B606N-100" });
 add({ id: "956.1004", family: "D50", label: "TIP-ON pour portes, version courte avec aimant", brand: "Blum",
      ref: "956.1004", source: `${BLUM_KA150} p. 172`, url: BLUM_KA150_URL });
 add({ id: "956A1004", family: "D50", label: "TIP-ON pour portes, version longue avec aimant", brand: "Blum",
@@ -285,11 +290,13 @@ add({ id: "SCREW_2.5x16", family: "D41", label: `Vis aggloméré tête fraisée 
          + `habillage de niche vissé sur lui-même dans des avant-trous ${DIAM}1,5`,
      brand: "SPAX", ref: "TF PZ 2,5 x 16", source: "Référence trouvée chez Bricomarché (EAN 4003530000935), "
          + "Ø2,5 pour ne pas fendre un chant de 8" });
-add({ id: "WASHER_5x20", family: "D60", label: "Rondelle large Ø5 x 20 acier zingué, sous la vis au mur",
-     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
+// The id stays the key of saved projects and prices : the washer itself is now a standard one the CAD can model
+add({ id: "WASHER_5x20", family: "D60", label: "Rondelle M5 extra-large ISO 7094:2000 (5,5 x 18 x 2) acier zingué, sous la "
+         + "vis au mur", brand: "", ref: "ISO 7094:2000 M5",
+     source: "ISO 7094:2000 tableau 1, M5 : d1 5,5, d2 18, h 2" });
 add({ id: "EDGE_CAP", family: "D60", label: `Cache-vis ${DIAM}14 découpé à l'emporte-pièce dans le chant ABS du décor, fil `
          + "orienté comme le panneau : double face sur une vis à démonter, cyanoacrylate sinon",
-     brand: "", ref: "Atelier", source: "Taillé dans les chutes du chant posé, convention d'atelier" });
+     brand: "", ref: "Atelier", source: "Taillé dans les chutes du chant posé, convention d'atelier", made: true });
 add({ id: "GLUE_PU", family: "D41", label: "Colle polyuréthane à bois, faces mélaminées poncées",
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
 

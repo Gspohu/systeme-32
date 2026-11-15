@@ -75,6 +75,8 @@ export interface HardwareRow
     brand: string;
     family: Family;
     qty: number;
+    // Cut in the workshop, not bought
+    made: boolean;
     notes: string[];
     source: string;
     url: string | null;
@@ -312,8 +314,8 @@ function hardwareNodes(lines: HardwareLine[], where: string, familyCounters: Map
         out.push(pbsNode({
             code,
             label: item.label,
-            fab_source: "sur_etagere",
-            manuf_method: "purchased_standard",
+            fab_source: item.made === true ? "interne" : "sur_etagere",
+            manuf_method: item.made === true ? "other" : "purchased_standard",
             quantity: e.qty,
             manufacturer: item.brand,
             manufacturer_ref: item.ref,
@@ -324,7 +326,7 @@ function hardwareNodes(lines: HardwareLine[], where: string, familyCounters: Map
         const existing = hwRows.get(ref);
         // The list shows the maker's reference, the key stays the catalogue id (Générique is shared)
         const row = existing ?? { code, id: ref, ref: item.ref, label: item.label, brand: item.brand, family: fam,
-                                 qty: 0,
+                                 qty: 0, made: item.made === true,
                                  notes: [], source: item.source, url: item.url ?? null };
         if (existing !== undefined)
         {

@@ -9,6 +9,7 @@ import { buildSheets } from "../drawing/sheets";
 import { pagesToPdf } from "../drawing/pdf";
 import { dxfBytes, partToDxf } from "../drawing/dxf";
 import type { Page } from "../drawing/display";
+import { fabrication, fabricationCsv } from "./fabrication";
 
 
 export function drawingSet(p: Project, o: Outputs): Page[]
@@ -21,10 +22,13 @@ export function workshopArchive(p: Project, o: Outputs): Uint8Array
 {
     const base = slug(p.name) || "projet";
     const pages = buildSheets(p, o.analysis, o.bom, o.nesting, true);
+    const fab = fabricationCsv(fabrication(o.bom, o.nesting));
     const files: Record<string, Uint8Array> = {
         [`${base}_plans.pdf`]: pagesToPdf(pages, p.name),
         [`${base}_fiche_de_debit.csv`]: strToU8(cutListCsv(o.bom)),
         [`${base}_quincaillerie.csv`]: strToU8(hardwareCsv(o.bom)),
+        [`${base}_approvisionnement.csv`]: strToU8(fab.supplies),
+        [`${base}_gamme_de_fabrication.csv`]: strToU8(fab.route),
         [`${base}_pbs_free-pbs.json`]: strToU8(pbsJson(p, o.bom)),  
     };
     for (const row of [...o.bom.cut, ...o.bom.offSheet])
