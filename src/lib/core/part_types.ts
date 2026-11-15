@@ -205,6 +205,7 @@ export interface PlateHold
     lines: { axis: "u" | "v"; at: number; side: 1 | -1; clamped: boolean }[];
     posts: [number, number][];
     backable?: boolean;
+    ticked?: { back: boolean; seat: boolean };
 }
 
 

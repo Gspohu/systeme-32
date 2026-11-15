@@ -245,31 +245,36 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
         return null;
     }
     const outer = endReach(c, side);
-    const phi = end.sweep === 180 ? 0 : Math.PI / 4;
-    const a = POST_WIDTH / 2;
-    const h = c.thickness / 2;
-    const lead = a * Math.cos(phi) + h * Math.sin(phi);
-    const reach = outer - POST_SETBACK;
-    let rho = -lead + Math.sqrt((lead * lead) - (a * a + h * h - reach * reach));
-    // It stands on the floor board too : drawn in when that one is cut smaller, its corners as far inside it
+    // The post leans out along the angle `bearing` from the centre of the arc, `fromCentre` mm off it
+    const bearing = end.sweep === 180 ? 0 : Math.PI / 4;
+    const halfWidth = POST_WIDTH / 2;
+    const halfThickness = c.thickness / 2;
+    const lead = halfWidth * Math.cos(bearing) + halfThickness * Math.sin(bearing);
+    const cornerReach = outer - POST_SETBACK;
+    let fromCentre = -lead + Math.sqrt((lead * lead) - (halfWidth * halfWidth + halfThickness * halfThickness
+        - cornerReach * cornerReach));
+    // It stands on the floor board too : drawn in when that one is cut smaller, its corners as far inside it, along
+    // the straight edge under the side as well
+    // TODO is the setback along that edge wanted ? It makes the least radius jump from 87 to 160 with a 10 mm plinth
     const floor = floorOutline(c, side);
     if (floor !== null)
     {
         const poly = tessellate(floor, 2);
-        const fits = (r: number): boolean =>
+        const fits = (distance: number): boolean =>
         {
-            const [u, v] = [r * Math.cos(phi), outer - r * Math.sin(phi)];
-            return [[u - a, v - h], [u + a, v - h], [u - a, v + h], [u + a, v + h]].every(([x, y]) =>
+            const [u, v] = [distance * Math.cos(bearing), outer - distance * Math.sin(bearing)];
+            return [[u - halfWidth, v - halfThickness], [u + halfWidth, v - halfThickness],
+                    [u - halfWidth, v + halfThickness], [u + halfWidth, v + halfThickness]].every(([x, y]) =>
             {
                 return insidePolygon(poly, x!, y!, POST_SETBACK);
             });
         };
-        let inside = rho;
+        let inside = fromCentre;
         while (inside > 0 && !fits(inside))
         {
             inside -= 1;
         }
-        let out = Math.min(rho, inside + 1);
+        let out = Math.min(fromCentre, inside + 1);
         if (inside > 0 && out > inside)
         {
             for (let k = 0; k < 40; k++)
@@ -277,31 +282,59 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
                 const mid = (inside + out) / 2;
                 [inside, out] = fits(mid) ? [mid, out] : [inside, mid];
             }
-            rho = inside;
+            fromCentre = inside;
+        }
+        // No place on the floor board for the whole post : it would stand partly on nothing
+        if (!fits(fromCentre))
+        {
+            return null;
         }
     }
     // Too small an arc : no place where the whole post stands off the side face, the square root of a negative or a
     // post across the side
-    const u = rho * Math.cos(phi);  
-    if (!Number.isFinite(u) || u < a)
+    const u = fromCentre * Math.cos(bearing);
+    if (!Number.isFinite(u) || u < halfWidth)
     {
         return null;
     }
-    return { u, v: outer - rho * Math.sin(phi), w: POST_WIDTH, t: c.thickness };
+    return { u, v: outer - fromCentre * Math.sin(bearing), w: POST_WIDTH, t: c.thickness };
 }
 
 
-// The least reach of an open end that takes the post of a seat, its floro board left aside : the post just off the
-// side face, its outer corner POST_SETBACK inside the arc
-export function seatPostMinReach(c: Carcass, sweep: 90 | 180): number
+// The least size of an open end that takes the post of a seat, on its real boards, floor board cut smaller included :
+// the radius of a quarter round, the depth of the carcass for a half round, whose radius is half its usable depth
+// Null when no radius within the usable depth will do. The search takes a larger end to take the post whenever a
+// smaller one does, true on the cases tried, not proved
+export function seatPostMinimum(c: Carcass, side: "left" | "right"): number | null
 {
-    const phi = sweep === 180 ? 0 : Math.PI / 4;
-    const halfWidth = POST_WIDTH / 2;
-    const halfThickness = c.thickness / 2; 
-    const lead = halfWidth * Math.cos(phi) + halfThickness * Math.sin(phi);
-    const radius = halfWidth / Math.cos(phi);
-    return Math.sqrt(radius * radius + 2 * radius * lead + halfWidth * halfWidth + halfThickness * halfThickness) 
-        + POST_SETBACK;
+    const end = c.ends[side];
+    if (end.type !== "rounded")
+    {
+        return null;
+    }
+    const trial = (size: number): Carcass =>
+    {
+        return end.sweep === 90 ? { ...c, ends: { ...c.ends, [side]: { ...end, radius: size } } } : { ...c,
+            depth: size };
+    };
+    const [smallest, largest] = end.sweep === 90 ? [1, usableDepth(c)] : [c.depth, 4 * c.depth + 1000];
+    if (endPost(trial(largest), side) === null)
+    {
+        return null;
+    }
+    let [refused, taken] = [smallest, largest];
+    while (taken - refused > 0.5)
+    {
+        const mid = (refused + taken) / 2;
+        [refused, taken] = endPost(trial(mid), side) === null ? [mid, taken] : [refused, mid];
+    }
+    // The least whole millimetre that takes it, never one more
+    let least = Math.ceil(refused);
+    while (endPost(trial(least), side) === null)
+    {
+        least++;
+    }
+    return least;
 }
 
 
@@ -394,8 +427,8 @@ export function buildEnds(c: Carcass, b: Build): void
         const toe = endToe(c, end);
         // A floor board cut smaller starts at its own front corner : the blank of the cut list is where the CNC sets 0
         const kept = floorOutline(c, side);
-        const reach = kept === null ? null : bounds(tessellate(kept));
-        const floorShift = reach === null ? 0 : reach.minY;
+        const floorBounds = kept === null ? null : bounds(tessellate(kept));
+        const floorShift = floorBounds === null ? 0 : floorBounds.minY;
         const floor: Outline = kept === null ? outline : {
             start: [kept.start[0], kept.start[1] - floorShift],
             segments: kept.segments.map((s) =>
@@ -404,15 +437,16 @@ export function buildEnds(c: Carcass, b: Build): void
                     y: s.y - floorShift };
             }),
         };
-        const floorLength = reach === null ? inner : reach.maxX;
+        const floorLength = floorBounds === null ? inner : floorBounds.maxX;
         const xFace = side === "right" ? c.x + c.width : c.x;
         const uDir: Vec3 = side === "right" ? X : neg(X);
         const base = { item: c.id, itemName: c.name };
         const title = `Bout arrondi ${side === "right" ? "droit" : "gauche"}`;
         if (end.floor === true && c.base.type === "wall")
         {
+            // The box Jusqu'au sol only shows over a plinth or feet : the way out is the base
             b.errors.push(`${c.name}, ${title.toLowerCase()} : un meuble suspendu ne descend pas au sol. `
-                + "Décocher la case Jusqu'au sol, ou poser le meuble au sol.");
+                + "Poser le meuble sur un socle ou des pieds.");
         }
         const drop = endDrop(c, end);
         const y0 = c.y - drop;
@@ -432,22 +466,26 @@ export function buildEnds(c: Carcass, b: Build): void
             k++;
         }
         const post = endPost(c, side);
-        if (open && end.seat === true && post === null)   
-        {
-            // A half round has half the usable depth for a radius
-            const least = seatPostMinReach(c, end.sweep);
-            const grow = end.sweep === 90 ? `le rayon à au moins ${Math.ceil(least)} mm`
-                : `la profondeur du caisson à au moins ${Math.ceil(c.depth - usableDepth(c) + 2 * least)} mm`;
-            b.errors.push(`${c.name}, ${title.toLowerCase()} : bout trop petit pour le montant de l'assise `
-                + `(${POST_WIDTH} mm de large, ${POST_SETBACK} mm en retrait de l'arc), il traverserait la joue. Porter `  
-                + `${grow}, ou décocher Assise.`);
-        }  
         // Its back carries the shelves along their back edge, a quarter round only has one
         const backed = end.back === true && end.sweep === 90 && c.back.type === "applied";
-        if (drop > 0 && post === null && end.back !== true)
+        // What is left to tick on this end : Fond only on a quarter round, neither one already ticked
+        const ticks = [...(end.sweep === 90 && end.back !== true ? ["Fond"] : []),
+                       ...(open && end.seat !== true ? ["Assise, qui pose un montant"] : [])];
+        const tickHint = ticks.length > 0 ? `Cocher ${ticks.join(", ou ")}.` : "Voir le montant de l'assise, refusé.";
+        if (open && end.seat === true && post === null)
+        {
+            const least = seatPostMinimum(c, side);
+            const grow = least === null ? "Approfondir le caisson"
+                : end.sweep === 90 ? `Porter le rayon à au moins ${least} mm`
+                : `Porter la profondeur du caisson à au moins ${least} mm`;
+            b.errors.push(`${c.name}, ${title.toLowerCase()} : bout trop petit pour le montant de l'assise `
+                + `(${POST_WIDTH} mm de large, ${POST_SETBACK} mm en retrait de l'arc), qui doit rester hors de la joue `
+                + `et reposer entier sur la flasque basse. ${grow}, ou décocher Assise.`);
+        }
+        if (drop > 0 && post === null && !backed)
         {
             b.errors.push(`${c.name}, ${title.toLowerCase()} : la flasque basse posée au sol n'est tenue par rien, `
-                + "la joue s'arrête au-dessus du socle. Cocher la case Fond, ou Assise qui pose un montant.");
+                + `la joue s'arrête au-dessus du socle. ${tickHint}`);
         }
         for (const level of levels)
         {
@@ -486,8 +524,9 @@ export function buildEnds(c: Carcass, b: Build): void
                 {
                     lines.push({ axis: "v", at: usable, side: -1, clamped: false });
                 }
-                b.plates.set(panel.id, { lines, posts: post === null ? [] : [[post.u, post.v]], 
-                                        backable: end.sweep === 90 }); 
+                b.plates.set(panel.id, { lines, posts: post === null ? [] : [[post.u, post.v]],
+                                        backable: end.sweep === 90,
+                                        ticked: { back: end.back === true, seat: end.seat === true } });
             }
             // Shaped panels butt the outer face of the side with their straight edge
             b.joints.push({ edgePart: panel.id, edge: "u0", facePart: `${c.id}/side/${side === "right" ? "R" : "L"}`,
@@ -501,10 +540,9 @@ export function buildEnds(c: Carcass, b: Build): void
         // The end panels hang off the side as the shelves do, shelves or not
         if (open && !backed && post === null)
         {
-            const fix = end.sweep === 90 ? "Cocher Fond, ou Assise qui pose un montant." : "Cocher Assise, qui pose un montant.";
             b.warnings.push(`${c.name}, ${title.toLowerCase()} : flasques et tablettes tenues en console par les seuls `
                 + "tourillons du flanc. Leur flèche suppose un encastrement parfait, la tenue des tourillons en flexion "
-                + `n'est pas vérifiée. ${fix}`);
+                + `n'est pas vérifiée. ${tickHint}`);
         }
         if (post !== null)
         {

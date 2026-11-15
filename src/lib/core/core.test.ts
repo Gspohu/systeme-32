@@ -369,30 +369,84 @@ describe("rounded ends", () =>
         const left = box(backed, "left").deflections.find((x) => { return x.part.includes("/end/left/Tablette 1"); })!;
         expect(left.instant).toBeCloseTo(right.instant, 6);
         expect(left.limit).toBeCloseTo(right.limit, 6);
-        // A seat on an arc too small for its post : refused with the least radius, the post never put across the side
-        const seated = (radius: number): ReturnType<typeof analyse> =>
+        // A seat on an arc too small for its post : refused with the least size that takes it, the post never put across
+        // the side nor partly off the floor board cut back to the plinth line
+        const seated = (shape: Partial<Extract<End, { type: "rounded" }>>, depth = 500): ReturnType<typeof analyse> =>
         {
-            return analyse(addItem(newProject("Assise"), newCarcass({ width: 600, height: 450, depth: 500,
+            return analyse(addItem(newProject("Assise"), newCarcass({ width: 600, height: 450, depth,
                 base: { type: "plinth", height: 100, setback: 50 },
-                ends: { left: { type: "square" }, right: { ...end, radius, seat: true, floor: true } } })));
+                ends: { left: { type: "square" }, right: { ...end, seat: true, ...shape } } })));
         };
+        const refused = (a: ReturnType<typeof analyse>, least: string): void =>
+        {
+            expect(a.build.errors.filter((m) => { return m.includes("bout trop petit pour le montant")
+                && m.includes(least); })).toHaveLength(1);
+            expect([...a.build.plates.values()].every((hold) => { return hold.posts.length === 0; })).toBe(true);
+        };
+        const taken = (a: ReturnType<typeof analyse>): void =>
+        {
+            expect(a.build.errors.some((m) => { return m.includes("bout trop petit"); })).toBe(false);
+            expect([...a.build.plates.values()].every((hold) => { return hold.posts.length === 1; })).toBe(true);
+        };
+        // Down to the floor : the floor board stops at the plinth line, the post has to stand wholly on it
+        for (const radius of [25, 87, 172])
+        {
+            refused(seated({ radius, floor: true }), "rayon à au moins 173 mm");
+        }
+        taken(seated({ radius: 173, floor: true }));
+        // Not down to the floor : only the side and the arc bound it
         for (const radius of [25, 40, 86])
         {
-            const small = seated(radius);
-            expect(small.build.errors.filter((m) => { return m.includes("bout trop petit pour le montant") &&
-                                                         m.includes("au moins 87 mm"); })).toHaveLength(1);
-            expect(small.build.plates.get([...small.build.plates.keys()][0]!)!.posts).toEqual([]);
+            refused(seated({ radius }), "rayon à au moins 87 mm");
         }
-        const fits = seated(87);
-        expect(fits.build.errors.some((m) => { return m.includes("bout trop petit"); })).toBe(false);
-        const [postU] = [...fits.build.plates.values()][0]!.posts[0]!;
-        expect(postU).toBeGreaterThanOrEqual(30);
-        // A half round grows by the depth of its carcass
-        const deep = analyse(addItem(newProject("Demi"), newCarcass({ width: 600, height: 450, depth: 150,
-            base: { type: "plinth", height: 100, setback: 50 },
-            ends: { left: { type: "square" }, right: { ...end, sweep: 180, seat: true, floor: true } } })));
-        expect(deep.build.errors.filter((m) => { return m.includes("profondeur du caisson à au moins 160 mm"); }))
-            .toHaveLength(1);
+        taken(seated({ radius: 87 }));
+        expect([...seated({ radius: 87 }).build.plates.values()][0]!.posts[0]![0]).toBeGreaterThanOrEqual(30);
+        // A half round grows by the depth of its carcass, the least depth announced being the first one taken
+        refused(seated({ sweep: 180, floor: true }, 290), "profondeur du caisson à au moins 291 mm");
+        taken(seated({ sweep: 180, floor: true }, 291));
+        refused(seated({ sweep: 180 }, 159), "profondeur du caisson à au moins 160 mm");
+        taken(seated({ sweep: 180 }, 160));
+        // No radius within the depth will do : the carcass has to grow
+        refused(seated({ radius: 87 }, 90), "Approfondir le caisson");
+    });
+
+
+    it("only offers what the end has and what is not ticked yet", () =>
+    {
+        const end: End = { type: "rounded", radius: 300, sweep: 90, technique: "battens", flexThickness: 9,
+                           battens: DEFAULT_BATTENS, decor: "W1000_ST9", open: true, shelves: 2 };
+        const said = (shape: Partial<Extract<End, { type: "rounded" }>>): string[] =>
+        {
+            const a = analyse(addItem(newProject("Bout"), newCarcass({ width: 600, height: 450, depth: 500,
+                base: { type: "plinth", height: 100, setback: 50 },
+                ends: { left: { type: "square" }, right: { ...end, ...shape } } })));
+            // A build error comes back among the checks too : each message once
+            return [...new Set([...a.build.errors, ...a.checks.map((k) => { return k.message; })])];
+        };
+        // A half round down to the floor : no back to tick, Assise alone
+        const half = said({ sweep: 180, floor: true });
+        expect(half.some((m) => { return m.includes("flasque basse posée au sol n'est tenue par rien")
+            && m.includes("Cocher Assise"); })).toBe(true);
+        expect(half.some((m) => { return m.includes("Fond"); })).toBe(false);
+        // A back left ticked from a quarter round holds nothing on a half round : the floor board error stays
+        expect(said({ sweep: 180, floor: true, back: true }).some((m) => { return m.includes("n'est tenue par rien"); }))
+            .toBe(true);
+        // A closed end has no seat to tick, only its back
+        const closed = said({ open: false, floor: true }).filter((m) => { return m.includes("n'est tenue par rien"); });
+        expect(closed).toHaveLength(1);
+        expect(closed[0]).toContain("Cocher Fond.");
+        expect(closed[0]).not.toContain("Assise");
+        // A seat ticked but refused isn't offered again, its own error says what to do
+        const small = said({ radius: 60, seat: true, floor: true });
+        expect(small.some((m) => { return m.includes("bout trop petit pour le montant"); })).toBe(true);
+        expect(small.some((m) => { return m.includes("Cocher") && m.includes("Assise"); })).toBe(false);
+        // Hung on the wall, the box Jusqu'au sol isn't shown : the base is the way out
+        const hung = analyse(addItem(newProject("Suspendu"), newCarcass({ width: 600, height: 450, depth: 500, y: 900,
+            base: { type: "wall" }, ends: { left: { type: "square" }, right: { ...end, floor: true } } })));
+        const ground = hung.build.errors.filter((m) => { return m.includes("un meuble suspendu ne descend pas au sol"); });
+        expect(ground).toHaveLength(1);
+        expect(ground[0]).toContain("Poser le meuble sur un socle ou des pieds");
+        expect(ground[0]).not.toContain("Décocher");
     });
 
 

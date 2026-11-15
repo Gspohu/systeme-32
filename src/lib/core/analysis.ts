@@ -359,8 +359,10 @@ function anchored(p: Project): boolean
 // radius of its own but the depth of the carcass
 function endRemedy(hold: PlateHold): string
 {
-    const ticks = [...(hold.backable === true && !hold.lines.some((l) => { return l.axis === "v"; }) ? ["Fond"] : []),
-                   ...(hold.posts.length === 0 ? ["Assise"] : [])];
+    // A box already ticked but refused is said by its own error, not offered again
+    const ticks = [...(hold.backable === true && hold.ticked?.back !== true
+                       && !hold.lines.some((line) => { return line.axis === "v"; }) ? ["Fond"] : []),
+                   ...(hold.posts.length === 0 && hold.ticked?.seat !== true ? ["Assise"] : [])];
     const size = hold.backable === true ? "réduire le rayon du bout arrondi" : "réduire la profondeur du caisson";
     return ticks.length > 0 ? `Cocher ${ticks.join(" ou ")}, ou ${size}.` : `${size[0]!.toUpperCase()}${size.slice(1)}.`;
 }
