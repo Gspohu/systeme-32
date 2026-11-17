@@ -3,7 +3,7 @@
 import type { Bom, CutRow } from "../bom";
 import { edgeNotation } from "../bom";
 import type { Fitted, Part } from "../parts";
-import { tessellate, type Vec3 } from "../geometry";
+import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale, textWidth, type Stroke } from "./display";
 import type { Draft } from "./draft";
@@ -34,6 +34,19 @@ const WIDE_H = 150;
 const UPRIGHT = new Set(["door", "leaf", "panel"]);
 
 
+// Which way +u and +v run on the paper (y down the sheet) seen from face A for real : lying u to the right
+// and standing u up, v the way the frame makes it (geometry.ts, vDown)
+export function paperAxes(part: Part): { su: [number, number]; sv: [number, number] }
+{
+    const down = vDown(part.frame);
+    if (UPRIGHT.has(part.role))
+    {
+        return { su: [0, -1], sv: [down ? 1 : -1, 0] };
+    }
+    return { su: [1, 0], sv: [0, down ? 1 : -1] };
+}
+
+
 // Width and height the part takes on the sheet before scaling
 function spans(part: Part): [number, number]
 {
@@ -45,10 +58,12 @@ function originText(part: Part): string
 {
     if (UPRIGHT.has(part.role))
     {
-        // The quarter turn keeps the view from face A : v then runs from right to left
-        return "u depuis le bas, v depuis la gauche vue de face, dessin vu de l'intérieur (face A) : v de droite à gauche";
+        // The quarter turn keeps the view from face A : v then runs one way or the other with the frame
+        return "u depuis le bas, v depuis la gauche vue de face, dessin vu de l'intérieur (face A) : v de "
+            + (vDown(part.frame) ? "gauche à droite" : "droite à gauche");
     }
-    return ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN;
+    const text = ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN;
+    return vDown(part.frame) ? text.replace("coin bas gauche", "coin haut gauche") : text;
 }
 
 
@@ -150,14 +165,18 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     const scale = pickScale(spanX, spanY, boxW - 20, boxH - 20);
     const ox = x0 + 12;
     const oy = y0 + 24 + spanY / scale;
-    // Lying, u to the right and v up. Standing, u up and v to the left. Both seen from face A
+    const down = vDown(part.frame);
+    const { su, sv } = paperAxes(part);
+    // The board's box set left on ox and down on oy, whichever corner its origin lands on
+    const minX = Math.min(0, maxU * su[0]) + Math.min(0, maxV * sv[0]);
+    const maxY = Math.max(0, maxU * su[1]) + Math.max(0, maxV * sv[1]);
     const P = (u: number, v: number): [number, number] =>
     {
-        return upright ? [ox + (maxV - v) / scale, oy - u / scale] : [ox + u / scale, oy - v / scale];
+        return [ox + (u * su[0] + v * sv[0] - minX) / scale, oy + (u * su[1] + v * sv[1] - maxY) / scale];
     };
     const D = (du: number, dv: number): [number, number] =>
     {
-        return upright ? [-dv, -du] : [du, -dv];
+        return [du * su[0] + dv * sv[0], du * su[1] + dv * sv[1]];
     };
     const seg = (u1: number, v1: number, u2: number, v2: number, s: Stroke): void =>
     {
@@ -278,7 +297,9 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     // The origin, then which way u and v run from it
     const [zx, zy] = P(0, 0);
     canvas.circle(zx, zy, 1, "thin");
-    canvas.text(zx + (upright ? 1.5 : -1.5), zy + 3, "0", 2, upright ? "start" : "end");
+    // Its 0 outside the part, whichever corner it took
+    const zeroRight = upright && !down;
+    canvas.text(zx + (zeroRight ? 1.5 : -1.5), zy + (down && !upright ? -1.5 : 3), "0", 2, zeroRight ? "start" : "end");
     for (const [du, dv, name] of [[1, 0, "u"], [0, 1, "v"]] as const)
     {
         const [dx, dy] = D(du, dv);

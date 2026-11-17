@@ -64,7 +64,9 @@ ENGAGED = {
     "282.24.727": ((-4, 0, 0),),
     "283.33.910": ((27, -60, 0),),
     "956.1004": (),
-    "267.07.903": ((-10, 0, 0),),
+    # The sleeve across both boards, the screw inside it : Häfele's file cut in 2 (cad_models.ts)
+    "267.07.903.sleeve": ((-10, 0, 0),),
+    "267.07.903.screw": ((-30, 0, 0),),
 }
 
 
@@ -238,7 +240,8 @@ def check_held(links, screws, bought, sink=0.0):
         screw = link.Shape.copy()
         origin = base - way * sink
         screw.translate(way * -sink)
-        under = HEAD_DEPTH * d if s["kind"] == "countersunk" else 0.0
+        # A head of known height stops there : 0.6 x d took the shank of a coupling screw rubbing its slot for a head
+        under = s.get("headHeight", HEAD_DEPTH * d) if s["kind"] == "countersunk" else 0.0
         zone = Part.makeCylinder(2 * d, under + 2 * d, origin - way * under, way)
         head = screw.common(zone)
         core = Part.makeCylinder(CORE_RATIO * d / 2, s["length"], origin - way * under, way * -1)
@@ -395,34 +398,34 @@ def check_hardware(bought, shapes, model):
     table = {}
     placed = []
     for link in bought:
-        s = link.LinkedObject.Shape.copy()
-        s.Placement = link.Placement.multiply(s.Placement)
-        placed.append((link, s))
+        shape = link.LinkedObject.Shape.copy()
+        shape.Placement = link.Placement.multiply(shape.Placement)
+        placed.append((link, shape))
         row = table.setdefault(link.Label2, {"n": 0, "max": 0.0, "sum": 0.0, "failed": 0, "worst": ""})
         row["n"] += 1
         for name, _, board in shapes:
-            if not s.BoundBox.intersect(board.BoundBox):
+            if not shape.BoundBox.intersect(board.BoundBox):
                 continue
             try:
-                v = s.common(board).Volume
+                shared = shape.common(board).Volume
             except App.Base.FreeCADError:
                 row["failed"] += 1
                 continue
-            row["sum"] += v
-            if (v > row["max"]):
-                row["max"] = v
+            row["sum"] += shared
+            if (shared > row["max"]):
+                row["max"] = shared
                 row["worst"] = f"{link.Label[:40]} x {name[:34]}"
     for row in table.values():
         row["max"] = round(row["max"], 1)
         row["sum"] = round(row["sum"], 1)
     bottoms = []
-    for p in model["parts"]:
-        f = p["frame"]
-        for h in p["holes"]:
-            if (h.get("purpose") == "hinge-cup"):
-                w = h["depth"] if h["face"] == "A" else p["thickness"] - h["depth"]
-                bottoms.append(App.Vector(*to_room([f["o"][k] + h["u"] * f["u"][k] + h["v"] * f["v"][k] + w *
-                                                    f["n"][k] for k in range(3)])))
+    for part in model["parts"]:
+        frame = part["frame"]
+        for hole in part["holes"]:
+            if (hole.get("purpose") == "hinge-cup"):
+                in_thickness = hole["depth"] if hole["face"] == "A" else part["thickness"] - hole["depth"]
+                bottoms.append(App.Vector(*to_room([frame["o"][k] + hole["u"] * frame["u"][k] + hole["v"] * frame["v"][k]
+                                                    + in_thickness * frame["n"][k] for k in range(3)])))
     gaps = []
     cup_off = []
     for link, _ in placed:
@@ -431,36 +434,36 @@ def check_hardware(bought, shapes, model):
             if link.Label2 not in CUP_BOTTOM:
                 cup_off.append(f"{link.Label[:44]} : cuvette du modele inconnue")
                 continue
-            q = link.Placement.multVec(App.Vector(*CUP_BOTTOM[link.Label2]))
-            gap = round(min((q - b).Length for b in bottoms), 2)
+            cup_bottom = link.Placement.multVec(App.Vector(*CUP_BOTTOM[link.Label2]))
+            gap = round(min((cup_bottom - bottom).Length for bottom in bottoms), 2)
             gaps.append(gap)
             if (gap > CUP_OFF):
                 cup_off.append(f"{link.Label[:44]} : {gap} mm du fond de son percage")
-    floors = [round(s.BoundBox.ZMin, 2) for link, s in placed if link.Label2.startswith("637.76.35")]
+    floors = [round(shape.BoundBox.ZMin, 2) for link, shape in placed if link.Label2.startswith("637.76.35")]
     # Clear of every board proves nothing of a dowel pointing the wrong way : what must sit in a board has to be in one
     loose = {}
     for link, _ in placed:
-        for q in ENGAGED.get(link.Label2, ()):
-            at = link.Placement.multVec(App.Vector(*q))
-            if not any(board.BoundBox.isInside(at) for _, _, board in shapes):
+        for engaged in ENGAGED.get(link.Label2, ()):
+            point = link.Placement.multVec(App.Vector(*engaged))
+            if not any(board.BoundBox.isInside(point) for _, _, board in shapes):
                 loose.setdefault(link.Label2, []).append(link.Label[:44])
     # What two articles share
     pairs = {}
-    for i, (a, sa) in enumerate(placed):
-        for b, sb in placed[i + 1:]:
-            if not sa.BoundBox.intersect(sb.BoundBox):
+    for i, (first, first_shape) in enumerate(placed):
+        for second, second_shape in placed[i + 1:]:
+            if not first_shape.BoundBox.intersect(second_shape.BoundBox):
                 continue
             try:
-                v = sa.common(sb).Volume
+                shared = first_shape.common(second_shape).Volume
             except App.Base.FreeCADError:
-                v = -1
-            if (v > 0.05 or v < 0):
-                key = " x ".join(sorted((a.Label2, b.Label2)))
+                shared = -1
+            if (shared > 0.05 or shared < 0):
+                key = " x ".join(sorted((first.Label2, second.Label2)))
                 row = pairs.setdefault(key, {"n": 0, "max": 0.0, "worst": ""})
                 row["n"] += 1
-                if (v > row["max"]):
-                    row["max"] = round(v, 1)
-                    row["worst"] = f"{a.Label[:36]} x {b.Label[:36]}"
+                if (shared > row["max"]):
+                    row["max"] = round(shared, 1)
+                    row["worst"] = f"{first.Label[:36]} x {second.Label[:36]}"
     return {"table": table, "hinge_cup_gaps": sorted(gaps), "cup_off": cup_off, "foot_floors": sorted(set(floors)),
             "loose": loose, "pairs": pairs}
 
@@ -485,16 +488,17 @@ def verdict(out):
 
 
 def main():
-    with open(SOURCE, encoding="utf-8") as f:
-        model = json.load(f)
+    with open(SOURCE, encoding="utf-8") as source:
+        model = json.load(source)
     doc = App.openDocument(DOC)
-    by_id = {p["id"]: p for p in model["parts"]}
-    every = [o for o in doc.Objects if o.TypeId == "App::Link"]
-    links = [o for o in every if o.LinkedObject.TypeId == "PartDesign::Body" and o.LinkedObject.Label2 in by_id]
+    by_id = {part["id"]: part for part in model["parts"]}
+    every = [obj for obj in doc.Objects if obj.TypeId == "App::Link"]
+    links = [obj for obj in every if obj.LinkedObject.TypeId == "PartDesign::Body" and obj.LinkedObject.Label2 in by_id]
     # The edge bands, a body each in the place of a strip taken off their board : in the checks of clashes and heads
     # not in that of fixings, glued on their board
-    strips = [o for o in every if o.LinkedObject.TypeId == "PartDesign::Body" and "#chant-" in o.LinkedObject.Label2]
-    bought = [o for o in every if o.Label2 in model["models"]]
+    strips = [obj for obj in every if obj.LinkedObject.TypeId == "PartDesign::Body" and
+              "#chant-" in obj.LinkedObject.Label2]
+    bought = [obj for obj in every if obj.Label2 in model["models"]]
     out = {"parts_json": len(model["parts"]), "links": len(links), "edge_bands": len(strips), "misplaced": [],
            "probes_ok": 0, "probes_bad": [], "crossing": [], "no_material": []}
     shapes = []
@@ -509,61 +513,61 @@ def main():
             out["misplaced"].append(f"{link.Label} : chant d'une pièce absente du JSON")
     for link in links:
         body = link.LinkedObject
-        p = by_id.get(body.Label2)
+        part = by_id.get(body.Label2)
         shape = body.Shape.copy()
         shape.Placement = link.Placement.multiply(shape.Placement)
-        shapes.append((link.Label, p, shape))
-        if p is None:
+        shapes.append((link.Label, part, shape))
+        if part is None:
             out["misplaced"].append(f"{link.Label} : absent du JSON")
             continue
         if (body.ShapeMaterial.Name == "" or body.ShapeMaterial.Name == "Default"):
             out["no_material"].append(link.Label)
-        lo, hi = world_box(p)
+        lo, hi = world_box(part)
         # The finished size is the board and its bands together
-        bb = App.BoundBox(shape.BoundBox)
+        finished = App.BoundBox(shape.BoundBox)
         for strip in banded.get(body.Label2, []):
-            bb.add(strip)
-        got = ([bb.XMin, bb.YMin, bb.ZMin], [bb.XMax, bb.YMax, bb.ZMax])
+            finished.add(strip)
+        got = ([finished.XMin, finished.YMin, finished.ZMin], [finished.XMax, finished.YMax, finished.ZMax])
         if (max(abs(got[0][k] - lo[k]) for k in range(3)) > 0.01 or max(abs(got[1][k] -
             hi[k]) for k in range(3)) > 0.01):
-            shaped = len(p["outline"]["segments"]) != 4
+            shaped = len(part["outline"]["segments"]) != 4
             if not shaped:
                 out["misplaced"].append(f"{link.Label} : {got} pour {lo} {hi}")
-        f = p["frame"]
-        for h in p["holes"]:
-            if h["face"] not in ("A", "B"):
+        frame = part["frame"]
+        for hole in part["holes"]:
+            if hole["face"] not in ("A", "B"):
                 continue
             # In the axis of the hole, half way down it : empty. Beside it, a board may hold another hole : only the
             # empty side is a proof
-            w = h["depth"] / 2 if h["face"] == "A" else p["thickness"] - h["depth"] / 2
-            q = App.Vector(*to_room([f["o"][k] + h["u"] * f["u"][k] + h["v"] * f["v"][k] + w *
-                                     f["n"][k] for k in range(3)]))
-            if shape.isInside(q, 1e-6, True):  
-                out["probes_bad"].append(f"{link.Label} : {h['label']} a {h['u']}, {h['v']}") 
+            in_thickness = hole["depth"] / 2 if hole["face"] == "A" else part["thickness"] - hole["depth"] / 2
+            probe = App.Vector(*to_room([frame["o"][k] + hole["u"] * frame["u"][k] + hole["v"] * frame["v"][k]
+                                         + in_thickness * frame["n"][k] for k in range(3)]))
+            if shape.isInside(probe, 1e-6, True):
+                out["probes_bad"].append(f"{link.Label} : {hole['label']} a {hole['u']}, {hole['v']}")
             else:
                 out["probes_ok"] += 1
     def crossings(pieces):
         found = []
-        for i, (na, pa, a) in enumerate(pieces):   
-            for nb, pb, c in pieces[i + 1:]:
-                if not a.BoundBox.intersect(c.BoundBox):
+        for i, (first_name, first_part, first_shape) in enumerate(pieces):
+            for second_name, second_part, second_shape in pieces[i + 1:]:
+                if not first_shape.BoundBox.intersect(second_shape.BoundBox):
                     continue
-                common = a.common(c).Volume
+                common = first_shape.common(second_shape).Volume
                 if (common > CROSS_MM3):
-                    found.append(f"{pa['item']} {na} x {pb['item']} {nb} : {common:.0f} mm3")
+                    found.append(f"{first_part['item']} {first_name} x {second_part['item']} {second_name} : "
+                                 f"{common:.0f} mm3")
         return found
 
     out["crossing"] = crossings(shapes)
     # The check proves it can see a clash : every part moved 5 mm in turn along its normal, some must cross a neighbour
     moved = 0
-    for k, (name, p, s) in enumerate(shapes):
-        n = p["frame"]["n"]
-        shifted = s.copy()
-        shifted.translate(App.Vector(*to_room([5 * c for c in n])))
-        others = [(nb, pb, c) for j, (nb, pb, c) in enumerate(shapes) if j != k]
-        if (crossings([(name, p, shifted)] + others)[:1] and not crossings(others)[:1]):
+    for index, (name, part, shape) in enumerate(shapes):
+        shifted = shape.copy()
+        shifted.translate(App.Vector(*to_room([5 * component for component in part["frame"]["n"]])))
+        others = [entry for j, entry in enumerate(shapes) if j != index]
+        if (crossings([(name, part, shifted)] + others)[:1] and not crossings(others)[:1]):
             moved += 1
-        if (k >= 11):
+        if (index >= 11):
             break
     out["proof_moved_parts_seen_crossing"] = moved
     out["hardware"] = check_hardware(bought, shapes, model)
@@ -573,7 +577,7 @@ def main():
     # The test has to see a head out of place : every one sunk 2 mm deeper is buried in what it holds
     proof = check_interfaces(model["screws"], bought, shapes, 2.0)
     out["proof_heads_sunk_2mm_buried"] = len(proof["head_buried"])
-    drilled = [o for o in every if o.Name.startswith("Vis")]
+    drilled = [obj for obj in every if obj.Name.startswith("Vis")]
     out["held"] = check_held(drilled, model["screws"], bought)
     # The defect it was written for : every head 0.4 deeper, as when the rim of the head was forgotten
     sunk = check_held(drilled, model["screws"], bought, 0.4)
@@ -585,17 +589,17 @@ def main():
     out["proof_heads_sunk_whole_seen"] = len(heads_clear(model["screws"], shapes, 3.0))
     # The case it was written for, a head on the wood with no countersink : every head 1 mm deeper is in the wood
     out["proof_heads_sunk_1mm_in_wood"] = len(heads_in_wood(model["screws"], shapes, 1.0))
-    fixings = drilled + [o for o in every if o.Name.startswith("Article")]
+    fixings = drilled + [obj for obj in every if obj.Name.startswith("Article")]
     pairs = contacts(links, fixings)
     apart = {}
-    for o in links:
-        p = by_id.get(o.LinkedObject.Label2, {})   
-        if p.get("item") in model.get("standing", []):
-            apart[o.Name] = "standing"
-        elif (p.get("role") == "lining"):
-            apart[o.Name] = "slid_in"
-        elif p.get("glued"):
-            apart[o.Name] = "glued"
+    for link in links:
+        part = by_id.get(link.LinkedObject.Label2, {})
+        if part.get("item") in model.get("standing", []):
+            apart[link.Name] = "standing"
+        elif (part.get("role") == "lining"):
+            apart[link.Name] = "slid_in"
+        elif part.get("glued"):
+            apart[link.Name] = "glued"
     out["fixed"] = check_fixed(links, fixings, pairs, apart=apart)
     # A back without its screws has to come out unfixed : the case no check saw on the back of a rounded end
     bare = check_fixed(links, fixings, pairs, "Vis 4 x 30 du fond")["unfixed"]
@@ -603,11 +607,11 @@ def main():
     out["screws"] = check_screws(model["screws"], shapes)
     # The same check must see a screw too long : every one 25 mm longer, tips must come out
     out["proof_longer_screws_tips_out"] = len(check_screws(model["screws"], shapes, 25.0)["tip_in_air"])
-    total = sum(s.Volume for _, _, s in shapes)
+    total = sum(shape.Volume for _, _, shape in shapes)
     out["volume_dm3"] = round(total / 1e6, 2)
     out["verdict"] = verdict(out)
-    with open(DOC.replace(".FCStd", "_controle.json"), "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=1)
+    with open(DOC.replace(".FCStd", "_controle.json"), "w", encoding="utf-8") as report:
+        json.dump(out, report, ensure_ascii=False, indent=1)
     print(json.dumps({k: (v if not isinstance(v, list) else (len(v), v[:14])) for k, v in out.items()},
                      ensure_ascii=False))
     print("VERDICT : " + ("OK" if out["verdict"]["ok"] else "ECHEC, " + " ; ".join(out["verdict"]["raisons"])))

@@ -11,7 +11,6 @@ import traceback
 import FreeCAD as App
 import FreeCADGui as Gui
 import Import
-import Part
 from PySide import QtCore
 
 SOURCE = os.environ["S32_JSON"]
@@ -36,8 +35,8 @@ def screw_type(screw):
     if (screw["kind"] == "countersunk" and screw["diameter"] < under):
         return small
     return SCREW_TYPES[screw["kind"]]
-# The large washer of the wall screws, its bore and thickness a convention like the part itself (data/hardware.ts)
-WASHER = {"bore": 5.3, "outside": 20.0, "thickness": 1.5}
+# The extra large washer of the wall screws, ISO 7094:2000 M5 (data/hardware.ts) : 5.5 x 18 x 2 in the workbench table
+WASHER = {"type": "ISO7094", "diameter": "M5"}
 
 
 # Height along y in the software, along z in FreeCAD : the build turned the room up about x
@@ -62,7 +61,11 @@ def make_screw(doc, group, screw):
     o = doc.addObject("Part::FeaturePython", "Modele_vis")
     FastenersCmd.FSScrewObject(o, screw_type(screw), None)
     FastenersCmd.FSViewProviderTree(o.ViewObject)
-    o.Diameter = f"M{screw['diameter']:g}" if screw["kind"] == "metric" else f"{screw['diameter']:g} mm"
+    # A US wood screw goes by its gauge, #6 , the others by their millimetres
+    size = screw.get("size")
+    if size is None:
+        size = f"M{screw['diameter']:g}" if screw["kind"] == "metric" else f"{screw['diameter']:g} mm"
+    o.Diameter = size
     o.Length = "Custom"
     o.LengthCustom = screw["length"]
     o.Label2 = name
@@ -74,14 +77,22 @@ def make_screw(doc, group, screw):
 
 
 def make_washer(doc, group):
-    o = doc.addObject("Part::Feature", "Modele_rondelle")
-    o.Shape = Part.makeCylinder(WASHER["outside"] / 2, WASHER["thickness"]).cut(
-        Part.makeCylinder(WASHER["bore"] / 2, WASHER["thickness"]))
-    o.Label = "Rondelle large 5 x 20"
+    """The washer of the workbench and its thickness, read off its shape : it lies from its origin upwards"""
+    import FastenersCmd
+
+    o = doc.addObject("Part::FeaturePython", "Modele_rondelle")
+    FastenersCmd.FSScrewObject(o, WASHER["type"], None)
+    FastenersCmd.FSViewProviderTree(o.ViewObject)
+    o.Diameter = WASHER["diameter"]
+    o.Label2 = f"Rondelle {WASHER['diameter']} {WASHER['type']}"
+    o.recompute()
+    box = o.Shape.BoundBox
+    if (not abs(box.ZMin) <= 1e-6 or not box.ZLength > 0):
+        raise RuntimeError(f"rondelle {WASHER['type']} hors de son origine : z de {box.ZMin} à {box.ZMax}")
     o.ViewObject.ShapeColor = SCREW_COLOUR
     o.ViewObject.Visibility = False
     group.addObject(o)
-    return o
+    return o, box.ZLength
 
 
 def place(parent, base, label, note, origin, out):
@@ -122,9 +133,10 @@ def make_screws(doc, model, hardware):
                 washer = make_washer(doc, models)
             # By the PBS code of the board it sits on : a step of the assembly sequence names it by that
             tag = s.get("tag", s["part"])
-            place(parent, washer, f"Rondelle {k + 1}, {tag}", tag, origin, out)
+            # A Fasteners washer is read by its note : the board alone there made it a board, out of every step
+            place(parent, washer[0], f"Rondelle {k + 1}, {tag}", f"Rondelle M5 ISO 7094:2000, {tag}", origin, out)
             washers += 1
-            origin = origin + out * WASHER["thickness"]
+            origin = origin + out * washer[1]
         tag = s.get("tag", s["part"])
         link = place(parent, base, f"{name} {k + 1}, {tag}", f"{s['label']}, {tag}", origin, out)
         # Half way down its shank the axis is steel, past its tip it no longer is

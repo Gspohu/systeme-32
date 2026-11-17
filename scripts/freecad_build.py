@@ -109,7 +109,8 @@ def make_sheet(doc, model):
 
 
 GAMME_COLUMNS = ("N°", "N° PBS", "Numéro de série", "Nombre de pièces", "Type d'assemblage", "Opération", "Outillage",
-                 "Temps", "Sécurité", "Commentaire", "Direction")
+                 "Temps", "Sécurité", "Commentaire", "Direction", "Position du meuble")
+GAMME_LETTERS = "ABCDEFGHIJKL"
 
 
 def make_gamme(doc, model):
@@ -135,15 +136,18 @@ def make_gamme(doc, model):
         sheet.setStyle(f"A{row}", "bold")
         text(f"B{row}", t["code"])
         sheet.setStyle(f"B{row}", "bold")
+        # What it builds, beside its number : a step placing it whole reads it
+        text(f"C{row}", t.get("name", ""))
+        sheet.setStyle(f"C{row}", "bold")
         row += 1
-        for col, title in zip("ABCDEFGHIJK", GAMME_COLUMNS):
+        for col, title in zip(GAMME_LETTERS, GAMME_COLUMNS):
             text(f"{col}{row}", title)
             sheet.setStyle(f"{col}{row}", "bold")
         row += 1
         for n, r in enumerate(t["rows"]):
             values = (n + 1, "\n".join(r["pbs"]), "N/A", r["count"], r["type"], r["operation"], r["tool"], "N/A", "N/A",
-                      r["comment"], r["direction"])
-            for col, value in zip("ABCDEFGHIJK", values):
+                      r["comment"], r["direction"], r.get("position", "Debout"))
+            for col, value in zip(GAMME_LETTERS, values):
                 if isinstance(value, int):
                     sheet.set(f"{col}{row}", str(value))
                 else:
@@ -151,7 +155,7 @@ def make_gamme(doc, model):
             row += 1
             steps += 1
         row += 1
-    for col, width in zip("ABCDEFGHIJK", (150, 330, 110, 110, 190, 480, 130, 60, 70, 300, 80)):
+    for col, width in zip(GAMME_LETTERS, (150, 330, 110, 110, 190, 480, 130, 60, 70, 300, 80, 170)):
         sheet.setColumnWidth(col, width)
     sheet.recompute()
     return steps
@@ -162,42 +166,43 @@ def is_plain_rectangle(p):
     return p["outline"]["start"] == [0, 0] and len(seg) == 4 and all(s["kind"] == "line" for s in seg)
 
 
-def add_outline(sk, outline, place):
+def add_outline(sketch, outline, place):
     """Lines and arcs of an outline, a point mapped by place, a sketch geometry count returned"""
-    prev = outline["start"]
-    n = 0
-    for s in outline["segments"]:
-        a = place(prev[0], prev[1])
-        b = place(s["x"], s["y"])
+    previous = outline["start"]
+    added = 0
+    for segment in outline["segments"]:
+        start_point = place(previous[0], previous[1])
+        end_point = place(segment["x"], segment["y"])
         # A segment of no length, harmless in the outline of a part, a sketch refuses it
-        if (a.distanceToPoint(b) < TOL):
-            prev = [s["x"], s["y"]]
+        if (start_point.distanceToPoint(end_point) < TOL):
+            previous = [segment["x"], segment["y"]]
             continue
-        if (s["kind"] == "line"):
-            sk.addGeometry(Part.LineSegment(a, b), False)
+        if (segment["kind"] == "line"):
+            sketch.addGeometry(Part.LineSegment(start_point, end_point), False)
         else:
-            c = place(s["cx"], s["cy"])
-            r = math.hypot(a.x - c.x, a.y - c.y)
+            centre = place(segment["cx"], segment["cy"])
+            radius = math.hypot(start_point.x - centre.x, start_point.y - centre.y)
             # The way round read from the middle of the arc once on the sketch, its plane may be mirrored and a half
             # circle gives nothing from its 2 ends alone
-            s0 = math.atan2(prev[1] - s["cy"], prev[0] - s["cx"])
-            s1 = math.atan2(s["y"] - s["cy"], s["x"] - s["cx"])
-            while (s["ccw"] and s1 <= s0):
-                s1 += 2 * math.pi
-            while (not s["ccw"] and s1 >= s0):
-                s1 -= 2 * math.pi
-            mid = (s0 + s1) / 2
-            m = place(s["cx"] + r * math.cos(mid), s["cy"] + r * math.sin(mid))
-            ccw_on_sketch = (m.x - a.x) * (b.y - m.y) - (m.y - a.y) * (b.x - m.x) > 0
-            a0 = math.atan2(a.y - c.y, a.x - c.x)
-            a1 = math.atan2(b.y - c.y, b.x - c.x)
-            start, end = (a0, a1) if ccw_on_sketch else (a1, a0)
-            while (end <= start):
-                end += 2 * math.pi
-            sk.addGeometry(Part.ArcOfCircle(Part.Circle(c, App.Vector(0, 0, 1), r), start, end), False)
-        prev = [s["x"], s["y"]]
-        n += 1
-    return n
+            from_angle = math.atan2(previous[1] - segment["cy"], previous[0] - segment["cx"])
+            to_angle = math.atan2(segment["y"] - segment["cy"], segment["x"] - segment["cx"])
+            while (segment["ccw"] and to_angle <= from_angle):
+                to_angle += 2 * math.pi
+            while (not segment["ccw"] and to_angle >= from_angle):
+                to_angle -= 2 * math.pi
+            middle = (from_angle + to_angle) / 2
+            on_arc = place(segment["cx"] + radius * math.cos(middle), segment["cy"] + radius * math.sin(middle))
+            ccw_on_sketch = ((on_arc.x - start_point.x) * (end_point.y - on_arc.y)
+                             - (on_arc.y - start_point.y) * (end_point.x - on_arc.x) > 0)
+            start_angle = math.atan2(start_point.y - centre.y, start_point.x - centre.x)
+            end_angle = math.atan2(end_point.y - centre.y, end_point.x - centre.x)
+            first, last = (start_angle, end_angle) if ccw_on_sketch else (end_angle, start_angle)
+            while (last <= first):
+                last += 2 * math.pi
+            sketch.addGeometry(Part.ArcOfCircle(Part.Circle(centre, App.Vector(0, 0, 1), radius), first, last), False)
+        previous = [segment["x"], segment["y"]]
+        added += 1
+    return added
 
 
 def base_sketch(body, p, k, aliases, across):
@@ -285,79 +290,82 @@ def add_rect(sk, a, b):
         sk.addGeometry(Part.LineSegment(pts[i], pts[(i + 1) % 4]), False)
 
 
-def machine(body, tip, p, across):
+def machine(body, tip, part, across):
     """Holes grouped by face, diameter and depth, then cutouts, grooves and edge pockets"""
-    T = p["thickness"]
-    L = p["length"]
-    W = p["width"]
-    z_of = {"A": 0.0, "B": T}
+    thickness = part["thickness"]
+    length = part["length"]
+    width = part["width"]
+    z_of = {"A": 0.0, "B": thickness}
 
     def plane(face):
-        return {"A": ("z", 0.0), "B": ("z", T), "u0": ("x", 0.0), "u1": ("x", L), "v0": ("y", across(0.0)),
-                "v1": ("y", across(W))}[face]
+        return {"A": ("z", 0.0), "B": ("z", thickness), "u0": ("x", 0.0), "u1": ("x", length),
+                "v0": ("y", across(0.0)), "v1": ("y", across(width))}[face]
 
     # One pocket for each use : its label says what its holes hold, a tool wouldn't tell a dowel from a shelf pin
     groups = {}
-    for h in p["holes"]:
-        groups.setdefault((h["face"], h["diameter"], h["depth"], h["label"].split(" (")[0]), []).append(h)
-    n = 0
+    for hole in part["holes"]:
+        groups.setdefault((hole["face"], hole["diameter"], hole["depth"], hole["label"].split(" (")[0]), []).append(hole)
+    drilled = 0
     for (face, diameter, depth, use), holes in sorted(groups.items(), key=lambda kv: str(kv[0])):
         axis, value = plane(face)
-        n += 1
-        sk, to = sketch_on(body, tip, axis, value, f"Percages_{n}")
+        drilled += 1
+        sketch, to = sketch_on(body, tip, axis, value, f"Percages_{drilled}")
         points = []
-        for h in holes:
+        for hole in holes:
             if face in ("A", "B"):
-                points.append(to(h["u"], across(h["v"]), z_of[face]))
+                points.append(to(hole["u"], across(hole["v"]), z_of[face]))
             else:
-                w = h["w"] if h.get("w") is not None else T / 2
-                u = 0.0 if face == "u0" else L if face == "u1" else h["u"]
-                v = 0.0 if face == "v0" else W if face == "v1" else h["v"]
-                points.append(to(u, across(v), w))
-        add_circles(sk, points, diameter)
-        sk.recompute()
-        tip = pocket(body, sk, f"D{diameter}x{depth}_{face}", depth, 1e9)
+                # Its height in the thickness of the board, the middle when the part said none
+                in_thickness = hole["w"] if hole.get("w") is not None else thickness / 2
+                u = 0.0 if face == "u0" else length if face == "u1" else hole["u"]
+                v = 0.0 if face == "v0" else width if face == "v1" else hole["v"]
+                points.append(to(u, across(v), in_thickness))
+        add_circles(sketch, points, diameter)
+        sketch.recompute()
+        tip = pocket(body, sketch, f"D{diameter}x{depth}_{face}", depth, 1e9)
         tip.Label = use
         # The seat of a head on the wood, a cone of 90 degrees from the face : a tool bevel, no separate piece
         sink = holes[0].get("countersink")
         if sink:
-            sk, to = sketch_on(body, tip, axis, value, f"Fraisages_{n}")
-            add_circles(sk, points, sink)
-            sk.recompute()
-            cone = pocket(body, sk, f"Fraisage_{n}", (sink - diameter) / 2, 1e9)
+            sketch, to = sketch_on(body, tip, axis, value, f"Fraisages_{drilled}")
+            add_circles(sketch, points, sink)
+            sketch.recompute()
+            cone = pocket(body, sketch, f"Fraisage_{drilled}", (sink - diameter) / 2, 1e9)
             cone.TaperAngle = TAPER_NARROWING
             cone.recompute()
             cone.Label = f"Fraisage, {use}"
             tip = cone
-    for i, c in enumerate(p["cutouts"]):
-        sk, to = sketch_on(body, tip, "z", 0.0, f"Decoupe_{i + 1}")
-        add_outline(sk, c, lambda u, v: to(u, across(v), 0.0))
-        sk.recompute()
-        tip = pocket(body, sk, f"Decoupe_{i + 1}", 0, 0, True)
-    for i, g in enumerate(p["grooves"]):
-        sk, to = sketch_on(body, tip, "z", z_of[g["face"]], f"Rainure_{i + 1}")
-        half = g["width"] / 2
-        if (g["along"] == "u"):
-            a = to(g["from"], across(g["at"] - half), z_of[g["face"]])
-            b = to(g["to"], across(g["at"] + half), z_of[g["face"]])
+    for i, cutout in enumerate(part["cutouts"]):
+        sketch, to = sketch_on(body, tip, "z", 0.0, f"Decoupe_{i + 1}")
+        add_outline(sketch, cutout, lambda u, v: to(u, across(v), 0.0))
+        sketch.recompute()
+        tip = pocket(body, sketch, f"Decoupe_{i + 1}", 0, 0, True)
+    for i, groove in enumerate(part["grooves"]):
+        face_z = z_of[groove["face"]]
+        sketch, to = sketch_on(body, tip, "z", face_z, f"Rainure_{i + 1}")
+        half = groove["width"] / 2
+        if (groove["along"] == "u"):
+            corner = to(groove["from"], across(groove["at"] - half), face_z)
+            opposite = to(groove["to"], across(groove["at"] + half), face_z)
         else:
-            a = to(g["at"] - half, across(g["from"]), z_of[g["face"]])
-            b = to(g["at"] + half, across(g["to"]), z_of[g["face"]])
-        add_rect(sk, a, b)
-        sk.recompute()
-        tip = pocket(body, sk, f"Rainure_{i + 1}", g["depth"], 1e9)
-    for i, k in enumerate(p["pockets"]):
-        axis, value = plane(k["edge"])
-        sk, to = sketch_on(body, tip, axis, value, f"Entaille_{i + 1}")
-        w0, w1 = k["w"] - k["across"] / 2, k["w"] + k["across"] / 2
-        half = k["length"] / 2
-        if k["edge"] in ("v0", "v1"):
-            a, b = to(k["at"] - half, value, w0), to(k["at"] + half, value, w1)
+            corner = to(groove["at"] - half, across(groove["from"]), face_z)
+            opposite = to(groove["at"] + half, across(groove["to"]), face_z)
+        add_rect(sketch, corner, opposite)
+        sketch.recompute()
+        tip = pocket(body, sketch, f"Rainure_{i + 1}", groove["depth"], 1e9)
+    for i, notch in enumerate(part["pockets"]):
+        axis, value = plane(notch["edge"])
+        sketch, to = sketch_on(body, tip, axis, value, f"Entaille_{i + 1}")
+        lowest, highest = notch["w"] - notch["across"] / 2, notch["w"] + notch["across"] / 2
+        half = notch["length"] / 2
+        if notch["edge"] in ("v0", "v1"):
+            corner, opposite = to(notch["at"] - half, value, lowest), to(notch["at"] + half, value, highest)
         else:
-            a, b = to(value, across(k["at"] - half), w0), to(value, across(k["at"] + half), w1)
-        add_rect(sk, a, b)
-        sk.recompute()
-        tip = pocket(body, sk, f"Entaille_{i + 1}", k["depth"], 1e9)
+            corner = to(value, across(notch["at"] - half), lowest)
+            opposite = to(value, across(notch["at"] + half), highest)
+        add_rect(sketch, corner, opposite)
+        sketch.recompute()
+        tip = pocket(body, sketch, f"Entaille_{i + 1}", notch["depth"], 1e9)
     return tip
 
 
@@ -656,7 +664,13 @@ def make_models(doc, model, sources):
                 continue
             read = Part.read(path)
             o = doc.addObject("Part::Feature", "Article")
-            o.Shape = Part.makeCompound([s for s in read.Solids if s.Volume > 1e-6])
+            shape = Part.makeCompound([s for s in read.Solids if s.Volume > 1e-6])
+            # A file drawn round another origin than the maker's model it stands for : turned into that frame
+            if "frame" in m:
+                x, y, z, at = (m["frame"][k] for k in ("x", "y", "z", "o"))
+                shape.transformShape(App.Matrix(x[0], y[0], z[0], at[0], x[1], y[1], z[1], at[1],
+                                                x[2], y[2], z[2], at[2], 0, 0, 0, 1))
+            o.Shape = shape
             o.Label = named
             o.Label2 = "quincaillerie"
             o.Visibility = False
@@ -735,6 +749,13 @@ def place_hardware(model, models, hardware):
         if i.get("unit"):
             link.addProperty("App::PropertyString", "Unit", "Article", "The bought article this solid is a piece of")
             link.Unit = i["unit"]
+        # The screws it's tightened by, when its file shows them : the film puts a screwdriver on each
+        tighten = ((model["models"].get(i["model"]) or {}).get("fixing") or {}).get("tighten") or {}
+        if tighten.get("at"):
+            link.addProperty("App::PropertyVectorList", "ToolPoints", "Article", "Heads of the screws tightened")
+            link.addProperty("App::PropertyVector", "ToolAway", "Article", "Way the tool comes out of them")
+            link.ToolPoints = [base.Placement.multVec(App.Vector(*p)) for p in tighten["at"]]
+            link.ToolAway = base.Placement.Rotation.multVec(App.Vector(*tighten["away"]))
         link.Placement = turn.multiply(App.Placement(m))
         link.Visibility = True
     return unrouted

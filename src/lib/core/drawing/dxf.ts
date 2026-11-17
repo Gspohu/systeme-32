@@ -1,7 +1,7 @@
 // DXF R12 (AC1009) of one owrkpiece at full scale, machining sorted in layers named after the operation
 
 import type { Part } from "../parts";
-import type { Outline } from "../geometry";
+import { vDown, type Outline } from "../geometry";
 import { bandedPieces, innerOutline } from "../edge_bands";
 import { decorById } from "../../data/materials";
 
@@ -74,25 +74,29 @@ function text(layer: string, x: number, y: number, h: number, t: string): Group[
 }
 
 
-function contour(layer: string, o: Outline, ents: Group[][]): void
+// sy is -1 on a board whose v goes down seen from face A : y = -v, an arc turning the other way once mirrored
+function contour(layer: string, o: Outline, ents: Group[][], sy: number): void
 {
     let px = o.start[0];
-    let py = o.start[1];
+    let py = sy * o.start[1];
     for (const s of o.segments)
     {
+        const [x, y] = [s.x, sy * s.y];
         if (s.kind === "line")
         {
-            ents.push(line(layer, px, py, s.x, s.y));
+            ents.push(line(layer, px, py, x, y));
         }
         else
         {
-            const r = Math.hypot(px - s.cx, py - s.cy);
-            const a = Math.atan2(py - s.cy, px - s.cx) * 180 / Math.PI;
-            const b = Math.atan2(s.y - s.cy, s.x - s.cx) * 180 / Math.PI;
-            ents.push(s.ccw ? arc(layer, s.cx, s.cy, r, a, b) : arc(layer, s.cx, s.cy, r, b, a));
+            const cy = sy * s.cy;
+            const r = Math.hypot(px - s.cx, py - cy);
+            const a = Math.atan2(py - cy, px - s.cx) * 180 / Math.PI;
+            const b = Math.atan2(y - cy, x - s.cx) * 180 / Math.PI;
+            const ccw = sy > 0 ? s.ccw : !s.ccw;
+            ents.push(ccw ? arc(layer, s.cx, cy, r, a, b) : arc(layer, s.cx, cy, r, b, a));
         }
-        px = s.x;
-        py = s.y;
+        px = x;
+        py = y;
     }
 }
 
@@ -101,20 +105,23 @@ export function partToDxf(p: Part, code: string): string
 {
     const ents: Group[][] = [];
     const layers = new Set<string>(["CONTOUR", "TEXTE"]);
+    // Face A towards the reader for real : v down on the boards where it goes down, the origin still the corner the
+    // table of holes counts from
+    const sy = vDown(p.frame) ? -1 : 1;
     // The contour to cut is the one the banding leaves, the finished one beside it for reference
     const t = decorById(p.decor).edgeThickness;
     const banded = p.edges.length > 0 && t !== undefined;
-    contour("CONTOUR", banded ? innerOutline(p.outline, p.length, p.width, p.edges, t) : p.outline, ents);
+    contour("CONTOUR", banded ? innerOutline(p.outline, p.length, p.width, p.edges, t) : p.outline, ents, sy);
     if (banded)
     {
         layers.add("FINI_CHANTS_COMPRIS");
-        contour("FINI_CHANTS_COMPRIS", p.outline, ents);
+        contour("FINI_CHANTS_COMPRIS", p.outline, ents, sy);
     }
     // Openings get a layer of their own, the router takes them before the outer contour
     for (const c of p.cutouts)
     {
         layers.add("DECOUPE");
-        contour("DECOUPE", c, ents);
+        contour("DECOUPE", c, ents, sy);
     }
     if (p.edges.length > 0)
     {
@@ -124,7 +131,7 @@ export function partToDxf(p: Part, code: string): string
     // on the quarter rounds
     for (const { from, s } of bandedPieces(p.outline, p.length, p.width, p.edges))
     {
-        contour("CHANT_PLAQUE", { start: from, segments: [s] }, ents);
+        contour("CHANT_PLAQUE", { start: from, segments: [s] }, ents, sy);
     }
     for (const h of p.holes)
     {
@@ -134,16 +141,16 @@ export function partToDxf(p: Part, code: string): string
             {
                 const l = layerName(["POINTAGE", h.face]);
                 layers.add(l);
-                ents.push(point(l, h.u, h.v));
+                ents.push(point(l, h.u, sy * h.v));
             }
             else
             {
-                const l = layerName(["PERCAGE", h.face, `D${h.diameter}`, `P${h.depth}`]);  
+                const l = layerName(["PERCAGE", h.face, `D${h.diameter}`, `P${h.depth}`]);
                 layers.add(l);
-                ents.push(circle(l, h.u, h.v, h.diameter / 2));
+                ents.push(circle(l, h.u, sy * h.v, h.diameter / 2));
             }
             continue;
-        }  
+        }
         // edge drilling : a line from the edge inward, as long as the hole is deep
         const l = layerName(["PERCAGE_CHANT", h.face, `D${h.diameter}`, `P${h.depth}`,
                              `W${Math.round((h.w ?? p.thickness / 2) * 10) / 10}`]);
@@ -151,19 +158,19 @@ export function partToDxf(p: Part, code: string): string
         const d = h.depth;
         if (h.face === "u0")
         {
-            ents.push(line(l, h.u, h.v, h.u + d, h.v));
+            ents.push(line(l, h.u, sy * h.v, h.u + d, sy * h.v));
         }
         else if (h.face === "u1")
         {
-            ents.push(line(l, h.u, h.v, h.u - d, h.v));
+            ents.push(line(l, h.u, sy * h.v, h.u - d, sy * h.v));
         }
         else if (h.face === "v0")
         {
-            ents.push(line(l, h.u, h.v, h.u, h.v + d));
+            ents.push(line(l, h.u, sy * h.v, h.u, sy * (h.v + d)));
         }
         else
         {
-            ents.push(line(l, h.u, h.v, h.u, h.v - d));
+            ents.push(line(l, h.u, sy * h.v, h.u, sy * (h.v - d)));
         }
     }
     for (const g of p.grooves)
@@ -171,8 +178,9 @@ export function partToDxf(p: Part, code: string): string
         const l = layerName(["RAINURE", g.face, `L${g.width}`, `P${g.depth}`]);
         layers.add(l);
         const half = g.width / 2;
-        const [x0, y0, x1, y1] = g.along === "u" ? [g.from, g.at - half, g.to, g.at + half] : [g.at -
+        const [x0, v0, x1, v1] = g.along === "u" ? [g.from, g.at - half, g.to, g.at + half] : [g.at -
             half, g.from, g.at + half, g.to];
+        const [y0, y1] = [sy * v0, sy * v1];
         ents.push(line(l, x0, y0, x1, y0), line(l, x1, y0, x1, y1), line(l, x1, y1, x0, y1), line(l, x0, y1, x0, y0));
     }
     // An edge pocket seen from face A : its length along the edge, as deep as it goes, its layer naming the edge
@@ -182,13 +190,17 @@ export function partToDxf(p: Part, code: string): string
         const l = layerName(["ENTAILLE", k.edge, `L${k.across}`, `W${k.w}`, `P${k.depth}`]);
         layers.add(l);
         const half = k.length / 2;
-        const [x0, y0, x1, y1] = k.edge === "v0" ? [k.at - half, 0, k.at + half, k.depth]
+        const [x0, v0, x1, v1] = k.edge === "v0" ? [k.at - half, 0, k.at + half, k.depth]
             : k.edge === "v1" ? [k.at - half, p.width - k.depth, k.at + half, p.width]
                 : k.edge === "u0" ? [0, k.at - half, k.depth, k.at + half] : [p.length - k.depth, k.at - half, p.length,
                     k.at + half];
+        const [y0, y1] = [sy * v0, sy * v1];
         ents.push(line(l, x0, y0, x1, y0), line(l, x1, y0, x1, y1), line(l, x1, y1, x0, y1), line(l, x0, y1, x0, y0));
     }
-    ents.push(text("TEXTE", 0, -12, 6, `${code} ${p.label} ep. ${p.thickness} face A vers soi`));
+    // Under the board either way, its v running up or down from the origin
+    const origin = sy > 0 ? "origine en bas à gauche" : "origine en haut à gauche";
+    ents.push(text("TEXTE", 0, sy > 0 ? -12 : -p.width - 12, 6,
+                   `${code} ${p.label} ep. ${p.thickness} face A vers soi, ${origin}`));
 
     const layerTable: Group[] = [[0, "TABLE"], [2, "LAYER"], [70, layers.size]];
     let colour = 1;

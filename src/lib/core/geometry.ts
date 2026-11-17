@@ -22,6 +22,20 @@ export function at(f: Frame, u: number, v: number, w: number): Vec3
 }
 
 
+// Seen from face A, the viewer on the side of -n, u running to the right : v goes down when u x v runs along n. Drawn
+// v up regardless, half the boards came out as the mirror of the face they claim to show
+export function vDown(f: Frame | null): boolean
+{
+    if (f === null)
+    {
+        return false;
+    }
+    const c: Vec3 = [f.u[1] * f.v[2] - f.u[2] * f.v[1], f.u[2] * f.v[0] - f.u[0] * f.v[2], f.u[0] * f.v[1] -
+                     f.u[1] * f.v[0]];
+    return c[0] * f.n[0] + c[1] * f.n[1] + c[2] * f.n[2] > 0;
+}
+
+
 export const X: Vec3 = [1, 0, 0];
 export const Y: Vec3 = [0, 1, 0];
 export const Z: Vec3 = [0, 0, 1];

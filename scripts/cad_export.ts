@@ -13,8 +13,8 @@ for (const t of TEMPLATES)
     if (SENT.includes(t.id))
     {
         const p = t.make();
-        // The assembly sequence of the TV wall only, the dresser still under review
-        writeFileSync(`${out}/${t.id}.json`, JSON.stringify(cadModel(p, computeOutputs(p), t.id === "tv")));
+        // Each piece with its assembly sequence : the film of the gamme is made from it
+        writeFileSync(`${out}/${t.id}.json`, JSON.stringify(cadModel(p, computeOutputs(p), true)));
         console.log(`${t.id} : ${out}/${t.id}.json`);
     }
 }
