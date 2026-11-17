@@ -1,7 +1,7 @@
 // The manufacturing route of the parts, neutral to any machine : what to buy, then for each part what to obtain
 
 import type { Bom, CutRow } from "../bom";
-import { BYTE_ORDER_MARK, csvQuote, edgeNotation, sawSize, shapeWord } from "../bom";
+import { BYTE_ORDER_MARK, csvQuote, edgeLengthOf, edgeNotation, sawSize, shapeWord } from "../bom";
 import type { NestResult } from "../nesting";
 import type { Edge, Hole } from "../part_types";
 import { MATERIALS, decorById } from "../../data/materials";
@@ -24,7 +24,7 @@ export interface FabStep
     phase: number;
     title: string;
     spec: string;
-    // The phases that must be done before this one, for a physical reason given in `why`
+    // The phases that must be done before this one, for a physical reason given in `why` : the Après column
     after: number[];
     why: string;
 }
@@ -66,7 +66,7 @@ const n1 = (x: number): string => { return round1(x); };
 function holeWhat(h: Hole): string
 {
     const sink = h.countersink === undefined ? "" : `, fraisé ${DIAM}${n1(h.countersink)} à 90°`;
-    // A depth of 0 is one the model doesn't give (drilling.ts reads it as 15), never a hole drilled through
+    // A depth of 0 is one the model doesn't give (drilling.ts reads it as 15), never a hole drille through
     const depth = h.depth === 0 ? "profondeur non cotée, à confirmer" : `prof. ${n1(h.depth)}`;
     return `${DIAM}${n1(h.diameter)} ${depth}${sink} (${h.label})`;
 }
@@ -91,19 +91,26 @@ function routeOf(r: CutRow): FabRoute
     const decor = decorById(r.decor);
     const steps: FabStep[] = [];
     const saw = sawSize(r);
-    const shaped = shapeWord(r) !== "" || part.bevel.u0 !== 0 || part.bevel.u1 !== 0;
+    // A solid skin on an arc is a quarter round profile, R x R in section (curves.ts), a bent one is sawn flat
+    const curvedSkin = part.curve !== null && part.role === "skin"; 
+    const profile = curvedSkin && MATERIALS[part.material]?.kind === "solid";
+    const shaped = shapeWord(r) !== "" || part.bevel.u0 !== 0 || part.bevel.u1 !== 0 || profile;
     // A filler leaves the workshop wider than its finished width, the extra planed to the wall on site
     const extra = r.scribe ?? 0;
     const wide = r.width + extra;
     const ends = Math.max(0, part.bevel.u1) - Math.min(0, part.bevel.u0);
+    // TODO the overall size said with a DXF leaves out a scribe allowence and a bevelled end : no shaped part has one
+    // yet, the first that does gets a blank too short
     const debit = saw === null
-        ? `Débit à ${n1(r.length + ends)} x ${n1(wide)}, moins l'épaisseur du chant sur chaque arête plaquée (chant non spécifié par le décor)`
+        ? `Débit à ${n1(r.length + ends)} x ${n1(wide)}, moins l'épaisseur du chant sur chaque arête plaquée `
+            + "(chant non spécifié par le décor)"
         : saw === "dxf" ? `Débit capable du contour du DXF (${n1(r.length)} x ${n1(r.width)} hors tout)`
         : `Débit à ${n1(saw.length)} x ${n1(saw.width)}${r.edges.length > 0 ? ", chants retranchés" : ""}`;
     const grain = r.grain ? `, fil le long de la longueur ${n1(r.length)}` : ", sans sens de fil";
     const scribe = extra === 0 ? ""
         : `. Surlargeur de ${n1(extra)} comprise, à garder : chant ajusté au mur sur place, pas en atelier`;
-    steps.push({ phase: PHASE_DEBIT, title: "Débit", spec: `${debit}${grain}, épaisseur ${r.thickness}${scribe}`,
+    const flat = curvedSkin && !profile ? ". Livrée à plat : cintrée au montage, pas en atelier" : "";
+    steps.push({ phase: PHASE_DEBIT, title: "Débit", spec: `${debit}${grain}, épaisseur ${r.thickness}${scribe}${flat}`,
                  after: [], why: "" });
     if (shaped)
     {
@@ -113,9 +120,15 @@ function routeOf(r: CutRow): FabRoute
         // Without its band thickness the DXF draws the finished contour (dxf.ts), the band still to come off it
         const under = r.edges.length > 0 && decor.edgeThickness === undefined
             ? " Le DXF donne le contour fini : retrancher l'épaisseur du chant sur chaque arête plaquée." : "";
-        steps.push({ phase: PHASE_CONTOUR, title: "Contour", after: [PHASE_DEBIT], why: "Dans la pièce débitée",
-                     spec: `Pièce ${shapeWord(r) || "à abouts inclinés"} : contour d'après le DXF et le plan de la pièce `
-                         + `${r.code}.${cutouts}${bevel}${under}`.trim() });
+        steps.push({ phase: PHASE_CONTOUR, title: profile ? "Profil" : "Contour", after: [PHASE_DEBIT],
+                     why: "Dans la pièce débitée",
+                     spec: profile
+                         ? `Quart de rond de rayon ${n1(part.width)} dans la section `
+                             + `${n1(part.width)} x ${n1(part.thickness)}, `
+                             + `sur toute la longueur ${n1(part.length)}, face bombée vue`
+                         : `Pièce ${shapeWord(r) || "à abouts inclinés"} : contour d'après le DXF `
+                             + "et le plan de la pièce "
+                             + `${r.code}.${cutouts}${bevel}${under}`.trim() });
     }
     const shapedDone = shaped ? [PHASE_CONTOUR] : [PHASE_DEBIT];
     if (r.edges.length > 0)
@@ -151,7 +164,8 @@ function routeOf(r: CutRow): FabRoute
                      why: throughBand ? "Traversent le chant plaqué" : "Cotés depuis le contour",
                      spec: holeLines(onEdges, (h) =>
                      {
-                         return `chant ${EDGE_NAME(h.face as Edge)}${h.w === undefined ? "" : ` à ${n1(h.w)} de la face A`}`;
+                         const across = h.w === undefined ? "" : ` à ${n1(h.w)} de la face A`;
+                         return `chant ${EDGE_NAME(h.face as Edge)}${across}`;
                      }).join(" ; ") });
     }
     const grooveEnds = part.grooves.flatMap((g): Edge[] =>
@@ -167,32 +181,36 @@ function routeOf(r: CutRow): FabRoute
         const spec = [
             ...part.grooves.map((g) =>
             {
-                // u runs along the length from l1, v across it from L1, as on the part's drawing
-                const where = g.along === "u"
+                // u runs along the lenght from l1, v across it from L1, as on the part's drawing
+                const where = g.along === "u"   
                     ? `parallèle à la longueur, axe à ${n1(g.at)} de L1, de ${n1(g.from)} à ${n1(g.to)} depuis l1`
                     : `parallèle à la largeur, axe à ${n1(g.at)} de l1, de ${n1(g.from)} à ${n1(g.to)} depuis L1`;
-                return `Rainure ${n1(g.width)} x ${n1(g.depth)} face ${g.face}, ${where} (${g.label})`;
+                return `Rainure ${n1(g.width)} x ${n1(g.depth)} face ${g.face}, ${where} (${g.label})`; 
             }),
             ...pockets.map((k) =>
             {
-                return `Poche ${n1(k.length)} x ${n1(k.across)} prof. ${n1(k.depth)} dans le chant ${EDGE_NAME(k.edge)}, `
+                return `Poche ${n1(k.length)} x ${n1(k.across)} prof. ${n1(k.depth)} `
+                    + `dans le chant ${EDGE_NAME(k.edge)}, `
                     + `centrée à ${n1(k.at)} et à ${n1(k.w)} de la face A (${k.label})`;
             }),
         ];
         steps.push({ phase: PHASE_GROOVES, title: "Rainures et poches",
                      after: cuts && r.edges.length > 0 ? [...shapedDone, PHASE_EDGES] : shapedDone,
-                     why: cuts ? "Débouchent dans un chant plaqué" : "Cotés depuis le contour", spec: spec.join(" ; ") });
+                     why: cuts ? "Débouchent dans un chant plaqué" : "Cotés depuis le contour",
+                     spec: spec.join(" ; ") });
     }
     const machined = steps.filter((s) => { return s.phase > PHASE_DEBIT; }).map((s) => { return s.phase; });
     if (r.decor === "MDF_LAQUE")
     {
-        const tint = part.colour === null ? "teinte à définir avec le donneur d'ordre avant fabrication" : `teinte ${part.colour}`;
+        const tint = part.colour === null ? "teinte à définir avec le donneur d'ordre avant fabrication"
+            : `teinte ${part.colour}`;
         steps.push({ phase: PHASE_FINISH, title: "Finition", after: machined.length > 0 ? machined : [PHASE_DEBIT],
-                     why: "Couvre les usinages", spec: `Laque ${tint}, faces et chants vus` });
+                     why: "Couvre les usinages", spec: `Laque ${tint}, faces et chants vus` });  
     }
     const all = steps.map((s) => { return s.phase; });
     steps.push({ phase: PHASE_CHECK, title: "Contrôle", after: all, why: "Sur la pièce finie",
-                 spec: `Cotes ${n1(r.length)} x ${n1(wide)}${extra === 0 ? "" : ` (surlargeur de ${n1(extra)} comprise)`} et `
+                 spec: `Cotes ${n1(r.length)} x ${n1(wide)}`
+                     + `${extra === 0 ? "" : ` (surlargeur de ${n1(extra)} comprise)`} et `
                      + `positions des usinages : ${TOLERANCE}. ${SQUARENESS}. Aucun éclat de surface`
                      + (r.edges.length > 0 ? " ni décollement de chant" : "") });
     steps.push({ phase: PHASE_MARK, title: "Marquage", after: [PHASE_CHECK], why: "Pièce acceptée",
@@ -203,77 +221,108 @@ function routeOf(r: CutRow): FabRoute
 }
 
 
-// What is bought ready-made : the boards by the sheets the nesting asks, the edging by its metres, the hardware
-function suppliesOf(bom: Bom, nesting: NestResult): Supply[]
+const comma = (x: number, digits: number): string => { return x.toFixed(digits).replace(".", ","); };
+
+
+// The sheets the nesting ass, counted by board and format
+function sheetsToBuy(nesting: NestResult): Supply[]
 {
-    const sheets = new Map<string, { s: NestResult["sheets"][number]; n: number }>();
-    for (const s of nesting.sheets)
+    const counted = new Map<string, { sheet: NestResult["sheets"][number]; count: number }>();
+    for (const sheet of nesting.sheets)
     {
-        const key = `${s.decor}|${s.thickness}|${s.length}|${s.width}`;
-        sheets.set(key, { s, n: (sheets.get(key)?.n ?? 0) + 1 });
+        const key = `${sheet.decor}|${sheet.thickness}|${sheet.length}|${sheet.width}`;
+        counted.set(key, { sheet, count: (counted.get(key)?.count ?? 0) + 1 });
     }
-    const out: Supply[] = [...sheets.values()].map(({ s, n }) =>
+    const out = [...counted.values()].map(({ sheet, count }): Supply =>
     {
-        const d = decorById(s.decor);
-        return { kind: "Panneau" as const, brand: d.brand, ref: d.ref,
-                label: `${s.decorLabel}, ${s.length} x ${s.width} x ${s.thickness}`,
-                 qty: String(n), unit: "plaque", note: d.grain ? "Décor à fil" : "" };
+        const decor = decorById(sheet.decor);
+        return { kind: "Panneau", brand: decor.brand, ref: decor.ref,
+                 label: `${sheet.decorLabel}, ${sheet.length} x ${sheet.width} x ${sheet.thickness}`, qty: String(count),
+                 unit: "plaque", note: decor.grain ? "Décor à fil" : "" };
     });
-    for (const r of bom.offSheet)
+    // What the nesting left out still needs a board, one line a workpiece
+    const left = new Map<string, { label: string; reason: string; count: number }>();
+    for (const miss of nesting.unplaced)
     {
-        const d = decorById(r.decor);
-        out.push({ kind: "Hors plaque", brand: d.brand, ref: d.ref,
-                  label: `${r.label} : ${r.decorLabel}, ${n1(r.length)} x ${n1(r.width)} x ${r.thickness}`,
-                   qty: String(r.quantity), unit: "pièce", note: `Pour ${r.code}` });
+        left.set(miss.code, { label: miss.label, reason: miss.reason, count: (left.get(miss.code)?.count ?? 0) + 1 });
     }
-    for (const e of bom.edges)
+    for (const [code, miss] of left)
     {
-        const d = decorById(e.decor);
-        out.push({ kind: "Chant", brand: d.brand, ref: "", label: e.label, qty: e.metres.toFixed(1).replace(".", ","),
-                  unit: "m",
-                   note: d.edgeThickness === undefined ? "Épaisseur à confirmer" : `Ép. ${n1(d.edgeThickness)}, surlongueur comprise` });
-    }
-    for (const h of bom.hardware.filter((x) => { return !x.made; }))
-    {
-        out.push({ kind: "Quincaillerie", brand: h.brand, ref: h.ref, label: h.label, qty: String(h.qty), unit: "pièce",
-                   note: h.code });
-    }
-    // Cut to size by the glazier : bought as it is, no route of its own
-    for (const r of bom.cut.filter(isGlass))
-    {
-        const d = decorById(r.decor);
-        out.push({ kind: "Verre", brand: d.brand, ref: d.ref,
-                   label: `${r.label} : ${r.decorLabel}, ${n1(r.length)} x ${n1(r.width)} x ${r.thickness}`,
-                   qty: String(r.quantity), unit: "pièce", note: [`Pour ${r.code}`, ...r.notes].join(". ") });
-    }
-    // The lacquer by colour, with the board it covers : one face of each part, its second face and edges on top
-    const lacquer = new Map<string, number>();
-    for (const r of [...bom.cut, ...bom.offSheet].filter((x) => { return x.decor === "MDF_LAQUE"; }))
-    {
-        for (const q of r.parts)
-        {
-            const tint = q.colour ?? "teinte à définir";
-            lacquer.set(tint, (lacquer.get(tint) ?? 0) + q.length * q.width * 1e-6 * q.quantity);
-        }
-    }
-    for (const [tint, m2] of lacquer)
-    {
-        out.push({ kind: "Laque", brand: "", ref: "", label: `Laque pour MDF, ${tint}`, qty: m2.toFixed(2).replace(".",
-            ","),
-                   unit: "m² de panneau", note: "Surface d'une face : seconde face et chants vus en plus" });
-    }
-    const unplaced = new Map<string, { label: string; reason: string; n: number }>();
-    for (const u of nesting.unplaced)
-    {
-        const was = unplaced.get(u.code);
-        unplaced.set(u.code, { label: u.label, reason: u.reason, n: (was?.n ?? 0) + 1 });
-    }
-    for (const [code, u] of unplaced)
-    {
-        out.push({ kind: "Panneau", brand: "", ref: "", label: `${code} ${u.label}`, qty: String(u.n), unit: "pièce",
-                   note: `Hors calepinage, plaque à prévoir : ${u.reason}` });
+        out.push({ kind: "Panneau", brand: "", ref: "", label: `${code} ${miss.label}`, qty: String(miss.count),
+                   unit: "pièce", note: `Hors calepinage, plaque à prévoir : ${miss.reason}` });
     }
     return out;
+}
+
+
+// Bought by the piece : soldi stock and flexible skins, and the glass the glazier cuts, no route of its own
+function piecesToBuy(bom: Bom): Supply[]
+{
+    const line = (row: CutRow, kind: Supply["kind"], note: string): Supply =>
+    {
+        const decor = decorById(row.decor);
+        return { kind, brand: decor.brand, ref: decor.ref,
+                 label: `${row.label} : ${row.decorLabel}, ${n1(row.length)} x ${n1(row.width)} x ${row.thickness}`,
+                 qty: String(row.quantity), unit: "pièce", note };
+    };  
+    return [...bom.offSheet.map((row) => { return line(row, "Hors plaque", `Pour ${row.code}`); }),
+            ...bom.cut.filter(isGlass).map((row) => { return line(row, "Verre", [`Pour ${row.code}`,
+                ...row.notes].join(". ")); })];
+}
+
+
+// The banding by decor and board thickness : a band have to be wider than the board it covers
+function bandsToBuy(bom: Bom): Supply[]
+{
+    const bands = new Map<string, { decor: string; board: number; mm: number }>();
+    for (const part of [...bom.cut, ...bom.offSheet].flatMap((row) => { return row.parts; }))
+    {
+        const key = `${part.decor}|${part.thickness}`;
+        const was = bands.get(key) ?? { decor: part.decor, board: part.thickness, mm: 0 };
+        bands.set(key, { ...was, mm: was.mm + edgeLengthOf(part) * part.quantity });
+    }
+    return [...bands.values()].filter((band) => { return band.mm > 0; }).map((band): Supply =>
+    {
+        const decor = decorById(band.decor);
+        const thick = decor.edgeThickness === undefined ? "épaisseur à confirmer" : `ép. ${n1(decor.edgeThickness)}`;
+        return { kind: "Chant", brand: decor.brand, ref: decor.ref,
+                 label: `${decor.edge ?? `Chant assorti ${decor.label}`}, pour panneau de ${band.board}`,
+                 qty: comma(band.mm / 1000, 1), unit: "m",
+                 note: `Largeur supérieure à ${band.board}, ${thick}, surlongueur comprise` };
+    });
+}
+
+
+// The lacquer by colour, with the board it covers : one face of each part, its second face and edges on top
+function lacquerToBuy(bom: Bom): Supply[]
+{
+    const byTint = new Map<string, number>();
+    for (const part of [...bom.cut, ...bom.offSheet].flatMap((row) => { return row.parts; }))
+    {
+        if (part.decor !== "MDF_LAQUE")
+        {
+            continue;
+        }
+        const tint = part.colour ?? "teinte à définir";
+        byTint.set(tint, (byTint.get(tint) ?? 0) + part.length * part.width * 1e-6 * part.quantity);
+    }
+    return [...byTint].map(([tint, area]): Supply =>
+    {
+        return { kind: "Laque", brand: "", ref: "", label: `Laque pour MDF, ${tint}`, qty: comma(area, 2),
+                 unit: "m² de panneau", note: "Surface d'une face : seconde face et chants vus en plus" };
+    });
+}
+
+
+// What is bought ready-made, the hardware cut in the workshop left out
+function suppliesOf(bom: Bom, nesting: NestResult): Supply[]
+{
+    const hardware = bom.hardware.filter((item) => { return !item.made; }).map((item): Supply =>
+    {
+        return { kind: "Quincaillerie", brand: item.brand, ref: item.ref, label: item.label, qty: String(item.qty),
+                 unit: "pièce", note: item.code };
+    });
+    return [...sheetsToBuy(nesting), ...piecesToBuy(bom), ...bandsToBuy(bom), ...hardware, ...lacquerToBuy(bom)];
 }
 
 

@@ -82,7 +82,7 @@ function skinParts(
         thickness: radius, decor: "CHENE_MASSIF", edges: [], frame: null,
     });
     p.curve = curve;
-    p.notes.push("Profil massif en quart de rond, usinage CN ou toupie");
+    p.notes.push(`Profil massif en quart de rond de rayon ${Math.round(radius)}, face bombée vue`);
     b.parts.push(p);
 }
 

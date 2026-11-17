@@ -46,7 +46,8 @@ export function fabricationSheets(f: Fabrication): Draft[]
     const route = paged("Gamme de fabrication", [
         "Résultat à obtenir par pièce, quels que soient les moyens. Seule contrainte d'ordre : la colonne Après, "
             + "antériorités physiques. Positions des usinages : plan de chaque pièce et DXF.",
-        `Tolérances générales ${TOLERANCE}. ${SQUARENESS}. Diamètre "-" au plan : position de vis sans avant-trou, non usinée.`,
+        `Tolérances générales ${TOLERANCE}. ${SQUARENESS}. `
+            + "Diamètre \"-\" au plan : position de vis sans avant-trou, non usinée.",
     ], ["Code", "Pièce", "Qté", "Matière", "Ph.", "Opération", "Spécification", "Après"],
         [20, 48, 10, 46, 10, 28, 210, 16], rows);
     return [...buy, ...route];
