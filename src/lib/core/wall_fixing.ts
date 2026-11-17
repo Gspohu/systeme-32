@@ -1,13 +1,23 @@
 // Anti-tip brackets of a standing carcass : where they go, which ones something standing on the top leaves out
 
 import type { Carcass, Item, Settings } from "./model";
-import type { Build, Purpose } from "./part_types";
+import type { Build, Part, Purpose } from "./part_types";
 import { byId } from "./edit";
 import { topAngle, topAt } from "./slope";
 import { box } from "./fitted";
 import { boxesMeet, wallBox, type Box3 } from "./room";
 import { spread } from "./fittings";
 import { wallPlug } from "./wall_load";
+import { at, type Vec3 } from "./geometry";
+
+// The opening a fist needs, A = d3 (P95) + x of ISO 15534-2:2000 4.7 : d3 = 120 in ISO 15534-3:2000 Table 1
+// x = 10 the basic allowance for movement (A.3.7). The project yml gives the CAD checks the same hand_allowance
+export const FIST_OPENING = 130;
+// Blade of a catalogue PZ2 driver (Wiha), the fist around the handle beyond it
+const PZ2_BLADE = 100;
+// The wide washer under the head, d2 = 18 of an M5 in ISO 7094:2000 table 1
+const WASHER_RADIUS = 9;
+const BOARD_ROLES = new Set(["side", "top", "bottom", "hdivider", "vdivider", "stiffener"]);
 
 
 // One central up to 500 wide, else 100 to 150 from each end (Furnica guide)
@@ -61,6 +71,97 @@ export function antiTipKept(c: Carcass, items: Item[]): { x: number; under: stri
 }
 
 
+function boardBox(q: Part): Box3
+{
+    const corners: Vec3[] = [];
+    for (const u of [0, q.length])
+    {
+        for (const v of [0, q.width])
+        {
+            corners.push(at(q.frame!, u, v, 0), at(q.frame!, u, v, q.thickness));
+        }
+    }
+    const pick = (k: number, f: (...n: number[]) => number): number =>
+    {
+        return f(...corners.map((p) =>
+        {
+            return p[k]!;
+        }));
+    };
+    return { min: [pick(0, Math.min), pick(1, Math.min), pick(2, Math.min)],
+             max: [pick(0, Math.max), pick(1, Math.max), pick(2, Math.max)] };
+}
+
+
+// Whether a square of side a holding the point (x, y) clears every board : a free square slides left then down
+// until it meets an edge, which leave only the ends of its range and the far edges of the boards to try
+function squareFits(x: number, y: number, a: number, boards: Box3[]): boolean
+{
+    const tries = (k: 0 | 1, p: number): number[] =>
+    {
+        return [p - a, p, ...boards.flatMap((r) =>
+        {
+            return [r.max[k], r.min[k] - a];
+        })].filter((s) =>
+        {
+            return s >= p - a && s <= p;
+        });
+    };
+    return tries(0, x).some((sx) =>
+    {
+        return tries(1, y).some((sy) =>
+        {
+            return boards.every((r) =>
+            {
+                return r.max[0] <= sx || r.min[0] >= sx + a || r.max[1] <= sy || r.min[1] >= sy + a;
+            });
+        });
+    });
+}
+
+
+// The board of the carcass a driver on a wall screw would meet : the head and its washer along the blade, then a fist
+// coming in from the front up to the handle. The screw goes in along +z, out of a back standing on the wall
+export function wallScrewBlocked(head: Vec3, boards: Part[], front: number): Part | null
+{
+    const near = head[2] + PZ2_BLADE;
+    const inZone = (from: number, to: number): { q: Part; r: Box3 }[] =>
+    {
+        return boards.map((q) =>
+        {
+            return { q, r: boardBox(q) };
+        }).filter(({ r }) =>
+        {
+            return r.max[2] > from && r.min[2] < to;
+        });
+    };
+    const [x, y] = head;
+    const blade = inZone(head[2], near).find(({ r }) =>
+    {
+        return r.max[0] > x - WASHER_RADIUS && r.min[0] < x + WASHER_RADIUS && r.max[1] > y - WASHER_RADIUS
+            && r.min[1] < y + WASHER_RADIUS;
+    });
+    if (blade !== undefined)
+    {
+        return blade.q;
+    }
+    const fist = inZone(near, front);
+    if (squareFits(x, y, FIST_OPENING, fist.map((f) => { return f.r; })))
+    {
+        return null;
+    }
+    // The nearest of what stands across the way names the trouble
+    const gap = (r: Box3): number =>
+    {
+        return Math.hypot(Math.max(r.min[0] - x, 0, x - r.max[0]), Math.max(r.min[1] - y, 0, y - r.max[1]));
+    };
+    return fist.reduce((best, f) =>
+    {
+        return gap(f.r) < gap(best.r) ? f : best;
+    }).q;
+}
+
+
 // Screws through the back into the wall, a wide washer under each head : 8 mm of board alone would pull through
 export function fitBackWallScrews(c: Carcass, s: Settings, b: Build): void
 {
@@ -75,6 +176,25 @@ export function fitBackWallScrews(c: Carcass, s: Settings, b: Build): void
     {
         back.holes.push({ u: wide ? x : y, v: wide ? y : x, diameter: 5, depth: back.thickness, face: "A",
                           label: "Fixation au mur : vis 5 x 50, rondelle large, cheville", purpose: "wall-screw" });
+    }
+    const boards = b.parts.filter((q) =>
+    {
+        return q.item === c.id && q.frame !== null && BOARD_ROLES.has(q.role);
+    });
+    const front = Math.max(...boards.map((q) =>
+    {
+        return boardBox(q).max[2];
+    }));
+    for (const { x, y } of places)
+    {
+        const hit = back.frame === null ? null : wallScrewBlocked(at(back.frame, wide ? x : y, wide ? y : x, 0), boards,
+                                                                  front);
+        if (hit !== null)
+        {
+            b.errors.push(`${c.name} : la vis au mur à ${x} mm du côté gauche et ${y} mm du bas ne se visse pas, `
+                + `${hit.label} est devant le tournevis ou la main (ouverture de ${FIST_OPENING} mm pour un poing, `
+                + "ISO 15534-2:2000). Déplacer la vis là où la main passe depuis la façade.");
+        }
     }
     back.notes.push("Vissé au mur par l'intérieur : caler derrière le fond si le mur n'est pas plan, sans le cintrer");
     const line = (ref: string): void =>

@@ -77,11 +77,11 @@ export function tvWall(): Project
     // upright standing on the feet, under the column and Gilles' one over its whole length
     // 139 off the back puts its connectors on a row of the system, 37 + 7 x 32 from the front
     baseUnit.stiffeners = [{ cell: leftDoor.id, z: 139, height: 100 }];
-    // Held to the wall through its back, behind the two doors over the reach of their shelves : no bracket on a top that
-    // shows, none fits under the ceiling on the column either
+    // Held to the wall through its back, behind the 2 doors, under the reach of their shelves : the stiffener stands
+    // before the room over it. 95 is midway from the bottom (19) to a shelf on the lowest pin (172)
     baseUnit.backWallScrews = [100, 560, 2040, 2500].map((x) =>
     {
-        return { x, y: 430 };
+        return { x, y: 95 };
     });
     baseUnit.fronts.push(
         newFront(leftDoor.id, { type: "door", hinge: "left" }, PUSH_DOOR),

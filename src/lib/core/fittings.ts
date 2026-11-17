@@ -12,8 +12,8 @@ import { SLIDELINE_M, TIPON_ADAPTER } from "../data/rules";
 import {
     GLASS_SUPPORTS, SHELF_SUPPORTS, type ShelfSupport,
 } from "../data/hardware";
-import { AXILO_CLIP_SCREWS, AXILO_SCREW_PITCH, AXILO_SCREWS, FOOT_INSET, feetFitted, feetPerRow, footFor, footPlaces,
-    AXILO_SCREW_OFFSET, footLong, frontFootInset, sideFootInset } from "./feet";
+import { AXILO_CLIP_SCREWS, AXILO_SCREW_PITCH, AXILO_SCREWS, feetFitted, feetPerRow, footFor, footPlaces,
+    AXILO_SCREW_OFFSET, footLong } from "./feet";
 import { decorById, MATERIALS, materialOfDecor } from "../data/materials";
 import { DIAM } from "./text";
 import { PIN_BELOW_SHELF, holeLine, nearestHole, symmetricHeights } from "./grid";
@@ -549,10 +549,9 @@ export function fitBase(c: Carcass, b: Build): void
         const bottom = byId(b.parts, `${c.id}/bottom`);
         if (bottom !== undefined)
         {
-            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 x 35 (axe du pied à ${sideFootInset(c, "left")} mm de la `
-                + `joue gauche, ${sideFootInset(c, "right")} de la droite, ${FOOT_INSET} du fond, ${frontFootInset(c)} mm de `
-                + `l'avant, convention, 4 vis sur un carré de ${AXILO_SCREW_PITCH} centré à ${AXILO_SCREW_OFFSET} de l'axe `
-                + "vers le milieu du meuble, côté long de l'embase, Häfele p. 11.43A)";
+            // 4 screws on a square of AXILO_SCREW_PITCH off the axis of the foot (Häfele p. 11.43A), their pilot holes
+            // bored in the workshop : the label says no more, the whole of it ran past the captions
+            const label = `Embase AXILO 637.76.333, vis ${DIAM}4 x 35`;
             const half = AXILO_SCREW_PITCH / 2;
             for (const f of footPlaces(c))
             {

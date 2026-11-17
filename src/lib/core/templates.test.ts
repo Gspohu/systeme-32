@@ -11,6 +11,7 @@ import { itemViews } from "./drawing/item_views";
 import { round1 } from "./text";
 import { at } from "./geometry";
 import { crossedHoles, meets } from "./drilling";
+import { underPlate } from "./carcass_links";
 import { placedHardware, screwPlaces } from "./io/cad_model";
 import { FLAP_HINGE, floorEdge, hingeSetting } from "./drop_flaps";
 import type { Part } from "./parts";
@@ -153,7 +154,7 @@ describe("the sketch templates", () =>
     }
 
 
-    it("fits the dresser with 22 unsprung hinges, a TIP-ON per door and flap, three 480 runner pairs and a 450 one",
+    it("fits the dresser with 22 unsprung hinges, a TIP-ON per door and flap, three 480 runner pairs and a 420 one",
        () =>
     {
         // 7 short doors of 2 hinges, the 861 one of the left column three, the full height right one 5. The
@@ -170,9 +171,10 @@ describe("the sketch templates", () =>
         expect(hw.get("174H7100E")).toBe(22);
         expect(hw.get("173H7100")).toBeUndefined();
         expect(hw.get("760H4800S")).toBe(3);
-        // The flap in line with the doors, the pull-out behind the struts keeps its 450
-        expect(hw.get("760H4500S")).toBe(1);
-        expect(hw.get("760H4200S")).toBeUndefined();
+        // The pull-out behind the struts : its runners end 16 back, at the back of the box end its couplings screw
+        // into, and the 450 would run 4 into the back of the carcass
+        expect(hw.get("760H4200S")).toBe(1);
+        expect(hw.get("760H4500S")).toBeUndefined();
     });
 
 
@@ -1087,6 +1089,96 @@ describe("the sketch templates", () =>
     });
 
 
+    // Film of essai45 : one went up from a cell of 173 under the top of the book column
+    it("drives each screw up into a wall shelf from a cell with room for it and the fist", () =>
+    {
+        let checked = 0;
+        for (const make of [tvWall, dresser])
+        {
+            const parts = analyse(make()).build.parts;
+            const span = (q: Part, k: number): [number, number] =>
+            {
+                const ends = [0, q.length].flatMap((u) => { return [0, q.width].flatMap((v) =>
+                {
+                    return [0, q.thickness].map((t) => { return at(q.frame!, u, v, t)[k]!; });
+                }); });
+                return [Math.min(...ends), Math.max(...ends)];
+            };
+            for (const top of parts.filter((q) => { return q.role === "top" && q.frame !== null; }))
+            {
+                for (const h of top.holes.filter((x) => { return /étagère murale/.test(x.label); }))
+                {
+                    checked++;
+                    const p = at(top.frame!, h.u, h.v, 0);
+                    const under = span(top, 1)[0];
+                    const floor = Math.max(...parts.filter((q) =>
+                    {
+                        return q.item === top.item && q.frame !== null && q.id !== top.id && Math.abs(q.frame.n[1]) > 0.9
+                            && q.role !== "shelf" && span(q, 0)[0] < p[0] && span(q, 0)[1] > p[0] && span(q,
+                                1)[1] <= under;
+                    }).map((q) => { return span(q, 1)[1]; }));
+                    expect(under - floor, `${top.label} u ${h.u}`).toBeGreaterThanOrEqual(180);
+                }
+            }
+        }
+        expect(checked).toBeGreaterThan(0);
+    });
+
+
+    // Film of essai45 : a link screw between the left column and the cupboards went under the EXPANDO plate of a door
+    for (const make of [tvWall, dresser])
+    {
+        it(`${make.name} keeps every link screw out of the cross of a hinge plate`, () =>
+        {
+            let links = 0;
+            for (const q of analyse(make()).build.parts)
+            {
+                for (const h of q.holes.filter((x) => { return x.purpose === "link-screw"; }))
+                {
+                    links++;
+                    expect(underPlate(q, h.face, h.u, h.v), `${q.label} ${h.label}`).toBe(false);
+                }
+            }
+            expect(links).toBeGreaterThan(0);
+        });
+    }
+
+
+    it("drives the wall screws of the TV base with the stiffener out of the way of the fist", () =>
+    {
+        const errorsAt = (y: number): string[] =>
+        {
+            const p = tvWall();
+            const base = p.items.find((it) =>
+            {
+                return it.name === "Meuble bas";
+            }) as Carcass;
+            base.backWallScrews = base.backWallScrews!.map((s) =>
+            {
+                return { ...s, y };
+            });
+            return analyse(p).checks.filter((k) =>
+            {
+                return k.level === "error" && k.message.includes("vis au mur");
+            }).map((k) =>
+            {
+                return k.message;
+            });
+        };
+        expect(errorsAt(95)).toEqual([]);
+        // Behind the stiffener the 2 of the left cell are refused, down to its lower edge at 381
+        for (const y of [430, 400])
+        {
+            const said = errorsAt(y);
+            expect(said).toHaveLength(2);
+            expect(said.every((m) =>
+            {
+                return m.includes("Traverse sur chant 1");
+            })).toBe(true);
+        }
+    });
+
+
     it("stiffens the span of the TV base under its column, clear of its shelf and joined at both ends", () =>
     {
         const p = tvWall();
@@ -1534,11 +1626,18 @@ describe("the spacers of the dresser pull-out", () =>
                 const probe = { u: dot(f.u), v: dot(f.v), diameter: 4, depth: 30 - sp.thickness, face,
                                label: "vis de cale",
                                 purpose: "spacer-screw" as const };
-                const crossed = crossedHoles({ ...side, holes: [...side.holes, probe] }).some(([x, y]) =>
+                // Its own pilot hole, bored in the upright where it goes, is no drilling in its way : the others are
+                const others = { ...side, holes: side.holes.filter((x) =>
+                {
+                    // Its label lost the countersink the head got after it was bored : told by where it is
+                    return !(x.purpose === "spacer-screw" && x.label.endsWith(" : avant-trou") && x.face === face
+                        && Math.hypot(x.u - probe.u, x.v - probe.v) < 0.5);
+                }) };
+                const crossed = crossedHoles({ ...others, holes: [...others.holes, probe] }).some(([x, y]) =>
                 {
                     return x === probe || y === probe;
                 });
-                if (meets(side, face, probe.u, probe.v, 4, probe.depth) || crossed)
+                if (meets(others, face, probe.u, probe.v, 4, probe.depth) || crossed)
                 {
                     met.push(`${sp.label} ${h.u} ${h.v}`);
                 }
@@ -1663,7 +1762,15 @@ describe("the drop flap of the dresser", () =>
         // Its spacers stand on the floor : the collars of the hinges, 3.35 up, are well under it
         expect(Math.min(...ys) - floorTop).toBeCloseTo(17.5, 6);
         expect(Math.min(...ys) - floorTop).toBeGreaterThan(FLAP_HINGE.floorCollar[2]![1]);
-        expect(b.hardware.filter((h) => { return h.item === low.id && h.ref === "760H4500S"; })).toHaveLength(1);
+        expect(b.hardware.filter((h) => { return h.item === low.id && h.ref === "760H4200S"; })).toHaveLength(1);
+        // Its couplings screw into its box end : that end comes 15 under the sides, over their plate of 13.3, and the
+        // runners end at its back, where an overlay front would stand
+        const end = b.parts.find((q) => { return q.label === "Tiroir intérieur 1, avant de caisson"; })!;
+        const endYs = [0, end.width].map((v) => { return at(end.frame!, 0, v, 0)[1]; });
+        expect(Math.min(...ys) - Math.min(...endYs)).toBeCloseTo(2, 6);
+        const runner = b.fitted.find((f) => { return f.purpose === "runner" &&
+                                             f.label.startsWith("Tiroir intérieur 1"); })!;
+        expect(runner.centre[2] + runner.half[2]).toBeCloseTo(end.frame!.o[2], 6);
         // Turned open, the back of the flap comes level with the floor of the cell, its lower edge back to its plane
         // shut, clear of the front edge of the floor
         const m = b.motions.find((x) => { return x.front === fp.id && x.kind === "turn"; })!;

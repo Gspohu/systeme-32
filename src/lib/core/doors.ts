@@ -401,7 +401,7 @@ export function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: Node
         for (const v of TIPON_ADAPTER.screws)
         {
             part.holes.push({ u, v: v + setBack, diameter: 0, depth: 0, face: cellFace,
-                              label: `Embase TIP-ON ${TIPON_ADAPTER.ref} : vis ${DIAM}3,5 (Blum p. 173)`,
+                              label: `Embase TIP-ON ${TIPON_ADAPTER.ref} : vis ${DIAM}3,5 x 15 609.1500 (Blum p. 173)`,
                               purpose: "adapter-screw", fixes: tipRef });
         }
         const why = setBack > 0

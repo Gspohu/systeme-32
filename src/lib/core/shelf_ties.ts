@@ -5,8 +5,11 @@ import type { Build, Part } from "./part_types";
 import { byId } from "./edit";
 import { meets } from "./drilling";
 import { DIAM } from "./text";
+import { at } from "./geometry";
+import { FIST_OPENING } from "./wall_fixing";
 
 const HOLE = 5;
+const TOP_SCREW_LENGTH = 50;
 // Workshop conventions : each tie need 2 screws throught a side at these distances from the wall, 2 up through a top
 const SIDE_SCREWS_Z = [60, 190];
 const TOP_SCREWS_AT = [0.25, 0.75];
@@ -50,13 +53,78 @@ function screwsThroughSide(w: WallShelf, c: Carcass, side: Part, b: Build, s: Se
 }
 
 
+// The cells under the top, between its sides and uprights, with room for the screw and the fist round its driver
+// 50 + FIST_OPENING (ISO 15534-2:2000) : one of 173 in the book column took a screw no driver reached
+function roomUnderTop(c: Carcass, top: Part, b: Build): [number, number][]
+{
+    const span = (q: Part, k: number): [number, number] =>
+    {
+        const ends = [0, q.length].flatMap((u) => { return [0, q.width].flatMap((v) => { return [0,
+            q.thickness].map((t) =>
+        {
+            return at(q.frame!, u, v, t)[k]!;
+        }); }); });
+        return [Math.min(...ends), Math.max(...ends)];
+    };
+    const own = b.parts.filter((q) => { return q.item === c.id && q.frame !== null && q.id !== top.id; });
+    const [x0, x1] = span(top, 0);
+    const under = span(top, 1)[0];
+    const walls = own.filter((q) => { return q.role === "side" || q.role === "vdivider"; }).map((q) => { return span(q,
+        0); })
+        .sort((a, z) => { return a[0] - z[0]; });
+    const cells: [number, number][] = [];
+    let from = x0;
+    for (const [a, z] of walls)
+    {
+        if (z <= from || a >= x1)
+        {
+            continue;
+        }
+        if (a > from)
+        {
+            cells.push([from, a]);
+        }
+        from = Math.max(from, z);
+    }
+    if (from < x1)
+    {
+        cells.push([from, x1]);
+    }
+    return cells.filter(([a, z]) =>
+    {
+        const floor = Math.max(...own.filter((q) => { return Math.abs(q.frame!.n[1]) > 0.9 && q.role !== "shelf"; })
+            .filter((q) => { const [qa, qz] = span(q, 0); return qa < z && qz > a && span(q, 1)[1] <= under; })
+            .map((q) => { return span(q, 1)[1]; }), -Infinity);
+        return under - floor >= TOP_SCREW_LENGTH + FIST_OPENING;
+    }).map(([a, z]) => { return [a - x0, z - x0]; });
+}
+
+
 // Lying on the top of the carcass : screwed up through it, heads seen from under it
 function screwsThroughTop(w: WallShelf, c: Carcass, top: Part, b: Build): number
 {
     let n = 0;
+    const cells = roomUnderTop(c, top, b);
+    // Each screw where it was meant, or the nearest third of a cell high enough to drive it from
+    const spots = cells.flatMap(([a, z]) => { return [a + (z - a) / 3, a + 2 * (z - a) / 3]; });
+    const taken = new Set<number>();
     for (const f of TOP_SCREWS_AT)
     {
-        const [u, v] = [top.length * f, top.width / 2];
+        const wanted = top.length * f;
+        const fits = cells.some(([a, z]) => { return wanted > a + HOLE && wanted < z - HOLE; });
+        const near = spots.filter((s) => { return !taken.has(s); }).reduce<number | undefined>((best, s) =>
+        {
+            return best === undefined || Math.abs(s - wanted) < Math.abs(best - wanted) ? s : best;
+        }, undefined);
+        if (!fits && near === undefined)
+        {
+            b.errors.push(`${w.name} : aucune case sous le dessus de ${c.name} n'a ${TOP_SCREW_LENGTH + FIST_OPENING} mm `
+                + "pour visser par-dessous. Monter une tablette ou fixer l'étagère autrement.");
+            break;
+        }
+        const pick = fits ? wanted : near!;
+        taken.add(pick);
+        const [u, v] = [pick, top.width / 2];
         if (meets(top, "A", u, v, HOLE, top.thickness))
         {
             b.errors.push(`${w.name} : une vis vers ${c.name} tombe sur un perçage de ${top.label.toLowerCase()}. Déplacer `

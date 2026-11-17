@@ -52,6 +52,35 @@ function pickScrew(total: number): (typeof CONNECTING_SCREWS)[number] | undefine
 }
 
 
+// The cross of a hinge plate on its face, read off Blum's file of the 174H7100E : 28.6 either side of its middle along
+// its 2 dowels 32 apart, 21 across. A plate is no fitted volume, only its 2 holes : a link screw went under one
+const PLATE_ALONG = 28.6;
+const PLATE_ACROSS = 21;
+const PLATE_PITCH = 32;
+
+export function underPlate(panel: Part, face: string, u: number, v: number): boolean
+{
+    const r = CONNECTING_SCREW_HEAD / 2;
+    const mine = panel.holes.filter((h) => { return h.face === face && (h.purpose === "plate-dowel" ||
+                                                                        h.purpose === "plate-screw"); });
+    return mine.some((h) =>
+    {
+        // Its mate on the line of the system, the middle of the plate between them
+        const mate = mine.find((o) => { return o !== h && Math.abs(Math.hypot(o.u - h.u, o.v - h.v) -
+                                                                   PLATE_PITCH) < 0.5; });
+        if (mate === undefined)
+        {
+            return false;
+        }
+        const [cu, cv] = [(h.u + mate.u) / 2, (h.v + mate.v) / 2];
+        const [au, av] = [(mate.u - h.u) / PLATE_PITCH, (mate.v - h.v) / PLATE_PITCH];
+        const along = (u - cu) * au + (v - cv) * av;
+        const across = -(u - cu) * av + (v - cv) * au;
+        return Math.abs(along) < PLATE_ALONG + r && Math.abs(across) < PLATE_ACROSS + r;
+    });
+}
+
+
 // A screw head standing on the inner face of the panel at that point would sit under some hardware of the item
 function underHardware(b: Build, item: string, p: Vec3): boolean
 {
@@ -258,14 +287,16 @@ function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message
             // Its head on the inner face of the closed carcass, its point in the touching face of the other
             return blindA
                 ? !meets(panelC, cInner, uc, vc, CONNECTING_SCREW_HEAD, panelC.thickness)
-                    && !underHardware(b, panelC.item, headC) && !meets(panelA, aTouch, u, v, blindHole, biteA)
+                    && !underHardware(b, panelC.item, headC) && !underPlate(panelC, cInner, uc, vc)
+                    && !meets(panelA, aTouch, u, v, blindHole, biteA)
                 : !meets(panelA, aInner, u, v, CONNECTING_SCREW_HEAD, panelA.thickness)
-                    && !underHardware(b, panelA.item, headA) && !meets(panelC, cTouch, uc, vc, blindHole, biteC);
+                    && !underHardware(b, panelA.item, headA) && !underPlate(panelA, aInner, u, v)
+                    && !meets(panelC, cTouch, uc, vc, blindHole, biteC);
         }
         return !meets(panelA, aInner, u, v, CONNECTING_SCREW_HEAD, panelA.thickness)
-            && !underHardware(b, panelA.item, headA)
-            && !meets(panelC, cInner, uc, vc, CONNECTING_SCREW_HEAD, panelC.thickness) 
-            && !underHardware(b, panelC.item, headC);
+            && !underHardware(b, panelA.item, headA) && !underPlate(panelA, aInner, u, v)
+            && !meets(panelC, cInner, uc, vc, CONNECTING_SCREW_HEAD, panelC.thickness)
+            && !underHardware(b, panelC.item, headC) && !underPlate(panelC, cInner, uc, vc);
     };
     // The screws in rows along the longer side of the shared area, l along it and w across
     const alongU = u1 - u0 >= v1 - v0;

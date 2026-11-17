@@ -12,7 +12,7 @@ export const PURPOSES = [
     "hinge", "hinge-cup", "system-plate", "plate-dowel", "screwed-plate", "plate-screw", "cup-screw",
     "push-latch", "push-adapter", "adapter-screw", "catch-plate", "flap", "flap-screw", "flap-hinge", "flap-hinge-pilot", "flap-stay", "sliding",
     "handle", "handle-screw", "screw-passage",
-    "runner", "runner-screw", "runner-hook", "runner-coupling", "front-screw", "shelf-lug",
+    "runner", "runner-screw", "runner-hook", "runner-coupling", "coupling-screw", "front-screw", "shelf-lug",
     "foot", "foot-pad", "foot-mount", "foot-mount-screw", "plinth-clip", "vent-grill", "wall-hanger",
     "anti-tip", "anti-tip-screw", "wall-fixing", "wall-screw", "cleat-screw", "spacer-screw", "screw-cap",
     "shelf-support", "shelf-pin", "pin-spare", "shelf-bracket", "rail", "rail-screw", "shoe-rack", "light", "light-lead",
