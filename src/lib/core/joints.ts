@@ -72,7 +72,7 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                 const mid = alongU ? f.v : f.u;
                 fpart.grooves.push({ face: joint.face, along: alongU ? "v" : "u", at: alongU ? f.u : f.v,
                                      from: mid - 35, to: mid + 35, width: LAMELLO_P14.grooveWidth,
-                                     depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 (Zeta P2 ou CN)" });
+                                     depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14" });
                 ep.grooves.push({ face: "A", along: "v", at: edgeU, from: joint.edgeFrom + pos - 35,
                                   to: joint.edgeFrom + pos + 35, width: LAMELLO_P14.grooveWidth,
                                   depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 dans le chant" });

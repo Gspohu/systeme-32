@@ -115,11 +115,12 @@ function chiral(p: Part): boolean
 
 
 // Two parts are the same workpiece when board, size, edges and machining are identical, and so is the hand of a
-// part no mirror reproduces
+// part no mirror reproduces. A lacquer colour, a bevelled end or a scribe allowence makes another one
 function signature(p: Part): string
 {
     return [p.decor, p.material, p.thickness, r1(p.length), r1(p.width), p.role, outlineKey(p), machining(p, AS_IS),
-            chiral(p) ? `main ${handedness(p)}` : ""].join("|");
+            chiral(p) ? `main ${handedness(p)}` : "", p.colour ?? "", r1(p.bevel.u0), r1(p.bevel.u1),
+            r1(p.scribe ?? 0)].join("|");
 }
 
 

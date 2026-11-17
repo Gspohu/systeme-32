@@ -213,9 +213,9 @@ export function bandVisibleEdges(p: Project, b: Build): void
     for (const q of b.parts)
     {
         const box = boxes.get(q);
-        // A glass shelf takes no banding wherever it shows
+        // A glass shelf takes no banding wherever it shows, nor a lacquered board (part_base.ts)
         if (box === undefined || !JUDGED.has(q.role) || !plainRectangle(q.outline, q.length, q.width)
-            || materialOfDecor(decorById(q.decor)).kind === "glass")
+            || materialOfDecor(decorById(q.decor)).kind === "glass" || q.decor === "MDF_LAQUE")
         {
             continue;
         }

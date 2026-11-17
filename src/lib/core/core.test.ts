@@ -57,7 +57,8 @@ function placementsOf(r: NestResult): Placement[]
 function row(code: string, length: number, width: number, quantity: number, decor: string, grain: boolean): CutRow
 {
     return { code, items: ["x"], label: "p", quantity, length, width, thickness: 19, decor, decorLabel: "", grain,
-             edges: [], shaped: false, curved: false, areaM2: 0, massKg: 0, notes: [], parts: [] };
+             edges: [], shaped: false, curved: false, areaM2: 0, massKg: 0, notes: [], parts: [], bevel: { u0: 0,
+                 u1: 0 } };
 }
 
 

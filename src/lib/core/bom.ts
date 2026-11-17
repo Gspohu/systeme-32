@@ -23,7 +23,7 @@ export const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
 
 // A cut list row is one workpiece, its Part fields keep their meaning over the merged identical parts
 export interface CutRow extends Pick<Part, "label" | "quantity" | "length" | "width" | "thickness" | "decor" | "grain"
-    | "edges" | "notes" | "scribe">
+    | "edges" | "notes" | "scribe" | "bevel">
 {
     code: string;
     items: string[];
@@ -40,15 +40,18 @@ export interface CutRow extends Pick<Part, "label" | "quantity" | "length" | "wi
 // The size to saw a part to before its edges are glued on : its finished size less the banding on each edge, the ends
 // u0 and u1 off its length, the sides v0 and v1 off its width. Null when its decor doesn't say how thick its banding
 // is
-export function sawSize(r: Pick<CutRow, "length" | "width" | "edges" | "decor" | "shaped" | "scribe">):
-    { length: number; width: number } | "dxf" | null
+export function sawSize(r: Pick<CutRow, "length" | "width" | "edges" | "decor" | "shaped" | "scribe">
+    & Partial<Pick<CutRow, "bevel">>): { length: number; width: number } | "dxf" | null
 {
     const t = decorById(r.decor).edgeThickness;
     // A filler sawn wider, planed to the wall or the ceiling on site
     const extra = r.scribe ?? 0;
+    // A bevelled end lies further out on face B than on face A : the blank holds both faces
+    const bevel = r.bevel ?? { u0: 0, u1: 0 };
+    const ends = Math.max(0, bevel.u1) - Math.min(0, bevel.u0);
     if (r.edges.length === 0)
     {
-        return { length: r.length, width: r.width + extra };
+        return { length: r.length + ends, width: r.width + extra };
     }
     // Another outline is cut after its DXF, its contour already the one under the banding
     if (r.shaped)
@@ -61,7 +64,7 @@ export function sawSize(r: Pick<CutRow, "length" | "width" | "edges" | "decor" |
     }
     const on = (e: Edge): number => { return r.edges.includes(e) ? t : 0; };
     const tenth = (x: number): number => { return Math.round(x * 10) / 10; };
-    return { length: tenth(r.length - on("u0") - on("u1")), width: tenth(r.width - on("v0") - on("v1") + extra) };
+    return { length: tenth(r.length + ends - on("u0") - on("u1")), width: tenth(r.width - on("v0") - on("v1") + extra) };
 }
 
 
@@ -447,6 +450,7 @@ function cutRows(a: Analysis, codeOfPart: Map<string, string>): { cut: CutRow[];
             grain: first.grain,
             edges: first.edges,
             scribe: first.scribe,
+            bevel: first.bevel,
             shaped,
             curved,
             areaM2: (bb.maxX - bb.minX) * (bb.maxY - bb.minY) * 1e-6 * qty,
@@ -472,25 +476,29 @@ function cutRows(a: Analysis, codeOfPart: Map<string, string>): { cut: CutRow[];
 }
 
 
+// The banding one part takes in mm, each band with its overlength
+export function edgeLengthOf(part: Part): number
+{
+    // A board of another outline than its rectangle : the true length of its banded segments, arcs included
+    if (part.edges.length > 0 && !plainRectangle(part.outline, part.length, part.width))
+    {
+        return bandLength(part.outline, part.length, part.width, part.edges) + EDGE_OVERLENGTH;
+    }
+    let mm = 0;
+    for (const e of part.edges)
+    {
+        mm += (e === "v0" || e === "v1" ? part.length : part.width) + EDGE_OVERLENGTH;
+    }
+    return mm;
+}
+
+
 function edgeTotals(a: Analysis): Bom["edges"]
 {
     const edgeMap = new Map<string, number>();
     for (const part of a.build.parts)
     {
-        let mm = 0;
-        // A board of another outline than its rectangle : the true length of its banded segments, arcs included
-        if (part.edges.length > 0 && !plainRectangle(part.outline, part.length, part.width))
-        {
-            mm = bandLength(part.outline, part.length, part.width, part.edges) + EDGE_OVERLENGTH;
-        }
-        else
-        {
-            for (const e of part.edges)
-            {
-                mm += (e === "v0" || e === "v1" ? part.length : part.width) + EDGE_OVERLENGTH;
-            }
-        }
-        edgeMap.set(part.decor, (edgeMap.get(part.decor) ?? 0) + mm * part.quantity);
+        edgeMap.set(part.decor, (edgeMap.get(part.decor) ?? 0) + edgeLengthOf(part) * part.quantity);
     }
     const edges: Bom["edges"] = [];
     for (const [d, mm] of edgeMap)

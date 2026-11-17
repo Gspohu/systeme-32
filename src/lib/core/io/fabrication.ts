@@ -4,13 +4,13 @@ import type { Bom, CutRow } from "../bom";
 import { BYTE_ORDER_MARK, csvQuote, edgeNotation, sawSize, shapeWord } from "../bom";
 import type { NestResult } from "../nesting";
 import type { Edge, Hole } from "../part_types";
-import { decorById } from "../../data/materials";
+import { MATERIALS, decorById } from "../../data/materials";
 import { DIAM, round1 } from "../text";
 
 
 export interface Supply
 {
-    kind: "Panneau" | "Chant" | "Quincaillerie" | "Hors plaque";
+    kind: "Panneau" | "Chant" | "Quincaillerie" | "Hors plaque" | "Verre" | "Laque";
     brand: string;
     ref: string;
     label: string;
@@ -66,7 +66,8 @@ const n1 = (x: number): string => { return round1(x); };
 function holeWhat(h: Hole): string
 {
     const sink = h.countersink === undefined ? "" : `, fraisé ${DIAM}${n1(h.countersink)} à 90°`;
-    const depth = h.depth === 0 ? "débouchant" : `prof. ${n1(h.depth)}`;
+    // A depth of 0 is one the model doesn't give (drilling.ts reads it as 15), never a hole drilled through
+    const depth = h.depth === 0 ? "profondeur non cotée, à confirmer" : `prof. ${n1(h.depth)}`;
     return `${DIAM}${n1(h.diameter)} ${depth}${sink} (${h.label})`;
 }
 
@@ -91,13 +92,17 @@ function routeOf(r: CutRow): FabRoute
     const steps: FabStep[] = [];
     const saw = sawSize(r);
     const shaped = shapeWord(r) !== "" || part.bevel.u0 !== 0 || part.bevel.u1 !== 0;
+    // A filler leaves the workshop wider than its finished width, the extra planed to the wall on site
+    const extra = r.scribe ?? 0;
+    const wide = r.width + extra;
+    const ends = Math.max(0, part.bevel.u1) - Math.min(0, part.bevel.u0);
     const debit = saw === null
-        ? `Débit à ${n1(r.length)} x ${n1(r.width)} fini, moins l'épaisseur du chant sur chaque arête plaquée (chant non spécifié par le décor)`
+        ? `Débit à ${n1(r.length + ends)} x ${n1(wide)}, moins l'épaisseur du chant sur chaque arête plaquée (chant non spécifié par le décor)`
         : saw === "dxf" ? `Débit capable du contour du DXF (${n1(r.length)} x ${n1(r.width)} hors tout)`
-        : `Débit à ${n1(saw.length)} x ${n1(saw.width)}, chants retranchés`;
+        : `Débit à ${n1(saw.length)} x ${n1(saw.width)}${r.edges.length > 0 ? ", chants retranchés" : ""}`;
     const grain = r.grain ? `, fil le long de la longueur ${n1(r.length)}` : ", sans sens de fil";
-    const scribe = r.scribe === undefined || r.scribe === 0 ? ""
-        : `. Surlargeur de ${n1(r.scribe)} comprise : chant ajusté au mur sur place, pas en atelier`;
+    const scribe = extra === 0 ? ""
+        : `. Surlargeur de ${n1(extra)} comprise, à garder : chant ajusté au mur sur place, pas en atelier`;
     steps.push({ phase: PHASE_DEBIT, title: "Débit", spec: `${debit}${grain}, épaisseur ${r.thickness}${scribe}`,
                  after: [], why: "" });
     if (shaped)
@@ -105,9 +110,12 @@ function routeOf(r: CutRow): FabRoute
         const bevel = part.bevel.u0 !== 0 || part.bevel.u1 !== 0
             ? ` Abouts inclinés : décalage face B de ${n1(part.bevel.u0)} en l1 et ${n1(part.bevel.u1)} en l2.` : "";
         const cutouts = part.cutouts.length === 0 ? "" : ` ${part.cutouts.length} découpe(s) traversante(s).`;
+        // Without its band thickness the DXF draws the finished contour (dxf.ts), the band still to come off it
+        const under = r.edges.length > 0 && decor.edgeThickness === undefined
+            ? " Le DXF donne le contour fini : retrancher l'épaisseur du chant sur chaque arête plaquée." : "";
         steps.push({ phase: PHASE_CONTOUR, title: "Contour", after: [PHASE_DEBIT], why: "Dans la pièce débitée",
                      spec: `Pièce ${shapeWord(r) || "à abouts inclinés"} : contour d'après le DXF et le plan de la pièce `
-                         + `${r.code}.${cutouts}${bevel}`.trim() });
+                         + `${r.code}.${cutouts}${bevel}${under}`.trim() });
     }
     const shapedDone = shaped ? [PHASE_CONTOUR] : [PHASE_DEBIT];
     if (r.edges.length > 0)
@@ -115,18 +123,26 @@ function routeOf(r: CutRow): FabRoute
         const t = decor.edgeThickness === undefined ? "épaisseur non spécifiée" : `ép. ${n1(decor.edgeThickness)}`;
         steps.push({ phase: PHASE_EDGES, title: "Chants", after: shapedDone, why: "Sur le contour définitif",
                      spec: `${decor.edge ?? `Chant assorti ${decor.label}`}, ${t}, sur ${edgeNotation(r.edges)}. Arasé `
-                         + "au nu des faces, cote finie atteinte chant compris" });
+                         + `au nu des faces, ${n1(r.length)} x ${n1(wide)} atteint chant compris` });
     }
     const drilled = part.holes.filter((h) => { return h.diameter > 0; });
     const onFaces = drilled.filter((h) => { return h.face === "A" || h.face === "B"; });
+    const banded = (e: Edge): boolean => { return r.edges.includes(e); };
     if (onFaces.length > 0)
     {
-        steps.push({ phase: PHASE_FACE_DRILL, title: "Perçages de face", after: shapedDone,
-                    why: "Cotés depuis le contour",
+        // A bore running out over an edge, a flap hinge 10.5 off it, cuts into the band : drilled once it's on
+        const runsOut = onFaces.some((h) =>
+        {
+            const rad = h.diameter / 2;
+            return (h.u - rad < 0 && banded("u0")) || (h.u + rad > part.length && banded("u1"))
+                || (h.v - rad < 0 && banded("v0")) || (h.v + rad > part.width && banded("v1"));
+        });
+        steps.push({ phase: PHASE_FACE_DRILL, title: "Perçages de face",
+                     after: runsOut ? [...shapedDone, PHASE_EDGES] : shapedDone,
+                     why: runsOut ? "Débouchent dans un chant plaqué" : "Cotés depuis le contour",
                      spec: holeLines(onFaces, (h) => { return `face ${h.face}`; }).join(" ; ") });
     }
     const onEdges = drilled.filter((h) => { return h.face !== "A" && h.face !== "B"; });
-    const banded = (e: Edge): boolean => { return r.edges.includes(e); };
     if (onEdges.length > 0)
     {
         const throughBand = onEdges.some((h) => { return banded(h.face as Edge); });
@@ -151,8 +167,11 @@ function routeOf(r: CutRow): FabRoute
         const spec = [
             ...part.grooves.map((g) =>
             {
-                return `Rainure ${n1(g.width)} x ${n1(g.depth)} face ${g.face}, le long de ${g.along} à ${n1(g.at)}, `
-                    + `de ${n1(g.from)} à ${n1(g.to)} (${g.label})`;
+                // u runs along the length from l1, v across it from L1, as on the part's drawing
+                const where = g.along === "u"
+                    ? `parallèle à la longueur, axe à ${n1(g.at)} de L1, de ${n1(g.from)} à ${n1(g.to)} depuis l1`
+                    : `parallèle à la largeur, axe à ${n1(g.at)} de l1, de ${n1(g.from)} à ${n1(g.to)} depuis L1`;
+                return `Rainure ${n1(g.width)} x ${n1(g.depth)} face ${g.face}, ${where} (${g.label})`;
             }),
             ...pockets.map((k) =>
             {
@@ -165,15 +184,17 @@ function routeOf(r: CutRow): FabRoute
                      why: cuts ? "Débouchent dans un chant plaqué" : "Cotés depuis le contour", spec: spec.join(" ; ") });
     }
     const machined = steps.filter((s) => { return s.phase > PHASE_DEBIT; }).map((s) => { return s.phase; });
-    if (part.colour !== null)
+    if (r.decor === "MDF_LAQUE")
     {
+        const tint = part.colour === null ? "teinte à définir avec le donneur d'ordre avant fabrication" : `teinte ${part.colour}`;
         steps.push({ phase: PHASE_FINISH, title: "Finition", after: machined.length > 0 ? machined : [PHASE_DEBIT],
-                     why: "Couvre les usinages", spec: `Laque teinte ${part.colour}, faces et chants vus` });
+                     why: "Couvre les usinages", spec: `Laque ${tint}, faces et chants vus` });
     }
     const all = steps.map((s) => { return s.phase; });
     steps.push({ phase: PHASE_CHECK, title: "Contrôle", after: all, why: "Sur la pièce finie",
-                 spec: `Cotes finies ${n1(r.length)} x ${n1(r.width)} et positions des usinages : ${TOLERANCE}. ${SQUARENESS}. `
-                     + "Aucun éclat sur le décor ni décollement de chant" });
+                 spec: `Cotes ${n1(r.length)} x ${n1(wide)}${extra === 0 ? "" : ` (surlargeur de ${n1(extra)} comprise)`} et `
+                     + `positions des usinages : ${TOLERANCE}. ${SQUARENESS}. Aucun éclat de surface`
+                     + (r.edges.length > 0 ? " ni décollement de chant" : "") });
     steps.push({ phase: PHASE_MARK, title: "Marquage", after: [PHASE_CHECK], why: "Pièce acceptée",
                  spec: `Étiquette ${r.code} ${r.label} sur un chant non vu ou la face cachée, face A repérée, `
                      + "décor protégé pour le transport" });
@@ -217,18 +238,55 @@ function suppliesOf(bom: Bom, nesting: NestResult): Supply[]
         out.push({ kind: "Quincaillerie", brand: h.brand, ref: h.ref, label: h.label, qty: String(h.qty), unit: "pièce",
                    note: h.code });
     }
+    // Cut to size by the glazier : bought as it is, no route of its own
+    for (const r of bom.cut.filter(isGlass))
+    {
+        const d = decorById(r.decor);
+        out.push({ kind: "Verre", brand: d.brand, ref: d.ref,
+                   label: `${r.label} : ${r.decorLabel}, ${n1(r.length)} x ${n1(r.width)} x ${r.thickness}`,
+                   qty: String(r.quantity), unit: "pièce", note: [`Pour ${r.code}`, ...r.notes].join(". ") });
+    }
+    // The lacquer by colour, with the board it covers : one face of each part, its second face and edges on top
+    const lacquer = new Map<string, number>();
+    for (const r of [...bom.cut, ...bom.offSheet].filter((x) => { return x.decor === "MDF_LAQUE"; }))
+    {
+        for (const q of r.parts)
+        {
+            const tint = q.colour ?? "teinte à définir";
+            lacquer.set(tint, (lacquer.get(tint) ?? 0) + q.length * q.width * 1e-6 * q.quantity);
+        }
+    }
+    for (const [tint, m2] of lacquer)
+    {
+        out.push({ kind: "Laque", brand: "", ref: "", label: `Laque pour MDF, ${tint}`, qty: m2.toFixed(2).replace(".",
+            ","),
+                   unit: "m² de panneau", note: "Surface d'une face : seconde face et chants vus en plus" });
+    }
+    const unplaced = new Map<string, { label: string; reason: string; n: number }>();
     for (const u of nesting.unplaced)
     {
-        out.push({ kind: "Panneau", brand: "", ref: "", label: `${u.code} ${u.label}`, qty: "?", unit: "",
-                   note: `Hors calepinage : ${u.reason}` });
+        const was = unplaced.get(u.code);
+        unplaced.set(u.code, { label: u.label, reason: u.reason, n: (was?.n ?? 0) + 1 });
+    }
+    for (const [code, u] of unplaced)
+    {
+        out.push({ kind: "Panneau", brand: "", ref: "", label: `${code} ${u.label}`, qty: String(u.n), unit: "pièce",
+                   note: `Hors calepinage, plaque à prévoir : ${u.reason}` });
     }
     return out;
 }
 
 
+function isGlass(r: CutRow): boolean
+{
+    return MATERIALS[decorById(r.decor).material]?.kind === "glass";
+}
+
+
 export function fabrication(bom: Bom, nesting: NestResult): Fabrication
 {
-    return { supplies: suppliesOf(bom, nesting), routes: [...bom.cut, ...bom.offSheet].map(routeOf) };
+    const made = [...bom.cut, ...bom.offSheet].filter((r) => { return !isGlass(r); });
+    return { supplies: suppliesOf(bom, nesting), routes: made.map(routeOf) };
 }
 
 

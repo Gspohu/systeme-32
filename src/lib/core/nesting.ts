@@ -195,10 +195,13 @@ export function nest(rows: CutRow[], s: Settings, formatOf: (decor: string, thic
         {
             byBoard.set(key, { decor: r.decor, thickness: r.thickness, pieces: [] });
         }
+        // The scribe allowence and a bevelled end take board as well, past the finished size
+        const ends = r.bevel === undefined ? 0 : Math.max(0, r.bevel.u1) - Math.min(0, r.bevel.u0);
+        const across = r.width + (r.scribe ?? 0);
         let k = 0;
         while (k < r.quantity)
         {
-            all.push({ key, piece: { code: r.code, label: r.label, w: r.length, h: r.width, canRotate: !r.grain,
+            all.push({ key, piece: { code: r.code, label: r.label, w: r.length + ends, h: across, canRotate: !r.grain,
                                      shaped: r.shaped } });
             k++;
         }

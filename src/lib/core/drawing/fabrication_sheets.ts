@@ -28,8 +28,8 @@ export function fabricationSheets(f: Fabrication): Draft[]
 {
     const supplies = f.supplies.map((s) => { return [s.kind, s.brand, s.ref, s.label, s.qty, s.unit, s.note]; });
     const buy = paged("Approvisionnement", [
-        "Matière et articles du commerce à commander avant fabrication. Plaques : nombre donné par le calepinage "
-            + "du dossier, format du fournisseur retenu.",
+        "Matière et articles du commerce à commander avant fabrication. Plaques : nombre estimé par notre calepinage "
+            + "(trait de scie et affranchissement de la conception), à revoir selon vos moyens.",
     ], ["Type", "Marque", "Référence", "Désignation", "Qté", "Unité", "Remarque"], [26, 30, 34, 150, 14, 16,
         118], supplies);
     const rows: string[][] = [];

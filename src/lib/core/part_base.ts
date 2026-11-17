@@ -38,6 +38,11 @@ export function newPart(p: Omit<Part, "outline" | "cutouts" | "holes" | "grooves
     {
         part.colour = null;
     }
+    else
+    {
+        // The lacquer covers the MDF edges as well, no band is glued on them
+        part.edges = [];
+    }
     return part;
 }
 
