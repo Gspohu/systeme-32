@@ -15,10 +15,13 @@ export interface Bench
 const FRONT_ROLES = new Set(["door", "drawerFront", "leaf", "flap"]);
 const BOX_ROLES = new Set(["boxSide", "boxEnd", "boxBottom"]);
 const BOX_ID = /^(.+)\/(drawer|pull-out)\/([^/]+)\//;
+// The lining of a cell, screwed together out of the carcass and slid in whole : its boards and their screws
+const LINING_ID = /^(.+)\/lining\/([^/]+)\//;
 
 // Screwed onto the front at the bench, the rest of a frnot's hardware goes into the carcass : the plate of a hinge
 // the runenr and its screws, a push latch, the mechanism of a lift and the stay of a drop-down flap
-const ON_THE_FRONT = new Set(["hinge", "cup-screw", "handle", "front-screw", "runner-coupling", "flap-hinge",
+const ON_THE_FRONT = new Set(["hinge", "cup-screw", "handle", "front-screw", "runner-coupling", "coupling-screw",
+                              "flap-hinge",
                               "flap-screw", "sliding"]);
 // The front brackets of an AVENTOS HK top, listed with the mechanism under its purpose (Blum p. 46)
 const FRONT_BRACKETS = new Set(["20S4200"]);
@@ -31,6 +34,16 @@ export function benchOfPart(p: Part): string | null
     if (FRONT_ROLES.has(p.role) && p.id.startsWith(`${p.item}/front/`))
     {
         return p.id;
+    }
+    const lining = p.role === "lining" ? LINING_ID.exec(p.id) : null;
+    if (lining !== null)
+    {
+        return `${lining[1]}/lining/${lining[2]}`;
+    }
+    // The front plinth gets its clips screwed on in hand, then clips onto the feet : a return is screwed to the carcass
+    if (p.role === "plinth" && !/retour/.test(p.label))
+    {
+        return `${p.item}/plinth`;
     }
     // By its role : the spacers udner the runners of an inner drawer share its tag and are screwed to the carcass
     const m = BOX_ROLES.has(p.role) ? BOX_ID.exec(p.id) : null;
@@ -47,6 +60,11 @@ export function benchOfHardware(h: HardwareLine, fronts: FrontPanel[]): string |
     if (TRACKS.has(h.ref))
     {
         return null;
+    }
+    const lining = h.purpose === "lining-screw" && h.target !== null ? LINING_ID.exec(h.target) : null;
+    if (lining !== null)
+    {
+        return `${lining[1]}/lining/${lining[2]}`;
     }
     // Most lines name the front panel, those of a drop-down flap name its part (drop_flaps.ts)
     const own = `${h.item}/front/`;
@@ -90,14 +108,18 @@ export function benches(parts: Part[]): Bench[]
         const own = key === p.id;
         // A drawer box met before its front names itself after the front all the same
         const front = own ? p : parts.find((q) => { return q.id === key; });
-        const name = front !== undefined ? nameOf(front.label) : p.label.split(",")[0]!.trim();
+        const plinth = key.endsWith("/plinth");
+        const name = plinth ? "Plinthe avant" : front !== undefined ? nameOf(front.label) : p.label.split(",")[0]!.trim();
         found.set(key, { key, item: p.item, name });
     }
     // Numbered as named, Porte 1 before Porte 2 : the order of the build gave #120 to Tiroir 3. The items in the
-    // order met, a 0 between two of them made the sort depend on how the engine walks the array
+    // order met, a 0 between two of them made the sort depend on how the engine walks the array. The plinth last : put
+    // first by its name, it moved every door and drawer of the TV wall up a code
     const items = [...new Set(parts.map((p) => { return p.item; }))];
+    const last = (b: Bench): number => { return b.key.endsWith("/plinth") ? 1 : 0; };
     return [...found.values()].sort((a, b) =>
     {
-        return items.indexOf(a.item) - items.indexOf(b.item) || a.name.localeCompare(b.name, "fr", { numeric: true });
+        return items.indexOf(a.item) - items.indexOf(b.item) || last(a) - last(b)
+            || a.name.localeCompare(b.name, "fr", { numeric: true });
     });
 }

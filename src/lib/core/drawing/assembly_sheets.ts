@@ -1,8 +1,36 @@
 // The assembly sequences on A3 sheets, two columns of text running on from one sheet to the next
 
 import type { Sequence } from "../assembly";
+import type { GammeTable } from "../io/gamme";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, wrap } from "./display";
 import { heading, pageSuffix, type Draft } from "./draft";
+
+// The gamme the film and the FreeCAD sheet are made of, printed : one table a sequence, one row a step with its
+// tool, the
+// way the piece lies when it starts and what the comment says. A text of its own drifted from the film at every fix
+export function gammeSequences(tables: GammeTable[]): Sequence[]
+{
+    return tables.map((t) =>
+    {
+        return { item: t.code, name: `${t.code} ${t.name}`, steps: t.rows.map((r, k) =>
+        {
+            const lines: string[] = [];
+            if (k === 0 && r.position !== undefined)
+            {
+                lines.push(`Position : ${r.position}`);
+            }
+            if (!["Aucun", "N/A", ""].includes(r.tool))
+            {
+                lines.push(`Outil : ${r.tool}`);
+            }
+            if (!["N/A", ""].includes(r.comment))
+            {
+                lines.push(r.comment);
+            }
+            return { title: `${r.type} - ${r.operation}`, lines };
+        }) };
+    });
+}
 
 const TOP = MARGIN + 20;
 const BOTTOM = A3.h - MARGIN - TITLE_BLOCK_H - 6;

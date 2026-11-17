@@ -20,7 +20,9 @@
             updatePicture } from "../core/room_dressing";
     import { addLamp, addSofa, removeLamp, removeSofa, setSideWall, shownSideWalls, updateLamp,
              updateSofa } from "../core/room_dressing";
-    import { assemblySequences } from "../core/assembly";
+    import { gammeSequences } from "../core/drawing/assembly_sheets";
+    import { cadModel } from "../core/io/cad_model";
+    import type { GammeTable } from "../core/io/gamme";
     import { pickFile, readFile, shareOrDownload } from "../storage/files";
     import { FAMILY_LABELS } from "../data/hardware";
     import { HANDLING_LIMITS, SHELF_TEST_LOADS } from "../data/rules";
@@ -82,7 +84,9 @@
     const out = $derived(app.outputs);
     // The drawing set is only bilt while one of its tabs is open
     const pages = $derived(current === "Plans" || current === "Calepinage" ? drawingSet(project, out) : []);
-    const sequences = $derived(current === "Montage" ? assemblySequences(project, out.analysis, out.bom) : []);
+    // The gamme of the film and of the printed plans : one source of the order
+    const sequences = $derived(current === "Montage"
+        ? gammeSequences((cadModel(project, out, true) as { gamme: GammeTable[] }).gamme) : []);
     const nestPages = $derived.by(() =>
     {
         const found: typeof pages = [];

@@ -163,48 +163,49 @@ function holes(parts: Part[], purpose: Purpose): number
 }
 
 
-function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part[], lines: HardwareLine[]): Step[]
+function carcassSteps(project: Project, analysis: Analysis, bom: Bom, id: string, parts: Part[],
+                      lines: HardwareLine[]): Step[]
 {
-    const c = p.items.find((x) =>
+    const carcass = project.items.find((item) =>
     {
-        return x.id === id;
+        return item.id === id;
     })!;
-    if (c.kind !== "carcass")
+    if (carcass.kind !== "carcass")
     {
         return [];
     }
     // Every part a step names is marked too, the rest listed at the end
     const named = new Set<Part>();
-    const of = (pred: (q: Part) => boolean): Part[] =>
+    const partsWhere = (wanted: (part: Part) => boolean): Part[] =>
     {
-        const out = parts.filter(pred);
-        for (const q of out)
+        const found = parts.filter(wanted);
+        for (const part of found)
         {
-            named.add(q);
+            named.add(part);
         }
-        return out;
+        return found;
     };
-    const onEnd = (q: Part): boolean =>
+    const onEnd = (part: Part): boolean =>
     {
-        return q.id.startsWith(`${id}/end/`);
+        return part.id.startsWith(`${id}/end/`);
     };
     // Every line a step takes is marked, what none took is listed at the end : nothing left out. A line taken once is
     // never taken again : the hinges of a door built on the bench were listed a second time when it was hung
     const used = new Set<HardwareLine>();
-    const pick = (pred: (h: HardwareLine) => boolean): HardwareLine[] =>
+    const pick = (wanted: (line: HardwareLine) => boolean): HardwareLine[] =>
     {
-        const out = lines.filter((h) => { return !used.has(h) && pred(h); });
-        for (const h of out)
+        const taken = lines.filter((line) => { return !used.has(line) && wanted(line); });
+        for (const line of taken)
         {
-            used.add(h);
+            used.add(line);
         }
-        return out;
+        return taken;
     };
-    const serving = (...purposes: Purpose[]): ((h: HardwareLine) => boolean) =>
+    const serving = (...purposes: Purpose[]): ((line: HardwareLine) => boolean) =>
     {
-        return (h) =>
+        return (line) =>
         {
-            return purposes.includes(h.purpose);
+            return purposes.includes(line.purpose);
         };
     };
     // The reference the sentences quote, read off the line itself
@@ -212,13 +213,13 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return lines.find(serving(purpose))?.ref ?? "?";
     };
-    const shell = of((q) =>
+    const shell = partsWhere((part) =>
     {
-        return CARCASS.has(q.role) && !onEnd(q);
+        return CARCASS.has(part.role) && !onEnd(part);
     });
-    const boxes = of((q) =>
+    const boxes = partsWhere((part) =>
     {
-        return BOX.has(q.role);
+        return BOX.has(part.role);
     });
     const steps: Step[] = [partsStep(bom, parts)];
 
@@ -247,9 +248,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     {
         return `${t}, coulisses vissées sur les joues et montants avant assemblage`;
     }));
-    const doubler = shell.find((q) =>
+    const doubler = shell.find((part) =>
     {
-        return q.id === `${id}/top-doubler`;
+        return part.id === `${id}/top-doubler`;
     });
     pick(serving("doubler-glue", "doubler-screw"));
     if (doubler !== undefined)
@@ -260,15 +261,15 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
 
     // Standing the shell : bottom, sides, the inside panels, then the top
     const shellDowels = holes(shell, "dowel");
-    const uprights = shell.filter((q) =>
+    const uprights = shell.filter((part) =>
     {
-        return q.role === "vdivider";
+        return part.role === "vdivider";
     });
-    const fixed = shell.filter((q) =>
+    const fixed = shell.filter((part) =>
     {
-        return q.role === "hdivider";
+        return part.role === "hdivider";
     });
-    const grooved = c.back.type === "groove";
+    const grooved = carcass.back.type === "groove";
     const build: string[] = [];
     if (shellDowels > 0)
     {
@@ -286,57 +287,80 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         build.push(`Serrer les Clamex à la clé six pans de 4 par leurs trous d'accès ${DIAM}6`);
     }
     build.push(`Équerrage : diagonales de la face avant égales à ${SQUARE_TOLERANCE} mm près, `
-        + `${Math.round(Math.hypot(c.width, c.height))} mm chacune`);
+        + `${Math.round(Math.hypot(carcass.width, carcass.height))} mm chacune`);
     steps.push({ title: "Assembler le caisson", lines: build });
 
-    const back = of((q) =>
+    const back = partsWhere((part) =>
     {
-        return q.role === "back" && !onEnd(q);
+        return part.role === "back" && !onEnd(part);
     });
-    if (c.back.type === "applied" && back.length > 0)
+    if (carcass.back.type === "applied" && back.length > 0)
     {
         steps.push({ title: "Fond", lines: [`${codes(bom, back)} posé d'équerre sur le chant arrière, caisson couché sur `
-            + "la face avant", ...back.flatMap((q) =>
+            + "la face avant", ...back.flatMap((part) =>
         {
-            return q.notes;
+            return part.notes;
         }), ...listed(pick(serving("back-screw")))] });
     }
 
     // A rounded end comes on its side once the box is square, its boards joined to the side
-    const end = of(onEnd);
+    const end = partsWhere(onEnd);
     if (end.length > 0)
     {
         // Their bolts are in the face of the isde, counted with the panels. An open end has no bent skin
-        const carcass = p.items.find((it) => 
+        const isOpen = (side: End): boolean =>
         {
-            return it.id === id;
-        });
-        const isOpen = (e: End): boolean =>
-        {
-            return e.type !== "square" && e.open === true;
+            return side.type !== "square" && side.open === true;
         };
-        const open = carcass?.kind === "carcass" && (isOpen(carcass.ends.left) || isOpen(carcass.ends.right));  
+        const open = isOpen(carcass.ends.left) || isOpen(carcass.ends.right);
         steps.push({ title: "Bout arrondi", lines: [
-            `${codes(bom, end)} : ${open ? "flasques et tablettes découpées" : "planches galbées"} assemblées sur la `  
-                + `face extérieure de la joue, ${holes(end, "minifix-housing")} boîtiers Minifix dans leurs faces`,  
-            ...new Set(end.flatMap((q) =>
+            `${codes(bom, end)} : ${open ? "flasques et tablettes découpées" : "planches galbées"} assemblées sur la `
+                + `face extérieure de la joue, ${holes(end, "minifix-housing")} boîtiers Minifix dans leurs faces`,
+            ...new Set(end.flatMap((part) =>
             {
-                return q.notes;
+                return part.notes;
             })),
         ] });
     }
-    const linings = of((q) =>
+    // What is built on the bench, each one fitted whole once its carcass is ready : a drawer is its box and its front, a
+    // door its front with the hinge arms and the pull, a niche its lining screwed together
+    const panels = analysis.build.fronts.get(id) ?? [];
+    const benchStep = (sub: SubAssembly): { step: Step; drawer: boolean; lining: boolean } =>
     {
-        return q.role === "lining";
+        const own = partsWhere((part) => { return benchOfPart(part) === sub.key; });
+        const bought = pick((line) => { return benchOfHardware(line, panels) === sub.key; });
+        const box = own.filter((part) => { return BOX.has(part.role); });
+        const front = own.some((part) => { return part.role === "drawerFront"; });
+        const lining = own.some((part) => { return part.role === "lining"; });
+        const how = box.length > 0
+            ? `${holes(box, "dowel")} tourillons collés, fond glissé entre les côtés`
+                + (front ? ", façade vissée depuis l'intérieur du caisson" : "")
+            : lining ? "Panneaux vissés ensemble, têtes dehors, hors du caisson"
+            : "Façade posée à plat, sa quincaillerie vissée dessus avant de l'accrocher";
+        return { drawer: box.length > 0, lining,
+                 step: { title: `Établi : ${sub.code}-000 ${sub.name}`, lines: [`Pièces : ${codes(bom, own)}`, how,
+                                                                             ...listed(bought)] } };
+    };
+    const built = bom.subs.filter((s) => { return s.item === id; }).map((s) => { return { sub: s, ...benchStep(s) }; });
+    const fittedList = (subs: typeof built): string =>
+    {
+        return subs.map((x) => { return `${x.sub.code}-000 ${x.sub.name}`; }).join(", ");
+    };
+
+    // A niche : its lining built on the bench, then slid whole into its cell
+    const linings = partsWhere((part) =>
+    {
+        return part.role === "lining";
     });
+    const niches = built.filter((x) => { return x.lining; });
+    steps.push(...niches.map((x) => { return x.step; }));
     if (linings.length > 0)
     {
-        steps.push({ title: "Habillage", lines: [`${codes(bom, linings)} vissés ensemble, têtes dehors, puis glissés dans leur case`,
-                                                 ...listed(pick(serving("lining-screw"))),
+        steps.push({ title: "Habillage", lines: [`Habillage monté, glissé dans sa case : ${fittedList(niches)}`,
                                                  ...new Set(linings.flatMap(
-            (q) =>
+            (part) =>
             {
-                return q.notes;
+                return part.notes;
             }))] });
     }
 
@@ -348,32 +372,32 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
 
     // set in place : levelled, held to the wall, joined to its neighbours, closed to the walls
     const place: string[] = [];
-    if (c.freeStanding === true)
+    if (carcass.freeStanding === true)
     {
         place.push("Glisser à la main dans son logement, sans vis ni équerre : il se retire de la même façon");
     }
-    if (c.base.type === "plinth" || c.base.type === "feet")
+    if (carcass.base.type === "plinth" || carcass.base.type === "feet")
     {
         place.push("Mettre en place et régler les pieds avant de charger le meuble");
     }
     place.push(...listed(pick(serving("plinth-clip", "vent-grill", "wall-hanger", "anti-tip", "anti-tip-screw",
                                       "wall-fixing"))));
-    place.push(...pick(serving("link-screw")).map((h) =>
+    place.push(...pick(serving("link-screw")).map((line) =>
     {
-        if (h.ref === "WALL_SCREW_5x50" || h.ref === "SCREW_4x30")
+        if (line.ref === "WALL_SCREW_5x50" || line.ref === "SCREW_4x30")
         {
-            const [size, hole] = h.ref === "SCREW_4x30" ? ["4 x 30", 4] : ["5 x 50", 5];
-            return `${h.qty} vis ${size} depuis l'intérieur du caisson fermé : ${h.note ?? ""}, dans les trous ${DIAM}${hole} `
-                + "déjà percés";
+            const [size, hole] = line.ref === "SCREW_4x30" ? ["4 x 30", 4] : ["5 x 50", 5];
+            return `${line.qty} vis ${size} depuis l'intérieur du caisson fermé : ${line.note ?? ""}, dans les trous `
+                + `${DIAM}${hole} déjà percés`;
         }
-        return `${h.qty} vis de liaison ${h.ref} : ${h.note ?? ""}, dans les trous ${DIAM}8 déjà percés`;
+        return `${line.qty} vis de liaison ${line.ref} : ${line.note ?? ""}, dans les trous ${DIAM}8 déjà percés`;
     }));
     // The spacers under the runners of a pull-out go with the drawers, not with the fillers
-    const spacer = (id: string): boolean => { return id.includes("/pull-out/"); };
-    const spacers = of((q) => { return q.role === "cleat" && spacer(q.id); });
-    const fillers = of((q) =>
+    const spacer = (partId: string): boolean => { return partId.includes("/pull-out/"); };
+    const spacers = partsWhere((part) => { return part.role === "cleat" && spacer(part.id); });
+    const fillers = partsWhere((part) =>
     {
-        return (q.role === "filler" || q.role === "cleat") && !spacer(q.id);
+        return (part.role === "filler" || part.role === "cleat") && !spacer(part.id);
     });
     if (fillers.length > 0)
     {
@@ -382,9 +406,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         place.push(`${codes(bom, fillers)} : tasseaux et fileurs, ajustés au mur ou au plafond sur place`,
                    ...listed(pick(serving("cleat-screw"))));
     }
-    const plinths = of((q) =>
+    const plinths = partsWhere((part) =>
     {
-        return q.role === "plinth";
+        return part.role === "plinth";
     });
     if (plinths.length > 0)
     {
@@ -395,35 +419,12 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     place.push(...listed(pick(serving("screw-cap"))));
     steps.push({ title: "Mise en place", lines: place });
 
-    // What is built on the bench, each one fitted whole once its carcass is ready : a drawer is its box and its front, a
-    // door its front with the hinge arms and the pull
-    const panels = a.build.fronts.get(id) ?? [];
-    const benchStep = (sub: SubAssembly): { step: Step; drawer: boolean } =>
-    {
-        const own = of((q) => { return benchOfPart(q) === sub.key; });
-        const bought = pick((h) => { return benchOfHardware(h, panels) === sub.key; });
-        const box = own.filter((q) => { return BOX.has(q.role); });
-        const front = own.some((q) => { return q.role === "drawerFront"; });
-        const how = box.length > 0
-            ? `${holes(box, "dowel")} tourillons collés, fond glissé entre les côtés`
-                + (front ? ", façade vissée depuis l'intérieur du caisson" : "")
-            : "Façade posée à plat, sa quincaillerie vissée dessus avant de l'accrocher";
-        return { drawer: box.length > 0,
-                 step: { title: `Établi : ${sub.code}-000 ${sub.name}`, lines: [`Pièces : ${codes(bom, own)}`, how,
-                                                                             ...listed(bought)] } };
-    };
-    const built = bom.subs.filter((s) => { return s.item === id; }).map((s) => { return { sub: s, ...benchStep(s) }; });
-    const fittedList = (subs: typeof built): string =>
-    {
-        return subs.map((x) => { return `${x.sub.code}-000 ${x.sub.name}`; }).join(", ");
-    };
-
     // Drawers : built on the bench, clipped whole on their runners
     const drawers = built.filter((x) => { return x.drawer; });
     steps.push(...drawers.map((x) => { return x.step; }));
     if (boxes.length > 0)
     {
-        const under = pick(serving("spacer-screw")).reduce((n, h) => { return n + h.qty; }, 0);
+        const under = pick(serving("spacer-screw")).reduce((n, line) => { return n + line.qty; }, 0);
         steps.push({ title: "Tiroirs", lines: [
             ...(spacers.length > 0 ? [`${codes(bom, spacers)} : cales vissées sur les montants (${under} vis 4 x 30), `
                 + "avant les coulisses du tiroir intérieur"] : []),
@@ -432,9 +433,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     }
 
     // Doors and flaps : built on the bench, then hung on what the carcass holds for them, plates, mechanisms, stays
-    const doors = built.filter((x) => { return !x.drawer; });
+    const doors = built.filter((x) => { return !x.drawer && !x.lining; });
     steps.push(...doors.map((x) => { return x.step; }));
-    const fixedFronts = of((q) => { return q.role === "panel"; });
+    const fixedFronts = partsWhere((part) => { return part.role === "panel"; });
     const doorStep = hardwareStep("Portes et façades", pick(serving("hinge", "flap", "flap-hinge", "sliding",
                                                                     "push-latch",
                                                                     "push-adapter", "adapter-screw", "handle", "cup-screw",
@@ -450,9 +451,9 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
     steps.push(doorStep);
 
     // The inside last : pins and shelves, rails, light
-    const loose = of((q) =>
+    const loose = partsWhere((part) =>
     {
-        return q.role === "shelf";
+        return part.role === "shelf";
     });
     const inside = listed(pick(serving("shelf-support", "rail", "rail-screw", "shoe-rack", "light")));
     if (loose.length > 0)
@@ -460,13 +461,13 @@ function carcassSteps(p: Project, a: Analysis, bom: Bom, id: string, parts: Part
         inside.push(`Étagères réglables posées sur leurs taquets : ${codes(bom, loose)}`);
     }
     steps.push({ title: "Intérieur", lines: inside });
-    steps.push(hardwareStep("Autres quincailleries", lines.filter((h) =>
+    steps.push(hardwareStep("Autres quincailleries", lines.filter((line) =>
     {
-        return !used.has(h);
+        return !used.has(line);
     })));
-    const rest = parts.filter((q) =>
+    const rest = parts.filter((part) =>
     {
-        return !named.has(q);
+        return !named.has(part);
     });
     steps.push({ title: "Autres pièces", lines: rest.length > 0 ? [codes(bom, rest)] : [] });
     return steps;
