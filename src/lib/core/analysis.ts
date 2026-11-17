@@ -49,6 +49,7 @@ import { buildRails, packRailBars, wardrobeChecks } from "./wardrobe";
 import { buildLights, fitLightLeads, lightChecks } from "./lights";
 import { blockedOutlets, fitOutlets } from "./outlets";
 import { sinkHeads } from "./screw_heads";
+import { drillPilots } from "./pilots";
 import { fitScrewCaps } from "./screw_caps";
 import { at, bounds, tessellate } from "./geometry";
 import { lightsInTheWay, lowest } from "./loose";
@@ -210,6 +211,7 @@ export function analyse(p: Project): Analysis
     blockedOutlets(p.items, b);
     bandVisibleEdges(p, b);
     sinkHeads(b);
+    drillPilots(b);
     fitScrewCaps(p, b);
     packRailBars(b);
     b.fitted.push(...letInFittings(b.parts));
