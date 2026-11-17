@@ -82,7 +82,7 @@ function skinParts(
         thickness: radius, decor: "CHENE_MASSIF", edges: [], frame: null,
     });
     p.curve = curve;
-    p.notes.push(`Profil massif en quart de rond de rayon ${Math.round(radius)}, face bombée vue`);
+    p.notes.push(`Profil massif en quart de rond de rayon ${Math.round(radius)}, face courbe vue`);
     b.parts.push(p);
 }
 
@@ -301,10 +301,9 @@ export function endPost(c: Carcass, side: "left" | "right"): { u: number; v: num
 }
 
 
-// The least size of an open end that takes the post of a seat, on its real boards, floor board cut smaller included :
-// the radius of a quarter round, the depth of the carcass for a half round, whose radius is half its usable depth
-// Null when no radius within the usable depth will do. The search takes a larger end to take the post whenever a
-// smaller one does, true on the cases tried, not proved
+// Least size of an open end that takes a seat post, on its real boards (floor board cut smaller) : the radius of a
+// quarter round, the carcass depth for a half round. Null when none fits. Assumes a larger end takes the post
+// whenever a smaller one does : true on the cases tried, not proved
 export function seatPostMinimum(c: Carcass, side: "left" | "right"): number | null
 {
     const end = c.ends[side];

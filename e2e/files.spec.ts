@@ -136,7 +136,7 @@ test.describe("files", () =>
 
     test("keeps it even when the browser drops the database write of the closing page", async ({ page }) =>
     {
-        // The runner of the deployment lost it so : the write begun as the page went away never landed
+        // A write begun as the page goes away may never land : the work has to survive that too
         await openBlank(page);
         const name = page.getByLabel("Nom du projet");
         await name.fill("Banc de Kaysersberg");

@@ -4,11 +4,11 @@ import { dresser, tvWall } from "../templates";
 import { PHASE_CHECK, PHASE_DEBIT, PHASE_EDGES, PHASE_EDGE_DRILL, PHASE_FACE_DRILL, PHASE_FINISH, PHASE_MARK,
          fabrication, fabricationCsv, type Fabrication } from "./fabrication";
 import { addItem, setDividerFinish, splitCell } from "../commands";
-import { newCarcass, newProject } from "../factory";
+import { DEFAULT_BATTENS, newCarcass, newProject } from "../factory";
 import { newPart } from "../part_base";
 import { groupBySignature } from "../signature";
 import { sawSize } from "../bom";
-import type { Carcass } from "../model";
+import type { Carcass, End } from "../model";
 import { decorById } from "../../data/materials";
 import type { Edge } from "../part_types";
 import type { PbsNode } from "../bom";
@@ -25,12 +25,18 @@ function counted(spec: string | undefined): number
 
 // Every machine or tool word met in the route and the supplies, plurals included. A part's own name is left out : the
 // shaped boards of a rounded end are called "Gabarit 1", "Gabarit 2"
-const MEANS = /\b(CNC|CN|commandes? numériques?|Zeta|scies?|perceuses?|défonceuses?|plaqueuses?|toupies?|forets?|fraises?|Pozidriv|PZ\d|tournevis|gabarits?)\b/i;
+const MEANS = new RegExp("\\b(CNC|CN|commandes? numériques?|Zeta|scies?|perceuses?|défonceuses?|plaqueuses?|"
+    + "toupies?|forets?|fraises?|Pozidriv|PZ\\d|tournevis|gabarits?)\\b", "i");
+
+const CLAMEX_EDGE = /P-14 dans le chant/;
 
 function neutral(f: Fabrication): string[]
 {
     const said = [
-        ...f.routes.flatMap((r) => { return r.steps.map((s) => { return `${s.title} ${s.spec} ${s.why}`.split(r.label).join(""); }); }),
+        ...f.routes.flatMap((r) =>
+        {
+            return r.steps.map((s) => { return `${s.title} ${s.spec} ${s.why}`.split(r.label).join(""); });
+        }),
         ...f.supplies.map((s) => { return `${s.label} ${s.note}`; }),
     ];
     return said.filter((t) => { return MEANS.test(t); });
@@ -50,7 +56,7 @@ describe.each(PROJECTS)("gamme de fabrication du $name", ({ make }) =>
         {
             const phases = r.steps.map((s) => { return s.phase; });
             expect(phases[0]).toBe(PHASE_DEBIT);
-            expect(phases.slice(-2)).toEqual([PHASE_CHECK, PHASE_MARK]);
+            expect([phases.at(-2), phases.at(-1)]).toEqual([PHASE_CHECK, PHASE_MARK]);
         }
     });
 
@@ -114,7 +120,15 @@ describe.each(PROJECTS)("gamme de fabrication du $name", ({ make }) =>
         const cap = nodes(o.bom.pbs).filter((n) => { return n.manufacturer_ref === "Atelier"; });
         expect(cap.length).toBeGreaterThan(0);
         expect(cap.every((n) => { return n.fab_source === "interne"; })).toBe(true);
-        expect(f.supplies.filter((s) => { return s.kind === "Chant"; }).length).toBe(o.bom.edges.length);
+        // Split by board thickness, the banding still adds up to the bill's, worked out the other way
+        const metres = (q: string): number => { return Number(q.replace(",", ".")); };
+        const bands = f.supplies.filter((s) => { return s.kind === "Chant"; });
+        expect(bands.length).toBeGreaterThanOrEqual(o.bom.edges.length);
+        // The board's reference is no banding's : the 8685 white is banded with an Egger W1000
+        const boardRefs = new Set(o.bom.cut.map((r) => { return decorById(r.decor).ref; }));
+        expect(bands.every((s) => { return !boardRefs.has(s.ref) && / pour panneau de \d+/.test(s.label); })).toBe(true);
+        expect(bands.reduce((m, s) => { return m + metres(s.qty); }, 0))
+            .toBeCloseTo(o.bom.edges.reduce((m, e) => { return m + e.metres; }, 0), 0);
     });
 
     it("écrit une ligne de CSV par phase", () =>
@@ -145,7 +159,8 @@ function alone(c: Carcass): ReturnType<typeof computeOutputs>
     return computeOutputs(addItem(newProject("essai"), c));
 }
 
-// A cabinet with one adjustable shelf, its finish given
+
+// A cabinet with one adjsutable shelf, its finish given
 function cabinet(decor: string, colour: string | null): ReturnType<typeof computeOutputs>
 {
     let p = addItem(newProject("vitrine"), newCarcass({ name: "Vitrine", width: 600, height: 800, depth: 400 }));
@@ -156,6 +171,8 @@ function cabinet(decor: string, colour: string | null): ReturnType<typeof comput
 }
 
 
+// TODO no project here has a groove or a pocket running out into a banded edge : the wait for the band it cuts is
+// writen in fabrication.ts and never seen by a test
 describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
 {
     it("perce le logement de la charnière d'abattant après le placage du chant qu'il entame", () =>
@@ -169,7 +186,7 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
 
     it("débite le dessus sous rampant assez long pour sa face B", () =>
     {
-        // A decor that gives its band thickness, else the saw size is left to the cabinet maker
+        // A decor that give its band thickness, else the saw size is left to the cabinet maker
         const o = alone(newCarcass({ name: "Comble", width: 1038, height: 2000, depth: 500, decor: "U604_ST9",
                                      slope: { low: "left", height: 1500 } }));
         const top = o.bom.cut.find((r) => { return r.parts[0]!.role === "top"; })!;
@@ -180,7 +197,7 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
         expect((sawSize(top) as { length: number }).length).toBeCloseTo(top.length + d - banded, 1);
     });
 
-    it("commande le verre trempé à dimension et ne le fait pas débiter", () =>
+    it("commande le verre trempé à dimension et ne le fait pas débiter", () => 
     {
         const o = cabinet("VERRE_6", null);
         const f = fabrication(o.bom, o.nesting);
@@ -190,6 +207,7 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
         expect(line.qty).toBe(String(glass.quantity));
         expect(line.note).toContain("miroitier");
     });
+
 
     it("laque le MDF sans chant à plaquer ni à commander, et commande sa laque", () =>
     {
@@ -201,7 +219,7 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
         const route = f.routes.find((r) => { return r.code === row.code; })!;
         expect(route.steps.some((s) => { return s.phase === PHASE_EDGES; })).toBe(false);
         expect(route.steps.find((s) => { return s.phase === PHASE_FINISH; })!.spec).toContain("#b0493a");
-        expect(f.supplies.find((s) => { return s.kind === "Laque"; })!.label).toContain("#b0493a");
+        expect(f.supplies.find((s) => { return s.kind === "Laque"; })!.label).toContain("#b0493a"); 
     });
 
     it("ne confond pas deux pièces de teintes différentes", () =>
@@ -213,16 +231,52 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
         expect(groupBySignature([red, blue])).toHaveLength(2);
     });
 
+
     it("dit une profondeur non cotée au lieu d'un perçage débouchant, et reste neutre en Clamex", () =>
     {
         const p = dresser();
         p.settings.joinery = "clamex";
         const o = computeOutputs(p);
         const f = fabrication(o.bom, o.nesting);
-        const said = f.routes.flatMap((r) => { return r.steps.map((s) => { return s.spec; }); }).join("\n");
+        const said = f.routes.flatMap((r) => { return r.steps.map((s) => { return s.spec; }); }).join("\n");  
         expect(said).toContain("Accès levier Clamex");
         expect(said).not.toMatch(/Ø6 débouchant/);
         expect(said).toMatch(/Ø6 profondeur non cotée/);
         expect(neutral(f)).toEqual([]);
+        // The edge half of each connector is a pocket in the butting edge, mid thickness, not a groove on a face
+        const parts = o.analysis.build.parts;
+        const pockets = parts.flatMap((q) =>
+        {
+            const clamex = (q.pockets ?? []).filter((k) => { return CLAMEX_EDGE.test(k.label); });
+            return clamex.map((k) => { return { q, k }; });
+        });
+        expect(pockets.length).toBeGreaterThan(0);
+        expect(pockets.every(({ q, k }) => { return (k.edge === "u0" || k.edge === "u1") &&
+                                            k.w === q.thickness / 2; })).toBe(true);
+        const asGroove = parts.some((q) => { return q.grooves.some((g) => { return CLAMEX_EDGE.test(g.label); }); });
+        expect(asGroove).toBe(false);
+        expect(said).toContain("Poche 70 x 7 prof. 14 dans le chant");
+    });
+
+
+    it("dit le quart de rond d'un profil massif et livre à plat une peau cintrable", () =>
+    {
+        const end = (technique: "solid" | "flex"): End =>
+        {
+            return { type: "rounded", radius: 80, sweep: 90, technique, flexThickness: 9, battens: DEFAULT_BATTENS,
+                     decor: "W1000_ST9" };
+        };
+        const route = (technique: "solid" | "flex"): string =>
+        {
+            const o = alone(newCarcass({ width: 600, height: 800, depth: 500,
+                                         ends: { left: { type: "square" }, right: end(technique) } }));
+            const f = fabrication(o.bom, o.nesting);
+            const skin = [...o.bom.cut, ...o.bom.offSheet].find((r) => { return r.parts[0]!.role === "skin"; })!;
+            return f.routes.find((r) => { return r.code === skin.code; })!.steps
+                .map((s) => { return `${s.title} : ${s.spec}`; }).join("\n");
+        };
+        expect(route("solid")).toMatch(/Profil : Quart de rond de rayon 80 dans la section 80 x 80/);
+        expect(route("flex")).toContain("Livrée à plat : cintrée au montage");
+        expect(route("flex")).not.toContain("Quart de rond");
     });
 });

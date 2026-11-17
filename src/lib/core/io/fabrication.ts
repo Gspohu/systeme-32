@@ -125,7 +125,7 @@ function routeOf(r: CutRow): FabRoute
                      spec: profile
                          ? `Quart de rond de rayon ${n1(part.width)} dans la section `
                              + `${n1(part.width)} x ${n1(part.thickness)}, `
-                             + `sur toute la longueur ${n1(part.length)}, face bombée vue`
+                             + `sur toute la longueur ${n1(part.length)}, face courbe vue`
                          : `Pièce ${shapeWord(r) || "à abouts inclinés"} : contour d'après le DXF `
                              + "et le plan de la pièce "
                              + `${r.code}.${cutouts}${bevel}${under}`.trim() });
@@ -285,7 +285,8 @@ function bandsToBuy(bom: Bom): Supply[]
     {
         const decor = decorById(band.decor);
         const thick = decor.edgeThickness === undefined ? "épaisseur à confirmer" : `ép. ${n1(decor.edgeThickness)}`;
-        return { kind: "Chant", brand: decor.brand, ref: decor.ref,
+        // The decor gives no maker nor reference of its own banding, its label says it all : the board's would lie
+        return { kind: "Chant", brand: "", ref: "",
                  label: `${decor.edge ?? `Chant assorti ${decor.label}`}, pour panneau de ${band.board}`,
                  qty: comma(band.mm / 1000, 1), unit: "m",
                  note: `Largeur supérieure à ${band.board}, ${thick}, surlongueur comprise` };

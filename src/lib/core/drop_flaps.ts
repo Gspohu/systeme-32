@@ -8,7 +8,7 @@ import type { FaceRef } from "./locate";
 import { byId } from "./edit";
 import { panelBelow, sideFace } from "./locate";
 import { boxOrigin, newPart } from "./part_base";
-import { BOTTOM_RECESS, buildPullOut, chooseRunner } from "./drawers";
+import { BOTTOM_RECESS, BOX_THICKNESS, buildPullOut, chooseRunner } from "./drawers";
 import type { FrontPanel } from "./fronts";
 import { fitTipOnHole } from "./doors";
 import { X, Y, Z, at, neg, type Vec3 } from "./geometry";
@@ -16,9 +16,9 @@ import { crossedHoles } from "./drilling";
 import { MOVENTO } from "../data/rules";
 import { DIAM, round1 } from "./text";
 
-// Häfele 342.78.700, an overlay flap hinge (LGH-M 2017 p. MB 5.318) : a body in a Ø26 bore 15 deep of the floor 10.5
-// off its front edge, the other in a Ø26 bore 14 deep of the flap 10.5 over its lower edge, sold by 4. Its STEP shut :
-// x to the front, y across, z up from the floor, origin on the axis of the floor bore
+// Häfele 342.78.700 overlay flap hinge (LGH-M 2017 p. MB 5.318), sold by 4 : a body in a Ø26 bore 15 deep in the
+// floor, 10.5 off its front edge, the other Ø26 x 14 in the flap, 10.5 over its lower edge. Its STEP shut : x to the
+// front, y across, z up, origin on the floor bore axis
 export const FLAP_HINGE = {
     ref: "342.78.700", pack: 4, bore: 26, floorDepth: 15, flapDepth: 14, offEdge: 10.5,
     // Where the model has the flap : its back 13.09 in front of the floor bore, its bore 7.85 under the floor
@@ -34,10 +34,9 @@ export const FLAP_HINGE = {
 };
 // Workshop choice : each hinge 100 in from the side of the cell, clear of the stays against them
 const HINGE_INSET = 100;
-// Häfele gas stay 365.01.901, LGH-M 2017 p. MB 5.313 : flap shut, its pivots 238 and 65 over the lower edge of the
-// flap, 18 and 16 behind its back, 25 off the side, a strut of 15, its ball sockets 16.5 long. 2 of them past 400
-// high, 10 kg and 600 high at
-// most. The flap bracket off its STEP : a plate 46 x 31 x 3, 2 screws 32 apart 19 from the pivot
+// Häfele gas stay 365.01.901 (LGH-M 2017 p. MB 5.313), flap shut : pivots 238 and 65 over its lower edge, 18 and
+// 16 behind its back, 25 off the side, strut 15, sockets 16.5. 2 past 400 high, 10 kg and 600 high at most
+// Bracket in its STEP : plate 46 x 31 x 3, 2 screws 32 apart, 19 off the pivot
 export const GAS_STAY = { ref: "365.01.901", sideUp: 238, flapUp: 65, sideBehind: 18, flapBehind: 16, offSide: 25,
                           strut: 15, socket: 16.5, pin: 8, maxHigh: 600, maxKg: 10,
                           plate: { long: 46, wide: 31, thick: 3, screws: 32, offPivot: 19 } };
@@ -172,7 +171,6 @@ export function fitDropFlaps(c: Carcass, lay: ResolvedLayout, s: Settings, b: Bu
 }
 
 
-// The front edge and the top face of the floor, in the room
 export function floorEdge(floor: Part): { front: number; top: number }
 {
     const f = floor.frame!;
@@ -231,7 +229,8 @@ function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part
     };
     for (const [k, x] of [c.x + nb.x + HINGE_INSET, c.x + nb.x + nb.w - HINGE_INSET].entries())
     {
-        drill(floor, [x, top, bore], up, h.bore, h.floorDepth, `logement ${DIAM}26 x ${h.floorDepth}, débouchant sur le chant`);
+        drill(floor, [x, top, bore], up, h.bore, h.floorDepth,
+              `logement ${DIAM}26 x ${h.floorDepth}, débouchant sur le chant`);
         drill(flap, [x, bottom + h.offEdge, back], behind, h.bore, h.flapDepth,
               `logement ${DIAM}26 x ${h.flapDepth}, débouchant sur le chant bas`);
         for (const s of [-1, 1])
@@ -339,11 +338,13 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
     // into them in the clash check of the dresser
     const zFront = Math.min(c.depth - PULL_OUT_SETBACK, fp.z - GAS_STAY.sideBehind - GAS_STAY.strut / 2 -
                             PULL_OUT_CLEAR);
-    const runner = chooseRunner(zFront - lay.zBack, loadKg);
+    // Its runners end at the back of its box end, where the couplings screw into that end as into a front
+    const runnerFront = zFront - BOX_THICKNESS;
+    const runner = chooseRunner(runnerFront - lay.zBack, loadKg);
     if (runner === null)
     {
-        b.errors.push(`${c.name}, tiroir intérieur : aucune coulisse MOVENTO pour ${Math.round(zFront - lay.zBack)} mm de `
-            + "profondeur. Approfondir le caisson.");
+        b.errors.push(`${c.name}, tiroir intérieur : aucune coulisse MOVENTO pour ${Math.round(runnerFront - lay.zBack)} mm `
+            + "de profondeur. Approfondir le caisson.");
         return;
     }
     const [ox, oy, oz] = boxOrigin(c);
@@ -362,7 +363,7 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
         const spacer = newPart({
             item: c.id, itemName: c.name, thickness: t, decor: c.decor, id: `${c.id}/pull-out/${fp.id}/spacer/${left ? "L" : "R"}`,
             label: `Cale de coulisse ${left ? "gauche" : "droite"}`, role: "cleat", length: SPACER_HEIGHT, width: runner.nl,
-            edges: [], frame: { o: [ox + x, oy + y0, oz + zFront], u: Y, v: neg([0, 0, 1]), n: X },
+            edges: [], frame: { o: [ox + x, oy + y0, oz + runnerFront], u: Y, v: neg([0, 0, 1]), n: X },
         });
         // Face B looks into the cell on the left, face A on the right : screwed through into the side from there
         const face = left ? "B" as const : "A" as const;
