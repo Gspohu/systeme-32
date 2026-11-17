@@ -11,6 +11,8 @@ export interface ScrewSpec
     standard?: string;
     head?: number;
     headHeight?: number;
+    // The size of the workbench when no millimetre names it : "#6" for a US wood screw of ASME B18.6.1
+    size?: string;
 }
 
 // Drillings whose label doesn't give the size. Blum KA-150 p. 173 : the TIP-ON adapetr takes chipboard screws, the

@@ -23,6 +23,8 @@ import { DIAM } from "./text";
 export const BOX_THICKNESS = 16;
 const MIN_BOX_HEIGHT = 60;
 export const BOTTOM_RECESS = 13;
+// The front end of a drawer with no front of its own comes down past the recess, over the plate of its couplings
+const INNER_END_DROP = 15;
 const PULL_CLEARANCE = 1;
 // Ø8 x 35 dowels in 16 mm boards : 10 into a face leaves 6 of it, the holes 3 longer than the dowel for the glue
 // (Dictum, 4 x 3 tips for dowelling), the split between face and edge is a workshop convention
@@ -320,11 +322,13 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
         frame: { o: [xIn + SKW, oy + sideBottom, oz + zFront], u: neg(Z), v: Y, n: X },
     });
     // Blum's models : the coupling stays under the bottom at the front, the rear of the runner rises 26 up the side. The
-    // front end stops at the underside of the bottom, the back end stands on the bottom running under it
+    // front end stops at the underside of the bottom, the back end stands on the bottom running under it. With no front
+    // of its own the end is what the couplings screw into : it comes down over them, past the plate of 13.3
+    const drop = d.inner === true ? INNER_END_DROP : 0;
     const endF = newPart({
         ...common, id: `${tag}/endF`, label: `${name}, avant de caisson`, role: "boxEnd",
-        length: SKW, width: hs - BOTTOM_RECESS, edges: ["v1"],
-        frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS, oz + zFront - BOX_THICKNESS], u: X, v: Y, n: Z },
+        length: SKW, width: hs - BOTTOM_RECESS + drop, edges: ["v1"],
+        frame: { o: [xIn, oy + sideBottom + BOTTOM_RECESS - drop, oz + zFront - BOX_THICKNESS], u: X, v: Y, n: Z },
     });
     const endB = newPart({
         ...common, id: `${tag}/endB`, label: `${name}, arrière de caisson`, role: "boxEnd",
@@ -427,7 +431,7 @@ function fitRunners(d: DrawerSlot, k: DrawerBox, faces: (FaceRef | null)[], b: B
     // Blum reserves 21 per runner against the cell side, over NL from the box front (p. 419)
     // TODO the runner profile itself isn't dimensionned on p. 419, only the space it takes
     // The box comes forward with an overlay front, its runner stays screwed in the carcass
-    const runnerFront = inner || front.mount === "inset" ? zFront : zFront - FRONT_GAP;
+    const runnerFront = inner ? zFront - BOX_THICKNESS : front.mount === "inset" ? zFront : zFront - FRONT_GAP;
     const zs: [number, number] = [oz + runnerFront - runner.nl, oz + runnerFront];
     for (const [side, x0] of [["gauche", ox + nb.x], ["droite", ox + nb.x + nb.w - MOVENTO.sideInset]] as const)
     {

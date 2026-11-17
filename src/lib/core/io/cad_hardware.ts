@@ -10,7 +10,7 @@ import { decorById } from "../../data/materials";
 import { FRONT_GAP, MINIFIX, MOVENTO, TIPON_ADAPTER } from "../../data/rules";
 import { screwOf, type ScrewSpec } from "../../data/screws";
 import { AXILO_FEET, EDGE_PULL } from "../../data/hardware";
-import { STEEL, ZINC, type CadModel } from "../../data/cad_models";
+import { CAD_MODELS, STEEL, ZINC, type CadModel } from "../../data/cad_models";
 
 export interface CadScrew extends ScrewSpec
 {
@@ -35,7 +35,7 @@ const SUPPORT_SCREW_FACE = -2.5;
 const SUPPORT_SCREW_LEVEL = -1.7;
 // Blum model of the 70T3550.TL
 // The screw holes of the cup in each Blum model, 9.5 behind its cup : the crank of the twin one sets both 9.5 further
-const CUP_SCREW_X: Record<string, number> = { "70T3550.TL": -16, "70T3650.TL": -25.5 };
+const CUP_SCREW_X: Record<string, number> = { "70T3550.TL": -16, "70T3650.TL": -25.5, "71B3550": -16 };
 const CUP_SCREW_ACROSS = 22.5;
 // The 90 degree cone of its hole narrows to 3.8 at 37.3 : a head of 7 with its rim of 0.35 sits with its top
 // at 35.35, the door at 38.5
@@ -231,6 +231,61 @@ function runners(q: Part, out: CadInstance[]): void
 }
 
 
+// The face of the coupling against the front, z = 37 in its file, and a point of it over its slots : the file of the
+// right hand is the left one mirrored, x from -101.5 to -21
+const COUPLING_FACE = 37;
+const COUPLING_MIDDLE: [number, number] = [57, -16];
+// Further than this from a front, the coupling isn't on that drawer
+const COUPLING_REACH = 30;
+
+// The coupling is the drawer's, screwed on the back of its front : set off the runner at the carcass edge, it stood
+// behind an overlay front by its gap of 2.6, its screws in the air
+function seatCouplings(b: Build, out: CadInstance[]): void
+{
+    const along = (v: Vec3, w: Vec3): number => { return v[0] * w[0] + v[1] * w[1] + v[2] * w[2]; };
+    const fronts = b.parts.filter((q) => { return q.role === "drawerFront" && q.frame !== null && q.curve === null; });
+    for (const i of out.filter((k) => { return k.model.startsWith("T51.7601"); }))
+    {
+        const local = (u: number, v: number, w: number): Vec3 =>
+        {
+            return [0, 1, 2].map((k) => { return i.o[k]! + i.x[k]! * u + i.y[k]! * v + i.z[k]! * w; }) as Vec3;
+        };
+        const side = i.model.endsWith(".right") ? -1 : 1;
+        const middle = local(side * COUPLING_MIDDLE[0], COUPLING_MIDDLE[1], COUPLING_FACE);
+        const face = along(middle, i.z);
+        let gap: number | null = null;
+        for (const q of fronts)
+        {
+            const corners: Vec3[] = [];
+            for (const u of [0, q.length])
+            {
+                for (const v of [0, q.width])
+                {
+                    corners.push(at(q.frame!, u, v, 0), at(q.frame!, u, v, q.thickness));
+                }
+            }
+            const span = (w: Vec3): [number, number] =>
+            {
+                const s = corners.map((c) => { return along(c, w); });
+                return [Math.min(...s), Math.max(...s)];
+            };
+            const [sx, sy] = [span(i.x), span(i.y)];
+            const [mx, my] = [along(middle, i.x), along(middle, i.y)];
+            const back = span(i.z)[0] - face;
+            if (mx > sx[0] && mx < sx[1] && my > sy[0] && my < sy[1] && back > -0.01 && back < COUPLING_REACH
+                && (gap === null || back < gap))
+            {
+                gap = back;
+            }
+        }
+        if (gap !== null)
+        {
+            i.o = [i.o[0] + i.z[0] * gap, i.o[1] + i.z[1] * gap, i.o[2] + i.z[2] * gap];
+        }
+    }
+}
+
+
 function pushUnits(q: Part, out: CadInstance[]): void
 {
     const f = q.frame!;
@@ -421,7 +476,11 @@ function feet(c: Carcass, b: Build, out: CadInstance[], screws: CadScrew[]): voi
             // Häfele's model is drawn fitted : its origin on the axis, the ring 2.7 off it hooked behind the shaft, the
             // plate on the back of the plinth 39.5 off, against the mounting plate (drawing 637.76.333-1)
             const level = y[2] === 0 ? mid - CLIP_RETURN_DROP : mid;
-            const clip: CadInstance = { ...name, model: "637.38.054", o: [f.x, level, f.z], x: cross(y, Y), y, z: Y };
+            // On its plinth, not on the base : the clips of a return go on before the feet, those of the front plinth
+            // with it once the feet stand
+            const plinth = y[2] !== 0 ? "Plinthe" : y[0] < 0 ? "Plinthe, retour droit" : "Plinthe, retour gauche";
+            const clip: CadInstance = { ...name, part: plinth, model: "637.38.054", o: [f.x, level, f.z], x: cross(y, Y),
+                                        y, z: Y };
             out.push(clip);
             for (const dx of [-CLIP_SCREW_HALF, CLIP_SCREW_HALF])
             {
@@ -460,7 +519,11 @@ function bolts(q: Part, seen: Vec3[], out: CadInstance[]): void
             {
                 seen.push(o);
                 const y = square(way);
-                out.push(place("267.07.903", q, o, way, cross(cross(way, y), way)));
+                const unit = `${q.id}/liaison${seen.length}`;
+                for (const piece of ["sleeve", "screw"])
+                {
+                    out.push({ ...place(`267.07.903.${piece}`, q, o, way, cross(cross(way, y), way)), unit });
+                }
             }
         }
     }
@@ -529,11 +592,34 @@ function brackets(b: Build, out: CadInstance[], screws: CadScrew[]): void
 
 
 // The 2 screws of each hinge cup : Blum's model holds their holes at 22.5 either side and 9.5 behind the cup
+// The screws the catalogue gives the holes of, in the frame of the maker's file : the couplings of a
+// MOVENTO runner, sold
+// without them, fell off the drawer in the film of a TV
+function declaredScrews(out: CadInstance[], screws: CadScrew[]): void
+{
+    for (const i of out)
+    {
+        const held = CAD_MODELS[i.model]?.fixing?.screws;
+        if (held?.at === undefined || held.away === undefined)
+        {
+            continue;
+        }
+        for (const hole of held.at)
+        {
+            screws.push({ ...modelScrew(i, hole, held.away, held.spec ?? CHIPBOARD_SMALL, held.label),
+                         free: held.free ?? 0,
+                          holds: i.model });
+        }
+    }
+}
+
+
 function cupScrews(out: CadInstance[], screws: CadScrew[]): void
 {
     for (const i of out)
     {
-        if (i.model.startsWith("70T"))
+        // The 71B3550 screws on as well, 45/9.5 like the 70T, its file turned into their frame (cad_models.ts)
+        if (i.model.startsWith("70T") || i.model === "71B3550")
         {
             const x = CUP_SCREW_X[i.model];
             if (x === undefined)
@@ -697,6 +783,7 @@ export function cadHardware(p: Project, b: Build): { instances: CadInstance[]; s
         shelfPins(q, instances);
         bolts(q, seen, instances);
     }
+    seatCouplings(b, instances);
     pulls(b, instances);
     for (const c of p.items)
     {
@@ -709,6 +796,7 @@ export function cadHardware(p: Project, b: Build): { instances: CadInstance[]; s
     flapHinges(b, instances);
     brackets(b, instances, screws);
     cupScrews(instances, screws);
+    declaredScrews(instances, screws);
     const drawn: Record<string, CadModel> = {};
     lightModels(p, b, instances, drawn);
     capModels(b, instances, drawn);

@@ -142,9 +142,9 @@ function distanceToBox(pt: Vec3, lo: Vec3, hi: Vec3): number
 }
 
 
-// The assembly an article or a screw belongs to : that of the board it sits on, or for what is built on the bench from
-// a drilling of the carcass, that of the nearest board of a sub-assembly of the same item, then named after that
-// board. Named after the side, the couplings of 2 drawers on one upright read alike and each step took both
+// The assembly of an article or a screw : that of its board, or for a bench sub-assembly drilled from the carcass
+// that of its nearest board of the same item, named after it. Named after the side, the couplings of 2 drawers on
+// one upright read alike and each step took both
 function benchRouting(b: Build, codeOf: Map<string, string>, groupOf: Map<string, string>):
     (item: string, label: string, model: string, pt: Vec3) => { assembly: string; host?: string }
 {
@@ -213,7 +213,7 @@ function assignUnits<T extends { item: string; unit?: string; assembly: string }
 }
 
 
-export function cadModel(p: Project, o: Outputs, withGamme = false): object
+export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withGamme = false): object
 {
     const b = o.analysis.build;
     const materials = new Map<string, object>();
@@ -292,7 +292,7 @@ export function cadModel(p: Project, o: Outputs, withGamme = false): object
     const listed: Record<string, number> = {};
     for (const h of b.hardware)
     {
-        if (h.ref === "609.1500" || h.ref.includes("SCREW") || h.ref.startsWith("267.07"))
+        if (h.ref === "609.1500" || h.ref === "606N" || h.ref.includes("SCREW") || h.ref.startsWith("267.07"))
         {
             listed[h.ref] = (listed[h.ref] ?? 0) + h.qty;
         }
@@ -316,7 +316,10 @@ export function cadModel(p: Project, o: Outputs, withGamme = false): object
     }), groupOf);
     const every = placedAll.every.map((s) =>
     {
-        const r = assemblyOf(s.item, s.part, s.holds ?? "", s.point);
+        // By its tip, the board it goes into : by its head a coupling screw named the box front, its tip in the front
+        const tip: Vec3 = [s.point[0] - s.out[0] * s.length, s.point[1] - s.out[1] * s.length,
+                           s.point[2] - s.out[2] * s.length];
+        const r = assemblyOf(s.item, s.part, s.holds ?? "", tip);
         return { ...s, tag: r.host ?? tag(s.item, s.part), assembly: r.assembly };
     });
     const used = new Set(instances.map((i) =>

@@ -115,6 +115,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:48N0510.02": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:48N0510.03": entry(fromGbp(1.14), "u", "Interfit (UK), 1,14 GBP HT la ferrure"),
     "hw:609.1500": entry(fromGbp(2.66 / 100), "u", "Interfit (UK), 2,66 GBP HT le sachet de 100", READ_ON, 100),
+    "hw:606N": entry(fromUsd(3.76 / 100), "u", "Würth LAC (US), 3,76 USD HT la boîte B606N-100 de 100", "2026-11-15",
+                     100),
     "hw:637.76.352": entry(fromGbp(0.99), "u", "Interfit (UK), pied AXILO 80 mm à 0,99 GBP HT"),
     // No public price in France nor the UK : Polish zloty at the ECB rate of 7 October 2026, 4.3825
     "hw:637.76.353": entry(Math.round(2.1 / 4.3825 * 1000) / 1000, "u",
@@ -160,8 +162,12 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:SHELLY_PLUS_RGBW_PM": entry(ht(28.49), "u", "Alternate, Shelly Plus RGBW PM à 28,49 EUR TTC, momentanément "
                                     + "indisponible", READ_ON_2),
     "hw:ANTI_TIP_BRACKET": entry(ht(1.59), "u", "Brico Dépôt, équerre d'assemblage 40 x 40 x 40 à 1,59 EUR TTC"),
-    "hw:DOWEL_8x35": entry(ht(4.99 / 100), "u", "Brico Dépôt, 100 tourillons hêtre 8 x 40 à 4,99 TTC, 8 x 35 non vendu",  
-                           READ_ON, 100),
+    // No price of the 8 x 35 read yet : Riex JW51 at Hranipex shows it to trade accounts only, the 8 x 35 of Mr
+    // Bricolage (Vynex) and the 35 of Leroy Merlin (Hettich) refuse an automatic reading, unchecked. Priced meanwhile
+    // as the 8 x 40 of the same wood, the length that wouldn't let the joint close in holes of 36 to 38
+    "hw:DOWEL_8x35": entry(ht(4.99 / 100), "u", "Prix provisoire du 8 x 40 Brico Dépôt (100 tourillons hêtre à 4,99 TTC) : "
+                           + "8 x 35 chez Mr Bricolage (Vynex) et Leroy Merlin (Hettich), fiches non vérifiées", READ_ON,
+                           100),
     "hw:PLUG_NYLON_8x40": entry(ht(1.89 / 20), "u", "Brico Dépôt, lot de 20 chevilles nylon 8 x 40 à 1,89 EUR TTC",
                                 READ_ON, 20),
     "hw:SCREW_4x16": entry(ht(8.09 / 200), "u", "Brico Dépôt, boîte de 200 vis fischer 4 x 16 à 8,09 EUR TTC", READ_ON,
@@ -171,7 +177,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                              + "100 (EAN 4003530000935, Bricomarché), prix non relevé", "2026-11-09", 300),
     "hw:SCREW_4x35": entry(ht(13.5 / 300), "u", "Prix de la boîte de 4 x 30, longueur 35 non relevée", "2026-10-03",
                            300),
-    "hw:SCREW_4x30": entry(ht(13.5 / 300), "u", "Brico Dépôt, boîte de 300 vis fischer PowerFast II 4 x 30 à 13,50 EUR TTC",
+    "hw:SCREW_4x30": entry(ht(13.5 / 300), "u",
+                           "Brico Dépôt, boîte de 300 vis fischer PowerFast II 4 x 30 à 13,50 EUR TTC",
                            "2026-10-03", 300),
     "hw:WALL_SCREW_5x50": entry(ht(34.9 / 500), "u", "Brico Dépôt, boîte de 500 vis fischer 5 x 50 à 34,90 EUR TTC",
                                 READ_ON, 500),

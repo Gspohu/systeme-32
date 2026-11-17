@@ -94,10 +94,13 @@ describe("the bought articles of the CAD export", () =>
         const i = cadHardware(p, b).instances;
         // One article, one model
         for (const ref of ["DOWEL_8x35", "262.26.535", "262.28.020", "174H7100E", "70T3550.TL", "84335807", "282.24.727",
-                           "283.33.910", "267.07.903", "637.76.353", "637.76.333", "637.38.054", "956.1004"])
+                           "283.33.910", "637.76.353", "637.76.333", "637.38.054", "956.1004"])
         {
             expect([ref, count(i, ref)]).toEqual([ref, listed(b, ref)]);
         }
+        // A connecting bolt is its sleeve and its screw, set from either side : one solid they went through no hole
+        expect([count(i, "267.07.903.sleeve"), count(i, "267.07.903.screw")]).toEqual([listed(b, "267.07.903"),
+                                                                                        listed(b, "267.07.903")]);
         // The pair of runners and of couplings of a drawer
         for (const ref of ["760H3800S", "T51.7601"])
         {
@@ -123,7 +126,7 @@ describe("the bought articles of the CAD export", () =>
             // The screws and the washer go through Fasteners, the lead of a strip is a flexible cable laid
             // on site, a glue
             // is no solid
-            const apart = new Set(["609.1500", "SCREW_4x35", "SCREW_4x30", "SCREW_2.5x16", "SCREW_4x16",
+            const apart = new Set(["609.1500", "606N", "SCREW_4x35", "SCREW_4x30", "SCREW_2.5x16", "SCREW_4x16",
                                    "WALL_SCREW_5x50", "WALL_SCREW_5x50_PAN",
                                    "WASHER_5x20", "LED_LEAD", "GLUE_PU"]);
             expect([...new Set(b.hardware.map((h) => { return h.ref; }))].filter((r) =>
@@ -151,6 +154,48 @@ describe("the bought articles of the CAD export", () =>
         expect(size(5, 50, "countersunk")).toBe(listed(b, "WALL_SCREW_5x50"));
         expect(size(5, 50, "pan")).toBe(listed(b, "WALL_SCREW_5x50_PAN"));
         expect(size(3.5, 15)).toBe(listed(b, "609.1500"));
+        // The couplings take the 606N of Blum's notice, a #6 flat head of ASME B18.6.1 : the Ø7 of the DIN 7505:1986
+        // drawn
+        // for a 3.5 wedged in the pocket behind their slots
+        expect(size(3.5, 16)).toBe(listed(b, "606N"));
+        expect(all.filter((s) => { return s.length === 16 && s.diameter === 3.5; }).every((s) =>
+        {
+            return s.standard === "ASMEB18.6.1.3" && s.size === "#6" && s.head! < 7 && s.free > 4;
+        })).toBe(true);
+    });
+
+
+    it("sets each coupling against the back of its drawer front, not at the carcass edge 2.6 behind it", () =>
+    {
+        const { p, b } = tv();
+        const fronts = b.parts.filter((q) => { return q.role === "drawerFront"; });
+        const couplings = cadHardware(p, b).instances.filter((i) => { return i.model.startsWith("T51.7601"); });
+        expect(couplings.length).toBeGreaterThan(0);
+        // Both hands : the right one is the left file mirrored, a point taken on the left one missed its front
+        expect(new Set(couplings.map((i) => { return i.model; }))).toEqual(new Set(["T51.7601.left", "T51.7601.right"]));
+        for (const i of couplings)
+        {
+            // Its face z = 37 of the file, along the depth of the drawer
+            const face = i.o[2] + i.z[2] * 37;
+            const backs = fronts.map((q) => { return Math.min(q.frame!.o[2], q.frame!.o[2] + q.frame!.n[2] *
+                                                              q.thickness); });
+            expect(Math.min(...backs.map((z) => { return Math.abs(z - face); }))).toBeLessThan(1e-6);
+        }
+    });
+
+
+    it("drives the coupling screws at 75 degrees to the front, the way of Blum's notice", () =>
+    {
+        const { p, b } = tv();
+        const coupling = cadHardware(p, b).screws.filter((s) => { return s.label.startsWith("Accouplement MOVENTO"); });
+        expect(coupling.length).toBe(listed(b, "606N"));
+        for (const s of coupling)
+        {
+            // The way out of the head leans 15 degrees off the normal of the front, along the depth of the drawer
+            const front = Math.abs(s.out[2]);
+            expect(Math.acos(front) * 180 / Math.PI).toBeCloseTo(15, 3);
+            expect(Math.abs(s.out[0])).toBeLessThan(1e-9);
+        }
     });
 
     it("gives every model a right handed frame of unit axes", () =>
