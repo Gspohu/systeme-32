@@ -65,7 +65,8 @@ test.describe("plans and lists", () =>
         // bolt to the columns
         const whole = section(/^#000 Vaisselier bibliothèque$/);
         await expect(whole).toContainText("Lier les meubles : Vis 4 x 30 vers Niche");
-        await expect(whole).toContainText("Lier les meubles : Vis de liaison et son manchon sur #400-");
+        // The sleeve pushed in first, the screw driven into it from the other side
+        await expect(whole).toContainText(/Lier les meubles : Vis de liaison, manchon sur #400-.*Lier les meubles : Vis de liaison, vis sur #400-/);
     });
 
 
