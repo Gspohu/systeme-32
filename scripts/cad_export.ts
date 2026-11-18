@@ -22,6 +22,7 @@ for (const t of TEMPLATES)
         const drawings = drawingSet(p, o).map((page, k) =>
         {
             return { index: k + 1, title: page.title, fields: page.fields ?? {}, views: page.views ?? [],
+                     items: page.items ?? [],
                      overlay: page.marks === undefined ? "" : overlaySvg(page.marks, page.w, page.h),
                      tables: (page.tables ?? []).map((c) =>
                      {

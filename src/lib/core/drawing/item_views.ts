@@ -9,14 +9,51 @@ import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";
 import { endPost, endToe, floorOutline, openEndLevels, plinthFootGap } from "../curves";
 import { tessellate } from "../geometry";
-import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H } from "./display";
-import { heading, paginateTable, table, type Draft } from "./draft";
+import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H, type Prim } from "./display";
+import { heading, paginateTable, table, type Draft, type ItemView } from "./draft";
 import { drawFront } from "./views";
 import { round1 } from "../text";
 import { decorById } from "../../data/materials";
 import { hardware } from "../../data/hardware";
 
 type ToPage = (value: number) => number;
+
+
+// The extent on the page of what some primitives draw, their text left out, none when they draw nothing
+function boxOf(prims: Prim[]): ItemView["box"] | null
+{
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const p of prims)
+    {
+        if (p.k === "line")
+        {
+            xs.push(p.x1, p.x2);
+            ys.push(p.y1, p.y2);
+        }
+        else if (p.k === "poly")
+        {
+            xs.push(...p.pts.map((q) => { return q[0]; }));
+            ys.push(...p.pts.map((q) => { return q[1]; }));
+        }
+        else if (p.k === "rect")
+        {
+            xs.push(p.x, p.x + p.w);
+            ys.push(p.y, p.y + p.h);
+        }
+        else if (p.k === "circle")
+        {
+            xs.push(p.x - p.r, p.x + p.r);
+            ys.push(p.y - p.r, p.y + p.r);
+        }
+    }
+    if (xs.length === 0)
+    {
+        return null;
+    }
+    const [x, y] = [Math.min(...xs), Math.min(...ys)];
+    return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
 
 // Page millimetres betwen two views, room for their titles and dimensions
 const VIEW_GAP = 28;
@@ -26,6 +63,14 @@ export function itemViews(k: Carcass, a: Analysis): Draft
 {
     const canvas = new Canvas();
     heading(canvas, `${k.name} : vues`);
+    // What a TechDraw view projects of the solids is left out of the marks laid over it
+    const drawn: [number, number][] = [];
+    const geometry = (draw: () => void): void =>
+    {
+        const start = canvas.prims.length;
+        draw();
+        drawn.push([start, canvas.prims.length]);
+    };
     // What the plinth or the feet add under the box
     const standHeight = baseHeight(k);
     const reachLeft = endReach(k, "left");
@@ -61,7 +106,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const boxLeftX = MARGIN + 20 + reachLeft / scale;
     const floorY = MARGIN + 38 + fullHeight / scale;
     const topY = floorY - fullHeight / scale;
-    drawFront(canvas, k, scale, boxLeftX - k.x / scale, floorY + (k.y - standHeight) / scale, a);
+    geometry(() => { drawFront(canvas, k, scale, boxLeftX - k.x / scale, floorY + (k.y - standHeight) / scale, a); });
     canvas.text(boxLeftX + k.width / scale / 2, topY - 12, "Vue de face", 3, "middle", true);
     canvas.dimH(boxLeftX, boxLeftX + k.width / scale, floorY + 1, floorY + 8, `${k.width}`);
     if (k.slope === null)
@@ -124,7 +169,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     // TODO the hinges are drawn nowhere on these views, their arm and plate aren't modelled yet
     const cutX = stacked ? boxLeftX : boxLeftX + (k.width + reachRight) / scale + VIEW_GAP + reachLeft / scale;
     const cutY = stacked ? floorY + VIEW_GAP + fullHeight / scale : floorY;
-    drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - standHeight) / scale, a, false);
+    geometry(() => { drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - standHeight) / scale, a, false); });
     canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - floorY, "Vue de face, façades déposées", 3, "middle",
                 true);
     for (const cell of lay?.nodes.values() ?? [])
@@ -144,25 +189,29 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const sideX = (stacked ? boxLeftX : cutX) + (k.width + reachRight) / scale + VIEW_GAP;
     // set on the right of the front view with the front of the item on its right : seen from the left, first angle
     canvas.text(sideX + k.depth / scale / 2, topY - 12, "Vue de gauche", 3, "middle", true);
-    canvas.rect(sideX, topY, k.depth / scale, k.height / scale, "normal");
-    if (k.base.type === "plinth")
+    geometry(() =>
     {
-        const front = sideX + (k.depth - k.base.setback) / scale;
-        canvas.rect(front - k.thickness / scale, floorY - (standHeight - PLINTH_TOP_GAP) / scale, k.thickness / scale,
-                    (standHeight - plinthFootGap(k) - PLINTH_TOP_GAP) / scale, "thin");
-    }
-    // Seen from the side the feet stand in the open, the runner spaces behind the side panel
-    for (const fitting of a.build.fitted)
-    {
-        if (fitting.item !== k.id || fitting.host !== null)
+        canvas.rect(sideX, topY, k.depth / scale, k.height / scale, "normal");
+        if (k.base.type === "plinth")
         {
-            continue;
+            const front = sideX + (k.depth - k.base.setback) / scale;
+            canvas.rect(front - k.thickness / scale, floorY - (standHeight - PLINTH_TOP_GAP) / scale, k.thickness /
+                        scale,
+                        (standHeight - plinthFootGap(k) - PLINTH_TOP_GAP) / scale, "thin");
         }
-        const extent = fittedExtent(fitting);
-        canvas.rect(sideX + (extent.min[2] - k.z) / scale, floorY - (extent.max[1] - k.y + standHeight) / scale,
-                    (extent.max[2] - extent.min[2]) / scale, (extent.max[1] - extent.min[1]) / scale,
-                    fitting.hidden ? "dashed" : "thin");
-    }
+        // Seen from the side the feet stand in the open, the runner spaces behind the side panel
+        for (const fitting of a.build.fitted)
+        {
+            if (fitting.item !== k.id || fitting.host !== null)
+            {
+                continue;
+            }
+            const extent = fittedExtent(fitting);
+            canvas.rect(sideX + (extent.min[2] - k.z) / scale, floorY - (extent.max[1] - k.y + standHeight) / scale,
+                        (extent.max[2] - extent.min[2]) / scale, (extent.max[1] - extent.min[1]) / scale,
+                        fitting.hidden ? "dashed" : "thin");
+        }
+    });
     canvas.dimH(sideX, sideX + k.depth / scale, floorY + 1, floorY + 8, `${k.depth}`);
     // The base : its height on the front edge, and how far a plinth stands back from the front
     const sideFront = sideX + k.depth / scale;
@@ -191,7 +240,26 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         listY = floorY + 22;
     }
     itemTables(canvas, k, a, listX, listY);
-    return { title: `${k.name}, vues`, scale: `1:${scale}`, canvas };
+    const marks = canvas.prims.filter((_, i) => { return !drawn.some(([s, e]) => { return i >= s && i < e; }); });
+    // Each view's box as the sheet lays it out : the item with its ends, the base under it
+    const wide = fullWidth / scale;
+    const high = fullHeight / scale;
+    const left = boxLeftX - reachLeft / scale;
+    // A projection is centred on its own extent, fillers and plinth included : the box of what this sheet draws
+    // of each view puts both on the same centre
+    const extentOf = (k: number, fallback: ItemView["box"]): ItemView["box"] =>
+    {
+        return boxOf(canvas.prims.slice(drawn[k]![0], drawn[k]![1])) ?? fallback;
+    };
+    const items: ItemView[] = [
+        { item: k.id, whole: true, view: "front", scale, box: extentOf(0, { x: left, y: topY, w: wide, h: high }) },
+        { item: k.id, whole: false, view: "front", scale,
+          box: extentOf(1, { x: cutX - reachLeft / scale, y: cutY - high, w: wide, h: high }) },
+        { item: k.id, whole: true, view: "top", scale, box: { x: left, y: planTop, w: wide, h: k.depth / scale } },
+        { item: k.id, whole: true, view: "left", scale, box: extentOf(2, { x: sideX, y: topY,
+            w: k.depth / scale, h: high }) },
+    ];
+    return { title: `${k.name}, vues`, scale: `1:${scale}`, canvas, marks, items };
 }
 
 

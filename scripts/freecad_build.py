@@ -817,12 +817,12 @@ def main():
             elif (child.TypeId == ASSEMBLY and not child.Placement.isIdentity()):
                 moved += 1
     steps = make_gamme(doc, model)
-    # Each board seen with its edge bands, the finished outline the sheet draws
+    # Each board seen with its edge bands, the finished outline the sheet draw
     bodies = {}
     for b, _, _ in built:
         # An id may hold a # of its own (a drawer behind a flap, #0) : only its bands add #chant-
         bodies.setdefault(b.Label2.split("#chant-")[0], []).append(b)
-    # Its neighbour, found once the launcher's folder is on the path
+    # Its neighbour, found once the launcher's folder is on the pathe
     from freecad_drawings import make_drawings
     drawings = make_drawings(doc, model, bodies)
     path = os.path.join(OUT, f"{name}.FCStd")

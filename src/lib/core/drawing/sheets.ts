@@ -78,7 +78,8 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
                        scale: draft.scale, content: issue.hash };
         frameAndTitle(draft.canvas, info);
         pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind,
-                     fields: titleFields(info), views: draft.views, tables: draft.tables, marks: draft.marks });
+                     fields: titleFields(info), views: draft.views, tables: draft.tables, marks: draft.marks,
+                     items: draft.items });
     });
     return pages;
 }
@@ -166,6 +167,9 @@ function dims(it: Item): string
     return `R ${it.outerRadius} x P ${it.depth}`;
 }
 
+
+// The tightest the sources of the cover close up, mm between lines of 2.2 mm text
+const SOURCE_PITCH = 2.7;
 
 // Cover : what is inside the set, the legend, the workshop conventions and every source
 function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
@@ -321,9 +325,10 @@ function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
     sources.add("UNI 11663 et EN 16122:2012 §6.1.4 (via tableau CATAS) : flèche d'étagère 0,5 % de la portée "
         + `sous ${load} kg/dm²${use === undefined ? ", charge choisie hors catégorie" : `, ${use.label}`}`);
     sources.add("Code du travail R4541-9 : port de charge 55 kg, 25 kg pour les femmes");
-    // Every source printed, the lines closing up to 3.2 mm, and said when some still don't fit
+    // Every source printed, the lines closing up to 2.7 mm, half a mm left between lines of 2.2, and said when some
+    // still don't fit. Two columns cut the long ones short, the source's own words lost
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 4;
-    const pitch = Math.max(3.2, Math.min(4, (bottom - cursorY) / sources.size));
+    const pitch = Math.max(SOURCE_PITCH, Math.min(4, (bottom - cursorY) / sources.size));
     const fits = Math.max(0, Math.floor((bottom - cursorY) / pitch) + 1);
     const kept = sources.size <= fits ? [...sources] : [...sources].slice(0, Math.max(0, fits - 1));
     for (const line of kept)

@@ -30,6 +30,20 @@ SMALL_COUNTERSUNK = ("DIN7997", 3.0)
 DIM_TEXT = 2.2
 
 
+def settled(page, limit=120.0):
+    """With a GUI the views of a page project in threads : exported before, the last ones came out blank (the top
+    and left of the low unit of the TV wall). Waits until each has its edges"""
+    import time
+    views = [v for v in page.Views if v.TypeId == "TechDraw::DrawViewPart"]
+    end = time.monotonic() + limit
+    while (time.monotonic() < end and not all(len(v.getVisibleEdges()) > 0 for v in views)):
+        QtCore.QCoreApplication.processEvents()
+        Gui.updateGui()
+        time.sleep(0.2)
+    for _ in range(10):
+        Gui.updateGui()
+
+
 def export_pages(doc):
     """Each TechDraw page as a PDF beside the document, the plans read without opening FreeCAD"""
     import TechDrawGui
@@ -38,7 +52,7 @@ def export_pages(doc):
     written = []
     for page in [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]:
         page.ViewObject.show()
-        Gui.updateGui()
+        settled(page)
         path = os.path.join(folder, file_name(page.Label) + ".pdf")
         TechDrawGui.exportPageAsPdf(page, path)
         written.append(path)

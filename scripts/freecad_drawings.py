@@ -62,6 +62,41 @@ def overall_dimensions(doc, page, view, box, upright):
     return made
 
 
+# Each view of an item, first angle, in the axes of the document (x along the wall, y towards it, z up) : the
+# direction it's seen from, then the way the sheet's right runs. The left view has the front of the item on its right
+ITEM_AXES = {"front": ((0, -1, 0), (1, 0, 0)), "top": ((0, 0, 1), (1, 0, 0)), "left": ((-1, 0, 0), (0, -1, 0))}
+
+
+def boards_of(sub, nested):
+    out = []
+    for o in sub.Group:
+        if (o.TypeId == "App::Link"):
+            out.append(o)
+        elif (nested and o.TypeId == "Assembly::AssemblyObject" and o.Name.startswith("Sous_ensemble")):
+            out.extend(boards_of(o, True))
+    return out
+
+
+def item_view(doc, page, spec, assemblies):
+    """An item whole, or its own boards alone without the fronts built on the bench, where the sheet has it"""
+    sub = assemblies[spec["item"]]
+    # TechDraw projects no assembly given whole : its links are, down into what was built on the bench, all but the
+    # bought hardware the sheet doesn't draw on these views
+    source = boards_of(sub, spec["whole"])
+    view = doc.addObject("TechDraw::DrawViewPart", "Vue")
+    view.Label = f"{sub.Label}, {spec['view']}{'' if spec['whole'] else ', façades déposées'}"
+    page.addView(view)
+    view.Source = source
+    direction, right = ITEM_AXES[spec["view"]]
+    view.Direction, view.XDirection = App.Vector(*direction), App.Vector(*right)
+    view.ScaleType = "Custom"
+    view.Scale = 1 / spec["scale"]
+    box = spec["box"]
+    view.X = box["x"] + box["w"] / 2
+    view.Y = A3_H - (box["y"] + box["h"] / 2)
+    return view
+
+
 # One column of the table of holes, the same lines as the sheet, its top left where the sheet have it
 def table(doc, page, column, k):
     sheet = doc.addObject("Spreadsheet::Sheet", "Usinages")
@@ -129,9 +164,15 @@ def make_drawings(doc, model, bodies):
     with open(template_path, "w", encoding="utf-8") as f:
         f.write(model["template"])
     made = []
+    # Each item's own assembly, by the item's id : the PBS gives its code, the assembly carries the code
+    codes = {a["item"]: a["code"][:4] for a in model["assemblies"] if not a.get("parent")}
+    by_code = {o.Label2: o for o in doc.Objects if o.TypeId == "Assembly::AssemblyObject"
+               and o.Name.startswith("Sous_ensemble")}
+    assemblies = {item: by_code[code] for item, code in codes.items() if code in by_code}
     for spec in model.get("drawings", []):
         # A run on of a table has no view of its own, still its lines
-        if (not (spec["views"] or spec["tables"]) or (only is not None and not only.search(spec["title"]))):
+        if (not (spec["views"] or spec["tables"] or spec.get("items"))
+                or (only is not None and not only.search(spec["title"]))):
             continue
         template = doc.addObject("TechDraw::DrawSVGTemplate", "Gabarit")
         template.Template = template_path
@@ -158,6 +199,8 @@ def make_drawings(doc, model, bodies):
             doc.recompute()
             # u up the sheet : a front drawn standing
             overall_dimensions(doc, page, view, box, v["su"][1] != 0)
+        for v in spec.get("items", []):
+            item_view(doc, page, v, assemblies)
         for k, column in enumerate(spec["tables"]):
             table(doc, page, column, k)
         if (spec.get("overlay")):

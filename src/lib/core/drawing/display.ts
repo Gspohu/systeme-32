@@ -1,6 +1,6 @@
 // Display list in page millimetres, y down, rendered to SVG on screen and to PDF for the workshop
 
-import type { PartView } from "./draft";
+import type { ItemView, PartView } from "./draft";
 import type { PlacedColumn } from "./machining_table";
 
 export type Stroke = "thin" | "normal" | "thick" | "dashed" | "hidden" | "centre";
@@ -26,6 +26,7 @@ export interface Page
     views?: PartView[];
     tables?: PlacedColumn[];
     marks?: Prim[];
+    items?: ItemView[];
 }
 
 

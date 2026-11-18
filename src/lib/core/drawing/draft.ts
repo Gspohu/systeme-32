@@ -18,6 +18,18 @@ export interface Draft
     tables?: PlacedColumn[];
     // What the sheet writes and draws over and around its views, laid as it's over the TechDraw page
     marks?: Prim[];
+    items?: ItemView[];
+}
+
+// An item seen whole or without its fronts, first angle, its box on the sheet in mm. Its dimensions stay in the
+// marks : measured on the whole assembly they took in fillers, handles and screws
+export interface ItemView
+{
+    item: string;
+    whole: boolean;
+    view: "front" | "top" | "left";
+    scale: number;
+    box: { x: number; y: number; w: number; h: number };
 }
 
 // A board seen from face A at a drafting scale, its box on the sheet in mm from the top left corner

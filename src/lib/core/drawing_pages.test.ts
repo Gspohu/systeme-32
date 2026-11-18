@@ -48,6 +48,26 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             }
         });
 
+        it("gives each carcass its 4 views, whole and without its fronts, inside the frame", () =>
+        {
+            const carcasses = p.items.filter((it) => { return it.kind === "carcass"; });
+            expect(carcasses.length).toBeGreaterThan(0);
+            for (const k of carcasses)
+            {
+                const pg = pages.find((x) => { return x.title === `${k.name}, vues`; });
+                expect(pg?.items?.map((v) => { return `${v.view}${v.whole ? "" : " nue"}`; }).sort(), k.name)
+                    .toEqual(["front", "front nue", "left", "top"]);
+                for (const v of pg!.items!)
+                {
+                    expect(v.item).toBe(k.id);
+                    expect(v.box.x > 0 && v.box.y > 0 && v.box.x + v.box.w < A3.w && v.box.y + v.box.h < A3.h,
+                           `${k.name} ${v.view}`).toBe(true);
+                }
+                // The marks keep the titles and the tables, the projected boards left to TechDraw
+                expect(pg!.marks!.length).toBeLessThan(pg!.prims.length);
+            }
+        });
+
         it("fills every field of the template with what the sheet prints", () =>
         {
             const fields = editable(sheetTemplate(p));
