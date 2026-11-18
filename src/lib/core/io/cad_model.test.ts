@@ -128,7 +128,8 @@ describe("the bought articles of the CAD export", () =>
             // is no solid
             const apart = new Set(["609.1500", "606N", "SCREW_4x35", "SCREW_4x30", "SCREW_2.5x16", "SCREW_4x16",
                                    "WALL_SCREW_5x50", "WALL_SCREW_5x50_PAN",
-                                   "WASHER_5x20", "LED_LEAD", "GLUE_PU"]);
+                                   "WASHER_5x20", "LED_LEAD", "GLUE_PU", "GLUE_WOOD", "GLUE_CYANO", "TAPE_DOUBLE",
+                                   "RESIN_CHEM"]);
             expect([...new Set(b.hardware.map((h) => { return h.ref; }))].filter((r) =>
             {
                 return !placedRefs.has(r) && !apart.has(r);

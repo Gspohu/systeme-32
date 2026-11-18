@@ -79,17 +79,21 @@ describe("solid wood bought by the whole board", () =>
     });
 
 
-    it("screws each filler cleat of the dresser on 4 rows, half the 7 it had", () =>
+    it("screws each filler cleat of the dresser on 4 rows into its side, the filler glued on it", () =>
     {
-        // Far too many for a hidden strip. A row is a screw into the side and one into the filler
+        // 4 rows, half the 7 it had. The filler is glued on the cleat : screwed from the back edge of the cleat, its
+        // screws stood in the gap between the side and the wall, shut once the carcass is in
         const b = analyse(dresser()).build;
         for (const q of b.parts.filter((x) => { return x.label.startsWith("Tasseau du fileur"); }))
         {
             expect(q.holes.filter((h) => { return h.face === "B" && h.purpose === "cleat-screw"; })).toHaveLength(4);
-            expect(q.holes.filter((h) => { return h.face === "v0" && h.purpose === "cleat-screw"; })).toHaveLength(4);
+            expect(q.holes.filter((h) => { return h.face === "v0"; })).toHaveLength(0);
         }
-        expect(b.hardware.filter((h) => { return h.purpose === "cleat-screw" && h.note?.includes("fileur") === true; })
-            .map((h) => { return h.qty; })).toEqual([4, 4, 4, 4]);
+        const mine = b.hardware.filter((h) => { return h.purpose === "cleat-screw" &&
+                                               h.note?.includes("fileur") === true; });
+        expect(mine.filter((h) => { return h.ref === "SCREW_4x30"; }).map((h) => { return h.qty; })).toEqual([4, 4]);
+        expect(mine.filter((h) => { return h.ref === "GLUE_PU"; })).toHaveLength(2);
+        expect(mine.some((h) => { return h.ref.startsWith("WALL_SCREW"); })).toBe(false);
     });
 
 

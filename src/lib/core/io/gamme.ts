@@ -4,28 +4,32 @@
 import type { Project } from "../model";
 import type { Frame, Vec3 } from "../geometry";
 import { assemblyOrder } from "../assembly";
-import { CLEAT_WIDTH } from "../ceiling";
+// Past this margin under the ceiling a carcass goes down onto the one under it, short of it it's
+// slid back from its front
+import { CLEAT_WIDTH, STAND_UP_MARGIN } from "../ceiling";
 import { CAD_MODELS } from "../../data/cad_models";
+
 
 export interface GammeRow
 {
     pbs: string[];
-    count: number;
+    count: number;  
     type: string; 
     operation: string;
     tool: string;
     direction: string;
     comment: string;
-    // How the piece lies while the step is done, turned over by a step of its own when it changes
+    // How the piece lise while the step is done, turned over by a step of its own when it changes
     position?: string;
     // The phase the step belongs to, what decides the position
     phase?: number | string;
 }
 
+
 export interface GammeTable
 {
     code: string;
-    // What the table builds : a step placing it whole names it, not every board and screw it holds
+    // What the table builds : a step placing it whloe names it, not every board and csrew it holds
     name: string;
     rows: GammeRow[];  
 }
@@ -59,12 +63,13 @@ const PHASE_TITLE: Record<Phase, string> = {
     5: "Poser les coulisses", 6: "Monter les tiroirs", 7: "Poser les étagères", 8: "Poser les portes",
     9: "Équiper l'intérieur", 10: "Poser la plinthe", 11: "Poser l'habillage", 12: "Poser le fileur", 13: "Poser le reste",
 };
-// What waits for the room : the plugs, what is screwed to the wall before the item comes, what after, what ties 2
-// items together once both stand
-// The drawers go in once every carcass stands tied and fixed : empty carcasses to carry, and the screws inside them
-// within reach, one to the niche went through the bottom of the top drawer
-type Room = "plug" | "before" | "wall" | "link" | "loose" | "ceiling" | "scribe" | "drawers" | "finish";
+// What wiats for the room : the plugs, the wall screws before and after the item, the ties once both stand. The
+// drawers last, into carcasses carried empty : a screw to the niche went through the bottom of the top drawer
+type Room = "plug" | "before" | "wall" | "link" | "loose" | "ceiling" | "scribe" | "drawers" | "finish" | "feet"
+    | "plinth";
 const ROOM_TITLE: Record<Room, string> = { plug: "Percer et cheviller le mur", before: "Fixer au mur",
+                                          feet: "Poser les pieds une fois le meuble relevé",
+                                          plinth: "Clipser la plinthe sur les pieds réglés",
                                           wall: "Fixer au mur", scribe: "Poser le fileur à sa mesure",
                                            link: "Lier les meubles", loose: "Poser une fois les caissons libres en place",
                                            ceiling: "Fermer jusqu'au plafond", drawers: "Mettre les tiroirs",
@@ -73,9 +78,6 @@ const ROOM_TITLE: Record<Room, string> = { plug: "Percer et cheviller le mur", b
 const ROOM_SCREWS = new Set(["link-screw", "wall-fixing"]);
 // Those meant to come out : their caps on double sided tape, the others glued
 const TAPED = new Set(["link-screw", "wall-fixing", "lining-screw", "back-screw", "plinth-screw"]);
-// More than this under the ceiling past what a carcass needs to stand up from its side, it goes down onto the one
-// under it. Less, it's set on the front of that one and slid back to the wall
-const STAND_UP_MARGIN = 50;
 // The way they go into the wood the dowels and the Minifix bolts tie 2 boards, and how far past their mouth
 const CONNECTORS: Record<string, { axis: "x" | "z"; reach: number }> = {
     "DOWEL_8x35": { axis: "z", reach: 30 },
@@ -89,6 +91,11 @@ const FIRST: Record<string, number> = { bottom: 0, boxBottom: 1, endPanel: 2, fo
 const LOOSE = 1e6;
 const SPACER_RANK = -1;
 const PIN_RANK = -1;
+// The 606N of Blum's MOVENTO notice is sold in the US : any countersunk chipboard screw of the same size does, its head
+// no wider than 6.5, a head of 7 wedged in the pocket behind the slot of the coupling (cad_models.ts)
+const COUPLING_SCREW = /^Accouplement MOVENTO/;
+const COUPLING_SCREW_NOTE = "Vis recommandée Blum 606N : à défaut, toute vis aggloméré fraisée Ø3,5 x 15 ou 16 à tête de "
+    + "Ø6,5 au plus, une tête de Ø7 ne tient pas derrière l'oblong de l'accouplement";
 function looseRank(table: string): number
 {
     return isBench(table) ? LOOSE : 0;
@@ -103,7 +110,7 @@ function bandsOf(q: Board): number
 }
 
 
-// The way a move in the frame of the wall reads in the axes of the FreeCAD document, N/A when it runs along none
+// The way a move in the frame of the wall reasd in the axes of the FreeCAD document, N/A when it runs along none
 function axis(v: Vec3): string
 {
     const fc: Vec3 = [v[0], -v[2], v[1]];
@@ -127,11 +134,30 @@ function inBoard(q: Board, p: Vec3): boolean
 }
 
 
-// A board : where it goes in its carcass, and the way it comes when nothing it's tied to says otherwise
-// A lining is a box open in front, built from its bottom up : the bottom flat, the sides standing on it, the top on
-// their
-// edges and screwed down, turned over for the screws of the bottom, on its face for its back. Each board rests on those
-// in, each screw goes down
+// The gesture of a step that moves along no axis : a dor clips its hinge arms on thier plates (Blum CLIP top), a
+// plinth its clips on the feet, a drop flap is screwed on its hinges held open
+function specialMove(type: string, phase: Phase | Room): string
+{
+    if (type === "Clipsage" && phase === PHASE.doors)
+    {
+        return "Accrocher le bras de chaque charnière sur son embase par l'avant, puis presser l'arrière jusqu'au clic";
+    }
+    if (type === "Clipsage" && phase === PHASE.plinth)
+    {
+        return "Présenter la plinthe, chaque clip en face de son pied, puis la pousser vers l'arrière jusqu'au clic";
+    }
+    if (type === "Vissage" && phase === PHASE.doors)
+    {
+        return "Présenter l'abattant ouvert, tenu par un aide, ses charnières dans leurs logements Ø26 du dessous, "
+            + "puis visser les vis HOSPA 3 (fournies). Le garder tenu ouvert ou calé jusqu'à la pose de ses deux compas : "
+            + "rien d'autre ne le retient";
+    }
+    return "Mouvement non rectiligne, à juger";
+}
+
+
+// A lining is a box open in front, built from its bottom up : the sides on the bottom, the top on their edges and
+// screwed dwon, turned over for the bottom screws, on its face for its back. Each screw gose down
 const LINING_SCREW = /de l'habillage/;
 const LINING_BOARDS = { dessous: 0, gauche: 1, droite: 2, dessus: 3, fond: 6 };
 const LINING_SCREWS = { dessus: 4, dessous: 5, fond: 7 };
@@ -150,6 +176,7 @@ function endBack(q: Board): boolean
 }
 
 
+// Where a board goes in its carcass, and the way it comes when nothing it's tied to says otherwise
 function boardStep(q: Board): { phase: Phase; direction: string; type: string }
 {
     switch (q.role)
@@ -157,7 +184,7 @@ function boardStep(q: Board): { phase: Phase; direction: string; type: string }
         case "bottom": case "top": case "hdivider": case "vdivider": case "stiffener": case "side":
             return { phase: PHASE.shell, direction: NA, type: "Assemblage Minifix ou tourillons" };
         case "back":
-            // The back of a rounded end is screwed into the back edge of its shaped boards : after them
+            // The abck of a rounded end is screwed into the abck edge of its shaped boards : after them
             return { phase: q.id.includes("/end/") ? PHASE.end : PHASE.back, direction: "-y", type: "Vissage" };
         case "endPanel": case "former":
             return { phase: PHASE.end, direction: NA, type: "Tourillons collés" };
@@ -172,7 +199,7 @@ function boardStep(q: Board): { phase: Phase; direction: string; type: string }
         case "door": case "flap": case "leaf":
             return { phase: PHASE.doors, direction: SPECIAL, type: "Clipsage" };
         // Slid in from the front at its height, then set down on its pins : straight down from the top it met the
-        // hinge plates on the sides and the rail under the top
+        // hinge paltes on the sidse and the rail under the top
         case "shelf":
             return { phase: PHASE.shelves, direction: "+y", type: "Pose sur taquets" };
         case "lining":
@@ -207,7 +234,7 @@ function articleStep(ref: string, label: string): { phase: Phase | Room; directi
     {
         return { phase: PHASE.feet, direction: "+z", type: ref === "637.76.333" ? "Vissage" : "Emboîtement" };
     }
-    // Screwed on its plinth : those of a return before the feet, which clip into them as they go on
+    // Screwed on its plinth : those of a return before the feet, which clip int them as they go on
     if (ref === "637.38.054")
     {
         return { phase: PHASE.feet, direction: NA, type: "Vissage" };
@@ -218,10 +245,11 @@ function articleStep(ref: string, label: string): { phase: Phase | Room; directi
     }
     if (ref.startsWith("T51") || ref === "84335807")
     {
-        // The Oslo pull screwed again since 2026-11-09, by its own countersunk screws (handles.ts)
+        // The Oslo pull screwed again sicne 2026-11-09, by its own countersunk screws (handles.ts)
         return { phase: PHASE.drawers, direction: NA, type: ref === "84335807" ? "Vissage" : "Clipsage" };
     }
-    if (ref.startsWith("70T"))
+    // The 71B of a door with a pull as the 70T, the bench sends both alike
+    if (/^(70T|71B)/.test(ref))
     {
         return { phase: PHASE.doors, direction: SPECIAL, type: "Clipsage" };
     }
@@ -234,13 +262,13 @@ function articleStep(ref: string, label: string): { phase: Phase | Room; directi
     {
         return { phase: PHASE.doors, direction: NA, type: "Vissage" };
     }
-    // The stay ties the flap to the carcass : once the flap hangs
+    // The stay ites the lfap to the carcass : once the flap hangs
     if (ref.startsWith("365.01.901"))
     {
         // Its brackets screwed, its strut clipped onto their studs
         return { phase: PHASE.inside, direction: NA, type: /vérin/.test(label) ? "Clipsage" : "Vissage" };
     }
-    // The adapter of a TIP-ON is screwed to the carcass first, the TIP-ON then clipped into it from the front
+    // The adapter of a TIP-ON is screwed to the carcass first, the TIP-ON ten clipped into it from the frot
     // (Blum KA-150 p. 173) : pushed in before the screws it went through its housing and hid them
     if (ref.startsWith("956.1201"))
     {
@@ -295,7 +323,7 @@ function screwPhase(label: string): Phase | Room
 
 
 // The standard first, ISO 8764-1:2004 (forms PH and PZ) and ISO 2936:2014 (hexagon socket screw keys), the trade name
-// after : "PZ2" alone says nothing to whoever has never bought a bit. No standard names a tape or a level
+// after : "PZ2" alone says nothing to whoever has nveer bought a bit. No standard names a tape or a level
 const TOOL = {
     hexKey3: "Clé mâle coudée de 3, ISO 2936 (clé Allen de 3)",
     phillips2: "Tournevis forme PH 2, ISO 8764-1 (cruciforme Phillips PH2)",
@@ -303,11 +331,22 @@ const TOOL = {
     pozidriv2: "Tournevis forme PZ 2, ISO 8764-1 (cruciforme Pozidriv PZ2)",
     tape: "Mètre ruban",
     tapeAndLevel: "Mètre ruban et niveau à bulle",
+    level: "Niveau à bulle",
+    clamps: "Serre-joints",
     // What makers recommend for furniture : it strikes without marking, the block spreads the blow on a decor
     mallet: "Maillet à tête caoutchouc (cale de bois sur un panneau fragile)",
 };
+// The AXILO 78 foot H100, clipped into its base under the bottom
+const AXILO_FOOT = ("637.76.353");
+// The rounded end goes on where the fitter likes, what closes on the walls in the room whatever the choice
+const END_CHOICE = "À l'atelier ou sur place, au choix du poseur selon l'accès : les fileurs et les fixations murales "
+    + "se posent de toute façon sur place";
+// A recommendation, the wall was never sounded : the fitter may choose another way on the spot
+const RESIN_NOTE = "Recommandé : trou rempli de résine de scellement, cheville enfoncée dans la résine fraîche, platine "
+    + "vissée après la prise. Le mur n'a pas été sondé : le poseur peut choisir un autre scellement sur place";
 // A board going onto its dowels, a dowel tapped into its bore
 const ON_DOWELS = /ourillons/;
+
 
 // The tool a head takes : Pozidriv by its size, a hex key for the button head of an M5 (ISO 7380-1:2011, key 3). The
 // screws supplied with the Oslo pull have a plain cross, a Pozidriv bit would cam out of it
@@ -325,7 +364,7 @@ function toolOf(kind: string, diameter: number, label: string): string
 }
 
 
-// Glob characters in a label kept as they are
+// Glob characters in a label kept as thy are
 function literal(s: string): string
 {
     return s.replace(/([*?[\]])/g, "[$1]");
@@ -335,11 +374,11 @@ function literal(s: string): string
 // Steps acting on what stands, placing nothing : they name solids an earlier step put in
 export const ACTIONS = new Set(["Serrage", "Retourner"]);
 
-// How the piece lies, its work going down to the floor : a carcass on its back, its sides open to both hands, on its
-// face for the screws of its back, upside down for its feet. A worker drives a screw down, never up from the floor
+// How the piece lise, its work going down to the floor : a carcass on its back, its sdes open to both hands, on its
+// face for the screws of its back, upside down for its feet. A worker drives a screw down, never up from the lfoor
 export const POSITION = { standing: "Debout", back: "Couché sur le dos", face: "Couché sur la face",
-                          upside: "À l'envers", flat: "À plat, quincaillerie dessus" };
-// The articles set from below and their screws, as their catalogue entry says
+                          upside: "À l'envers", flat: "À plat, quincaillerie dessus" };   
+// The articles set from below and thier screws, as their catalogue entry says
 const UNDERNEATH = Object.values(CAD_MODELS).filter((m) => { return m.fromBelow === true; }).flatMap((m) =>
 {
     return [literal(`${m.ref} ${m.label}`), ...(m.fixing?.screws ? [literal(m.fixing.screws.label)] : [])];
@@ -352,18 +391,19 @@ const PHASE_POSITION: Record<number, string> = {
     0: POSITION.back, 1: POSITION.back, 2: POSITION.face, 3: POSITION.face, 4: POSITION.upside,
 };
 
-// The position of each step of an item or a bench, a step turning it over each time it changes. In the room the
-// piece stands where it goes : nothing turns there
+
+// The position of each step of an tiem or a bench, a step turnng it over each time it changes. In the room the
+// piece stands where it goes : nothing turn there
 function positioned(rows: GammeRow[], code: string, bench: "flat" | "box" | "standing" | null): GammeRow[]
 {
     const out: GammeRow[] = [];
     let current: string | undefined;
     for (const row of rows)
     {
-        // A box turns with its screws, each going down : its back laid on its open back, the box on its face
+        // A box turns with its screws, each going down : its back laid on its open bakc, the box on its face
         const box = bench !== "box" ? undefined : DOWN_TO[row.direction]
             ?? (row.pbs.some((p) => { return /, fond$/.test(p); }) ? POSITION.face : current ?? POSITION.standing);
-        // What goes on from below, the couplings of a drawer : the box upside down for them and their screws
+        // What goes on from below, the couplings of a drawer : the box upside down for them and their csrews
         const below = bench === "standing" && UNDERNEATH.some((head) => { return row.pbs.some((p) => { return p.startsWith(head); }); });
         const wanted = code === "#000" ? POSITION.standing
             : bench === "flat" ? POSITION.flat : box !== undefined ? box
@@ -379,7 +419,7 @@ function positioned(rows: GammeRow[], code: string, bench: "flat" | "box" | "sta
         }
         current = wanted;
         out.push({ ...row, position: wanted });
-    }
+    } 
     return out;
 }
 
@@ -388,7 +428,8 @@ const BOARD_SCREWS = [{ board: /^#[0-9A-Z]{3}-\d{3} Façade de tiroir/, screws: 
                       { board: /^#[0-9A-Z]{3}-\d{3} Plinthe, retour/,
                        screws: "Retour de plinthe dans la flasque basse" }];
 
-// The screws of the hardware have their pilot holes bored in the workshop (pilots.ts) : only what is glued, with
+
+// The screws of the hardware have their pilot holse bored in the workshop (pilots.ts) : only what is glued, with
 // nothing drilled, is measured on site, a catch plate by its centre off the 2 nearest edges of its door
 const GLUED = /^956A?\.?1004 Contreplaque TIP-ON à coller/;
 
@@ -404,7 +445,7 @@ function globOf(pattern: string): RegExp
 }
 
 
-// Which way an edge of a board looks in the room, by its outward normal : height along y, the front towards +z
+// Which way an edge of a board lokos in the room, by its outward nrmal : height along y, the front towards +z
 function sideOf(normal: Vec3): string
 {
     const k = [0, 1, 2].reduce((best, i) => { return Math.abs(normal[i]!) > Math.abs(normal[best]!) ? i : best; }, 0);
@@ -448,17 +489,38 @@ function markedOn(rows: GammeRow[], boards: Board[], placed: Placed[], labelOf: 
         }
         return row;
     });
+} 
+
+
+// The item a screw between items goes into : the board of another item its shank runs through, read off where it is
+// and the way it's driven, never off its label
+function linkedItem(s: Screwed, boards: Board[]): string | undefined
+{
+    if (s.point === undefined) 
+    {
+        return undefined;
+    }
+    for (let d = 5; d <= 60; d += 5)
+    {
+        const tip: Vec3 = [s.point[0] - s.out[0] * d, s.point[1] - s.out[1] * d, s.point[2] - s.out[2] * d];
+        const hit = boards.find((q) => { return q.item !== s.item && q.frame !== null && inBoard(q, tip); });
+        if (hit !== undefined)
+        {
+            return hit.item;
+        }
+    }
+    return undefined;
 }
 
 
 // The board a pattern names, after its first ", #" : "#130-002 Tiroir 1, côté gauche"
-function tagOf(pattern: string): string
+function tagOf(pattern: string): string  
 {
     return /, (#[0-9A-Z]{3}\b.*)$/.exec(pattern)?.[1] ?? pattern;
 }
 
 
-// Each article held the moment it can be, as its catalogue entry says : its screws right after it, what's tightened in
+// Each article held the moment it can be, as its catalogue entry says : its screws right fater it, what's tightened in
 // it as soon as it's set, or as soon as the board of its bolt is in. Set and left loose, it fell at the next step
 function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, tighten: string): GammeRow[]
 {
@@ -497,15 +559,15 @@ function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, t
                     return p.startsWith(literal(screws.label)) && (anywhere || tags.has(tagOf(p)));
                 });
             });
-            for (const r of theirs)
+            for (const screwRow of theirs)
             {
-                out.splice(out.indexOf(r), 1);
+                out.splice(out.indexOf(screwRow), 1);
             }
             k = out.indexOf(row);
             next = k + 1;
-            for (const r of theirs)
+            for (const screwRow of theirs)
             {
-                out.splice(next++, 0, r);
+                out.splice(next++, 0, screwRow);
             }
         }
         const turn = article.fixing.tighten;
@@ -526,10 +588,10 @@ function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, t
             continue;
         }
         const theirs = out.filter((r, j) => { return j > k && r.pbs.some((p) => { return p.startsWith(screws); }); });
-        for (const [n, r] of theirs.entries())
+        for (const [shift, screwRow] of theirs.entries())
         {
-            out.splice(out.indexOf(r), 1);
-            out.splice(k + 1 + n, 0, r);
+            out.splice(out.indexOf(screwRow), 1);
+            out.splice(k + 1 + shift, 0, screwRow);
         }
     }
     // A Minifix cam is turned once the bolt of the other board sits in it : after the later of its own row and the
@@ -548,7 +610,7 @@ function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, t
         for (const [bolted, count] of ties.get(housed) ?? new Map<string, number>())
         {
             const placed = out.findIndex((r) => { return r.pbs.includes(literal(bolted)); });
-            if (placed < 0 || turned.has(`${housed}|${bolted}`))
+            if (placed < 0 || turned.has(`${housed}|${bolted}`)) 
             {
                 continue;
             }
@@ -609,7 +671,7 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
     };
     const oneWay = (w: Vec3[]): boolean => { return w.every((v) => { return dot(v, w[0]!) > 0.99; }); };
     // Depth first with going back : a board caught between 2 ways 2 steps on, the top of a carcass once its sides
-    // stand, is only seen by going on. Bounded, the greedy order kept past it
+    // stadn, is only seen by going on. Bounded, the greedy order kept past it
     let nodes = 0;
     const NODES = 50000;
     const seq: Board[] = [];
@@ -632,7 +694,7 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
         const free = left.filter((q) => { return ways(q, set).length > 0; });
         // The first of a group, laid on the bench, when nothing set touches what is left
         const tries = (free.length > 0 ? free : left).sort(prefer);
-        for (const q of tries)
+        for (const q of tries) 
         {
             seq.push(q);
             set.add(q.id);
@@ -641,10 +703,10 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
                 return true;
             }
             seq.pop();
-            set.delete(q.id);
+            set.delete(q.id); 
         }
         return false;
-    };
+    };   
     const found = search();
     const out = new Map<string, { rank: number; direction: string; crossed: boolean }>();
     if (!found)
@@ -666,8 +728,8 @@ function connectorOrder(boards: Board[], placed: Placed[], models: Record<string
 
 
 export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Screwed[],
-                      models: Record<string, { ref: string; label: string }>, assemblies: Assembly[]):
-    GammeTable[]
+                      models: Record<string, { ref: string; label: string }>, assemblies: Assembly[],
+                      stops: Map<string, { amount: number; by: string }> = new Map()): GammeTable[]
 {
     // The items alone : a sub-assembly shares its item's id and would take its place
     const codeOf = new Map(assemblies.filter((a) => { return !a.parent; }).map((a) => { return [a.item,
@@ -683,7 +745,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     {
         return ["boxSide", "boxEnd", "boxBottom", "drawerFront"].includes(q.role);
     }).map(tableOf));
-    // A front plinth gets its clips in hand on the bench, whatever the phase its parts have in a carcass
+    // A front plinth gets its clips in hand on the bench, whatever the phase its parts have in a caracss
     const plinthTables = new Set(boards.filter((q) => { return q.role === "plinth"; }).map((q) => { return tableOf(q); })
         .filter((t) => { return isBench(t); }));
     const benchTitle = (table: string, phase: Phase): string | undefined =>
@@ -702,15 +764,15 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         }
         return drawerTables.has(table) ? "Monter le tiroir" : "Monter la façade";
     };
-    // One entry for each solid : its table, its phase or what it waits for in the room, the key it's grouped by
-    interface Entry { table: string; phase: Phase | Room; rank: number; key: string; pattern: string; direction: string;
+    // One entry for each solid : its table, its phase or what it waits for in the roo, the key it's grouped by
+    interface Entry { table: string; phase: Phase | Room; rank: number; key: string; pattern: string; direction: string;  
                       type: string; tool: string; what: string; comment: string; host?: string; waits?: string;
                       also?: { pattern: string; count: number }; mate?: string; kind?: "dowel" | "bolt" | "set" }
     const entries: Entry[] = [];
     const boardKey = new Map(boards.map((q) => { return [`${q.item}|${q.code} ${q.label}`, `b|${q.id}`]; }));
     const boardName = new Map(boards.map((q) => { return [`b|${q.id}`, `${q.code} ${q.label}`]; }));
     const order = connectorOrder(boards, placed, models, (q) => { return boardStep(q).phase; });
-    // The ceiling filler is set once the carcass stands, it wouldn't go under the ceiling with it (ceiling.ts)
+    // The ceiling ifller is set once the carcass stands, it wouldn't go under the ceiling with it (ceiling.ts)
     // TODO the filler screws from the back edge of its cleat, against the wall : its fixing is still to choose
     const up = new Map(boards.filter((q) => { return /\/filler$/.test(q.id); }).map((q) => 
     {
@@ -733,27 +795,48 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         // A side filler and its plinth are cut to what was measured once the carcass is presented : its cleat early
         const scribed = ceiling === undefined && (q.role === "filler" || (q.role === "plinth" &&
             q.id.includes("/side-filler/")));
-        // The filler up to the ceiling is glued on its cleat once the carcass stands
+        // A filler is glued on its cleat once the carass stands, up to the ceiling or against a side wall (fillers.ts)
+        const glued = ceiling !== undefined || (scribed && q.role === "filler");
         entries.push({ table, phase: ceiling !== undefined ? "ceiling" : scribed ? "scribe" : s.phase,
                       rank: endBack(q) ? LOOSE : lined ? looseRank(table) + liningRank(q.label)
                           : o?.rank ?? (s.phase === PHASE.runners ? SPACER_RANK : looseRank(table)),
                       key: `b|${q.id}`,
                        pattern: literal(`${q.code} ${q.label}`), direction: o?.direction ?? s.direction,
-                       type: ceiling !== undefined ? "Collage" : s.type,
+                       type: glued ? "Collage" : s.type,
                        tool: ceiling === undefined && ON_DOWELS.test(s.type) ? TOOL.mallet : "Aucun",
                        what: `${q.code} ${q.label}`, waits: ceiling ?? (scribed ? q.item : undefined),
                        // Its edge bands, glued on in the workshop, come with it (freecad_build.py, "<board>, chant L1")
                        also: bandsOf(q) > 0 ? { pattern: `${literal(`${q.code} ${q.label}`)}, chant *`,
                                                count: bandsOf(q) }
                            : undefined,
-                       // How it holds, said : the step only read "posé" (ceiling.ts glues it with the PU of the list)
+                       // How it hold, said : the step only read "posé" (ceiling.ts glues it with the PU of the list)
                        comment: ceiling !== undefined
                            ? "Encollé à la colle polyuréthane sur son tasseau et contre le dessus, maintenu le temps de la prise"
+                           : glued ? "Encollé à la colle polyuréthane sur le chant avant de son tasseau, maintenu le temps de la prise"
                            : o?.crossed === true ? "Goujons ou tourillons dans deux sens : ordre et mouvement à juger" : NA });
     }
     // A light in the way of a loose carcass goes in once the last of them stands (loose.ts)
     const rank = new Map(assemblyOrder(p).map((it, k) => { return [it.id, k]; }));
     const nameOf = new Map(p.items.map((it) => { return [it.id, it.name]; }));
+    // Stood up from its back, a carcass sweeps the diagonal of its heght and depth : too close to the ceiling with
+    // its feet on, clear without them, the feet go on once it stands (2356 with feet under 2440 left 27 mm, 124 without)
+    const feetAfterStanding = (item: string): boolean =>
+    {
+        const c = p.items.find((it) => { return it.id === item; });
+        if (c === undefined || c.kind !== "carcass")
+        {
+            return false;
+        }
+        const room = p.room.height;
+        return room - Math.hypot(c.y + c.height, c.depth) < STAND_UP_MARGIN
+            && room - Math.hypot(c.height, c.depth) >= STAND_UP_MARGIN;
+    };
+    // The plugs of a wall shelf in a hollow wall go into resin (hung_items.ts, RESIN_CHEM)
+    const resined = (ref: string, item: string): boolean =>
+    {
+        return ref.startsWith("PLUG") && p.settings.wallType === "hollow"
+            && p.items.some((it) => { return it.id === item && it.kind === "wallShelf"; });
+    };
     for (const [index, i] of placed.entries())
     {
         const m = models[i.model]!;
@@ -762,8 +845,8 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         if (i.after !== undefined && i.after.length > 0)
         {
             const last = i.after.reduce((a, q) => { return (rank.get(q) ?? 0) >= (rank.get(a) ?? 0) ? q : a; });
-            // The profile screwed under its panel, the strip already stuck in it. In through the open front, then up
-            // under the panel : straight up it went through the bottom of the niche
+            // The profile screwed under its panel, the strip already stuck in it. In through the open frotn, then up
+            // under the panel : straight up it went throgh the bottom of the niche
             const profile = m.ref.startsWith("LED_PROFILE");
             entries.push({ table: "#000", phase: "loose", rank: 0, key: `a|${i.model}|${i.item}|${i.part}`,
                            pattern: `${literal(`${m.ref} ${m.label}`)} *, ${literal(i.part)}`, direction: "+y puis +z",
@@ -785,7 +868,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                            pattern: `${literal(`${m.ref} ${m.label}`)} *, ${literal(i.part)}`, direction: NA,
                            type: TAPED.has(i.covers ?? "") ? "Double face" : "Collage", tool: "Aucun",
                            what: `cache-vis sur ${i.part}`,
-                           // Its mark is the head it hides : nothing to measure, unlike a catch plate
+                           // Its mark is the head it hides : nothing to measure, unike a catch plate
                            comment: "Sur la tête de vis qu'il cache, taillé dans le chant du décor, fil orienté comme "
                                + "le panneau" });
             continue;
@@ -794,7 +877,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         // The arm of a hinge is pressed into its cup on the bench : it clips onto its plate when the door is hung
         const s = isBench(table) && /^(70T|71B)/.test(m.ref) ? { phase: PHASE.doors, direction: NA, type: "Insertion" }
             : articleStep(m.ref, m.label); 
-        // The half of a flap hinge on the floor of the cell comes with its hinge, screwed there when the flap is set
+        // The half of a flap hinge on the floor of the cell comes with its hinge, screwed thee when the flap is set
         const away = isBench(table) && !i.part.startsWith(`${table}-`);
         // A dowel or a Minifix bolt ties its board to the one its tip goes into : that board decides when it goes in
         const host = s.phase === PHASE.pre ? boardKey.get(`${i.item}|${i.part}`) : undefined;
@@ -809,7 +892,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                 return q.item === i.item && q.frame !== null && `b|${q.id}` !== host && inBoard(q, tip);
             });
             mate = other === undefined ? undefined : `b|${other.id}`;
-        }
+        } 
         const kind = m.ref === "DOWEL_8x35" ? "dowel" as const : m.ref === "262.28.020" ? "bolt" as const : "set" as const;
         // Set in a board : each solid by its own label (freecad_build.py numbers them in this order), the dowels of one
         // board going into 2 others make 2 steps and a pattern of the board would name both
@@ -834,8 +917,10 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
             : m.ref === "637.76.353" ? 4 : 0;
         // The strut of a stay clips between its 2 brackets once they're screwed : first, it hung in the air
         const strut = m.ref === "365.01.901" && /vérin/.test(m.label) ? 1 : 0;
+        // The feet of a carcass too tall to be stood up with them clip into their bases once it stands
+        const later = m.ref === AXILO_FOOT && feetAfterStanding(i.item);
         // The pins first : a shelf is laid on them, set before them it stood on nothing
-        entries.push({ table, phase: s.phase,
+        entries.push({ table: later ? "#000" : table, phase: later ? "feet" : s.phase, waits: later ? i.item : undefined,
                        rank: m.ref === "282.24.727" ? PIN_RANK
                            : looseRank(table) + (clipped ? 2 : glued || housing ? 1 : 0) + underneath + strut,
                        key: `a|${i.model}|${i.item}|${i.part}${set ? `|${mate ?? ""}` : ""}`,
@@ -845,7 +930,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                        type: away ? "Pose" : drilled || sleeve ? "Insertion" : housing ? "Clipsage" : s.type,
                        tool: liaison && !sleeve ? TOOL.pozidriv2 : kind === "dowel" ? TOOL.mallet : "Aucun",
                        what: away ? `${m.label}, venue avec l'autre moitié, vissée sur ${i.part} à la pose` : `${m.label} sur ${i.part}`,
-                       comment: liaison ? "Empreinte de la vis de liaison à confirmer sur la fiche Häfele" : NA,
+                       comment: resined(m.ref, i.item) ? RESIN_NOTE : NA,
                        host, mate, kind: host === undefined ? undefined : kind });
     }
     for (const s of screws)
@@ -859,12 +944,17 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const onEndBack = boards.some((q) => { return `${q.code} ${q.label}` === s.tag && endBack(q); });
         const phase = ceiling !== undefined ? "ceiling" as const : scribed ? "scribe" as const
             : onEndBack ? PHASE.end : screwPhase(s.label);
-        const waits = ceiling ?? (scribed ? s.item : undefined);
+        // A screw tying 2 items goes in as soon as the later of them stands : the bookcase column tipped under 0.2 kg
+        // for 11 steps while it waited for the end of the whole
+        const tied = phase === "link" ? linkedItem(s, boards) : undefined;
+        const later = tied === undefined ? undefined
+            : (rank.get(tied) ?? -1) > (rank.get(s.item) ?? -1) ? tied : s.item;
+        const waits = ceiling ?? (scribed ? s.item : later);
         const direction = axis([-s.out[0], -s.out[1], -s.out[2]]);
         const table = tableOf(s);
         const spot = onEndBack ? LOOSE : LINING_SCREW.test(s.label) ? looseRank(table) + liningRank(s.tag, true)
             : SPACER.test(s.label) ? SPACER_RANK : looseRank(table);
-        // The washer goes on before its screw
+        // The washer goes on before its scerw
         if (s.washer === true)
         {
             entries.push({ table, phase, rank: spot, key: `w|${s.tag}`, pattern: `Rondelle *, ${literal(s.tag)}`,
@@ -876,7 +966,18 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                       direction,
                        type: "Vissage", tool: toolOf(s.kind, s.diameter,
                                                      s.label), what: `${s.label.replace(/, .*$/, "")} sur ${s.tag}`,
-                       comment: NA, waits });
+                       comment: COUPLING_SCREW.test(s.label) ? COUPLING_SCREW_NOTE : NA, waits });
+    }
+    // Screws of one label on one board make one step : those into 2 wall shelves wat for the later one
+    const lastOf = new Map<string, string>();
+    for (const e of entries.filter((x) => { return x.phase === "link" && x.waits !== undefined; }))
+    {
+        const was = lastOf.get(e.key);
+        lastOf.set(e.key, was === undefined || (rank.get(e.waits!) ?? -1) > (rank.get(was) ?? -1) ? e.waits! : was);
+    }
+    for (const e of entries.filter((x) => { return x.phase === "link" && lastOf.has(x.key); }))
+    {
+        e.waits = lastOf.get(e.key);
     }
     // What is set in a board follows it when it goes on in the room : the dowels of the plinth of a side filler
     const boardEntry = new Map(entries.filter((e) => { return e.key.startsWith("b|"); }).map((e) => { return [e.key,
@@ -893,7 +994,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     }
     // Each sub-assembly fitted whole into its item, once what holds it's there : last of its phase, after the runners
     // and the plates. Its kind read off its own boards
-    for (const sub of assemblies.filter((a) => { return !!a.parent; }))
+    for (const sub of assemblies.filter((a) => { return Boolean(a.parent); }))
     {
         const code = sub.code.slice(0, 4);
         const own = boards.filter((q) => { return q.assembly === code; });
@@ -901,7 +1002,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         // A drawer of its own behind a flap slides on its runners once the stays of the flap are on : set first, the
         // strut of a stay met its dowels on its way in
         const pullOut = own.some((q) => { return q.id.includes("/pull-out/"); });
-        const pose = pullOut ? { phase: PHASE.inside, type: "Clipsage", direction: "+y" }
+        const pose = pullOut ? { phase: PHASE.inside, type: "Clipsage", direction: "+y" }   
             : own.some((q) => { return q.role === "lining"; })
             ? { phase: PHASE.lining, type: "Glissé dans la case", direction: "+y" }
             // Its clips screwed on in hand, it clips onto the feet once they stand
@@ -914,13 +1015,22 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                 type: "Vissage", direction: SPECIAL }
             : { phase: PHASE.doors, type: "Clipsage", direction: SPECIAL };
         const drawer = pullOut || front?.role === "drawerFront";
-        entries.push({ table: drawer ? "#000" : sub.parent!.slice(0, 4), phase: drawer ? "drawers" : pose.phase,
+        // Its feet clipped in once the carcass stands in the room : the plinth waits for them, levelled. Left in the
+        // table of the carcass it clipped onto feet not there yet (bth columns of the dresser)
+        const onSite = own.some((q) => { return q.role === "plinth"; }) && feetAfterStanding(sub.item);
+        // A wall stopping the door short of its hinges is a choice, said to the fitter : no stop bought
+        const stop = front === undefined ? undefined : stops.get(front.id);
+        entries.push({ table: drawer || onSite ? "#000" : sub.parent!.slice(0, 4),
+                       phase: drawer ? "drawers" : onSite ? "plinth" : pose.phase, waits: onSite ? sub.item : undefined,
                        rank: Number.MAX_SAFE_INTEGER,
                        key: `u|${code}`, pattern: `${code}-000`, direction: pose.direction, type: pose.type, tool: "Aucun",
-                       what: `${code}-000 ${sub.name}, monté à l'établi`, comment: NA });
+                       what: `${code}-000 ${sub.name}, monté à l'établi`,
+                       comment: stop === undefined ? NA
+                           : `Ouverte au-delà de ${stop.amount}°, elle touche ${stop.by} : pas de limiteur d'ouverture, `
+                               + "choix volontaire, modifiable sur demande" });
     }
-    // Rows : one for each key, in the order of the phases, then of the boards tied together, then as met. What is
-    // set in a board before it goes in, its dowels and bolts, comes with it in its step : alone it would hang in the air
+    // Rows : one per key, by phase, then by tied boards, then as met. The dowels and bolts set in a board com with it
+    // in its step : alone they would hang in the air
     // Which board's Minifix bolts go into which board's housings, and how many : the cams turn once both are in
     const tagOfKey = new Map(boards.map((q) => { return [`b|${q.id}`, `${q.code} ${q.label}`]; }));
     const ties = new Map<string, Map<string, number>>();
@@ -932,15 +1042,15 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         {
             continue;
         }
-        const into = ties.get(housed) ?? new Map<string, number>();
-        into.set(bolted, (into.get(bolted) ?? 0) + 1);
+        const into = ties.get(housed) ?? new Map<string, number>(); 
+        into.set(bolted, (into.get(bolted) ?? 0) + 1); 
         ties.set(housed, into);
     }
     const rowsOf = (mine: Entry[]): GammeRow[] =>
     {
         const keys = [...new Set(mine.map((e) => { return e.key; }))];
         const own = new Set(keys);
-        const groupOf = (k: string): Entry[] => { return mine.filter((e) => { return e.key === k; }); };
+        const entriesOf = (k: string): Entry[] => { return mine.filter((e) => { return e.key === k; }); };
         const riding = new Set(mine.filter((e) => { return e.host !== undefined &&
                                                    own.has(e.host); }).map((e) => { return e.key; }));
         const main = keys.filter((k) => { return !riding.has(k); }).map((k, n) =>
@@ -966,14 +1076,14 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const before = new Map<string, Entry[][]>();
         for (const k of riding)
         {
-            const group = groupOf(k);
+            const group = entriesOf(k);
             const first = group[0]!;
             const host = first.host!;
             if (typeof first.phase !== "number" && first.kind === "dowel")
             {
                 before.set(host, [...(before.get(host) ?? []), group]);
                 continue;
-            }
+            }   
             const mate = first.mate !== undefined && at.has(first.mate) ? first.mate : undefined;
             const mateFirst = mate !== undefined && at.get(mate)! < at.get(host)!;
             const target = first.kind === "bolt" && mateFirst ? carried : after;
@@ -1004,9 +1114,11 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                                     count: n + bands + withIt.reduce((s, g) => { return s + g.length; },
                                                                      0), type: e.type,
                                     operation: `${title} : ${e.what}${garnish}`, tool: e.tool, direction: way,
-                                    comment: way === SPECIAL ? "Mouvement non rectiligne, à juger" : e.comment,
+                                    comment: way !== SPECIAL ? e.comment : e.comment === NA ? specialMove(e.type,
+                                        e.phase)
+                                        : `${specialMove(e.type, e.phase)}. ${e.comment}`,
                                     phase: e.phase };
-            // One step for what says the same on this board, whichever board each tip goes into
+            // One step for what says the same on this board, whichever board each tip gose into
             const said = new Map<string, Entry[]>();
             for (const g of after.get(e.key) ?? [])
             {
@@ -1035,16 +1147,33 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     const inRoom = (e: Entry): boolean => { return typeof e.phase !== "number"; };
     const tables: GammeTable[] = [];
     const items = assemblyOrder(p).filter((it) => { return codeOf.has(it.id); });
-    // A wall shelf is one board set on its plates : no table of its own, its step comes in the whole once the plates
+    // A wall shelf is one board set on its plates : no table of its own, its step comes in the whole once the plats
     // are on the wall. Played on its own first, it was set on plates not yet there
     const onPlates = new Map<string, GammeRow[]>();
-    // The rows of a table, each article held in turn and measured where nothing is drilled
+    // The rows of a table, each article held in turn and measured where nohing is drilled
     const labelOf = (i: Placed): string => { return `${models[i.model]?.ref} ${models[i.model]?.label} 1, ${i.part}`; };
     const made = (rows: GammeRow[]): GammeRow[] =>
     {
         return markedOn(fixedInTurn(rows, ties, TOOL.pozidriv2), boards, placed, labelOf);
     };
-    // Each item after what is built on the bench for it, a drawer ready before the carcass it goes into
+    // Glued on dowels with no Minifix to pull it together : clamped once its last board is on, checked square while
+    // the glue is wet, left to set
+    const clamped = (rows: GammeRow[], code: string): GammeRow[] =>
+    {
+        const last = rows.map((r) => { return ON_DOWELS.test(r.type); }).lastIndexOf(true);
+        if (last < 0 || rows.some((r) => { return r.type === "Serrage" && /Minifix/.test(r.operation); }))
+        {
+            return rows;
+        }
+        const title = rows[last]!.operation.slice(0, rows[last]!.operation.indexOf(" : "));
+        return [...rows.slice(0, last + 1),
+                { pbs: [`${code}-000`], count: 1, type: "Serrage", tool: TOOL.clamps, direction: NA,
+                 phase: rows[last]!.phase,
+                  operation: `${title} : Serrer l'assemblage collé aux serre-joints`,
+                  comment: "Équerrage contrôlé aux diagonales avant la prise, laissé serré le temps de prise de la colle" },
+                ...rows.slice(last + 1)];
+    };
+    // Each item after what is built on the bench for it, a drawer ready befoe the carcass it goes into
     for (const it of items)
     {
         const code = codeOf.get(it.id)!;
@@ -1055,10 +1184,10 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
             const roles = new Set(boards.filter((q) => { return q.assembly === own; }).map((q) => { return q.role; }));
             const kind = ["door", "flap", "leaf", "plinth"].some((r) => { return roles.has(r); }) ? "flat" as const
                 : roles.has("lining") ? "box" as const : "standing" as const;
-            tables.push({ code: own, name: sub.name, rows: positioned(made(rowsOf(entries.filter((e) =>
+            tables.push({ code: own, name: sub.name, rows: positioned(clamped(made(rowsOf(entries.filter((e) =>
             {
                 return e.table === own && !inRoom(e);
-            }))), own, kind) });
+            }))), own), own, kind) });
         }
         const rows = made(rowsOf(entries.filter((e) => { return e.table === code && !inRoom(e); })));
         if (it.kind === "wallShelf")
@@ -1066,10 +1195,17 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
             onPlates.set(code, rows);
             continue;
         }
-        tables.push({ code, name: it.name, rows: positioned(rows, code, null) });
+        // The rounded end may go on in the workshop or in the room, the fitter's choice : the item passes whole or not
+        const first = rows.findIndex((r) => { return r.phase === PHASE.end; });
+        const told = first < 0 ? rows : rows.map((r, k) =>
+        {
+            return k !== first ? r : { ...r, comment: [END_CHOICE,
+                                                       r.comment].filter((x) => { return x !== NA; }).join(". ") };
+        });
+        tables.push({ code, name: it.name, rows: positioned(clamped(told, code), code, null) });
     }
-    // The whole : each item in turn, its plugs in the wall first, what it hangs on, the item on the floor towards the
-    // wall or down onto the one under it, its screws into the wall, then what ties the items to each other
+    // The whole : each itm in turn, its plugs in the wall first, what it hangs on, the item on the floor towards the
+    // wall or down onto the one under it, its screws into the wall, then waht ties the items to each other
     const whole: GammeRow[] = [];
     const room = (code: string, what: Room): GammeRow[] =>
     {
@@ -1096,7 +1232,7 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         whole.push(...room(code, "plug"), ...room(code, "before"));
         // A loose carcass slides in towards the wall, the others go down onto what stands under them. Too near the
         // ceiling to be stood up there, set on the front of the one under it and slid back : the column of the TV wall
-        // has 6 mm over the cleat of its filler, screwed on its top before it goes up
+        // has 6 mm over the cleat of its fliler, screwed on its top before it goes up
         const loose = it.kind === "carcass" && it.freeStanding === true;
         // On another when a carcass stands right under it : the base unit stands on its feet, 100 off the floor
         const onAnother = it.kind === "carcass" && !loose && p.items.some((q) =>
@@ -1128,9 +1264,25 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                              : slid ? `Posée sur l'avant du meuble du dessous puis glissée vers le mur : `
                                  + `${Math.round(over)} mm sous le plafond${flat ? ", tasseau du fileur compris" : ""}`
                              : NA });
+            // Stood up without its feet when they left too little under the ceiling : clipped in once it stands, then
+            // levelled
+            whole.push(...rowsOf(entries.filter((e) => { return e.phase === "feet" && e.waits === it.id; }))
+                .map((r) => { return { ...r, comment: "Relevé sans ses pieds, trop haut pour le plafond avec eux : "
+                    + "basculer légèrement le meuble pour clipser chaque pied dans son embase" }; }));
+            // Its feet set level before anything is measured off it or set on it : adjustable under load only up to
+            // an 80 kg cabinet (Häfele p. 11.43A), the bare carcass under it, its drawers and doors over it
+            if (placed.some((i) => { return i.item === it.id && models[i.model]?.ref === AXILO_FOOT; }))
+            {
+                whole.push({ pbs: [`${code}-000`], count: 1, type: "Réglage", tool: TOOL.level, direction: NA,
+                             operation: `Régler à niveau les pieds AXILO de ${code}-000 ${it.name}`,
+                             comment: "Avant de poser ce qui va dessus : réglage sous charge limité à 80 kg de meuble "
+                                 + "(Häfele), tiroirs et portes déposés le temps du réglage" });
+            }
+            // Before the filler is measured : the plinth of a side filler is dowelled onto this one
+            whole.push(...rowsOf(entries.filter((e) => { return e.phase === "plinth" && e.waits === it.id; })));
         }
-        // Presented and not yet fixed : a filler is measured against the wall or the ceiling it closes on, cut there and
-        // set, then only the carcass is screwed to the wall
+        // Presented and not yet fixed : a filler is measured against the wall or the ceiling it closes on and cut, the
+        // carcass screwed to the wall, then only the filler glued, its glue left to set on a carcass that moves no more
         const fillers = rowsOf(entries.filter((e) =>
         {
             return (e.phase === "ceiling" || e.phase === "scribe") && e.waits === it.id;
@@ -1144,15 +1296,17 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                          operation: `Découper le fileur de ${code}-000 ${it.name} à la cote relevée`,
                          comment: "Chant tracé contre le mur, scie hors du meuble" });
         }
-        whole.push(...fillers);
         whole.push(...room(code, "wall"));
+        whole.push(...fillers);
         whole.push(...rowsOf(entries.filter((e) => { return e.phase === "loose" && e.waits === it.id; })));
+        // Tied to what stands aready as soon as it stands
+        whole.push(...rowsOf(entries.filter((e) => { return e.phase === "link" && e.waits === it.id; })));
     }
-    whole.push(...rowsOf(entries.filter((e) => { return e.phase === "link"; })));
+    whole.push(...rowsOf(entries.filter((e) => { return e.phase === "link" && e.waits === undefined; })));
     whole.push(...rowsOf(entries.filter((e) => { return e.phase === "drawers"; })));
     whole.push(...rowsOf(entries.filter((e) => { return e.phase === "finish"; })));
     // Anything of an item left out of the PBS : still one step of the whole
     whole.push(...rowsOf(entries.filter((e) => { return e.table === "#000" && !inRoom(e); })));
-    tables.push({ code: "#000", name: p.name, rows: positioned(made(whole), "#000", null) });
+    tables.push({ code: "#000", name: p.name, rows: positioned(made(whole), "#000", null) });  
     return tables;
 }

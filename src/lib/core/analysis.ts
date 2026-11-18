@@ -126,12 +126,12 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         const person = it.seat === null ? 0 : SEAT_LOAD_N / GRAVITY;
         loads.set(it.id, content + shelves + person + clothes + devicesOn(p, it));
         // The fillers weigh on the feet with the rest, the appliances and what stands on top are put where they are
-        buildSideFillers(it, b, s);
+        buildSideFillers(it, b);
         own.set(it.id, itemMass(b, it.id) + content + shelves + person + clothes);
         fitBase(it, b);
         fitWallFixing(it, s, b, p.items);
         fitBackWallScrews(it, s, b);
-        buildCeilingFiller(it, p.room, b, s);
+        buildCeilingFiller(it, p.room, b);
         // Last of the carcass : its screws keep clear of the others
         fitBackScrews(it, lay, b);
     }

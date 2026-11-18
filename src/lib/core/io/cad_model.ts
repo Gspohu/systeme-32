@@ -40,52 +40,54 @@ export function screwPlaces(parts: Part[]): ScrewPlace[]
 {
     const bolts: Vec3[] = [];
     const out: ScrewPlace[] = [];
-    for (const q of parts)
+    for (const board of parts)
     {
-        if (q.frame === null || q.curve !== null)
+        if (board.frame === null || board.curve !== null)
         {
             continue;
         }
-        for (const h of q.holes)
+        for (const hole of board.holes)
         {
             // Drilled in its back edge, a long screw runing in the width of a cleat into what it carries
-            if (h.purpose === "cleat-screw" && (h.face === "v1" || h.face === "v0"))
+            if (hole.purpose === "cleat-screw" && (hole.face === "v1" || hole.face === "v0"))
             {
-                const edge = screwOf(h.purpose, h.label);
+                const edge = screwOf(hole.purpose, hole.label);
                 if (edge !== null)
                 {
-                    const sink = h.countersink !== undefined ? HEAD_SINK : 0;
-                    const back = h.face === "v0";
-                    out.push({ ...edge, item: q.item, point: at(q.frame, h.u, back ? sink : q.width - sink,
-                                                                h.w ?? q.thickness / 2),
-                               out: back ? neg(q.frame.v) : q.frame.v, free: h.depth - sink, part: q.label, label: h.label,
-                               purpose: h.purpose,
+                    const sink = hole.countersink !== undefined ? HEAD_SINK : 0;
+                    const back = hole.face === "v0";
+                    out.push({ ...edge, item: board.item,
+                               point: at(board.frame, hole.u, back ? sink : board.width - sink,
+                                         hole.w ?? board.thickness / 2),
+                               out: back ? neg(board.frame.v) : board.frame.v, free: hole.depth - sink,
+                               part: board.label, label: hole.label,
+                               purpose: hole.purpose,
                                joins: sink > 0 });
                 }
                 continue;
             }
-            const spec = h.face === "A" || h.face === "B" ? screwOf(h.purpose, h.label) : null;
+            const spec = hole.face === "A" || hole.face === "B" ? screwOf(hole.purpose, hole.label) : null;
             if (spec === null)
             {
                 continue;
             }
-            const way = h.face === "A" ? neg(q.frame.n) : q.frame.n;
+            const way = hole.face === "A" ? neg(board.frame.n) : board.frame.n;
             // On the seat of what it holds, or a little under the face of the wood
-            const seat = h.countersink !== undefined ? -HEAD_SINK : SCREW_SEAT[h.purpose] ?? 0;
-            const face = at(q.frame, h.u, h.v, h.face === "A" ? 0 : q.thickness);
+            const seat = hole.countersink !== undefined ? -HEAD_SINK : SCREW_SEAT[hole.purpose] ?? 0;
+            const face = at(board.frame, hole.u, hole.v, hole.face === "A" ? 0 : board.thickness);
             const point: Vec3 = [face[0] + way[0] * seat, face[1] + way[1] * seat, face[2] + way[2] * seat];
             if (spec.kind === "bolt")
             {
-                if (bolts.some((b) => { return sameBolt(b, point, way, spec.length); }))
+                if (bolts.some((other) => { return sameBolt(other, point, way, spec.length); }))
                 {
                     continue;
                 }
                 bolts.push(point);
             }
-            out.push({ ...spec, item: q.item, point, out: way, free: h.depth + Math.max(seat, 0), part: q.label,
-                      label: h.label,
-                       purpose: h.purpose,
-                       holds: SCREW_HOLDS[h.purpose], joins: h.countersink !== undefined });
+            out.push({ ...spec, item: board.item, point, out: way, free: hole.depth + Math.max(seat, 0),
+                       part: board.label, label: hole.label,
+                       purpose: hole.purpose,
+                       holds: SCREW_HOLDS[hole.purpose], joins: hole.countersink !== undefined });
         }
     }
     return out;
@@ -215,19 +217,19 @@ function assignUnits<T extends { item: string; unit?: string; assembly: string }
 
 export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withGamme = false): object
 {
-    const b = o.analysis.build;
+    const build = o.analysis.build;
     const materials = new Map<string, object>();
-    const glued = new Set(b.hardware.filter((h) => { return h.ref === "GLUE_PU" &&
-                                                    h.target !== null; }).map((h) => { return h.target!; }));
-    const parts = b.parts.filter((q) =>
+    const glued = new Set(build.hardware.filter((h) => { return h.ref === "GLUE_PU" &&
+                                                        h.target !== null; }).map((h) => { return h.target!; }));
+    const parts = build.parts.filter((q) =>
     {
         return q.frame !== null && q.curve === null;
     }).map((q) =>
     {
         const decor = decorById(q.decor);
-        const m = materialOfDecor(decor);
-        materials.set(m.id, { id: m.id, label: m.label, density: m.density, modulus: m.modulus, strength: m.strength,
-                              source: m.source });
+        const stock = materialOfDecor(decor);
+        materials.set(stock.id, { id: stock.id, label: stock.label, density: stock.density, modulus: stock.modulus,
+                                  strength: stock.strength, source: stock.source });
         const code = o.bom.codeOfPart.get(q.id) ?? "";
         return {
             id: q.id,
@@ -265,7 +267,7 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
             bandInner: decor.edgeThickness === undefined || q.edges.length === 0 || plainRectangle(q.outline,
                 q.length, q.width)
                 ? null : innerOutline(q.outline, q.length, q.width, q.edges, decor.edgeThickness),
-            material: m.id,
+            material: stock.id,
             // Held by glue alone, its fixing no solid : the filler up to the ceiling on its cleat
             glued: glued.has(q.id),
             decor: `${decor.ref} ${decor.label}`.trim(),
@@ -273,14 +275,14 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
             notes: q.notes,
         };
     });
-    const left = b.parts.filter((q) =>
+    const left = build.parts.filter((q) =>
     {
         return q.frame === null || q.curve !== null;
     }).map((q) =>
     {
         return q.label;
     });
-    const fitted = b.fitted.filter((f) =>
+    const fitted = build.fitted.filter((f) =>
     {
         return f.host === null && f.purpose !== "runner";
     }).map((f) =>
@@ -290,14 +292,14 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
     });
     // What the hardware list counts, to set agianst what is placed
     const listed: Record<string, number> = {};
-    for (const h of b.hardware)
+    for (const h of build.hardware)
     {
         if (h.ref === "609.1500" || h.ref === "606N" || h.ref.includes("SCREW") || h.ref.startsWith("267.07"))
         {
             listed[h.ref] = (listed[h.ref] ?? 0) + h.qty;
         }
     }
-    const placedAll = placedHardware(p, b);
+    const placedAll = placedHardware(p, build);
     const { drawn } = placedAll;
     // What an article or a screw sits on, named by its PBS code : "Joue gauche" stands in three items of the TV wall
     // and a step of the assembly sequence has to name the one it means
@@ -308,7 +310,7 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
     {
         return tagOf.get(`${item}|${part}`) ?? `${groupOf.get(item) ?? ""} ${part}`.trim();
     };
-    const assemblyOf = benchRouting(b, o.bom.codeOfPart, groupOf);
+    const assemblyOf = benchRouting(build, o.bom.codeOfPart, groupOf);
     const instances = assignUnits(placedAll.instances.map((i) =>
     {
         const r = assemblyOf(i.item, i.part, i.model, i.o);
@@ -356,7 +358,12 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
         const sub = o.bom.subs.find((s) => { return s.key === key; });
         return { item: sub?.item ?? key, code: a.code, name: a.name, parent: a.parent };
     });
+    // A door a wall stops short of its hinges : the angle and the wall, said where it's hung (swing.ts)
+    const stops = new Map(build.motions.filter((motion) => { return motion.stoppedBy !== undefined; }).flatMap((motion) =>
+    {
+        return motion.parts.map((id) => { return [id, { amount: motion.amount, by: motion.stoppedBy! }] as const; });
+    }));
     return { schema: CAD_SCHEMA, name: p.name, parts, left, fitted, screws: every, listed, instances, standing, models,
-             assemblies: pbs, gamme: withGamme ? gamme(p, parts, instances, every, models, pbs) : null,
-             sections: handleSection(b.fitted), dowelLength: DOWEL_LENGTH, materials: [...materials.values()] };
+             assemblies: pbs, gamme: withGamme ? gamme(p, parts, instances, every, models, pbs, stops) : null,
+             sections: handleSection(build.fitted), dowelLength: DOWEL_LENGTH, materials: [...materials.values()] };
 }

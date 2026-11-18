@@ -5,6 +5,7 @@ import { cadModel } from "./cad_model";
 import { ACTIONS, POSITION, type GammeTable } from "./gamme";
 import { CAD_MODELS } from "../../data/cad_models";
 import { drawingSet } from "./workshop";
+import { gammeSequences } from "../drawing/assembly_sheets";
 
 // The shell glob the control of the sequence reads a step with : * any run, ? one character, [x] that one
 function glob(pattern: string): RegExp
@@ -144,7 +145,7 @@ describe(`the assembly sequence of the ${name}`, () =>
             {
                 for (const x of r.pbs.filter((s) => { return /^#[0-9A-Z]{3}-\d{3} /.test(s); }))  
                 {
-                    expect(`${t.code} : ${x}`).toMatch(new RegExp(`^${t.code} : ${t.code}-`));
+                    expect(x.startsWith(`${t.code}-`), `${t.code} : ${x}`).toBe(true);
                 }
             }
         }
@@ -243,8 +244,8 @@ describe(`the assembly sequence of the ${name}`, () =>
                 // By its tip, where it bites : the shank of a plate screw runs through the groove of the shelf over it
                 const inside = [s.length - 1].some((d) =>
                 {
-                    const p = [0, 1, 2].map((k) => { return s.point[k]! - s.out[k]! * d - f.o[k]!; });
-                    const [u, v, n] = [f.u, f.v, f.n].map((a) => { return p[0]! * a[0]! + p[1]! * a[1]! + p[2]! *
+                    const rel = [0, 1, 2].map((k) => { return s.point[k]! - s.out[k]! * d - f.o[k]!; });
+                    const [u, v, n] = [f.u, f.v, f.n].map((a) => { return rel[0]! * a[0]! + rel[1]! * a[1]! + rel[2]! *
                                                                   a[2]!; });
                     return u! > 0 && u! < q.length && v! > 0 && v! < q.width && n! > 0 && n! < q.thickness;
                 });
@@ -303,9 +304,9 @@ describe(`the assembly sequence of the ${name}`, () =>
                         return boards.some((q) =>
                         {
                             const f = q.frame!;
-                            const p = [0, 1, 2].map((k) => { return at[k]! - f.o[k]!; });
-                            const local = [f.u, f.v, f.n].map((a) => { return p[0]! * a[0]! + p[1]! * a[1]! +
-                                                                      p[2]! * a[2]!; });
+                            const rel = [0, 1, 2].map((k) => { return at[k]! - f.o[k]!; });
+                            const local = [f.u, f.v, f.n].map((a) => { return rel[0]! * a[0]! + rel[1]! * a[1]! +
+                                                                      rel[2]! * a[2]!; });
                             return local[0]! > 0 && local[0]! < q.length && local[1]! > 0 && local[1]! < q.width
                                 && local[2]! > 0 && local[2]! < q.thickness;
                         });
@@ -324,6 +325,16 @@ describe(`the assembly sequence of the ${name}`, () =>
 
     // The screws of a runner or a TIP-ON plate find their pilot holes, bored in the workshop : nothing to measure on
     // site. A glued catch plate, nothing drilled for it, is set by its distances to 2 edges
+    // The 606N is sold in the US : the worker reads which screw does instead, and the head it must not pass
+    it("says on each coupling screw which other screw does, its head no wider than 6.5", () =>
+    {
+        const rows = m.gamme.flatMap((t) => { return t.rows; })
+            .filter((r) => { return r.pbs.some((pattern) => { return pattern.startsWith("Accouplement MOVENTO"); }); });
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows.every((r) => { return /606N.*Ø6,5 au plus/.test(r.comment); })).toBe(true);
+    });
+
+
     it("bores the pilot holes of the hardware screws and measures only what is glued", () =>
     {
         const piloted = m.parts.flatMap((q) => { return q.holes; }).filter((h) =>
@@ -337,11 +348,11 @@ describe(`the assembly sequence of the ${name}`, () =>
         {
             for (const r of t.rows)
             {
-                if (r.pbs.some((p) => { return /^(Coulisse 760H|Embase TIP-ON 956\.1201 : vis)/.test(p); }))
+                if (r.pbs.some((pattern) => { return /^(Coulisse 760H|Embase TIP-ON 956\.1201 : vis)/.test(pattern); }))
                 {
                     expect(r.comment, `${t.code} ${r.operation}`).not.toMatch(/Pas d'avant-trou/);
                 }
-                if (r.pbs.some((p) => { return /^956A?\.?1004 Contreplaque/.test(p); }))
+                if (r.pbs.some((pattern) => { return /^956A?\.?1004 Contreplaque/.test(pattern); }))
                 {
                     glued++;
                     expect(r.comment, `${t.code} ${r.operation}`).toMatch(/^Pas d'avant-trou, repère : .*\d+ mm/);
@@ -355,7 +366,8 @@ describe(`the assembly sequence of the ${name}`, () =>
     // The printed plans had a notice of their own, which the film never followed : they print the gamme itself
     it("prints on the plans the very tables of the gamme the film is made of", () =>
     {
-        const printed = drawingSet(p, computeOutputs(p)).filter((page) => { return /Gamme de montage/.test(page.title); })
+        const printed = drawingSet(p,
+                                   computeOutputs(p)).filter((page) => { return /Gamme de montage/.test(page.title); })
             .flatMap((page) => { return page.prims.filter((x) => { return x.k === "text"; }).map((x) => { return (x as { t: string }).t; }); }); 
         expect(printed.length).toBeGreaterThan(0);
         for (const t of m.gamme)
@@ -420,10 +432,6 @@ describe(`the assembly sequence of the ${name}`, () =>
     });
 
 
-    // The return screwed into the bottom shaped board after the feet could not be done : return, the bases, the clips of
-    // the return (a base went up through one), the feet clipping in, the front plinth garnished at the bench last
-    // Film of essai45 : the screws of an anti-tip bracket set in the carcass before it, the dowels of a filler plinth
-    // after the plinth they slide it on with
     // Film of essai45 : the strut of a stay set first hung in the air, the drawer behind the flap set before
     // it in its way
     it("clips the strut of a stay between its screwed brackets, then slides in the drawer behind the flap", () =>
@@ -443,43 +451,64 @@ describe(`the assembly sequence of the ${name}`, () =>
             stays++;
             expect(Math.min(...struts)).toBeGreaterThan(Math.max(...at(/Compas 365\.01\.901, équerre/)));
             expect(struts.every((k) => { return t.rows[k]!.type === "Clipsage"; })).toBe(true);
-            expect(Math.min(...at(/Tiroir intérieur \d+, monté/))).toBeGreaterThan(Math.max(...struts));
+            // The drawer behind the flap slides in from the whole, after every carcass table : never in this one, where
+            // it could come before the strut it has to pass. Searched here, an empty list made a min of Infinity
+            expect(at(/Tiroir intérieur \d+, monté/)).toEqual([]);
+            const whole = m.gamme.at(-1)!;
+            expect(whole.rows.some((r) => { return /Tiroir intérieur \d+, monté/.test(r.operation); })).toBe(true);
         }
         expect(stays).toBe(name === "dresser" ? 1 : 0);
     });
 
 
-    it("screws a bracket once it stands, and dowels a filler plinth before setting it", () =>
+    // Film of essai45 : the screws of an anti-tip bracket set in the carcass before it, the dowels of a filler plinth
+    // after the plinth they slide it on with
+    it("screws a bracket or a back into the wall once it stands, and dowels a filler plinth before setting it", () =>
     {
         const whole = m.gamme.find((t) => { return t.code === "#000"; })!;
-        const at = (re: RegExp): number[] =>
+        const at = (test: RegExp | ((op: string) => boolean)): number[] =>
         {
-            return whole.rows.map((r, k) => { return re.test(r.operation) ? k : -1; }).filter((k) => { return k >= 0; });
+            return whole.rows.map((r, k) =>
+            {
+                return (typeof test === "function" ? test(r.operation) : test.test(r.operation)) ? k : -1;
+            }).filter((k) => { return k >= 0; });
         };
         const brackets = at(/Équerre 40 x 40 x 40 sur/);
         for (const k of brackets)
         {
             const item = whole.rows[k]!.operation.split(" sur ")[1]!.split(" : ")[0]!;
-            const screws = at(new RegExp(`Équerre anti-basculement : vis 4 x 16`)).filter((j) =>
+            const screws = at(/Équerre anti-basculement : vis 4 x 16/).filter((j) =>
             {
-                return whole.rows[j]!.pbs.some((p) => { return p.includes(item.slice(0, 4)); });
+                return whole.rows[j]!.pbs.some((pattern) => { return pattern.includes(item.slice(0, 4)); });
             });
             expect(screws.length, item).toBeGreaterThan(0);
             expect(Math.min(...screws), item).toBeGreaterThan(k);
+        }
+        // Through the back into the wall : screwed once its item stands in place
+        const walls = at(/Fixer au mur : Fixation au mur : vis 5 x \d+ sur #\w{3}-\d{3}/);
+        for (const k of walls)
+        {
+            const item = /sur (#\w{3})-/.exec(whole.rows[k]!.operation)![1]!;
+            const set = at((op) => { return op.startsWith(`Mettre en place ${item}-000 `); });
+            expect(set.length, item).toBe(1);
+            expect(set[0]!, item).toBeLessThan(k);
         }
         const dowels = at(/Tourillon 8 x 35 sur #\w{3}-\d{3} Plinthe du fileur/);
         for (const k of dowels)
         {
             const plinth = whole.rows[k]!.operation.split(" sur ")[1]!;
-            expect(at(new RegExp(`: ${plinth}$`)).every((j) => { return j > k; }), plinth).toBe(true);
+            expect(at((op) => { return op.endsWith(`: ${plinth}`); }).every((j) => { return j > k; }),
+                   plinth).toBe(true);
         }
         if (name === "dresser")
         {
-            expect([brackets.length, dowels.length].every((n) => { return n > 0; })).toBe(true);
+            expect([walls.length, dowels.length].every((n) => { return n > 0; })).toBe(true);
         }
     });
 
 
+    // The return screwed into the bottom shaped board after the feet could not be done : return, the bases, the clips of
+    // the return (a base went up through one), the feet clipping in, the front plinth garnished at the bench last
     it("sets a return plinth and the clips before the feet, the front plinth last", () =>
     {
         let plinths = 0;
@@ -507,6 +536,52 @@ describe(`the assembly sequence of the ${name}`, () =>
         {
             expect(plinths).toBeGreaterThan(0);
         }
+    });
+
+
+    // Printed on the first step of a table only, the way the piece lay was left to the steps that turn it over
+    it("prints the way the piece lies on every step", () =>
+    {
+        const steps = gammeSequences(m.gamme).flatMap((s) => { return s.steps; });
+        expect(steps.length).toBeGreaterThan(0);
+        expect(steps.filter((s) => { return !s.lines.some((l) => { return l.startsWith("Position : "); }); })
+            .map((s) => { return s.title; })).toEqual([]);
+    });
+
+
+    // The front plinths of both dresser columns clipped in their carcass table, on feet set only once they stood
+    it("clips a front plinth after every foot of its item, in the same table", () =>
+    {
+        let plinths = 0;
+        for (const t of m.gamme)
+        {
+            t.rows.forEach((r, k) =>
+            {
+                if (r.type !== "Clipsage" || !/Plinthe avant, monté à l'établi/.test(r.operation))
+                {
+                    return;
+                }
+                plinths++;
+                const item = `${r.pbs[0]!.slice(0, 2)}00`;
+                const feet = m.gamme.flatMap((x) =>
+                {
+                    return x.rows.flatMap((f, j) =>
+                    {
+                        return f.pbs.some((s) => { return s.startsWith("637.76.353") && s.includes(`, ${item}`); })
+                            ? [{ table: x.code, j }] : [];
+                    });
+                });
+                expect(feet.length, `${t.code} ${r.operation}`).toBeGreaterThan(0);
+                for (const f of feet)
+                {
+                    expect(f.table, `${r.operation} : pieds de ${item} dans une autre table`).toBe(t.code);
+                    expect(f.j, `${r.operation} : clipsée avant les pieds de ${item}`).toBeLessThan(k);
+                }
+            })
+                {
+                }
+        }
+        expect(plinths).toBeGreaterThan(0);
     });
 
 
@@ -602,7 +677,7 @@ describe(`the assembly sequence of the ${name}`, () =>
             {
                 const model = Object.values(CAD_MODELS).find((x) =>
                 {
-                    return r.type !== "Serrage" && r.pbs.some((p) => { return p.startsWith(`${x.ref} ${x.label}`); });
+                    return r.type !== "Serrage" && r.pbs.some((pattern) => { return pattern.startsWith(`${x.ref} ${x.label}`); });
                 });
                 const fixing = model?.fixing;
                 if (fixing === undefined)
@@ -613,7 +688,7 @@ describe(`the assembly sequence of the ${name}`, () =>
                 const next = t.rows[k + 1];
                 if (fixing.screws !== undefined)
                 {
-                    expect(next?.pbs.some((p) => { return p.startsWith(fixing.screws!.label); }),
+                    expect(next?.pbs.some((pattern) => { return pattern.startsWith(fixing.screws!.label); }),
                            `${t.code} ${r.operation} : pas suivie de ses vis`).toBe(true);
                 }
                 else if (fixing.tighten?.once === "set")
@@ -622,11 +697,23 @@ describe(`the assembly sequence of the ${name}`, () =>
                 }
                 else if (fixing.tighten?.once === "mate")
                 {
+                    // TODO no template puts a Minifix bolt in another table than its housing : fixedInTurn then skips
+                    // the turn without a word, and nothing here would see it. Throw there, or a check of its own ?
                     const board = / sur (#[0-9A-Z]{3}-\d{3} .+)$/.exec(r.operation)![1]!;
-                    expect(t.rows.slice(k + 1).some((x) =>
+                    const turns = t.rows.map((x, j) =>
                     {
-                        return x.type === "Serrage" && x.operation.includes(`Minifix de ${board}`);
-                    }), `${t.code} ${r.operation} : jamais serré`).toBe(true);
+                        return x.type === "Serrage" && x.operation.includes(`Minifix de ${board}`) ? j : -1;
+                    }).filter((j) => { return j > k; });
+                    expect(turns.length, `${t.code} ${r.operation} : jamais serré`).toBeGreaterThan(0);
+                    // Each cam turned once the board of the bolt it pulls is in, not only once its own housing is
+                    for (const j of turns)
+                    {
+                        const pulled = /ils tirent (.+)$/.exec(t.rows[j]!.operation)![1]!;
+                        const bolted = t.rows.findIndex((x) => { return x.type !== "Serrage" &&
+                                                                x.pbs.includes(pulled); });
+                        expect(bolted, `${t.rows[j]!.operation} : panneau du goujon absent`).toBeGreaterThanOrEqual(0);
+                        expect(j, `${t.rows[j]!.operation} : serré avant le panneau du goujon`).toBeGreaterThan(bolted);
+                    }
                 }
             }
         }
@@ -671,7 +758,7 @@ describe(`the assembly sequence of the ${name}`, () =>
                 // set in the room slides onto a piece standing built : its dowels are glued in it in the step before
                 const board = / (?:dans|sur) (#[0-9A-Z]{3}-\d{3} .+)$/.exec(r.operation)![1]!;
                 const above = t.rows.slice(0, k).reverse().find((x) => { return !/^[^:]+ : \d+ x /.test(x.operation); });
-                const below = t.rows.slice(k + 1).find((x) => { return !/^[^:]+ : \d+ x /.test(x.operation); });
+                const below = t.rows.find((x, j) => { return j > k && !/^[^:]+ : \d+ x /.test(x.operation); });
                 const room = typeof r.phase === "string";
                 expect(`${t.code} : ${(room ? below : above)?.operation}`).toContain(board);
             });
@@ -927,10 +1014,10 @@ describe("the niche of the left column of the TV wall", () =>
 describe("the fillers, measured on site", () =>
 {
     // Set with the carcass they could not have been measured : the carcass is presented, the gap measured, the filler
-    // cut and set, the carcass fixed only then. Its cleat may go on early
+    // cut, the carcass fixed, then only the filler glued. Its cleat may go on early
     for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
     {
-        it(`presents the carcass, measures, cuts and sets the filler, then fixes it in the ${name}`, () =>
+        it(`presents the carcass, measures and cuts the filler, fixes the carcass, then glues it in the ${name}`, () =>
         {
             const p = make();
             const m = cadModel(p, computeOutputs(p), true) as { gamme: GammeTable[] };
@@ -940,17 +1027,27 @@ describe("the fillers, measured on site", () =>
             for (const k of measured)
             {
                 const code = rows[k]!.pbs[0]!;
-                expect(rows[k - 1]!.type).toBe("Mise en place");
-                expect(rows[k - 1]!.pbs[0]).toBe(code);
+                // Right after it is set, or after what still goes under it before it's fixed : its feet clipped in
+                // once it stands, levelled, its plinth on them. Never once a screw holds it to the wall
+                let j = k - 1;
+                while (j > 0 && /^(Poser les pieds une fois|Régler à niveau|Clipser la plinthe)/.test(rows[j]!.operation)
+                    && rows[j]!.pbs.some((s) => { return s.includes(code.slice(0, 2)); }))
+                {
+                    j--;
+                }
+                const before = rows[j]!;
+                expect(before.type).toBe("Mise en place");
+                expect(before.pbs[0]).toBe(code);
                 expect(rows[k + 1]!.type).toBe("Découpe");
                 const set = rows.findIndex((r, j) => { return j > k &&
                                                       /^(Poser le fileur|Fermer jusqu'au plafond)/.test(r.operation); });
                 const fixed = rows.findIndex((r, j) => { return j > k && /^Fixer au mur/.test(r.operation) &&
                                                         r.operation.includes(code.slice(0, 4)); });
                 expect(set).toBeGreaterThan(k + 1);
+                // Glued once the carcass is fixed : screwing it to the wall would move a filler whose glue is wet
                 if (fixed !== -1)
                 {
-                    expect(set).toBeLessThan(fixed);
+                    expect(set).toBeGreaterThan(fixed);
                 }
             }
             // No filler left among the boards of its carcass, its cleat there still

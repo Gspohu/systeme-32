@@ -7,15 +7,15 @@ import { heading, pageSuffix, type Draft } from "./draft";
 
 // The gamme the film and the FreeCAD sheet are made of, printed : one table a sequence, one row a step with its
 // tool, the
-// way the piece lies when it starts and what the comment says. A text of its own drifted from the film at every fix
+// way the piece lies at each step and what the comment says. A text of its own drifted from the film at every fix
 export function gammeSequences(tables: GammeTable[]): Sequence[]
 {
     return tables.map((t) =>
     {
-        return { item: t.code, name: `${t.code} ${t.name}`, steps: t.rows.map((r, k) =>
+        return { item: t.code, name: `${t.code} ${t.name}`, steps: t.rows.map((r) =>
         {
             const lines: string[] = [];
-            if (k === 0 && r.position !== undefined)
+            if (r.position !== undefined)
             {
                 lines.push(`Position : ${r.position}`);
             }

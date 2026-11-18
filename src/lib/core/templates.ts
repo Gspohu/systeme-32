@@ -252,6 +252,10 @@ function dresserFrame(name: string, upper: Carcass[], bottles = false): Project
         kl.fronts.push(newFront(c.id, { type: "door", hinge: "left" }, PUSH_DOOR)); 
     }
     kr.fronts.push(newFront(rightRoot.id, { type: "door", hinge: "right" }, PUSH_DOOR));
+    // Held to the wall through their backs from inside, high in their top cell over its movable shelf : brackets on
+    // their tops had 84 mm under the ceiling, no hand with a driver goes in there
+    kl.backWallScrews = [79, 600 - 79].map((x) => { return { x, y: 2136 }; });
+    kr.backWallScrews = [79, 2280 - DRESSER_MIDDLE - 79].map((x) => { return { x, y: 2150 }; });
     // The hole for the mains in the back of the middle cell, its centre 100 in from the left and from the movable
     // shelf : over it, with the LED driver and controller the lead of the niche brings down, one
     // technical place and not 2
@@ -343,6 +347,9 @@ export function dresser(): Project
     });
     const high = box("Placards hauts", 600, DRESSER_HIGH_Y, DRESSER_MIDDLE, 716, split("v",
         [...DRESSER_BAYS], top), true);
+    // Through its back from inside, one in the upper cell of each bay : 84 mm under the ceiling left no room for a
+    // bracket on its top
+    high.backWallScrews = [79, 772, DRESSER_MIDDLE - 79].map((x) => { return { x, y: 640 }; });
     high.fronts.push(
         newFront(top[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),

@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { addItem, setFront, updateItem } from "./commands";
 import { newCarcass, newProject, newWallShelf } from "./factory";
-import { analyse } from "./analysis";
+import { analyse } from "./analysis";  
 import { shelfOutline } from "./hung_items";
 import { legroom } from "./desk";
 import { polygonArea, tessellate } from "./geometry";
 import type { Carcass, Item, Project, WallShelf } from "./model";
 import type { Part } from "./parts";
 
-// A bedroom in Mulhouse, 2500 under the ceiling : a wardrobe on a 100 plinth
+
+// A bedroom in Mulhouse, 2500 under the celiing : a wardrboe on a 100 plinth
 function wardrobe(o: Partial<Carcass> = {}): Project
 {
     return addItem(newProject("chambre"), newCarcass({ name: "Armoire", width: 800, height: 2000, depth: 600, y: 100,
@@ -85,6 +86,7 @@ describe("up to the ceiling", () =>
             .toBe(false);
     });
 
+
     it("refuses a filler over a sloped top or a carcass already at the ceiling", () =>
     {
         expect(said(wardrobe({ slope: { low: "left", height: 1500 } }),
@@ -92,11 +94,15 @@ describe("up to the ceiling", () =>
         expect(said(wardrobe({ height: 2400 }), "error")).toContain("touche le plafond");
     });
 
+
     it("warns when a tall carcass cannot be raised under the ceiling", () =>
     {
-        // hypot(2400, 600) = 2474 clears 2500, hypot(2450, 600) = 2522 doesn't
-        expect(said(wardrobe({ height: 2400, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
+        // hypot(2350, 600) = 2425 leaves 75 under 2500, hypot(2400, 600) = 2474 only 26, short of the 50 the gamme
+        // stands a carcass up with, hypot(2450, 600) = 2522 doesn't clear it at all
+        expect(said(wardrobe({ height: 2350, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
             .not.toContain("se relève");
+        expect(said(wardrobe({ height: 2400, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
+            .toContain("se relève en balayant 2474 mm, à moins de 50 mm");
         expect(said(wardrobe({ height: 2450, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
             .toContain("se relève en balayant 2522 mm");
     });
@@ -127,7 +133,7 @@ describe("desk tops", () =>
     {
         // A quarter of a 100 disc taken from its square corner
         const area = polygonArea(tessellate(shelfOutline(1200, 600, 0, 100), 1));
-        expect(area).toBeCloseTo(1200 * 600 - (100 * 100 - Math.PI * 100 * 100 / 4), -1);
+        expect(area).toBeCloseTo(1200 * 600 - ((100 * 100) - Math.PI * 100 * 100 / 4), -1);
         const p = office(300);
         const w = p.items[0]!;
         const rounded = updateItem<Item>(p, w.id, { corners: { left: 0, right: 100 } } as Partial<Item>);

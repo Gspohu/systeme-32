@@ -6,7 +6,6 @@ import type { Build, Edge } from "./part_types";
 import { newPart } from "./part_base";
 import { sideWallDepth } from "./room";
 import { X, Y, Z, neg } from "./geometry";
-import type { Cut } from "./solid_stock";
 import { spread } from "./fittings";
 import { FRONT_GAP } from "../data/rules";
 
@@ -16,13 +15,14 @@ export const CLEAT_WIDTH = 40;
 // A filler sawn this much wider than finished, its edge against the wall or the ceiling recut to fit on site
 // Workshop convention : cut to the exact gap, 25 mm left nothing to scribe (review of 2026-11-09)
 export const FILLER_SCRIBE = 15;
+// What a carcass stood up from its back keeps under the ceiling at least, for the hands and a ceiling not quite flat :
+// the check and the gamme read this one value
+export const STAND_UP_MARGIN = 50;
 // Workshop conventions, the screws of the side fillers
 const CEILING_CLEAT_SCREW_END = 100;
 // How near a side wall an end stands to be against it
 const WALL_TOUCH = 1;
 const CEILING_CLEAT_SCREW_PITCH = 400;
-// Its long screw runs in the width of the cleat, 10 in the strip of 19, along it from the screw into the top
-export const CLEAT_TO_STRIP = { hole: 5, along: 25 };
 
 
 export function fillerGap(c: Carcass, room: Room): number
@@ -31,7 +31,7 @@ export function fillerGap(c: Carcass, room: Room): number
 }
 
 
-export function buildCeilingFiller(c: Carcass, room: Room, b: Build, cut: Cut): void
+export function buildCeilingFiller(c: Carcass, room: Room, b: Build): void
 {
     if (!c.ceilingFiller)
     {
@@ -123,11 +123,12 @@ export function ceilingChecks(p: Project): Check[]
         }
         // Assembled lying on its back, it's raised about its bottom front edge
         const swing = Math.hypot(c.height, c.depth);
-        if (swing > h)
+        if (swing > h - STAND_UP_MARGIN)
         {
             checks.push({ level: "warning", item: c.id, target: null,
-                          message: `${c.name} : couché sur le dos, il se relève en balayant ${Math.round(swing)} mm, plus que `
-                              + `les ${h} mm sous plafond. L'assembler debout sur place ou le scinder en deux caissons.` });
+                          message: `${c.name} : couché sur le dos, il se relève en balayant ${Math.round(swing)} mm, à moins `
+                              + `de ${STAND_UP_MARGIN} mm des ${h} mm sous plafond. L'assembler debout sur place ou le `
+                              + "scinder en deux caissons." });
         }
     }
     return checks;
