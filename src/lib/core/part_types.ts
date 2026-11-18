@@ -17,13 +17,13 @@ export const PURPOSES = [
     "anti-tip", "anti-tip-screw", "wall-fixing", "wall-screw", "cleat-screw", "spacer-screw", "screw-cap",
     "shelf-support", "shelf-pin", "pin-spare", "shelf-bracket", "rail", "rail-screw", "shoe-rack", "light", "light-lead",
     "spot", "ladder", "slat-nail", "doubler-glue", "doubler-screw", "back-screw", "lining-screw", "lining-pilot", "plinth-screw",
+    "front-pilot", "spacer-pilot",
 ] as const;
 export type Purpose = (typeof PURPOSES)[number];
 
 
 export interface Hole
 {
-    // Part coordinates of the axis, and the face or edge it's drilled from
     u: number;
     v: number;
     // 0 marks a screw position without pre-drilling
@@ -102,9 +102,7 @@ export interface Part
     grooves: Groove[];
     pockets?: Pocket[];
     notes: string[];
-    // Flexible skins and battens are cut flat but sit on an arc in the model
     curve: CurveShape | null;
-    // Lacquer colour of a lacquered MDF part, shown in 3D and noted for the painter
     colour: string | null;
     // Where each end of the board lies on face B, along u, measured from where it lies on face A : a plumb cut
     // under a roof or a chamfered head, the outline being face A only
@@ -122,7 +120,6 @@ export interface CurveShape
     thickness: number;
     a0: number;
     a1: number;
-    // Extent along the axis, measured from the centre
     from: number;
     to: number;
     // Flat run continuing the skin towards -z from the arc end at angle `straightAt` (axis "y" only)
@@ -159,7 +156,6 @@ export interface HardwareLine
     qty: number;
     item: string;
     itemName: string;
-    // Part or front the line belongs to, for the drawings
     target: string | null;
     note: string | null;
     purpose: Purpose;
@@ -247,7 +243,6 @@ export interface Fitted
     centre: Vec3;
     axes: [Vec3, Vec3, Vec3];
     half: Vec3;
-    // The part it's let into, never counted as clashing with it
     host: string | null;
     // Inside a closed carcass : drawn in 3D only when the hardware is asked for
     hidden: boolean;

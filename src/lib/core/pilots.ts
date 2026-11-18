@@ -7,8 +7,8 @@ import { screwOf } from "../data/screws";
 // to Ø4 : a chipboard screw cuts its own thread past it
 export const PILOT_DIAMETER = 2.5;
 const PILOT_MAX_SCREW = 4;
-// Stopped short of the tip, whose thread bites the last of it, and of the far face, left whole
-const PILOT_SHORT = 3;
+// Stopped short of the tip, whose thread bites the lsat of it, and of the far face, left whole
+export const PILOT_SHORT = 3;
 const PILOTED = new Set<Purpose>(["runner-screw", "adapter-screw", "cup-screw", "handle-screw", "plate-screw",
                                   "flap-screw", "foot-mount-screw"]);
 

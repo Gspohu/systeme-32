@@ -71,6 +71,34 @@ export function pageToSvg(page: Page): string
 }
 
 
+// What a sheet draws over its views, the whole page with no background : TechDraw lay it as a symbol at scale 1
+export function overlaySvg(prims: Prim[], w: number, h: number): string
+{
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}mm" height="${h}mm">\n`
+        + `${prims.map(prim).join("\n")}\n</svg>\n`;
+}
+
+
+// A FreeCAD TechDraw template of the frame and the title block : each value tagged with its field turns editable
+// TechDraw fills it page by page with the same text the sheet prints
+export function templateSvg(prims: Prim[], w: number, h: number): string
+{
+    const body = prims.map((p) =>
+    {
+        if (p.k !== "text" || p.field === undefined)
+        {
+            return prim(p);
+        }
+        const weight = p.bold === true ? `;font-weight:bold` : "";
+        return `<text x="${n(p.x)}" y="${n(p.y)}" freecad:editable="${esc(p.field)}" style="font-family:Helvetica, `
+            + `Arial, sans-serif;font-size:${n(p.size)}px;text-anchor:${p.anchor}${weight}"><tspan>${esc(p.t)}</tspan></text>`;
+    }).join("\n");
+    return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<svg xmlns="http://www.w3.org/2000/svg" `
+        + `xmlns:freecad="https://www.freecad.org/wiki/index.php?title=Svg_Namespace" version="1.1" `
+        + `viewBox="0 0 ${w} ${h}" width="${w}mm" height="${h}mm">\n${body}\n</svg>\n`;
+}
+
+
 // An SVG shown through <img> never runs script, whatever a loaed project managed to put in its tetx
 export function pageToDataUri(page: Page): string
 {

@@ -6,6 +6,7 @@
 import json
 import math
 import os
+import sys
 import time
 import uuid
 
@@ -16,6 +17,9 @@ import Part
 import Sketcher
 
 from JointObject import GroundedJoint, Joint
+
+# Run by exec, the script has no __file__ : the folder of its neighbours comes from the launcher
+sys.path.insert(0, os.environ.get("S32_SCRIPTS", os.getcwd()))
 
 SOURCE = os.environ["S32_JSON"]
 OUT = os.environ["S32_OUT"]
@@ -813,12 +817,20 @@ def main():
             elif (child.TypeId == ASSEMBLY and not child.Placement.isIdentity()):
                 moved += 1
     steps = make_gamme(doc, model)
+    # Each board seen with its edge bands, the finished outline the sheet draws
+    bodies = {}
+    for b, _, _ in built:
+        # An id may hold a # of its own (a drawer behind a flap, #0) : only its bands add #chant-
+        bodies.setdefault(b.Label2.split("#chant-")[0], []).append(b)
+    # Its neighbour, found once the launcher's folder is on the path
+    from freecad_drawings import make_drawings
+    drawings = make_drawings(doc, model, bodies)
     path = os.path.join(OUT, f"{name}.FCStd")
     doc.saveAs(path)
     strips = sum(1 for b, _, _ in built if "#chant-" in b.Label2)
     report = {"name": model["name"], "parts": len(built) - strips, "edge_bands": strips, "failed": failed,
               "invalid": bad,
-              "not_one_solid": several,
+              "not_one_solid": several, "drawings": drawings,
               "missing_models": missing, "unrouted": unrouted, "instances": len(model["instances"]),
               "solve": status, "moved_by_solver": moved, "gamme_steps": steps, "left_out": model["left"],
               "seconds": round(time.perf_counter() - t0),

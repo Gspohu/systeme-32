@@ -9,7 +9,16 @@ import { DIAM, round1 } from "../text";
 
 export const ROW = 3.6;
 export const TABLE_COL_W = 198;
-const TABLE_COLS = [16, 16, 10, 11, 24, 111];
+export const TABLE_COLS = [16, 16, 10, 11, 24, 111];
+export const TABLE_HEAD = ["u", "v", DIAM, "prof.", "face", "usage"];
+
+// One column of the table as laid on the sheet, its top left corner and its lines : FreeCAD prints the same
+export interface PlacedColumn
+{
+    x: number;
+    top: number;
+    lines: string[][];
+}
 
 
 // The arcs of an outline : centre, radius and the angle of their middle, u and v as x and y
@@ -116,7 +125,7 @@ export function tableLines(row: CutRow, part: Part): string[][]
 
 // The table down as many columns as it's given from `top`, under its heading : what doesn't fit is returned
 export function drawTable(canvas: Canvas, lines: string[][], x0: number, top: number, tableCols: number,
-                          heading: string): string[][]
+                          heading: string, placed: PlacedColumn[] = []): string[][]
 {
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 6;
     canvas.text(x0, top - 5, heading, 2.8, "start", true);
@@ -134,8 +143,9 @@ export function drawTable(canvas: Canvas, lines: string[][], x0: number, top: nu
             }
             ty = top;
             let cx = x0 + col * TABLE_COL_W;
+            placed.push({ x: cx, top, lines: [] });
             let c = 0;
-            for (const title of ["u", "v", DIAM, "prof.", "face", "usage"])
+            for (const title of TABLE_HEAD)
             {
                 canvas.text(cx, ty, title, 2.4, "start", true);
                 cx += TABLE_COLS[c]!;
@@ -159,6 +169,7 @@ export function drawTable(canvas: Canvas, lines: string[][], x0: number, top: nu
                 c++;
             }
         }
+        placed.at(-1)!.lines.push(cells);
         ty += ROW;
         n++;
     }

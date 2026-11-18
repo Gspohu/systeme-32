@@ -1630,7 +1630,7 @@ describe("the spacers of the dresser pull-out", () =>
                 const others = { ...side, holes: side.holes.filter((x) =>
                 {
                     // Its label lost the countersink the head got after it was bored : told by where it is
-                    return !(x.purpose === "spacer-screw" && x.label.endsWith(" : avant-trou") && x.face === face
+                    return !(x.purpose === "spacer-pilot" && x.label.endsWith(" : avant-trou") && x.face === face
                         && Math.hypot(x.u - probe.u, x.v - probe.v) < 0.5);
                 }) };
                 const crossed = crossedHoles({ ...others, holes: [...others.holes, probe] }).some(([x, y]) =>

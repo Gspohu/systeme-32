@@ -5,7 +5,8 @@ import type { Analysis } from "../analysis";
 import type { Bom } from "../bom";
 import { EDGE_OVERLENGTH } from "../bom";
 import type { NestResult } from "../nesting";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, frameAndTitle, type Page } from "./display";
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, frameAndTitle, titleFields, type Page } from "./display";
+import { templateSvg } from "./svg";
 import { BODY, heading, type Draft } from "./draft";
 import { composition } from "./views";
 import { sectionSheets } from "./sections";
@@ -70,14 +71,30 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
     const pages: Page[] = [];
     drafts.forEach((draft, i) =>
     {
-        frameAndTitle(draft.canvas, { owner, creator, approver, project: p.name, 
-                                     title: draft.supplement ? `${draft.title}, ${draft.supplement}` : draft.title,  
-                                     status: issue.status, identification: identificationOf(p),
-                                     revision: issue.index, date: issue.date, index: i + 1, count: drafts.length,
-                                     scale: draft.scale, content: issue.hash });
-        pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind });
+        const info = { owner, creator, approver, project: p.name,
+                       title: draft.supplement ? `${draft.title}, ${draft.supplement}` : draft.title,
+                       status: issue.status, identification: identificationOf(p),
+                       revision: issue.index, date: issue.date, index: i + 1, count: drafts.length,
+                       scale: draft.scale, content: issue.hash };
+        frameAndTitle(draft.canvas, info);
+        pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind,
+                     fields: titleFields(info), views: draft.views, tables: draft.tables, marks: draft.marks });
     });
     return pages;
+}
+
+
+// The frame and the title block of this project as a FreeCAD template, its values left editable : the owner, set
+// out on as many lines as the sheets give it, is the only one that moves the drawing
+export function sheetTemplate(p: Project): string
+{
+    const canvas = new Canvas();
+    const issue = issueState(p);
+    const { owner, creator, approver } = p.settings;
+    frameAndTitle(canvas, { owner, creator, approver, project: p.name, title: "", status: issue.status,
+                            identification: identificationOf(p), revision: issue.index, date: issue.date, index: 1,
+                            count: 1, scale: "-", content: issue.hash });
+    return templateSvg(canvas.prims, A3.w, A3.h);
 }
 
 

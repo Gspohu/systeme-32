@@ -2,7 +2,7 @@
 
 import type { Battens, Carcass, CurveTechnique, End, RoundCorner } from "./model";
 import type { ResolvedLayout } from "./layout";
-import type { Build, Part, PlateHold } from "./part_types";
+import type { Build, Edge, Part, PlateHold } from "./part_types";
 import { baseHeight, newPart, PLINTH_FOOT_GAP } from "./part_base";
 import { byId } from "./edit";
 import { type Outline, type Segment, type Vec3, X, Y, Z, at, bounds, insidePolygon, neg, tessellate } from "./geometry";
@@ -354,7 +354,34 @@ export function plinthFootGap(c: Carcass): number
 
 // The side stops over the plinth, the low board of an open end on the floor : the return of the plinth stands against
 // its edge, 2 screws from inside the plinth into it. Workshop conventions
-const RETURN_SCREWS = { count: 2, end: 40, label: "Retour de plinthe dans la flasque basse : vis 5 x 50" };
+const RETURN_SCREWS = { count: 2, end: 40, length: 50, label: "Retour de plinthe dans la flasque basse : vis 5 x 50" };
+// The pilot of a 5 mm screw in a particle board edge : the largest core of a 5, d2 of DIN 7505:1986 type A, the core
+// Würth's ASSY data tell to pre-drill at to shorten the edge distance. Bored past the screw's tip by the guard
+const RETURN_PILOT = 3;
+const PILOT_GUARD = 4;
+
+
+// A pilot bored into the straight edge of a board where a point lies on it, at mid thickness. False when the point
+// lies on no edge of the board's rectangle
+function edgePilot(q: Part, point: Vec3, depth: number): boolean
+{
+    const f = q.frame!;
+    const d: Vec3 = [point[0] - f.o[0], point[1] - f.o[1], point[2] - f.o[2]];
+    const u = d[0] * f.u[0] + d[1] * f.u[1] + d[2] * f.u[2];
+    const v = d[0] * f.v[0] + d[1] * f.v[1] + d[2] * f.v[2];
+    const near = (a: number, b: number): boolean => { return Math.abs(a - b) < 1; };
+    const edge: Edge | undefined = near(u, 0) ? "u0" : near(u, q.length) ? "u1" : near(v, 0) ? "v0"
+        : near(v, q.width) ? "v1" : undefined;
+    if (edge === undefined)
+    {
+        return false;
+    }
+    const along = edge === "u0" || edge === "u1";
+    q.holes.push({ u: along ? (edge === "u0" ? 0 : q.length) : u, v: along ? v : (edge === "v0" ? 0 : q.width),
+                   diameter: RETURN_PILOT, depth, face: edge, w: q.thickness / 2,
+                   label: `${RETURN_SCREWS.label} : avant-trou Ø${RETURN_PILOT}`, purpose: "plinth-screw" });
+    return true;
+}
 
 function plinthReturnScrews(c: Carcass, side: "left" | "right", b: Build, title: string): void
 {
@@ -377,8 +404,17 @@ function plinthReturnScrews(c: Carcass, side: "left" | "right", b: Build, title:
     const inner = ret.frame.n[0] * (side === "right" ? 1 : -1) > 0 ? "A" : "B";
     for (const s of spread(zs[2]! - zs[1]!, RETURN_SCREWS.end, Infinity))
     {
-        ret.holes.push({ u: ret.frame.o[2] - (zs[1]! + s), v: level, diameter: 0, depth: 0, face: inner,
+        const u = ret.frame.o[2] - (zs[1]! + s);
+        ret.holes.push({ u, v: level, diameter: 0, depth: 0, face: inner,
                          label: RETURN_SCREWS.label, purpose: "plinth-screw" });
+        // The head on the inner face, the screw comes out of the other one into the edge of the low board : its
+        // pilot is bored there in the workshop, nothing drilled on site
+        const tip = at(ret.frame, u, level, inner === "A" ? ret.thickness : 0);
+        if (!edgePilot(floor, tip, RETURN_SCREWS.length - ret.thickness + PILOT_GUARD))
+        {
+            b.errors.push(`${c.name}, ${title.toLowerCase()} : la vis du retour de plinthe ne tombe sur aucun chant `
+                + "droit de la flasque basse, son avant-trou n'est pas placé. Vérifier le retour de plinthe.");
+        }
     }
     b.hardware.push({ ref: "WALL_SCREW_5x50", qty: RETURN_SCREWS.count, item: c.id, itemName: c.name, target: ret.id,
                       note: "retour de plinthe dans la flasque basse", purpose: "plinth-screw" });

@@ -150,7 +150,7 @@ export function footLoadChecks(p: Project, b: Build, own: Map<string, number>): 
             const bottom = byId(b.parts, `${c.id}/bottom`);
             if (bottom !== undefined && total > AXILO_ADJUST_MAX_CABINET)
             {
-                bottom.notes.push(`Meuble de ${total.toFixed(0)} kg chargé : régler les pieds AXILO `
+                bottom.notes.push(`${total.toFixed(0)} kg sur les pieds, chargé avec ce qui est posé dessus : régler les pieds AXILO `
                     + `avant chargement (réglage sous charge limité à ${AXILO_ADJUST_MAX_CABINET} kg)`);
             }
         }

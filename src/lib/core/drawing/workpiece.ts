@@ -5,9 +5,9 @@ import { edgeNotation } from "../bom";
 import type { Fitted, Part } from "../parts";
 import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale, textWidth, type Stroke } from "./display";
-import type { Draft } from "./draft";
-import { ROW, TABLE_COL_W, drawTable, outlineArcs, tableLines } from "./machining_table"; 
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale, textWidth, type Prim, type Stroke } from "./display";
+import type { Draft, PartView } from "./draft";
+import { ROW, TABLE_COL_W, drawTable, outlineArcs, tableLines, type PlacedColumn } from "./machining_table";
 import { round1 } from "../text";
 
 
@@ -103,6 +103,9 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         const codes: string[] = [];
         const stuff = new Set<string>(); 
         const overflow: { row: CutRow; rest: string[][] }[] = [];
+        const views: PartView[] = [];
+        const tables: PlacedColumn[] = [];
+        const marks: Prim[] = [];
         const wide = wantsWholeSheet(rows[i]!);
         let k = 0;
         while (k < (wide ? 1 : 2) && i + k < rows.length && (wide || !wantsWholeSheet(rows[i + k]!)))
@@ -111,6 +114,9 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
             const drawn = wide ? drawWorkpiece(canvas, row, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 2)
                 : drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1);
             scales.add(drawn.scale);
+            views.push(drawn.view);
+            tables.push(...drawn.columns);
+            marks.push(...drawn.marks);
             codes.push(row.code.split(",")[0]!);
             stuff.add(`${row.decorLabel} ${row.thickness} mm, chants ${edgeNotation(row.edges)}`); 
             if (drawn.rest.length > 0)
@@ -123,7 +129,8 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         {
             return `1:${s}`;
         }).join(", ");
-        sheets.push({ title: `Pièces ${codes.join(" et ")}`, supplement: [...stuff].join(" / "), scale, canvas });
+        sheets.push({ title: `Pièces ${codes.join(" et ")}`, supplement: [...stuff].join(" / "), scale, canvas, views,
+                      tables, marks });
         // what a table could not hold runs on over sheets of its own, never left to the DXF alone
         for (const o of overflow)
         {
@@ -133,8 +140,11 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
                 const more = new Canvas();
                 const code = o.row.code.split(",")[0]!;
                 more.text(MARGIN + 5, MARGIN + 10, `${code}  ${o.row.label} (suite)`, 3.5, "start", true);
-                rest = drawTable(more, rest, MARGIN + 5, MARGIN + 24, 2, "Usinages (suite)");
-                sheets.push({ title: `Pièces ${code} (suite)`, scale: "-", canvas: more });
+                const columns: PlacedColumn[] = [];
+                rest = drawTable(more, rest, MARGIN + 5, MARGIN + 24, 2, "Usinages (suite)", columns);
+                // Its heading and the one drawTable writes first, the cells left to the TechDraw table
+                sheets.push({ title: `Pièces ${code} (suite)`, scale: "-", canvas: more, tables: columns,
+                              marks: more.prims.slice(0, 2) });
             }
         }
         i += k;
@@ -145,13 +155,23 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
 
 // A workpiece in a 195 x 255 box : header, drawing at a drafting scale, then the table of holes
 function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW: number, boxH: number,
-                       fitted: Fitted[], tableCols: number): { scale: number; rest: string[][] }
+                       fitted: Fitted[], tableCols: number):
+    { scale: number; rest: string[][]; view: PartView; columns: PlacedColumn[]; marks: Prim[] }
 {
+    // What is drawn from here on goes on the TechDraw page as it is : all but the board, its dimensions and the table
+    const marks: Prim[] = [];
+    let from = canvas.prims.length;
+    const keep = (): void =>
+    {
+        marks.push(...canvas.prims.slice(from));
+        from = canvas.prims.length;
+    };
     const part = row.parts[0]!;
     const details = `${row.items.join(", ")} : quantité ${row.quantity}, ${row.decorLabel}, ép. ${row.thickness} mm`;
     canvas.text(x0, y0 + 5, fit(`${row.code}  ${row.label}`, 3.5, boxW + 5), 3.5, "start", true);
     canvas.text(x0, y0 + 10, fit(`${details}, chants ${edgeNotation(row.edges)}`, 2.5, boxW + 5), 2.5);
     canvas.text(x0, y0 + 14, fit(`Origine : ${originText(part)}`, 2.5, boxW + 5), 2.5);
+    keep();
     const outline = tessellate(part.outline);
     let maxU = 0;
     let maxV = 0;
@@ -191,6 +211,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
 
     if (part.curve !== null && (part.role === "skin" || part.role === "batten"))
     {
+        // Laid flat here, bent in the solid : no projection draw it this way
         box(0, 0, part.length, part.width, "normal");
         const what = part.role === "batten" ? `${row.quantity} tasseaux` : "Peau développée";
         canvas.text(...P(part.length / 2, part.width / 2), what, 2.5, "middle");
@@ -204,6 +225,8 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
                 return P(u, v);
             }), true, "normal");
         }
+        // The outline is the projection's own
+        from = canvas.prims.length;
     }
     for (const e of part.edges)
     {
@@ -307,6 +330,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.arrowHead(zx + 8 * dx, zy + 8 * dy, -dx, -dy);
         canvas.text(zx + 10 * dx + (dx === 0 ? 1.5 : 0), zy + 10 * dy + (dy === 0 ? 1 : 0), name, 2.2, "middle", true);
     }
+    keep();
     const left = ox;
     const right = ox + spanX / scale;
     canvas.dimH(left, right, oy + 1, oy + 7, round1(spanX));
@@ -315,8 +339,11 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     const away = upright ? 1 : -1;
     canvas.dimV(oy - spanY / scale, oy, dimAt + away, dimAt + (upright ? 12 : 6) * away,
                 round1(spanY));
+    // The dimensions are TechDraw's own, measured on the solid
+    from = canvas.prims.length;
     drawFootprints(canvas, part, fitted, P);
     canvas.text(x0 + boxW, y0 + 18, `1:${scale}`, 2.5, "end");
+    keep();
     const lines = tableLines(row, part);
     const counts = [`Perçages (${part.holes.length})`];
     for (const [n, what] of [[part.cutouts.length, "découpes"], [outlineArcs(part).length, "arcs"],
@@ -327,8 +354,13 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
             counts.push(`${what} (${n})`);
         }
     }
-    const rest = drawTable(canvas, lines, x0, oy + 18, tableCols, counts.join(", "));
-    return { scale, rest };
+    const columns: PlacedColumn[] = [];
+    const rest = drawTable(canvas, lines, x0, oy + 18, tableCols, counts.join(", "), columns);
+    // The heading drawTable writes first over the table, its cells left to the TechDraw table
+    marks.push(canvas.prims[from]!);
+    const view: PartView = { part: part.id, scale, su, sv,
+                             box: { x: ox, y: oy - spanY / scale, w: spanX / scale, h: spanY / scale } };
+    return { scale, rest, view, columns, marks };
 }
 
 

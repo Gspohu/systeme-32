@@ -43,7 +43,7 @@ describe("the size to saw before the edges go on", () =>
 
     it("gives no size to saw where the banding of a plain rectangle has no thickness", () =>
     {
-        const r = { length: 500, width: 300, edges: ["v0" as const], decor: "CHENE_PLAQUE_AGGLO", shaped: false };
+        const r = { length: 500, width: 300, edges: ["v0" as const], decor: "U638_ST9", shaped: false };
         expect(sawSize(r)).toBeNull();
     });
 });

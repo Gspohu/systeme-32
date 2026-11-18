@@ -30,7 +30,8 @@ export function sinkHeads(b: Build): void
         for (const h of q.holes)
         {
             const spec = bears(h) ? screwOf(h.purpose, h.label) : null;
-            if (spec === null || spec.kind === "bolt")
+            // Narrower than the screw, it's the pilot its thread bites in, in the board it goes into : no head there
+            if (spec === null || spec.kind === "bolt" || (h.diameter > 0 && h.diameter < spec.diameter))
             {
                 continue;
             }

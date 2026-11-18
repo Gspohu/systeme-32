@@ -1,5 +1,8 @@
 // Display list in page millimetres, y down, rendered to SVG on screen and to PDF for the workshop
 
+import type { PartView } from "./draft";
+import type { PlacedColumn } from "./machining_table";
+
 export type Stroke = "thin" | "normal" | "thick" | "dashed" | "hidden" | "centre";
 
 
@@ -9,7 +12,7 @@ export type Prim =
     | { k: "circle"; x: number; y: number; r: number; s: Stroke; fill?: string }
     | { k: "rect"; x: number; y: number; w: number; h: number; s: Stroke; fill?: string }
     | { k: "text"; x: number; y: number; t: string; size: number; anchor: "start" | "middle" |
-       "end"; bold?: boolean; rot?: 0 | 90 };
+       "end"; bold?: boolean; rot?: 0 | 90; field?: string };
 
 export interface Page
 {
@@ -18,6 +21,11 @@ export interface Page
     title: string;
     prims: Prim[];
     kind?: "nesting";
+    // The title block field by field and what a FreeCAD page draws from the solids, the same sheet in TechDraw
+    fields?: Record<string, string>;
+    views?: PartView[];
+    tables?: PlacedColumn[];
+    marks?: Prim[];
 }
 
 
@@ -97,9 +105,10 @@ export class Canvas
 
 
     text(x: number, y: number, t: string, size = 2.5, anchor: "start" | "middle" | "end" = "start",
-         bold = false, rot: 0 | 90 = 0): void
+         bold = false, rot: 0 | 90 = 0, field?: string): void
     {
-        this.prims.push({ k: "text", x, y, t, size, anchor, bold, rot });
+        this.prims.push(field === undefined ? { k: "text", x, y, t, size, anchor, bold, rot }
+            : { k: "text", x, y, t, size, anchor, bold, rot, field });
     }
 
 
@@ -166,6 +175,39 @@ export interface TitleInfo
     content: string;
 }
 
+// Where the columns of the block start, from its left edge
+const TB_COLS = { people: 40, title: 85, number: 137, date: 145, lang: 163, sheet: 169 };
+// The general tolerances named in or near the block (ISO 2768-1:1989 via the Zeiss quality forum chart)
+const GENERAL_TOLERANCES = "ISO 2768-1:1989 classe m";
+
+
+// Each value of the block as printed, cut to its cell : the sheet draws them and the FreeCAD template takes them
+// as its editable fields, named after those of the templates FreeCAD ships where one fits
+export function titleFields(info: TitleInfo): Record<string, string>
+{
+    const { people, title, number, date, lang, sheet } = TB_COLS;
+    const W = TITLE_BLOCK_W;
+    const names = wrap(info.owner, 2.6, people - 4);
+    const more = wrap(info.title, 2.2, number - title - 2);
+    return {
+        legal_owner_1: names[0] ?? "", legal_owner_2: names[1] ?? "",
+        legal_owner_3: fit(names.slice(2).join(" "), 2.6, people - 4),
+        creator: fit(info.creator, 2.4, title - people - 2), approval_person: fit(info.approver, 2.4, title - people -
+            2),
+        content: fit(info.content, 2.4, title - people - 2), document_type: fit("Dossier de fabrication", 2.4, number -
+            title - 2),
+        title: fit(info.project, 2.6, number - title - 2), supplementary_title_1: more[0] ?? "",
+        supplementary_title_2: fit(more.slice(1).join(" "), 2.2, number - title - 2),
+        document_status: fit(info.status, 2.4, W - number - 2), drawing_number: fit(info.identification, 2.8,
+            W - number - 2),
+        revision_index: fit(info.revision, 2.4, date - number - 2), date_of_issue: fit(info.date, 2.4, lang - date - 2),
+        // The language code of ISO 7200:2004 5.1.8, the sheets are writen in French only
+        language_code: "fr", sheet_number: fit(`${info.index}/${info.count}`, 2.4, W - sheet - 2),
+        scale: fit(info.scale, 2.4, number - title - 2),
+        general_tolerances: `Cotes en mm, tolérances générales ${GENERAL_TOLERANCES}`,
+    };
+}
+
 
 // ISO 5456-2:1996 first angle : the truncated cone on the left, its small end leftmost, its end view on the right
 // (drawn as the European symbol of the Çukurova EEE114 course, week 7), u its size against the 8 mm high original
@@ -187,8 +229,8 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     const x = w - MARGIN - TITLE_BLOCK_W;
     const row = TITLE_BLOCK_H / 4;
     c.rect(x, y, TITLE_BLOCK_W, TITLE_BLOCK_H, "normal");
-    const [people, title, number] = [40, 85, 137];
-    const [date, lang, sheet] = [145, 163, 169];
+    const { people, title, number, date, lang, sheet } = TB_COLS;
+    const f = titleFields(info);
     c.line(x + people, y, x + people, y + 3 * row, "thin");
     c.line(x + title, y, x + title, y + TITLE_BLOCK_H, "thin");
     c.line(x + number, y, x + number, y + TITLE_BLOCK_H, "thin");
@@ -205,56 +247,51 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     {
         c.text(x + col + 1, y + k * row + 2.2, text, 1.6, "start");
     };
-    const value = (col: number, k: number, text: string, width: number, size = 2.4, bold = false): void =>
+    // Each value already cut to its cell, tagged with its field : a FreeCAD template is drawn from the same list
+    const value = (col: number, k: number, field: string): void =>
     {
-        c.text(x + col + 1, y + (k * row) + 6, fit(text, size, width - 2), size, "start", bold);
+        c.text(x + col + 1, y + (k * row) + 6, f[field]!, 2.4, "start", false, 0, field);
     };
     label(0, 0, "Propriétaire");
     // A naem of any length (table 1), up to three lines centred in its tall cell
-    const names = wrap(info.owner, 2.6, people - 4);
-    const owned = [names[0] ?? "", names[1] ?? "", fit(names.slice(2).join(" "), 2.6, people - 4)]; 
-    const used = owned.filter((l) =>
+    const owned = ["legal_owner_1", "legal_owner_2", "legal_owner_3"];
+    const used = owned.filter((k) =>
     {
-        return l !== "";
+        return f[k] !== "";
     }).length;
-    owned.forEach((l, i) => 
+    owned.forEach((k, i) =>
     {
-        c.text(x + people / 2, y + 1.5 * row + 2 + (i - (used - 1) / 2) * 3.4, l, 2.6, "middle", true);
+        c.text(x + people / 2, y + 1.5 * row + 2 + (i - (used - 1) / 2) * 3.4, f[k]!, 2.6, "middle", true, 0, k);
     });
     label(people, 0, "Dessiné par");
-    value(people, 0, info.creator, title - people);
+    value(people, 0, "creator");
     label(people, 1, "Approuvé par");
-    value(people, 1, info.approver, title - people);
+    value(people, 1, "approval_person");
     label(people, 2, "Empreinte du contenu");
-    value(people, 2, info.content, title - people);
+    value(people, 2, "content");
     label(title, 0, "Type de document");
-    value(title, 0, "Dossier de fabrication", number - title);
+    value(title, 0, "document_type");
     label(title, 1, "Titre, titre complémentaire");
-    c.text(x + title + 1, y + row + 5.6, fit(info.project, 2.6, number - title - 2), 2.6, "start", true);
+    c.text(x + title + 1, y + row + 5.6, f.title!, 2.6, "start", true, 0, "title");
     // The supplemnetary title takes two lines of 25 characters or so (table 2), always two for a block of fixed size
-    const more = wrap(info.title, 2.2, number - title - 2);
-    const lines = [more[0] ?? "", fit(more.slice(1).join(" "), 2.2, number - title - 2)];
-    lines.forEach((l, i) =>
+    ["supplementary_title_1", "supplementary_title_2"].forEach((k, i) =>
     {
-        c.text(x + title + 1, y + row + 9.4 + i * 3.2, l, 2.2, "start");
+        c.text(x + title + 1, y + row + 9.4 + i * 3.2, f[k]!, 2.2, "start", false, 0, k);
     });
     label(number, 0, "Statut");
-    value(number, 0, info.status, TITLE_BLOCK_W - number);
-    c.text(x + (number + TITLE_BLOCK_W) / 2, y + row + 5, fit(info.identification, 2.8, TITLE_BLOCK_W - number - 2),
-           2.8, "middle", true);   
+    value(number, 0, "document_status");
+    c.text(x + (number + TITLE_BLOCK_W) / 2, y + row + 5, f.drawing_number!, 2.8, "middle", true, 0, "drawing_number");
     label(number, 2, "Ind.");
-    value(number, 2, info.revision, date - number);
+    value(number, 2, "revision_index");
     label(date, 2, "Date d'émission");
-    value(date, 2, info.date, lang - date);
+    value(date, 2, "date_of_issue");
     label(lang, 2, "Lang.");
-    // The language code of ISO 7200:2004 5.1.8, the sheets are writen in French only
-    value(lang, 2, "fr", sheet - lang);
+    value(lang, 2, "language_code");
     label(sheet, 2, "Planche");
-    value(sheet, 2, `${info.index}/${info.count}`, TITLE_BLOCK_W - sheet);
-    // The class named in or near the title block (ISO 2768-1:1989 via the Zeiss quality forum chart)
-    c.text(x + 1, y + 3 * row + 4.6, "Cotes en mm, tolérances générales ISO 2768-1:1989 classe m", 2.2, "start");
+    value(sheet, 2, "sheet_number");
+    c.text(x + 1, y + 3 * row + 4.6, f.general_tolerances!, 2.2, "start", false, 0, "general_tolerances");
     label(title, 3, "Échelle");
-    value(title, 3, info.scale, number - title);
+    value(title, 3, "scale");
     firstAngleSymbol(c, x + number + 12, y + 3.5 * row, 0.75);  
 }
 

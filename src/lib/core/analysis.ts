@@ -105,6 +105,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         buildShoeRacks(it, lay, b);
         fitJoints(b.joints.slice(before), { ...s, joinery: it.joinery ?? s.joinery }, b, it.id, it.name);
         settleSpacerScrews(it, b);
+        noteHousingsUnderRunners(it.id, b);
         let content = 0;
         for (const f of it.fronts)
         {
@@ -159,6 +160,38 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
                           purpose: "wall-hanger" });
         b.hardware.push({ ref: "48N0510.03", qty: 1, item: it.id, itemName: it.name, target: null, note: null,
                           purpose: "wall-hanger" });
+    }
+}
+
+
+// A Minifix housing a runner covers, its cam out of reach once the runner is on : said on the board, the carcass then
+// comes apart only with the runner off
+export function noteHousingsUnderRunners(item: string, b: Build): void
+{
+    const runners = b.fitted.filter((f) => { return f.item === item && f.purpose === "runner"; });
+    for (const q of b.parts.filter((x) => { return x.item === item && x.frame !== null; }))
+    {
+        const covered = q.holes.filter((h) =>
+        {
+            if (h.purpose !== "minifix-housing" || (h.face !== "A" && h.face !== "B"))
+            {
+                return false;
+            }
+            // Just off the face it's bored in, where a runner screwed on that face stands
+            const off = h.face === "A" ? -2 : q.thickness + 2;
+            const p = at(q.frame!, h.u, h.v, off);
+            return runners.some((r) =>
+            {
+                const d = [p[0] - r.centre[0], p[1] - r.centre[1], p[2] - r.centre[2]];
+                return r.axes.every((a, k) => { return Math.abs(d[0]! * a[0] + d[1]! * a[1] + d[2]! * a[2]) <=
+                                               r.half[k]!; });
+            });
+        });
+        if (covered.length > 0)
+        {
+            q.notes.push(`${covered.length} boîtier(s) Minifix sous la coulisse : déposer la coulisse pour les desserrer `
+                + "au démontage");
+        }
     }
 }
 
@@ -576,6 +609,14 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
         const loaded = load > 0 ? `, ${(m + load).toFixed(0)} kg chargé (charges d'essai)` : "";
         checks.push({ level: "info", item: it.id, target: null,
                      message: `${it.name} : ${m.toFixed(1)} kg à vide${loaded}.` });
+        // A carcass goes in whole, its boards already together : the part check alone missed a 93 kg one
+        const limit = p.settings.handlingKg;
+        if (it.kind === "carcass" && m > limit)
+        {
+            checks.push({ level: "warning", item: it.id, target: null,
+                          message: `${it.name} : ${m.toFixed(1)} kg monté, à manutentionner à ${Math.ceil(m / limit)} `
+                              + `personnes (limite ${limit} kg par personne, R4541-9).` });
+        }
         if (it.kind === "wallShelf" && it.purpose === "desk")
         {
             checks.push({ level: "warning", item: it.id, target: null,

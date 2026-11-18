@@ -1,6 +1,7 @@
 // Pieces shared by every sheet of the drawing set : the draft record, headings, tables, pagination
 
-import { Canvas, MARGIN, fit, wrap } from "./display";
+import { Canvas, MARGIN, fit, wrap, type Prim } from "./display";
+import type { PlacedColumn } from "./machining_table";
 
 
 export interface Draft
@@ -12,6 +13,21 @@ export interface Draft
     canvas: Canvas;
     // What the screen picks some sheets by, never by their title
     kind?: "nesting";
+    // What a FreeCAD page draws of its own from the solids : the views of the boards and the tables beside them
+    views?: PartView[];
+    tables?: PlacedColumn[];
+    // What the sheet writes and draws over and around its views, laid as it's over the TechDraw page
+    marks?: Prim[];
+}
+
+// A board seen from face A at a drafting scale, its box on the sheet in mm from the top left corner
+export interface PartView
+{
+    part: string;
+    scale: number;
+    su: [number, number];
+    sv: [number, number];
+    box: { x: number; y: number; w: number; h: number };
 }
 
 export const BODY = 2.5;

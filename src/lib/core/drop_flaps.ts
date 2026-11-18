@@ -13,6 +13,7 @@ import type { FrontPanel } from "./fronts";
 import { fitTipOnHole } from "./doors";
 import { X, Y, Z, at, neg, type Vec3 } from "./geometry";
 import { crossedHoles } from "./drilling";
+import { PILOT_DIAMETER, PILOT_SHORT } from "./pilots";
 import { MOVENTO } from "../data/rules";
 import { DIAM, round1 } from "./text";
 
@@ -32,7 +33,7 @@ export const FLAP_HINGE = {
     floorCollar: [[-16.5, 10], [-19, 19], [0, 3.35]] as [number, number][],
     flapCollar: [[11.59, 13.09], [-19, 19], [-18.85, 8.65]] as [number, number][],
 };
-// Workshop choice : each hinge 100 in from the side of the cell, clear of the stays against them
+// Workshop choice : each hinge 100 in from the side of the cell, clear of the stays agaisnt them
 const HINGE_INSET = 100;
 // Häfele gas stay 365.01.901 (LGH-M 2017 p. MB 5.313), flap shut : pivots 238 and 65 over its lower edge, 18 and
 // 16 behind its back, 25 off the side, strut 15, sockets 16.5. 2 past 400 high, 10 kg and 600 high at most
@@ -56,7 +57,7 @@ const SPACER_SLIDES = [0, 10, -10, 20, -20, 30, -30];
 const SPACER_END = 15;
 
 
-// The side each spacer is screwed into, read once every drilling of that side is made
+// The side each spacer is screwed into, read once every driling of that side is made
 const spacers = new WeakMap<Part, FaceRef>();
 
 
@@ -103,8 +104,18 @@ export function settleSpacerScrews(c: Carcass, b: Build): void
                 continue;
             }
             h.v = clear;
+            // Its pilot in the side where it setled, bored in the workshop : nothing drilled on site
+            side.part.holes.push(spacerPilot(side.part, onPart(side.part, at(spacer.frame!, h.u, clear, 0)), side.face,
+                                             SPACER_SCREW.length - spacer.thickness, h.label));
         }
     }
+}
+
+
+function spacerPilot(q: Part, [u, v]: [number, number], face: "A" | "B", reach: number, label: string): Hole
+{
+    return { u, v, face, diameter: PILOT_DIAMETER, label: `${label} : avant-trou`, purpose: "spacer-pilot",
+             depth: Math.max(1, Math.min(reach - PILOT_SHORT, q.thickness - PILOT_SHORT)) };
 }
 
 
@@ -284,7 +295,7 @@ function stays(c: Carcass, nb: NodeBox, fp: FrontPanel, faces: FaceRef[], flap: 
         fr.part.holes.push({ u: fp.rect.y + g.sideUp - fr.uOrigin, v: c.depth - (fp.z - g.sideBehind) - fr.vOrigin,
                              diameter: 0, depth: 0, face: fr.face, purpose: "flap-screw", fixes: g.ref,
                              label: `Compas ${g.ref} ${hand} : axe de l'équerre de corps, posée par essai (Häfele)` });
-        // The plate on the flap reaches 26 in from its pivot and 5 out, its screws 19 in
+        // The plate on the flap reachs 26 in from its pivot and 5 out, its screws 19 in
         const screwsX = axisX + inward * p.offPivot - fp.rect.x;
         for (const du of [-p.screws / 2, p.screws / 2])
         {
@@ -307,9 +318,10 @@ function stays(c: Carcass, nb: NodeBox, fp: FrontPanel, faces: FaceRef[], flap: 
               label: `${c.name}, compas ${g.ref} ${hand} : équerre d'abattant`, purpose: "flap-stay", shape: "box",
               centre: [plateX, lower[1], back - p.thick / 2], axes: [X, Y, Z], half: [p.wide / 2, p.long / 2,
                                                                                       p.thick / 2] },
-            // Not in the STEP : a plate as large as the flap one on the side, a pin out to the pivot
+            // Not in the STEP : a plate as large as the flap one on the side, a pin out to the pivot. A real bracket
+            // supplied with the stay and screwed to the side, only its shape is guessed
             { key: `${key}/equerre-corps`, item: c.id, ref: g.ref, host: fr.part.id, hidden: true,
-              label: `${c.name}, compas ${g.ref} ${hand} : équerre de corps (encombrement)`, purpose: "flap-stay",
+              label: `${c.name}, compas ${g.ref} ${hand} : équerre de corps`, purpose: "flap-stay",
               shape: "box", centre: [c.x + sideX + inward * p.thick / 2, upper[1], upper[2]], axes: [X, Y, Z],
               half: [p.thick / 2, p.long / 2, p.wide / 2] },
             { key: `${key}/teton`, item: c.id, ref: g.ref, host: null, hidden: true,

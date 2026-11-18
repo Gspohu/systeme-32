@@ -13,7 +13,8 @@ mkdir -p "$OUT/json"
 for piece in ${2:-tv dresser}
 do
     json="$OUT/json/$piece.json"
-    flatpak run --env=S32_JSON="$json" --env=S32_OUT="$OUT" --env=S32_SOURCES="$SOURCES" --command=FreeCADCmd "$APP" \
+    flatpak run --env=S32_JSON="$json" --env=S32_OUT="$OUT" --env=S32_SOURCES="$SOURCES" --env=S32_SCRIPTS="$HERE" \
+        --env=S32_DRAWINGS="${S32_DRAWINGS:-}" --command=FreeCADCmd "$APP" \
         -c "exec(open('$HERE/freecad_build.py').read())" 2>&1 | grep -E '^pieces|^\{|Traceback|Error:' || true
     # A window opens and closes alone, some minutes for each piece
     flatpak run --env=S32_JSON="$json" --env=S32_DOC="$OUT/$piece.FCStd" --env=S32_IMAGE="$OUT/$piece.png" \

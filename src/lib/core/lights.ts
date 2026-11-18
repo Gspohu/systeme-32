@@ -49,7 +49,7 @@ export interface LightPlan
 }
 
 
-// The strip keeps a whole cutting pitch clear of the profile ends and the lead
+// The strip keeps a whole cuting pitch clear of the profile ends and the lead
 export function lightPlan(nb: NodeBox, s: Settings): LightPlan
 {
     const profile = nb.w - 2 * FIT_PLAY;
@@ -372,7 +372,9 @@ function fitDriver(c: Carcass, next: Carcass, back: Part, leadY: number, s: Sett
     const y = leadY - DRIVER_UNDER_LEAD;
     const [L, W, H] = driver.size;
     b.fitted.push({ key: `${c.id}/light/driver`, item: next.id, ref: "LED_DRIVER_24V",
-                    label: `${next.name} : alimentation de ${c.name} (Loox ${driver.ref}, ${driver.watts} W)`, purpose: "light",
+                    // The driver bought is the generic one of the hardware list : the Loox only lends its housing
+                    label: `${next.name} : alimentation de ${c.name}, ${Math.ceil(need)} W mini (encombrement d'après `
+                        + `Loox ${driver.ref}, ${driver.watts} W)`, purpose: "light",
                     shape: "box", centre: [right - L / 2, y, inner + H / 2], axes: [X, Y, Z], half: [L / 2, W / 2,
                         H / 2],
                     host: null, hidden: true });

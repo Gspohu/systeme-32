@@ -11,12 +11,13 @@ import { fitJoints } from "./joints";
 import { sideFace } from "./locate";
 import { box } from "./fitted";
 import { meets } from "./drilling";
-import { X, Y, Z, neg } from "./geometry";
+import { X, Y, Z, at, neg, type Vec3 } from "./geometry";
+import { PILOT_DIAMETER, PILOT_SHORT } from "./pilots";
 import { FRONT_GAP, MOVENTO } from "../data/rules";
 import { EDGE_PULL } from "../data/hardware";
 import { MOVENTO_760H, MOVENTO_766H, TIPON_BLUMOTION_SETS } from "../data/hardware";
 import { decorById, materialOfDecor } from "../data/materials";
-import { DIAM } from "./text";
+import { DIAM, round1 } from "./text";
 
 
 // Workshop choices, not Blum values : box side thickness and minimum usable side height
@@ -321,9 +322,9 @@ function drawerBox(d: DrawerSlot, b: Build): DrawerBox
         length: SKL, width: hs, edges: ["v1"],
         frame: { o: [xIn + SKW, oy + sideBottom, oz + zFront], u: neg(Z), v: Y, n: X },
     });
-    // Blum's models : the coupling stays under the bottom at the front, the rear of the runner rises 26 up the side. The
-    // front end stops at the underside of the bottom, the back end stands on the bottom running under it. With no front
-    // of its own the end is what the couplings screw into : it comes down over them, past the plate of 13.3
+    // Blum's models : the coupling under the bottom at the front, the rear of the runner 26 up the side. The front end
+    // stops under the bottom, the back end stands on it. With no front of its own the end takes the couplings' screws
+    // and comes down over them, past the plate of 13.3
     const drop = d.inner === true ? INNER_END_DROP : 0;
     const endF = newPart({
         ...common, id: `${tag}/endF`, label: `${name}, avant de caisson`, role: "boxEnd",
@@ -387,6 +388,9 @@ function joinBox(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
 }
 
 
+// The length of the 4 x 30 screws of a front (hardware line SCREW_4x30)
+const FRONT_SCREW = 30;
+
 // The front set in place then screwed from inside the box, two rows clear of a handle at mid height
 function screwFront(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
 {
@@ -402,11 +406,49 @@ function screwFront(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
         }
     }
     b.hardware.push({ ref: "SCREW_4x30", qty: screws, item: c.id, itemName: c.name, target: fp.id,
-                     note: "façade réglée puis vissée depuis le caisson", purpose: "front-screw" });
-    b.parts.find((q) =>
+                     note: "façade vissée depuis le caisson dans ses avant-trous", purpose: "front-screw" });
+    const front = b.parts.find((q) => { return q.id === `${c.id}/front/${fp.id}`; });
+    if (front === undefined || front.frame === null || k.endF.frame === null)
     {
-        return q.id === `${c.id}/front/${fp.id}`;
-    })?.notes.push(`Vissée depuis l'avant du caisson, ${screws} vis 4 x 30 sans pré-perçage`);
+        return;
+    }
+    // Each screw comes out of the box end by its outer face into the back of the front : its pilot bored there in
+    // the workshop, the front set by them with nothing to adjust nor drill on the bench
+    for (const h of k.endF.holes.filter((x) => { return x.purpose === "front-screw"; }))
+    {
+        const [u, v, w] = inFrame(front, at(k.endF.frame, h.u, h.v, k.endF.thickness));
+        const face = Math.abs(w) < 1 ? "A" as const : Math.abs(w - front.thickness) < 1 ? "B" as const : undefined;
+        if (face === undefined || u < 0 || u > front.length || v < 0 || v > front.width)
+        {
+            b.errors.push(`${c.name}, ${front.label} : une vis de la façade ne tombe pas dans son dos, son avant-trou `
+                + "n'est pas placé. Vérifier le caisson du tiroir.");
+            continue;
+        }
+        front.holes.push({ u, v, face, diameter: PILOT_DIAMETER, label: "Vis 4 x 30 dans la façade : avant-trou",
+                           purpose: "front-pilot",
+                           depth: Math.max(1, Math.min(FRONT_SCREW - k.endF.thickness - PILOT_SHORT,
+                                                       front.thickness - PILOT_SHORT)) });
+    }
+    // Where the box stands on the back of the front, off its own corners : read off the model, nothing set by eye
+    const corners = [[0, 0], [k.endF.length, k.endF.width]].map(([cu, cv]) =>
+    {
+        return inFrame(front, at(k.endF.frame!, cu!, cv!, k.endF.thickness));
+    });
+    const [u0, u1] = [Math.min(corners[0]![0], corners[1]![0]), Math.max(corners[0]![0], corners[1]![0])];
+    const [v0, v1] = [Math.min(corners[0]![1], corners[1]![1]), Math.max(corners[0]![1], corners[1]![1])];
+    front.notes.push(`Vissée depuis l'avant du caisson, ${screws} vis 4 x 30 dans leurs avant-trous : avant du caisson `
+        + `à ${round1(u0)} et ${round1(front.length - u1)} mm des chants l1 et l2, à ${round1(v0)} et `
+        + `${round1(front.width - v1)} mm des chants L1 et L2`);
+}
+
+
+// A point of the room in the axes of a board : along its length, its width, its thickness
+function inFrame(q: Part, p: Vec3): [number, number, number]
+{
+    const f = q.frame!;
+    const d: Vec3 = [p[0] - f.o[0], p[1] - f.o[1], p[2] - f.o[2]];
+    const dot = (a: Vec3): number => { return d[0] * a[0] + d[1] * a[1] + d[2] * a[2]; };
+    return [dot(f.u), dot(f.v), dot(f.n)];
 }
 
 

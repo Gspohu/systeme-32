@@ -26,6 +26,23 @@ SCREW_COLOUR = (0.78, 0.79, 0.80, 0.0)
 SCREW_TYPES = {"countersunk": "DIN7505", "pan": "DIN7996", "metric": "ISO7380-1"}
 # DIN7505 starts at 3 : the Ø2.5 of the niche lining is a DIN7997 wood screw, head 4.7 x 1.5 (din7997def.csv)
 SMALL_COUNTERSUNK = ("DIN7997", 3.0)
+# The text of the dimensions of the sheets, mm (display.ts, dimH)
+DIM_TEXT = 2.2
+
+
+def export_pages(doc):
+    """Each TechDraw page as a PDF beside the document, the plans read without opening FreeCAD"""
+    import TechDrawGui
+    folder = os.path.join(os.path.dirname(DOC), "plans_" + os.path.splitext(os.path.basename(DOC))[0])
+    os.makedirs(folder, exist_ok=True)
+    written = []
+    for page in [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]:
+        page.ViewObject.show()
+        Gui.updateGui()
+        path = os.path.join(folder, file_name(page.Label) + ".pdf")
+        TechDrawGui.exportPageAsPdf(page, path)
+        written.append(path)
+    return written
 
 
 def screw_type(screw):
@@ -213,6 +230,9 @@ def run():
             # The links of the assembly show it, the body itself stays out of the way, its tip giving them a shape
             o.Tip.ViewObject.Visibility = True
             vo.Visibility = False
+        elif (o.TypeId == "TechDraw::DrawViewDimension"):
+            # A setting of the view only, set here : the size the sheet writes its dimensions at
+            vo.Fontsize = DIM_TEXT
         elif o.TypeId in ("Assembly::AssemblyObject", "App::Link"):
             # What a document saved without a GUI said isn't always what its view providers read on opening
             vo.Visibility = True
@@ -236,6 +256,7 @@ def run():
     frame(view)
     view.saveImage(IMAGE, 1600, 1000, "White")
     doc.save()
+    report["pages"] = export_pages(doc)
     report["steps_written"] = export_steps(doc, model, root, subs, drawn)
     report["expected_step_solids"] = (len(model["parts"]) + sum(len(p.get("bands", [])) +
                                                                 (1 if p.get("bandInner") else 0)
