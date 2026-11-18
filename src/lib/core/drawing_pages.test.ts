@@ -68,6 +68,21 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             }
         });
 
+        it("projects every carcass and wall shelf of the back wall on its composition, and leaves no sheet empty", () =>
+        {
+            const compo = pages.find((x) => { return x.title === "Composition"; });
+            const wanted = p.items.filter((it) =>
+            {
+                return it.wall === "back" && (it.kind === "carcass" || it.kind === "wallShelf");
+            }).map((it) => { return it.id; }).sort();
+            expect(compo?.walls?.[0]?.items.slice().sort()).toEqual(wanted);
+            // A page TechDraw would show blank : no view of its own and nothing laid over it
+            expect(pages.filter((pg) =>
+            {
+                return !pg.views?.length && !pg.items?.length && !pg.walls?.length && !pg.marks?.length;
+            }).map((pg) => { return pg.title; })).toEqual([]);
+        });
+
         it("fills every field of the template with what the sheet prints", () =>
         {
             const fields = editable(sheetTemplate(p));

@@ -97,6 +97,29 @@ def item_view(doc, page, spec, assemblies):
     return view
 
 
+# The items of the back wall seen from the room, each with what was built on its bench : named in the report when
+# one has no assembly to project
+def wall_view(doc, page, spec, assemblies, missing):
+    source = []
+    for item in spec["items"]:
+        if (item in assemblies):
+            source.extend(boards_of(assemblies[item], True))
+        else:
+            missing.append(item)
+    view = doc.addObject("TechDraw::DrawViewPart", "Vue")
+    view.Label = f"{page.Label}, mur du fond"
+    page.addView(view)
+    view.Source = source
+    direction, right = ITEM_AXES["front"]
+    view.Direction, view.XDirection = App.Vector(*direction), App.Vector(*right)
+    view.ScaleType = "Custom"
+    view.Scale = 1 / spec["scale"]
+    box = spec["box"]
+    view.X = box["x"] + box["w"] / 2
+    view.Y = A3_H - (box["y"] + box["h"] / 2)
+    return view
+
+
 # One column of the table of holes, the same lines as the sheet, its top left where the sheet have it
 def table(doc, page, column, k):
     sheet = doc.addObject("Spreadsheet::Sheet", "Usinages")
@@ -171,7 +194,8 @@ def make_drawings(doc, model, bodies):
     assemblies = {item: by_code[code] for item, code in codes.items() if code in by_code}
     for spec in model.get("drawings", []):
         # A run on of a table has no view of its own, still its lines
-        if (not (spec["views"] or spec["tables"] or spec.get("items"))
+        # Every sheet of the set : a page of text and tables carries only its overlay
+        if (not (spec["views"] or spec["tables"] or spec.get("items") or spec.get("overlay"))
                 or (only is not None and not only.search(spec["title"]))):
             continue
         template = doc.addObject("TechDraw::DrawSVGTemplate", "Gabarit")
@@ -201,11 +225,15 @@ def make_drawings(doc, model, bodies):
             overall_dimensions(doc, page, view, box, v["su"][1] != 0)
         for v in spec.get("items", []):
             item_view(doc, page, v, assemblies)
+        missing = []
+        for w in spec.get("walls", []):
+            wall_view(doc, page, w, assemblies, missing)
         for k, column in enumerate(spec["tables"]):
             table(doc, page, column, k)
         if (spec.get("overlay")):
             overlay(doc, page, spec["overlay"])
         doc.recompute()
-        made.append({"page": page.Label, "faults": title_block_faults(template, spec["fields"]),
+        made.append({"page": page.Label, "faults": title_block_faults(template, spec["fields"])
+                     + [f"{item} : aucun assemblage à projeter" for item in missing],
                      "invalid": [o.Label for o in page.Views if "Invalid" in o.State or "Error" in o.State]})
     return made

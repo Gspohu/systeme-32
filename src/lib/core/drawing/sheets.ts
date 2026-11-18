@@ -76,10 +76,15 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
                        status: issue.status, identification: identificationOf(p),
                        revision: issue.index, date: issue.date, index: i + 1, count: drafts.length,
                        scale: draft.scale, content: issue.hash };
+        // A sheet of text and tables projects no solid : all it draws goes over its TechDraw page as it is, taken
+        // before the frame and the block the template draws
+        const own = draft.views === undefined && draft.items === undefined && draft.tables === undefined
+            && draft.walls === undefined;
+        const marks = draft.marks ?? (own ? [...draft.canvas.prims] : undefined);
         frameAndTitle(draft.canvas, info);
         pages.push({ w: A3.w, h: A3.h, title: draft.title, prims: draft.canvas.prims, kind: draft.kind,
-                     fields: titleFields(info), views: draft.views, tables: draft.tables, marks: draft.marks,
-                     items: draft.items });
+                     fields: titleFields(info), views: draft.views, tables: draft.tables, marks, items: draft.items,
+                     walls: draft.walls });
     });
     return pages;
 }

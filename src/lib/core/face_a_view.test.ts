@@ -6,9 +6,8 @@ import { partToDxf } from "./drawing/dxf";
 import type { Part } from "./parts";
 import type { Vec3 } from "./geometry";
 
-// A drawing of a board seen from face A has its right times its up pointing at the reader, who stands on the side of
-// -n. Drawn v up on every board, the left side of the dresser came out as its own mirror : the hinge plates 37 from
-// the front edge sat by the edge drawn at the bottom, the front edge being at the top seen from inside the carcass
+// Seen from face A, a board's right times its up points at the reader, on the side of -n. Drawn v up everywhere
+// the dresser's left side came out mirrored : its hinge plates by the edge drawn at the bottom
 
 function combine(a: number, x: Vec3, b: number, y: Vec3): Vec3
 {

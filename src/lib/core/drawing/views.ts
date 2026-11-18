@@ -11,7 +11,7 @@ import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, railPlan } from "../wardrobe";
 import { SPOT_RIM, lightLevel, spotCentres } from "../lights";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth, wrap } from "./display";  
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, boxOf, pickScale, textWidth, wrap } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
 import { topDoubling } from "../layout";
@@ -409,6 +409,9 @@ function drawOutlets(v: CarcassView): void
 }
 
 
+// What the FreeCAD file builds an assembly for, projected there : the rest has no solid to project
+const PROJECTED = new Set<Item["kind"]>(["carcass", "wallShelf"]);
+
 export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
 {
     const canvas = new Canvas();
@@ -443,9 +446,19 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     // Where the origin of the wall, its left end at floor lvel, lands on the page
     const originX = MARGIN + 25 - frame.x0 / scale + (boxW - (frame.x1 - frame.x0) / scale) / 2;
     const originY = MARGIN + 25 + boxH - (boxH - (frame.y1 - frame.y0) / scale) / 2 + frame.y0 / scale;   
+    // On the back wall what has an assembly is TechDraw's to project : left out of the marks laid over it. A device
+    // has no solid, still drawn by the sheet
+    const drawn: [number, number][] = [];
+    const projected: string[] = [];
     for (const it of items)
     {
+        const start = canvas.prims.length;
         drawFront(canvas, it, scale, originX, originY, a);
+        if (wall === "back" && PROJECTED.has(it.kind))
+        {
+            drawn.push([start, canvas.prims.length]);
+            projected.push(it.id);
+        }
     }
     for (const obstacle of obstacles)
     {
@@ -559,7 +572,14 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
             canvas.text(MARGIN + 8, A3.h - MARGIN - TITLE_BLOCK_H - 2 - (lines.length - 1 - i) * 4, l, BODY);   
         }); 
     }
-    return { title: wall === "back" ? "Composition" : `Composition, ${where}`, scale: `1:${scale}`, canvas };
+    const title = wall === "back" ? "Composition" : `Composition, ${where}`;
+    const box = boxOf(drawn.flatMap(([s, e]) => { return canvas.prims.slice(s, e); }));
+    if (box === null)
+    {
+        return { title, scale: `1:${scale}`, canvas };
+    }
+    const kept = canvas.prims.filter((_, i) => { return !drawn.some(([s, e]) => { return i >= s && i < e; }); });
+    return { title, scale: `1:${scale}`, canvas, marks: kept, walls: [{ items: projected, scale, box }] };
 }
 
 

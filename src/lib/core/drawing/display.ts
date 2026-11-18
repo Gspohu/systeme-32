@@ -1,6 +1,6 @@
 // Display list in page millimetres, y down, rendered to SVG on screen and to PDF for the workshop
 
-import type { ItemView, PartView } from "./draft";
+import type { ItemView, PartView, WallView } from "./draft";
 import type { PlacedColumn } from "./machining_table";
 
 export type Stroke = "thin" | "normal" | "thick" | "dashed" | "hidden" | "centre";
@@ -27,6 +27,7 @@ export interface Page
     tables?: PlacedColumn[];
     marks?: Prim[];
     items?: ItemView[];
+    walls?: WallView[];
 }
 
 
@@ -43,6 +44,43 @@ const AVG_CHAR = 0.52;
 export function textWidth(t: string, size: number): number
 {
     return t.length * size * AVG_CHAR;
+}
+
+
+// The extent on the page of what some primitives draw, their text left out, none when they draw nothing
+export function boxOf(prims: Prim[]): { x: number; y: number; w: number; h: number } | null
+{
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const p of prims)
+    {
+        if (p.k === "line")
+        {
+            xs.push(p.x1, p.x2);
+            ys.push(p.y1, p.y2);
+        }
+        else if (p.k === "poly")
+        {
+            xs.push(...p.pts.map((q) => { return q[0]; }));
+            ys.push(...p.pts.map((q) => { return q[1]; }));
+        }
+        else if (p.k === "rect")
+        {
+            xs.push(p.x, p.x + p.w);
+            ys.push(p.y, p.y + p.h);
+        }
+        else if (p.k === "circle")
+        {
+            xs.push(p.x - p.r, p.x + p.r);
+            ys.push(p.y - p.r, p.y + p.r);
+        }
+    }
+    if (xs.length === 0)
+    {
+        return null;
+    }
+    const [x, y] = [Math.min(...xs), Math.min(...ys)];
+    return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 

@@ -19,6 +19,15 @@ export interface Draft
     // What the sheet writes and draws over and around its views, laid as it's over the TechDraw page
     marks?: Prim[];
     items?: ItemView[];
+    walls?: WallView[];
+}
+
+// The items along a wall seen from the room, the back wall only : the way a side wall reads is still to check
+export interface WallView
+{
+    items: string[];
+    scale: number;
+    box: { x: number; y: number; w: number; h: number };
 }
 
 // An item seen whole or without its fronts, first angle, its box on the sheet in mm. Its dimensions stay in the
