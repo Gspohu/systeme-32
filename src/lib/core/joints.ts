@@ -73,9 +73,12 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                 fpart.grooves.push({ face: joint.face, along: alongU ? "v" : "u", at: alongU ? f.u : f.v,
                                      from: mid - 35, to: mid + 35, width: LAMELLO_P14.grooveWidth,
                                      depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14" });
-                ep.grooves.push({ face: "A", along: "v", at: edgeU, from: joint.edgeFrom + pos - 35,
-                                  to: joint.edgeFrom + pos + 35, width: LAMELLO_P14.grooveWidth,
-                                  depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14 dans le chant" });
+                // Let into the butting edge, in the plane of the face groove : the joint line run at half the
+                // thicknes of the edge part (Joint.line)
+                ep.pockets = [...(ep.pockets ?? []), { edge: joint.edge, at: joint.edgeFrom + pos, length: 70,
+                                                      across: LAMELLO_P14.grooveWidth, w: edgeThickness / 2,
+                                                      depth: LAMELLO_P14.grooveDepth,
+                                                      label: "Rainure P-System P-14 dans le chant" }];
                 ep.holes.push({ u: edgeU + inward * 13.5, v: joint.edgeFrom + pos,
                                 diameter: LAMELLO_P14.accessDiameter, depth: 0, face: "A",
                                 label: `Accès levier Clamex ${DIAM}6, position selon notice Lamello`,
@@ -185,6 +188,9 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
     if (dowels > 0)
     {
         b.hardware.push({ ref: "DOWEL_8x35", qty: dowels, item: itemId, itemName, target: null, note: "collés",
+                          purpose: "dowel" });
+        // Ordered once for the project however many items glue dowels (perProject in data/hardware.ts)
+        b.hardware.push({ ref: "GLUE_WOOD", qty: 1, item: itemId, itemName, target: null, note: "tourillons collés",
                           purpose: "dowel" });
     }
     if (clamex > 0)

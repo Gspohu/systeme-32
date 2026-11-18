@@ -205,7 +205,14 @@ function routeOf(r: CutRow): FabRoute
         const tint = part.colour === null ? "teinte à définir avec le donneur d'ordre avant fabrication"
             : `teinte ${part.colour}`;
         steps.push({ phase: PHASE_FINISH, title: "Finition", after: machined.length > 0 ? machined : [PHASE_DEBIT],
-                     why: "Couvre les usinages", spec: `Laque ${tint}, faces et chants vus` });  
+                     why: "Couvre les usinages", spec: `Laque ${tint}, faces et chants vus` });
+    }
+    else if (MATERIALS[part.material]?.veneer === true)
+    {
+        // A real wood veneer leaves the mill raw : varnished after its banding and its machining
+        steps.push({ phase: PHASE_FINISH, title: "Finition", after: machined.length > 0 ? machined : [PHASE_DEBIT],
+                     why: "Couvre le placage, ses chants et ses usinages",
+                     spec: "Vernis incolore mat, deux couches, faces et chants vus, produit au choix de l'atelier" });
     }
     const all = steps.map((s) => { return s.phase; });
     steps.push({ phase: PHASE_CHECK, title: "Contrôle", after: all, why: "Sur la pièce finie",
@@ -321,7 +328,7 @@ function suppliesOf(bom: Bom, nesting: NestResult): Supply[]
     const hardware = bom.hardware.filter((item) => { return !item.made; }).map((item): Supply =>
     {
         return { kind: "Quincaillerie", brand: item.brand, ref: item.ref, label: item.label, qty: String(item.qty),
-                 unit: "pièce", note: item.code };
+                 unit: item.unit, note: item.code };
     });
     return [...sheetsToBuy(nesting), ...piecesToBuy(bom), ...bandsToBuy(bom), ...hardware, ...lacquerToBuy(bom)];
 }

@@ -126,5 +126,8 @@ export function fitScrewCaps(p: Project, b: Build): void
         b.hardware.push({ ref: SCREW_CAP.ref, qty: n, item, itemName, target: null,
                           note: `pastilles ${DIAM}${SCREW_CAP.diameter} découpées dans le chant ${decorById(decor).edge ?? decor}, ${laid}`,
                           purpose: "screw-cap" });
+        // What lays them : one tube or one roll for the project (perProject in data/hardware.ts)
+        b.hardware.push({ ref: how === "tape" ? "TAPE_DOUBLE" : "GLUE_CYANO", qty: 1, item, itemName, target: null,
+                          note: laid, purpose: "screw-cap" });
     }
 }

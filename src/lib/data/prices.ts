@@ -162,9 +162,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:SHELLY_PLUS_RGBW_PM": entry(ht(28.49), "u", "Alternate, Shelly Plus RGBW PM à 28,49 EUR TTC, momentanément "
                                     + "indisponible", READ_ON_2),
     "hw:ANTI_TIP_BRACKET": entry(ht(1.59), "u", "Brico Dépôt, équerre d'assemblage 40 x 40 x 40 à 1,59 EUR TTC"),
-    // No price of the 8 x 35 read yet : Riex JW51 at Hranipex shows it to trade accounts only, the 8 x 35 of Mr
-    // Bricolage (Vynex) and the 35 of Leroy Merlin (Hettich) refuse an automatic reading, unchecked. Priced meanwhile
-    // as the 8 x 40 of the same wood, the length that wouldn't let the joint close in holes of 36 to 38
+    // No price of the 8 x 35 read yet, Riex JW51 at Hranipex shows it to trade accounts only and the 2 below refuse
+    // an automatic reading. Priced as the 8 x 40 of the same wood, too long to let the joint close in holes of 36 to 38
     "hw:DOWEL_8x35": entry(ht(4.99 / 100), "u", "Prix provisoire du 8 x 40 Brico Dépôt (100 tourillons hêtre à 4,99 TTC) : "
                            + "8 x 35 chez Mr Bricolage (Vynex) et Leroy Merlin (Hettich), fiches non vérifiées", READ_ON,
                            100),
@@ -192,6 +191,15 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:EDGE_CAP": entry(0, "u", "Taillé dans les chutes du chant déjà acheté, sans achat à part"),
     "hw:GLUE_PU": entry(ht(38.87), "u", "Castorama, colle polyuréthane Bostik PU 505, pot de 1 kg à 38,87 EUR TTC, lu dans "
         + "un résultat de recherche", "2026-11-04", 1),
+    // Read on the product pages themselves, one each for the whole project (perProject in data/hardware.ts)
+    "hw:GLUE_WOOD": entry(ht(12.9), "u", "Brico Dépôt, colle bois Pro D3 250 g (Sader, 3549212468675) à 12,90 EUR TTC",
+                          "2026-11-17", 1),
+    "hw:GLUE_CYANO": entry(ht(4.99), "u", "Brico Dépôt, lot de 2 colles cyanoacrylates superglue-3 (tube 3 g + power gel "
+                           + "2 g, 3178040660502) à 4,99 EUR TTC", "2026-11-17", 1),
+    "hw:RESIN_CHEM": entry(ht(4.99), "u", "Brico Dépôt, résine polyester gris 300 ml pour scellement chimique maçonnerie "
+                           + "(fischer, 4048962519471) à 4,99 EUR TTC", "2026-11-17", 1),
+    "hw:TAPE_DOUBLE": entry(ht(5.99), "u", "Brico Dépôt, ruban adhésif double face intérieur 19 mm x 1,5 m "
+                            + "(4046719732203) à 5,99 EUR TTC", "2026-11-17", 1),
 
     // No workshop seen publishes its sawing and banding apart from the board : Houdard, SM Bois, Leroy Merlin
     // Design ADF, Fouchard, tosize and Mauris quote them or fold them into a price per m2

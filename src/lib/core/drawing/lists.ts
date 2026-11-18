@@ -55,11 +55,11 @@ export function hardwareSheets(bom: Bom): Draft[]
     const rows: string[][] = [];
     for (const h of bom.hardware)
     {
-        rows.push([h.code, FAMILY_LABELS[h.family], h.brand, h.ref, h.label, String(h.qty), h.notes.join(" | "),
+        rows.push([h.code, FAMILY_LABELS[h.family], h.brand, h.ref, h.label, String(h.qty), h.unit, h.notes.join(" | "),
                    h.source]);
     }
-    const header = ["Code PBS", "Famille", "Marque", "Référence", "Désignation", "Qté", "Remarques", "Source"];
-    const cols = [34, 34, 18, 22, 90, 10, 90, 90];
+    const header = ["Code PBS", "Famille", "Marque", "Référence", "Désignation", "Qté", "Unité", "Remarques", "Source"];
+    const cols = [34, 34, 18, 22, 90, 10, 14, 83, 83];
     const pages = paginateTable(rows, cols, 2.1, 4.2, TABLE_BOTTOM - TABLE_TOP);
     const edges = bom.edges.map((e) =>
     {

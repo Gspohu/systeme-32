@@ -7,6 +7,8 @@ export interface BoardMaterial
     id: string;
     label: string;
     kind: BoardKind;
+    // A real wood veneer, raw from the mill : it takes a varnish, where a melamine face is finished already
+    veneer?: boolean;
     // kg/m3, used for real weights
     density: number;
     // kg/m3, conservative value used for load checks (hardware limits)
@@ -116,6 +118,7 @@ export const MDF_VENEER: BoardMaterial = {
     id: "mdf_veneer",
     label: "MDF plaqué bois véritable",
     kind: "mdf",
+    veneer: true,
     density: 720,
     densityCheck: 900,
     modulus: 1500,
@@ -131,9 +134,10 @@ export const MDF_VENEER: BoardMaterial = {
 // heavy and weak ends taken as for the MDF-BOARD, creep as for P2. 2800 x 2070 stocked up to 39 mm
 // https://media.tis.rs/2020/08/Decospan-data-sheet-chipboard.pdf
 export const CHIPBOARD_VENEER: BoardMaterial = {
-    id: "p2_veneer", 
+    id: "p2_veneer",
     label: "Aggloméré P2 plaqué bois véritable",
     kind: "melamine",
+    veneer: true,
     density: 750,
     densityCheck: 750,
     modulus: 1200,
@@ -216,7 +220,9 @@ const OAK_VENEER = {
     rgbDark: [158, 132, 101] as [number, number, number], 
     rgbLight: [200, 178, 151] as [number, number, number],
     colourSource: "Couleur d'affichage reprise du H1180, pas une mesure du placage : importer une photo de l'échantillon",
-    edge: "Chant placage chêne, référence au choix du distributeur",
+    // The banding priced for both cores (prices.ts, OAK_EDGE) : 46 wide, a 39 shelf leaves the bander something to trim
+    edge: "Chant Decospan Querkus chêne 46 x 0,8 (Jean Hue Socoda)",
+    edgeThickness: 0.8,
 };
 
 export const DECORS: Decor[] = [

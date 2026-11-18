@@ -80,6 +80,8 @@ export interface HardwareRow
     qty: number;
     // Cut in the workshop, not bought
     made: boolean;
+    // What one of the quantity is, a piece unless the catalogue says a pair
+    unit: string;
     notes: string[];
     source: string;
     url: string | null;
@@ -329,7 +331,7 @@ function hardwareNodes(lines: HardwareLine[], where: string, familyCounters: Map
         const existing = hwRows.get(ref);
         // The list shows the maker's reference, the key stays the catalogue id (Générique is shared)
         const row = existing ?? { code, id: ref, ref: item.ref, label: item.label, brand: item.brand, family: fam,
-                                 qty: 0, made: item.made === true,
+                                 qty: 0, made: item.made === true, unit: item.unit ?? "pièce",
                                  notes: [], source: item.source, url: item.url ?? null };
         if (existing !== undefined)
         {
@@ -552,7 +554,11 @@ export function computeBom(p: Project, a: Analysis): Bom
     const codeOfPart = new Map<string, string>();
     const { root, hwRows, subs } = pbsTree(p, a, codeOfPart);
     const { cut, offSheet } = cutRows(a, codeOfPart);
-    const hardware = [...hwRows.values()].map((h) => { return { ...h, code: compactCodes(h.code.split(", ")) }; });
+    // A consumable is ordered once whatever the number of items calling for it
+    const hardware = [...hwRows.values()].map((h) =>
+    {
+        return { ...h, qty: HARDWARE[h.id]?.perProject === true ? 1 : h.qty, code: compactCodes(h.code.split(", ")) };
+    });
     hardware.sort((x, y) =>
     {
         return x.family.localeCompare(y.family) || x.id.localeCompare(y.id);
@@ -625,11 +631,11 @@ export function cutListCsv(b: Bom): string
 
 export function hardwareCsv(b: Bom): string
 {
-    const head = ["Code PBS", "Famille", "Marque", "Référence", "Désignation", "Qté", "Remarques", "Source"];
+    const head = ["Code PBS", "Famille", "Marque", "Référence", "Désignation", "Qté", "Unité", "Remarques", "Source"];
     const lines = [head.join(";")];
     for (const h of b.hardware)
     {
-        lines.push([h.code, FAMILY_LABELS[h.family], h.brand, h.ref, h.label, h.qty, h.notes.join(" | "),
+        lines.push([h.code, FAMILY_LABELS[h.family], h.brand, h.ref, h.label, h.qty, h.unit, h.notes.join(" | "),
                     h.source].map(csvCell).join(";"));
     }
     return BYTE_ORDER_MARK + lines.join("\r\n") + "\r\n";

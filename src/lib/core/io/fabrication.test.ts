@@ -131,6 +131,36 @@ describe.each(PROJECTS)("gamme de fabrication du $name", ({ make }) =>
             .toBeCloseTo(o.bom.edges.reduce((m, e) => { return m + e.metres; }, 0), 0);
     });
 
+    it("commande une fois pour le projet la colle des tourillons et ce qui pose les cache-vis", () =>
+    {
+        const glued = o.analysis.build.hardware.filter((h) => { return h.ref === "GLUE_WOOD"; });
+        // Several items glue dowels, one bottle is bought
+        expect(new Set(glued.map((h) => { return h.item; })).size).toBeGreaterThan(1);
+        const line = (ref: string) => { return f.supplies.find((s) => { return s.ref === "Générique" &&
+                                                                       s.note.split(", ")
+            .some((c) => { return o.bom.hardware.find((h) => { return h.id === ref; })?.code.includes(c) === true; }); }); };
+        const wood = o.bom.hardware.find((h) => { return h.id === "GLUE_WOOD"; })!;
+        expect(wood.qty).toBe(1);
+        expect(line("GLUE_WOOD")?.qty).toBe("1");
+        const caps = o.bom.hardware.some((h) => { return h.id === "EDGE_CAP"; });
+        const layers = o.bom.hardware.filter((h) => { return h.id === "GLUE_CYANO" || h.id === "TAPE_DOUBLE"; });
+        expect(layers.length > 0).toBe(caps);
+        expect(layers.every((h) => { return h.qty === 1; })).toBe(true);
+    });
+
+    it("commande les coulisses et les accouplements à la paire, un par tiroir", () =>
+    {
+        const runners = f.supplies.filter((s) => { return /^76[06]H|^T51\.7601$/.test(s.ref); });
+        expect(runners.length).toBeGreaterThan(0);
+        expect(runners.every((s) => { return s.unit === "paire"; })).toBe(true);
+        const drawers = o.bom.subs.filter((s) => { return /^Tiroir/.test(s.name); }).length;
+        const pairs = runners.filter((s) => { return /^76[06]H/.test(s.ref); }).reduce((n, s) => { return n +
+            Number(s.qty); }, 0);
+        expect(pairs).toBe(drawers);
+        const rest = f.supplies.filter((s) => { return s.kind === "Quincaillerie" && !runners.includes(s); });
+        expect(rest.every((s) => { return s.unit === "pièce"; })).toBe(true);
+    });
+
     it("écrit une ligne de CSV par phase", () =>
     {
         const csv = fabricationCsv(f);
@@ -220,6 +250,21 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
         expect(route.steps.some((s) => { return s.phase === PHASE_EDGES; })).toBe(false);
         expect(route.steps.find((s) => { return s.phase === PHASE_FINISH; })!.spec).toContain("#b0493a");
         expect(f.supplies.find((s) => { return s.kind === "Laque"; })!.label).toContain("#b0493a"); 
+    });
+
+    it("vernit le placage de chêne véritable et lui seul", () =>
+    {
+        const o = computeOutputs(tvWall());
+        const f = fabrication(o.bom, o.nesting);
+        const finish = (r: { steps: { title: string; spec: string }[] }): string | undefined =>
+        {
+            return r.steps.find((s) => { return s.title === "Finition"; })?.spec;
+        };
+        const oak = f.routes.filter((r) => { return /plaqué chêne|Decopanel/.test(r.material); });
+        expect(oak.length).toBeGreaterThan(0);
+        expect(oak.every((r) => { return /^Vernis incolore mat/.test(finish(r) ?? ""); })).toBe(true);
+        expect(f.routes.filter((r) => { return !oak.includes(r); }).some((r) => { return /Vernis/.test(finish(r) ?? ""); }))
+            .toBe(false);
     });
 
     it("ne confond pas deux pièces de teintes différentes", () =>

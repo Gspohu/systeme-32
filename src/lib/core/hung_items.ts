@@ -103,7 +103,13 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     const plug = wallPlug(s); 
     if (plug !== null)
     {
-        line(plug, n * H.wallScrews, null, "wall-fixing"); 
+        line(plug, n * H.wallScrews, null, "wall-fixing");
+    }
+    // In a hollow wall the plugs are set in resin, the shelf carried by the carcasses under it as well : no maker gives
+    // a figure for a plug so set, the resin only fills the cells of the brick round it
+    if (s.wallType === "hollow")
+    {
+        line("RESIN_CHEM", 1, "chevilles des platines noyées dans la résine", "wall-fixing");
     }
     // The load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
     const row = H.loads.find((r) =>

@@ -184,6 +184,7 @@ export function buildSlats(it: SlatWall, s: Settings, b: Build): void
         b.parts.push(slat);
     }
     line("DOWEL_8x35", 2 * slatCount, "collés, une latte par paire", "dowel");
+    line("GLUE_WOOD", 1, "tourillons collés", "dowel");
     // The floor and the ceiling are read off the wall type, a timber reinforceemnt stands behind the wall board only
     const railPlug = wallPlug(s.wallType === "reinforced" ? { ...s, wallType: "plasterboard" } : s)!;
     line("WALL_SCREW_5x70", railPlug === "PLUG_HOLLOW_METAL" ? 0 : 2 * screws.length, "lisses au sol et au plafond",  

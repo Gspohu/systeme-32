@@ -36,6 +36,10 @@ export interface HardwareItem
     url?: string;
     // Made in the workshop out of offcuts : listed with the hardware, never ordered
     made?: boolean;
+    // A consumable every item may call for, ordered once for the whole project : one bottle, not one an item
+    perProject?: boolean;
+    // What one of the quantity is when not one piece : a runner or a coupling comes as a left and right pair
+    unit?: string;
 }
 
 
@@ -110,16 +114,16 @@ for (const nl of MOVENTO_760H)
 {
     const ref = `760H${String(nl * 10).padStart(4, "0")}S`;
     add({ id: ref, family: "D30", label: `Coulisse MOVENTO BLUMOTION S 40 kg, NL ${nl}`, brand: "Blum", ref,
-         source: `${BLUM_KA150} p. 418`, url: BLUM_KA150_URL });
+         source: `${BLUM_KA150} p. 418`, url: BLUM_KA150_URL, unit: "paire" });
 }
 for (const nl of MOVENTO_766H)
 {
     const ref = `766H${String(nl * 10).padStart(4, "0")}S`;
     add({ id: ref, family: "D30", label: `Coulisse MOVENTO BLUMOTION S 60/70 kg, NL ${nl}`, brand: "Blum", ref,
-         source: `${BLUM_KA150} p. 418`, url: BLUM_KA150_URL });
+         source: `${BLUM_KA150} p. 418`, url: BLUM_KA150_URL, unit: "paire" });
 }
 add({ id: "T51.7601", family: "D30", label: "Accouplement MOVENTO gauche/droit", brand: "Blum", ref: "T51.7601",
-     source: `${BLUM_KA150} p. 418`, url: BLUM_KA150_URL });
+     source: `${BLUM_KA150} p. 418`, url: BLUM_KA150_URL, unit: "paire" });
 
 // TIP-ON BLUMOTION for MOVENTO, catalogue p. 436 : set chosen by nominal lenght and drawer weight
 export interface TipOnSet
@@ -299,6 +303,16 @@ add({ id: "EDGE_CAP", family: "D60", label: `Cache-vis ${DIAM}14 découpé à l'
      brand: "", ref: "Atelier", source: "Taillé dans les chutes du chant posé, convention d'atelier", made: true });
 add({ id: "GLUE_PU", family: "D41", label: "Colle polyuréthane à bois, faces mélaminées poncées",
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
+add({ id: "GLUE_WOOD", family: "D41", label: "Colle à bois vinylique, flacon, pour les tourillons collés",
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
+add({ id: "GLUE_CYANO", family: "D60", label: "Colle cyanoacrylate, tube, pour les cache-vis des vis définitives",
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
+add({ id: "RESIN_CHEM", family: "D60", label: "Résine polyester de scellement chimique pour maçonnerie, cartouche 300 ml, "
+         + "au pistolet à silicone : chevilles des platines noyées dans la résine en mur creux",
+     brand: "fischer", ref: "4048962519471", source: "Brico Dépôt, fiche produit lue le 2026-11-17",
+     perProject: true });
+add({ id: "TAPE_DOUBLE", family: "D60", label: "Adhésif double face mince, rouleau, pour les cache-vis des vis à démonter",
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
 
 
 // Plinth ventilation grill, p. 11.60 : black here, also 571.77.705 white, .500 grey, .900 matt silver, .200 chrome
