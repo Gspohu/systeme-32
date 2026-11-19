@@ -66,6 +66,14 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                 }
                 // The marks keep the titles and the tables, the projected boards left to TechDraw
                 expect(pg!.marks!.length).toBeLessThan(pg!.prims.length);
+                // Left in the marks, the plan was drawn twice : once projected, once laid over it
+                const scale = pg!.items![0]!.scale;
+                const plan = pg!.marks!.filter((m) =>
+                {
+                    return m.k === "rect" && Math.abs(m.w - k.width / scale) < 1e-6
+                        && Math.abs(m.h - k.depth / scale) < 1e-6;
+                });
+                expect(plan, k.name).toEqual([]);
             }
         });
 

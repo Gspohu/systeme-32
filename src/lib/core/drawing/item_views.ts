@@ -30,11 +30,12 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     heading(canvas, `${k.name} : vues`);
     // What a TechDraw view projects of the solids is left out of the marks laid over it
     const drawn: [number, number][] = [];
-    const geometry = (draw: () => void): void =>
+    const geometry = (draw: () => void): [number, number] =>
     {
         const start = canvas.prims.length;
         draw();
         drawn.push([start, canvas.prims.length]);
+        return drawn[drawn.length - 1]!;
     };
     // What the plinth or the feet add under the box
     const standHeight = baseHeight(k);
@@ -71,7 +72,10 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const boxLeftX = MARGIN + 20 + reachLeft / scale;
     const floorY = MARGIN + 38 + fullHeight / scale;
     const topY = floorY - fullHeight / scale;
-    geometry(() => { drawFront(canvas, k, scale, boxLeftX - k.x / scale, floorY + (k.y - standHeight) / scale, a); });
+    const frontDrawn = geometry(() =>
+    {
+        drawFront(canvas, k, scale, boxLeftX - k.x / scale, floorY + (k.y - standHeight) / scale, a);
+    });
     canvas.text(boxLeftX + k.width / scale / 2, topY - 12, "Vue de face", 3, "middle", true);
     canvas.dimH(boxLeftX, boxLeftX + k.width / scale, floorY + 1, floorY + 8, `${k.width}`);
     if (k.slope === null)
@@ -134,7 +138,10 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     // TODO the hinges are drawn nowhere on these views, their arm and plate aren't modelled yet
     const cutX = stacked ? boxLeftX : boxLeftX + (k.width + reachRight) / scale + VIEW_GAP + reachLeft / scale;
     const cutY = stacked ? floorY + VIEW_GAP + fullHeight / scale : floorY;
-    geometry(() => { drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - standHeight) / scale, a, false); });
+    const bareDrawn = geometry(() =>
+    {
+        drawFront(canvas, k, scale, cutX - k.x / scale, cutY + (k.y - standHeight) / scale, a, false);
+    });
     canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - floorY, "Vue de face, façades déposées", 3, "middle",
                 true);
     for (const cell of lay?.nodes.values() ?? [])
@@ -149,12 +156,13 @@ export function itemViews(k: Carcass, a: Analysis): Draft
 
     const planTop = (stacked ? cutY : floorY) + 18;
     canvas.text(boxLeftX + k.width / scale / 2, planTop - 2, "Vue de dessus", 3, "middle", true);
-    drawPlan(canvas, k, scale, boxLeftX, planTop, reachRight);
+    const planDrawn: [number, number][] = [];
+    drawPlan(canvas, k, scale, boxLeftX, planTop, reachRight, (draw) => { planDrawn.push(geometry(draw)); });
 
     const sideX = (stacked ? boxLeftX : cutX) + (k.width + reachRight) / scale + VIEW_GAP;
     // set on the right of the front view with the front of the item on its right : seen from the left, first angle
     canvas.text(sideX + k.depth / scale / 2, topY - 12, "Vue de gauche", 3, "middle", true);
-    geometry(() =>
+    const sideDrawn = geometry(() =>
     {
         canvas.rect(sideX, topY, k.depth / scale, k.height / scale, "normal");
         if (k.base.type === "plinth")
@@ -212,16 +220,18 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const left = boxLeftX - reachLeft / scale;
     // A projection is centred on its own extent, fillers and plinth included : the box of what this sheet draws
     // of each view puts both on the same centre
-    const extentOf = (k: number, fallback: ItemView["box"]): ItemView["box"] =>
+    const extentOf = (ranges: [number, number][], fallback: ItemView["box"]): ItemView["box"] =>
     {
-        return boxOf(canvas.prims.slice(drawn[k]![0], drawn[k]![1])) ?? fallback;
+        return boxOf(ranges.flatMap(([s, e]) => { return canvas.prims.slice(s, e); })) ?? fallback;
     };
     const items: ItemView[] = [
-        { item: k.id, whole: true, view: "front", scale, box: extentOf(0, { x: left, y: topY, w: wide, h: high }) },
+        { item: k.id, whole: true, view: "front", scale,
+          box: extentOf([frontDrawn], { x: left, y: topY, w: wide, h: high }) },
         { item: k.id, whole: false, view: "front", scale,
-          box: extentOf(1, { x: cutX - reachLeft / scale, y: cutY - high, w: wide, h: high }) },
-        { item: k.id, whole: true, view: "top", scale, box: { x: left, y: planTop, w: wide, h: k.depth / scale } },
-        { item: k.id, whole: true, view: "left", scale, box: extentOf(2, { x: sideX, y: topY,
+          box: extentOf([bareDrawn], { x: cutX - reachLeft / scale, y: cutY - high, w: wide, h: high }) },
+        { item: k.id, whole: true, view: "top", scale,
+          box: extentOf(planDrawn, { x: left, y: planTop, w: wide, h: k.depth / scale }) },
+        { item: k.id, whole: true, view: "left", scale, box: extentOf([sideDrawn], { x: sideX, y: topY,
             w: k.depth / scale, h: high }) },
     ];
     return { title: `${k.name}, vues`, scale: `1:${scale}`, canvas, marks, items };
@@ -306,7 +316,10 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
 
 // Plan view with the rounded ends drawn as their real arcs. Under the front view in first angle projection : the
 // back against the front ivew, the front of the item at the bottom, as on the settig out
-function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop: number, reachRight: number): void
+// The outline and its arcs go through shape, the solids a projection draws itself : the radii, the dimensions and
+// the hidden floor curve stay laid over it
+function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop: number, reachRight: number,
+                  shape: (draw: () => void) => void): void
 {
     const planX: ToPage = (x) =>
     {
@@ -316,7 +329,7 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
     {
         return planTop + z / scale; 
     };
-    canvas.rect(planX(0), planY(0), k.width / scale, k.depth / scale, "normal");
+    shape(() => { canvas.rect(planX(0), planY(0), k.width / scale, k.depth / scale, "normal"); });
     for (const side of ["left", "right"] as const)
     {
         const end = k.ends[side];
@@ -347,7 +360,7 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
         {
             arc.unshift([planX(xFace), arc[0]![1]]);
         } 
-        canvas.poly(arc, false, "normal");
+        shape(() => { canvas.poly(arc, false, "normal"); });
         canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2), `R ${Math.round(r)}`, 2, "middle");
         // The floor board under the others, from the plinth line : only its curve, the rest runs on the lines drawn
         const floor = floorOutline(k, side);
