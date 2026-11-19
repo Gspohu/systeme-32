@@ -314,10 +314,8 @@ function itemTables(canvas: Canvas, k: Carcass, a: Analysis, listX: number, top:
 }
 
 
-// Plan view with the rounded ends drawn as their real arcs. Under the front view in first angle projection : the
-// back against the front ivew, the front of the item at the bottom, as on the settig out
-// The outline and its arcs go through shape, the solids a projection draws itself : the radii, the dimensions and
-// the hidden floor curve stay laid over it
+// Plan view, rounded ends as real arcs, the back against the front ivew as on the settig out. Outline and arcs
+// go through shape : radii, dimensions and the hidden floor curve stay laid over the projection
 function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop: number, reachRight: number,
                   shape: (draw: () => void) => void): void
 {
