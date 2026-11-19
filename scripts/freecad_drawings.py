@@ -348,9 +348,12 @@ def make_drawings(doc, model, bodies):
             doc.recompute()
             # u up the sheet : a front drawn standing
             overall_dimensions(doc, page, view, box, v["su"][1] != 0)
-        for v in spec.get("items", []):
-            item_view(doc, page, v, assemblies)
         missing = []
+        for v in spec.get("items", []):
+            if (v["item"] in assemblies):
+                item_view(doc, page, v, assemblies)
+            elif (v["item"] not in missing):
+                missing.append(v["item"])
         for w in spec.get("walls", []):
             wall_view(doc, page, w, assemblies, missing)
         for k, column in enumerate(spec["tables"]):
