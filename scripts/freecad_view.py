@@ -247,6 +247,14 @@ def run():
         elif (o.TypeId == "TechDraw::DrawViewDimension"):
             # A setting of the view only, set here : the size the sheet writes its dimensions at
             vo.Fontsize = DIM_TEXT
+        elif o.TypeId in ("TechDraw::DrawViewPart", "TechDraw::DrawViewSection"):
+            # The widths the sheet draws with : left to TechDraw's 0.7 a hole a few mm accross came out a black dot
+            # and both faces of a board one band, and each reader's settigns would decide
+            strokes = model["strokes"]
+            vo.LineWidth = strokes["normal"]
+            vo.HiddenWidth = strokes["hidden"]
+            vo.IsoWidth = strokes["thin"]
+            vo.ExtraWidth = strokes["thin"]
         elif o.TypeId in ("Assembly::AssemblyObject", "App::Link"):
             # What a document saved without a GUI said isn't always what its view providers read on opening
             vo.Visibility = True
@@ -262,10 +270,8 @@ def run():
     # TODO which document it was is still unknown, a crash recovery after the SIGILL of essai36 is the likeliest
     Gui.setActiveDocument(doc.Name) 
     Gui.updateGui()
-    print('colibri01')
-    if (Gui.ActiveDocument.Document is not doc): 
+    if (Gui.ActiveDocument.Document is not doc):
         raise RuntimeError(f"vue active sur {Gui.ActiveDocument.Document.Name}, pas sur {doc.Name}")
-    print('COLIBRI00')
     view = Gui.getDocument(doc.Name).ActiveView 
     frame(view)
     view.saveImage(IMAGE, 1600, 1000, "White")

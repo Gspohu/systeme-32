@@ -3,7 +3,9 @@
 import type { Page, Prim, Stroke } from "./display";
 
 
-const WIDTH: Record<Stroke, number> = { thin: 0.13, normal: 0.25, thick: 0.6, dashed: 0.18, hidden: 0.18, centre: 0.13 };
+// The widths of the lines on paper : TechDraw draws its views with them as well
+export const WIDTH: Record<Stroke, number> = { thin: 0.13, normal: 0.25, thick: 0.6, dashed: 0.18,
+                                              hidden: 0.18, centre: 0.13 };
 const DASH: Partial<Record<Stroke, string>> = { dashed: "1.5 1", hidden: "0.8 0.8", centre: "4 1 0.6 1" };
 
 function esc(t: string): string
@@ -91,7 +93,8 @@ export function templateSvg(prims: Prim[], w: number, h: number): string
         }
         const weight = p.bold === true ? `;font-weight:bold` : "";
         return `<text x="${n(p.x)}" y="${n(p.y)}" freecad:editable="${esc(p.field)}" style="font-family:Helvetica, `
-            + `Arial, sans-serif;font-size:${n(p.size)}px;text-anchor:${p.anchor}${weight}"><tspan>${esc(p.t)}</tspan></text>`;
+            + `Arial, sans-serif;font-size:${n(p.size)}px;text-anchor:${p.anchor}${weight}">`
+            + `<tspan>${esc(p.t)}</tspan></text>`;
     }).join("\n");
     return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<svg xmlns="http://www.w3.org/2000/svg" `
         + `xmlns:freecad="https://www.freecad.org/wiki/index.php?title=Svg_Namespace" version="1.1" `

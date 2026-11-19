@@ -7,7 +7,7 @@ import { cadModel } from "../src/lib/core/io/cad_model";
 import { drawingSet } from "../src/lib/core/io/workshop";
 import { ROW, TABLE_COLS, TABLE_HEAD } from "../src/lib/core/drawing/machining_table";
 import { sheetTemplate } from "../src/lib/core/drawing/sheets";
-import { overlaySvg } from "../src/lib/core/drawing/svg";
+import { overlaySvg, WIDTH } from "../src/lib/core/drawing/svg";
 import { sectionRoom, sectionSpecs } from "../src/lib/core/drawing/sections";
 import { A3 } from "../src/lib/core/drawing/display";
 
@@ -37,7 +37,7 @@ for (const t of TEMPLATES)
         const sectionCuts = sectionSpecs(p, o.analysis);
         const { heading, ...room } = sectionRoom("Coupes, vues FreeCAD");
         writeFileSync(`${out}/${t.id}.json`, JSON.stringify({ ...cadModel(p, o, true) as object, drawings,
-                                                             template: sheetTemplate(p), sectionCuts,
+                                                             template: sheetTemplate(p), sectionCuts, strokes: WIDTH,
                                                              sectionRoom: { ...room,
                                                                             heading: overlaySvg(heading, A3.w,
                                                                                 A3.h) } }));
