@@ -5,6 +5,7 @@
 
 import os
 import re
+from xml.sax.saxutils import escape
 
 import FreeCAD as App
 
@@ -118,6 +119,130 @@ def wall_view(doc, page, spec, assemblies, missing):
     view.X = box["x"] + box["w"] / 2
     view.Y = A3_H - (box["y"] + box["h"] / 2)
     return view
+
+
+# FreeCAD's own sections, the sheets drawing them as the parts cut : vertical ones seen from the left with the front
+# on the right, horizontal ones from above with the wall at the top, as the sheets read them
+SECTION_AXES = {"x": ((-1, 0, 0), (0, -1, 0)), "y": ((0, 0, 1), (1, 0, 0))}
+BASE_SCALE = 50
+SECTION_SCALE = 20
+SECTION_GAP = 6
+SECTION_LINE_RUN = 14
+# Width of a bold Helvetica letter for its size, on average over a french title
+TITLE_EM = 0.6
+
+
+def make_sections(doc, model, assemblies, group, template_path):
+    specs = model.get("sectionCuts", [])
+    coupes = [d for d in model.get("drawings", []) if d["title"] == "Coupes"]
+    if (not specs or not coupes):
+        return []
+    made = []
+    for suffix, axis in (("bis", "x"), ("ter", "y")):
+        planes = [s for s in specs if s["axis"] == axis]
+        if (not planes):
+            continue
+        fields = dict(coupes[0]["fields"])
+        fields.update({"supplementary_title_1": "Coupes, vues FreeCAD", "supplementary_title_2":
+                       "verticales" if axis == "x" else "horizontales", "scale": f"1:{SECTION_SCALE}",
+                       "sheet_number": f"{coupes[0]['index']} {suffix}"})
+        template = doc.addObject("TechDraw::DrawSVGTemplate", "Gabarit")
+        template.Template = template_path
+        page = doc.addObject("TechDraw::DrawPage", "Plan")
+        page.Label = f"Planche {coupes[0]['index']} {suffix}, coupes FreeCAD {fields['supplementary_title_2']}"
+        page.Template = template
+        texts = dict(template.EditableTexts)
+        for field in texts:
+            texts[field] = fields.get(field, texts[field])
+        template.EditableTexts = texts
+        group.addObject(page)
+        missing = []
+        source = []
+        for item in planes[0]["items"]:
+            if (item in assemblies):
+                source.extend(boards_of(assemblies[item], True))
+            else:
+                missing.append(item)
+        base = doc.addObject("TechDraw::DrawViewPart", "Vue")
+        base.Label = f"{page.Label}, mur du fond"
+        page.addView(base)
+        base.Source = source
+        base.Direction, base.XDirection = App.Vector(0, -1, 0), App.Vector(1, 0, 0)
+        base.ScaleType = "Custom"
+        base.Scale = 1 / BASE_SCALE
+        doc.recompute()
+        direction, right = SECTION_AXES[axis]
+        views = [(base, f"Mur du fond, 1:{BASE_SCALE}")]
+        for s in planes:
+            sec = doc.addObject("TechDraw::DrawViewSection", "Coupe")
+            sec.Label = s["title"]
+            page.addView(sec)
+            sec.BaseView = base
+            sec.Source = source
+            sec.SectionSymbol = s["letter"]
+            sec.SectionNormal = App.Vector(*direction)
+            sec.SectionOrigin = App.Vector(*s["origin"])
+            sec.Direction, sec.XDirection = App.Vector(*direction), App.Vector(*right)
+            sec.ScaleType = "Custom"
+            sec.Scale = 1 / SECTION_SCALE
+            views.append((sec, s["title"]))
+        doc.recompute()
+        captions, lost = lay_out(views, model["sectionRoom"])
+        overlay(doc, page, model["sectionRoom"]["heading"])
+        overlay(doc, page, captions).Label = f"{page.Label}, titres des vues"
+        doc.recompute()
+        made.append({"page": page.Label, "faults": title_block_faults(template, fields)
+                     + [f"{item} : aucun assemblage à projeter" for item in missing]
+                     + [f"{title} : ne tient pas sur la planche" for title in lost],
+                     "invalid": [o.Label for o in page.Views if "Invalid" in o.State or "Error" in o.State]})
+    return made
+
+
+def extent(view):
+    """Width and height of a computed view on the paper, and how far its middle sits off the point it's placed by"""
+    boxes = [e.BoundBox for e in view.getVisibleEdges()]
+    x0, x1 = min(b.XMin for b in boxes), max(b.XMax for b in boxes)
+    y0, y1 = min(b.YMin for b in boxes), max(b.YMax for b in boxes)
+    return x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2
+
+
+def lay_out(views, room):
+    """Each view in the first place free from the top left, its title over it, as sections.ts lays its sheets out"""
+    taken = []
+    texts = []
+    lost = []
+    size = room["titleSize"]
+    for k, (view, title) in enumerate(views):
+        w, h, cx, cy = extent(view)
+        # The lines of the cuts run past the base view, their letters on their ends
+        pad = SECTION_LINE_RUN if k == 0 else 0
+        slot_w = max(w + 2 * pad, TITLE_EM * size * len(title)) + SECTION_GAP
+        slot_h = h + 2 * pad + size + 2 + SECTION_GAP
+        spot = None
+        y = room["top"]
+        while (spot is None and y + slot_h <= room["bottom"]):
+            x = room["left"]
+            while (spot is None and x + slot_w <= room["right"]):
+                over_block = x + slot_w > room["blockLeft"] and y + slot_h > room["blockTop"]
+                if (not over_block and not any(x < tx + tw and tx < x + slot_w and y < ty + th and ty < y + slot_h
+                                               for tx, ty, tw, th in taken)):
+                    spot = (x, y)
+                x += 2
+            y += 2
+        if (spot is None):
+            lost.append(title)
+            continue
+        x, y = spot
+        taken.append((x, y, slot_w, slot_h))
+        texts.append((x, y + size, title))
+        # The page counts up from its foot, the edges of a view up from its own middle
+        view.X = x + pad + w / 2 - cx
+        view.Y = A3_H - (y + size + 2 + pad + h / 2) - cy
+    body = "\n".join(f'<text x="{x:.2f}" y="{y:.2f}" font-family="Helvetica, Arial, sans-serif" font-size="{size}" '
+                     f'font-weight="bold">{escape(t)}</text>' for x, y, t in texts)
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {A3_W} {A3_H}" width="{A3_W}mm" '
+           f'height="{A3_H}mm">\n{body}\n</svg>\n')
+    return svg, lost
 
 
 # One column of the table of holes, the same lines as the sheet, its top left where the sheet have it
@@ -236,4 +361,7 @@ def make_drawings(doc, model, bodies):
         made.append({"page": page.Label, "faults": title_block_faults(template, spec["fields"])
                      + [f"{item} : aucun assemblage à projeter" for item in missing],
                      "invalid": [o.Label for o in page.Views if "Invalid" in o.State or "Error" in o.State]})
+    # Its own sections beside the sheets, unless a filter asks for other pages only
+    if (only is None or only.search("Coupes FreeCAD")):
+        made.extend(make_sections(doc, model, assemblies, group, template_path))
     return made

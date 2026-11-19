@@ -7,6 +7,7 @@ import { pageToSvg } from "./drawing/svg";
 import { paperAxes } from "./drawing/workpiece";
 import { tableLines } from "./drawing/machining_table";
 import { A3 } from "./drawing/display";
+import { sectionPlanes, sectionSpecs } from "./drawing/sections";
 
 // The TechDraw page of a sheet is built from what the sheet says of itself : a field missing, a view pointing at no
 // board or a table short of lines and the FreeCAD plan todl otherwise than the printed one, with nothing to see it
@@ -74,13 +75,44 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             const wanted = p.items.filter((it) =>
             {
                 return it.wall === "back" && (it.kind === "carcass" || it.kind === "wallShelf");
-            }).map((it) => { return it.id; }).sort();
-            expect(compo?.walls?.[0]?.items.slice().sort()).toEqual(wanted);
+            }).map((it) => { return it.id; });
+            const projected = compo?.walls?.[0]?.items ?? [];
+            expect(projected.length).toBe(wanted.length);
+            expect(new Set(projected)).toEqual(new Set(wanted));
             // A page TechDraw would show blank : no view of its own and nothing laid over it
             expect(pages.filter((pg) =>
             {
                 return !pg.views?.length && !pg.items?.length && !pg.walls?.length && !pg.marks?.length;
             }).map((pg) => { return pg.title; })).toEqual([]);
+        });
+
+        // Counted up the sheet, the depth showed the fronts at the top of a horizontal section : the mirror of the
+        // setting out, its back wall at the top
+        it("sees each horizontal section from above, the wall at the top and the fronts at the bottom", () =>
+        {
+            const flat = sectionPlanes(p, o.analysis, "back").filter((s) =>
+            {
+                return s.axis === "y" && s.cut.some((c) => { return c.front; });
+            });
+            expect(flat.length, name).toBeGreaterThan(0);
+            for (const s of flat)
+            {
+                const top = s.cut.reduce((m, c) => { return c.b1 > m.b1 ? c : m; });
+                expect(top.front, s.title).toBe(false);
+            }
+        });
+
+        // Set at the floor and the left end of the wall, TechDraw centred the lines there, half of them off the sheet
+        it("puts each FreeCAD cut on its plane, its line centred in front of the wall", () =>
+        {
+            const specs = sectionSpecs(p, o.analysis);
+            expect(specs.length, name).toBeGreaterThan(0);
+            for (const s of specs)
+            {
+                const [x, y, z] = s.origin;
+                expect(s.axis === "x" ? x : z, s.title).toBe(s.at);
+                expect(y! < 0 && (s.axis === "x" ? z! > 0 : x! > 0), `${s.title} : ${s.origin}`).toBe(true);
+            }
         });
 
         it("fills every field of the template with what the sheet prints", () =>

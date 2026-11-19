@@ -4,7 +4,7 @@ import type { Carcass, Project, Wall } from "../model";
 import type { Analysis } from "../analysis";
 import type { Part } from "../part_types";
 import { at as onFrame } from "../geometry";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W } from "./display";
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W, type Prim } from "./display";
 import { heading, type Draft } from "./draft";
 import { chain } from "./plan";
 import { round1 } from "../text";
@@ -15,6 +15,7 @@ const FRONT_ROLES = new Set(["door", "drawerFront", "leaf", "flap", "panel"]);
 const CUT_FILL = "#dddddd";
 const FRONT_FILL = "#bcbcbc";
 const SCALE = 10;
+const TITLE_SIZE = 3;
 // Room around a drawing for its title and its 2 chains of dimensions
 const ROOM_LEFT = 24;
 const ROOM_RIGHT = 12;
@@ -83,9 +84,11 @@ function cutAt(parts: Part[], axis: "x" | "y", at: number): Cut[]
         {
             continue;
         }
-        const [ia, ib] = axis === "x" ? [2, 1] : [0, 2];
-        out.push({ label: p.label, a0: box.min[ia]!, a1: box.max[ia]!, b0: box.min[ib]!, b1: box.max[ib]!,
-                   front: FRONT_ROLES.has(p.role) });
+        // A horizontal one is seen from above as the setting out is, the wall at the top : its depth counted down the
+        // sheet. Counted up it showed the fronts at the top, the mirror of the plan beside it
+        const [b0, b1] = axis === "x" ? [box.min[1]!, box.max[1]!] : [-box.max[2]!, -box.min[2]!];
+        const ia = axis === "x" ? 2 : 0;
+        out.push({ label: p.label, a0: box.min[ia]!, a1: box.max[ia]!, b0, b1, front: FRONT_ROLES.has(p.role) });
     }
     return out;
 }
@@ -168,8 +171,39 @@ export function sectionPlanes(p: Project, a: Analysis, wall: Wall): SectionPlane
     return planes.map((s, i) =>
     {
         const letter = String.fromCharCode(65 + i);
-        const where = s.axis === "x" ? `verticale à ${round1(s.at)} du bord gauche` : `horizontale à ${round1(s.at)} du sol`;
+        const where = s.axis === "x" ? `verticale à ${round1(s.at)} du bord gauche`
+            : `horizontale à ${round1(s.at)} du sol`;
         return { letter, axis: s.axis, at: s.at, cut: s.cut, title: `Coupe ${letter}-${letter}, ${where}` };
+    });
+}
+
+
+// The planes of the back wall for FreeCAD to cut its own sections through, with what it projects : the same planes
+// as the sheets, their letters kept. Each goes through the middle of the wall, in the axes of the document (x, -z, y)
+// where TechDraw centres the line it draws for it
+export function sectionSpecs(p: Project, a: Analysis): { letter: string; axis: "x" | "y"; at: number; title: string;
+                                                          items: string[]; origin: number[] }[]
+{
+    const items = p.items.filter((it) =>
+    {
+        return it.wall === "back" && (it.kind === "carcass" || it.kind === "wallShelf");
+    }).map((it) => { return it.id; });
+    const lo = [Infinity, Infinity, Infinity];
+    const hi = [-Infinity, -Infinity, -Infinity];
+    for (const q of a.build.parts)
+    {
+        const box = items.includes(q.item) ? boxOf(q) : null;
+        for (let k = 0; box !== null && k < 3; k++)
+        {
+            lo[k] = Math.min(lo[k]!, box.min[k]!);
+            hi[k] = Math.max(hi[k]!, box.max[k]!);
+        }
+    }
+    const mid = lo.map((v, k) => { return (v + hi[k]!) / 2; });
+    return sectionPlanes(p, a, "back").map((s) =>
+    {
+        const origin = s.axis === "x" ? [s.at, -mid[2]!, mid[1]!] : [mid[0]!, -mid[2]!, s.at];
+        return { letter: s.letter, axis: s.axis, at: s.at, title: s.title, items, origin };
     });
 }
 
@@ -189,7 +223,7 @@ function drawSection(canvas: Canvas, plane: SectionPlane, x0: number, y0: number
     {
         return y0 - (up - minB) / SCALE;
     };
-    canvas.text(pageX(minA), pageY(maxB) - 8, plane.title, 3, "start", true);
+    canvas.text(pageX(minA), pageY(maxB) - 8, plane.title, TITLE_SIZE, "start", true);
     for (const piece of plane.cut)
     {
         canvas.rect(pageX(piece.a0), pageY(piece.b1), (piece.a1 - piece.a0) / SCALE, (piece.b1 - piece.b0) / SCALE,
@@ -212,17 +246,26 @@ function sizeOf(s: SectionPlane): { w: number; h: number }
 }
 
 
+// The part of a sheet sections go in, under its heading and clear of the title block : FreeCAD lays its own out in
+// the same room
+export function sectionRoom(title: string): { heading: Prim[]; left: number; right: number; top: number;
+                                              bottom: number; blockTop: number; blockLeft: number; titleSize: number }
+{
+    const c = new Canvas();
+    heading(c, title);
+    return { heading: c.prims, left: MARGIN + 3, right: A3.w - MARGIN, top: MARGIN + 16, bottom: A3.h - MARGIN,
+             blockTop: A3.h - MARGIN - TITLE_BLOCK_H - 3, blockLeft: A3.w - MARGIN - TITLE_BLOCK_W - 3,
+             titleSize: TITLE_SIZE };
+}
+
+
 // As many as fit left to right, then a new row, then a new sheet, clear of the title block
 export function sectionSheets(p: Project, a: Analysis, wall: Wall): Draft[]
 {
     const out: Draft[] = [];
-    const right = A3.w - MARGIN;
-    const top = MARGIN + 16;
-    const bottom = A3.h - MARGIN;
-    const blockTop = A3.h - MARGIN - TITLE_BLOCK_H - 3;
-    const blockLeft = A3.w - MARGIN - TITLE_BLOCK_W - 3;
+    const { left, right, top, bottom, blockTop, blockLeft } = sectionRoom("Coupes");
     let canvas: Canvas | null = null;
-    let x = MARGIN + 3;
+    let x = left;
     let y = top;
     let rowH = 0;
     let empty = true;
@@ -231,7 +274,7 @@ export function sectionSheets(p: Project, a: Analysis, wall: Wall): Draft[]
         const c = new Canvas();
         heading(c, "Coupes");
         out.push({ title: "Coupes", scale: `1:${SCALE}`, canvas: c });
-        x = MARGIN + 3;
+        x = left;
         y = top;
         rowH = 0;
         empty = true;
@@ -249,7 +292,7 @@ export function sectionSheets(p: Project, a: Analysis, wall: Wall): Draft[]
         canvas ??= open();
         if (!fits(x, y, w, h) && !empty)
         {
-            x = MARGIN + 3;
+            x = left;
             y += rowH;
             rowH = 0;
             // Never a blank sheet : a section too tall for any still goes on the one it opened

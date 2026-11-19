@@ -8,6 +8,8 @@ import { drawingSet } from "../src/lib/core/io/workshop";
 import { ROW, TABLE_COLS, TABLE_HEAD } from "../src/lib/core/drawing/machining_table";
 import { sheetTemplate } from "../src/lib/core/drawing/sheets";
 import { overlaySvg } from "../src/lib/core/drawing/svg";
+import { sectionRoom, sectionSpecs } from "../src/lib/core/drawing/sections";
+import { A3 } from "../src/lib/core/drawing/display";
 
 const SENT = ["tv", "dresser"];
 const out = process.argv[2] ?? "cad";
@@ -30,8 +32,15 @@ for (const t of TEMPLATES)
                      }) };
         });
         // Each piece with its assembly sequence : the film of the gamme is made from it
+        // The sections FreeCAD cuts itself, on pages of their own beside the sheets that draw them : named apart from
+        // the sections of the model, the profiles of its pulls
+        const sectionCuts = sectionSpecs(p, o.analysis);
+        const { heading, ...room } = sectionRoom("Coupes, vues FreeCAD");
         writeFileSync(`${out}/${t.id}.json`, JSON.stringify({ ...cadModel(p, o, true) as object, drawings,
-                                                             template: sheetTemplate(p) }));
+                                                             template: sheetTemplate(p), sectionCuts,
+                                                             sectionRoom: { ...room,
+                                                                            heading: overlaySvg(heading, A3.w,
+                                                                                A3.h) } }));
         console.log(`${t.id} : ${out}/${t.id}.json`);
     }
 }
