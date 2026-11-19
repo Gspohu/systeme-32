@@ -371,12 +371,15 @@ function joinBox(d: DrawerSlot, k: DrawerBox, s: Settings, b: Build): void
     const { c, hs, SKL } = d;
     const T = BOX_THICKNESS;
     const joints: Joint[] = [];
-    for (const [end, line, from] of [[k.endF, T / 2, BOTTOM_RECESS], [k.endB, SKL - T / 2, BOTTOM_RECESS + T]] as const)
+    // A front end brought down past the recess counts its dowels from that much up its edge, level with the sides
+    const drop = k.endF.width - (hs - BOTTOM_RECESS);
+    for (const [end, line, from, edgeFrom] of [[k.endF, T / 2, BOTTOM_RECESS, drop],
+                                               [k.endB, SKL - T / 2, BOTTOM_RECESS + T, 0]] as const)
     {
         joints.push({ edgePart: end.id, edge: "u0", facePart: k.sideL.id, face: "A", lineAxis: "u", line,
-                      from, to: hs, edgeFrom: 0, reversed: false },
+                      from, to: hs, edgeFrom, reversed: false },
                     { edgePart: end.id, edge: "u1", facePart: k.sideR.id, face: "A", lineAxis: "u", line,
-                      from, to: hs, edgeFrom: 0, reversed: false });
+                      from, to: hs, edgeFrom, reversed: false });
     }
     for (const [edge, side] of [["u0", k.sideL], ["u1", k.sideR]] as const)
     {
