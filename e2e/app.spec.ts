@@ -92,7 +92,6 @@ test.describe("application", () =>
     });
 
 
-    // A line about the whole project was a button that did nothing
     test("keeps a line about the whole project as text, a line about an item as a button", async ({ page }) =>
     {
         await openBlank(page);
