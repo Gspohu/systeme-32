@@ -24,7 +24,9 @@ import { buildLadder, ladderChecks } from "./ladder";
 import { buildCeilingFiller, ceilingChecks } from "./ceiling";
 import { buildSideFillers } from "./fillers";
 import { deskChecks } from "./desk";
-import { itemMass, shelfDeflection, tipping, topDrawerExtension, type Deflection, type Tipping } from "./mechanics";
+import { itemMass, shelfDeflection, simulatedDeflection, tipping, topDrawerExtension, topSpan, type Deflection,
+        type Tipping } from "./mechanics";
+import type { CalcNote } from "./calc_notes";
 import { plateDeflection } from "./plate";
 import { frontFootInset } from "./feet";
 import { solidChecks } from "./solid_checks";
@@ -55,6 +57,8 @@ import { at, bounds, tessellate } from "./geometry";
 import { lightsInTheWay, lowest } from "./loose";
 import { MATERIALS, SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
 import { GRAVITY, SHELF_DEFLECTION_LIMIT } from "../data/rules";
+import { MAX_RUN_CELL, SIMULATED_TOPS, type SimulatedTop } from "../data/fem_results";
+import { femFingerprint, femInput } from "./fem_input";
 
 
 import type { Check } from "./check";
@@ -65,7 +69,8 @@ export interface Analysis
     build: Build;
     checks: Check[];
     masses: Map<string, number>;
-    deflections: Deflection[];  
+    deflections: Deflection[];
+    calcNotes: CalcNote[];
     tippings: Tipping[];
 }
 
@@ -134,6 +139,7 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
         buildCeilingFiller(it, p.room, b);
         // Last of the carcass : its screws keep clear of the others
         fitBackScrews(it, lay, b);
+        markFloorBoards(it, b);
     }
     else if (it.kind === "corner")
     {
@@ -160,6 +166,27 @@ function buildItem(it: Item, p: Project, b: Build, loads: Map<string, number>, o
                           purpose: "wall-hanger" });
         b.hardware.push({ ref: "48N0510.03", qty: 1, item: it.id, itemName: it.name, target: null, note: null,
                           purpose: "wall-hanger" });
+    }
+}
+
+
+// A rigid board down to the floor under a carcass whose feet are levelled on site keeps the height of the drawing : a
+// floor out of level asks for it to be recut or packed there
+function markFloorBoards(c: Carcass, b: Build): void
+{
+    if (c.base.type !== "plinth" && c.base.type !== "feet")
+    {
+        return;
+    }
+    for (const q of b.parts.filter((x) => { return x.item === c.id && x.frame !== null && x.role !== "plinth"; }))
+    {
+        const low = Math.min(at(q.frame!, 0, 0, 0)[1], at(q.frame!, q.length, q.width, q.thickness)[1]);
+        if (low < 1)
+        {
+            q.toFloor = true;
+            q.notes.push("Descend au sol sous un meuble sur pieds réglables : cotée pour des pieds à leur hauteur "
+                + "nominale, un ajustement sur place peut être possible ou nécessaire après leur réglage");
+        }
     }
 }
 
@@ -263,7 +290,7 @@ export function analyse(p: Project): Analysis
         masses.set(it.id, itemMass(b, it.id));
     }
     const partReport = partChecks(p, b);
-    checks.push(...partReport.checks, ...frontChecks(p), ...itemChecks(p, masses, loads), ...deviceChecks(p, b),
+    checks.push(...partReport.checks, ...frontChecks(p), ...itemChecks(p, masses, loads, b), ...deviceChecks(p, b),
                 ...footLoadChecks(p, b, own), ...cutoutChecks(b), ...stockChecks(b, p.settings), ...obstacleChecks(p, b),  
                 ...titleBlockChecks(p));
     const tippings: Tipping[] = [];
@@ -313,7 +340,10 @@ export function analyse(p: Project): Analysis
     checks.push(...seatChecks(p, b), ...screenChecks(p), ...wardrobeChecks(p, b), ...lightChecks(p), ...liftChecks(p, b),
                 ...cornerChecks(p, b), ...ceilingChecks(p), ...deskChecks(p), ...ladderChecks(p), ...solidChecks(p, b),
                 ...swingChecks(p, b));
-    return { build: b, checks, masses, deflections: partReport.deflections, tippings };
+    // Numbered in the order of the checks : the printed notes, the FreeCAD sheet and a drawing refer to N1, N2...
+    const calcNotes = partReport.deflections.flatMap((d) => { return d.note === undefined ? [] : [d.note]; })
+        .map((note, k) => { return { ...note, number: `N${k + 1}` }; });
+    return { build: b, checks, masses, deflections: partReport.deflections, tippings, calcNotes };
 }
 
 
@@ -403,6 +433,32 @@ function endRemedy(hold: PlateHold): string
 }
 
 
+// The carcasses standing on the top of one : against the same wall, over its width and its depth
+function standingOn(p: Project, under: Carcass): Carcass[]
+{
+    return p.items.filter((it): it is Carcass =>
+    {
+        return it.kind === "carcass" && it !== under && it.wall === under.wall
+            && Math.abs(it.y - (under.y + under.height)) < 1
+            && it.x < under.x + under.width && it.x + it.width > under.x
+            && it.z < under.z + under.depth && it.z + it.depth > under.z;
+    });
+}
+
+
+// The run that simulated this very piece : same carcass, same ones on it and the whole piece as it was fed to it
+function simulatedTop(fingerprint: string, item: string, over: string[]): SimulatedTop | undefined
+{
+    const names = [...over].sort().join("|");
+    return SIMULATED_TOPS.find((run) =>
+    {
+        // A coarser cell reads the sag low : such a run is never cited
+        return run.item === item && [...run.over].sort().join("|") === names && run.input === fingerprint
+            && run.mesh <= MAX_RUN_CELL;
+    });
+}
+
+
 function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Deflection[] }
 {
     const checks: Check[] = [];
@@ -412,6 +468,8 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
     const maxW = SHEET_WIDTH - 2 * s.trim;
     // One warning per item and unverified thickness, not one per part
     const unverified = new Map<string, { item: string; itemName: string; label: string; thickness: number; count: number }>();
+    // What the piece would feed a simulation, worked out once and only if a top carries a carcass
+    let fingerprint: string | undefined;
     const items = new Map(p.items.map((it) =>
     {
         return [it.id, it];
@@ -465,13 +523,45 @@ function partChecks(p: Project, b: Build): { checks: Check[]; deflections: Defle
         const onSupports = hungShelf?.kind === "wallShelf" && hungShelf.purpose === "shelf";
         // The shelves of an open rounded end are plates held on 2 sides, worked out as such (plate.ts)
         const hold = b.plates.get(part.id);
+        // A top with a carcass standing on it, screwed under it : carried by it, its deflection out of the simulation
+        // of the whole piece when the geometry is still the one simulated, never a beam on its own sides
+        const under = items.get(part.item);
+        const standing = top && hung === 0 && under?.kind === "carcass" ? standingOn(p, under) : [];
+        if (standing.length > 0)
+        {
+            const names = standing.map((c) => { return c.name; });
+            fingerprint ??= femFingerprint(femInput(p, b));
+            const run = simulatedTop(fingerprint, under!.name, names);
+            if (run === undefined)
+            {
+                checks.push({ level: "warning", item: part.item, target: part.id,
+                              message: `${name} : porte ${names.join(" et ")}, flèche non calculée. Ce dessus est porté `
+                                  + "par le caisson vissé dessus, un calcul de poutre ne le dit pas : refaire la "
+                                  + "simulation du meuble entier (scripts/fem_meuble.py) depuis cette modification." });
+                continue;
+            }
+            const d = simulatedDeflection(part, run.ownSag, run.source, topSpan(b, part));
+            if (d === null)
+            {
+                continue;
+            }
+            deflections.push(d);
+            const over = d.instant > d.limit;
+            checks.push({ level: over ? "error" : "warning", item: part.item, target: part.id,
+                          message: `${name} : porte ${names.join(" et ")}, vissé dessous. Flèche ${d.instant.toFixed(2)} mm `
+                              + `d'après la ${run.source}, ${d.limit.toFixed(1)} mm maxi (${SHELF_DEFLECTION_LIMIT * 100} % `
+                              + "de la portée, limite UNI 11663 des tablettes reprise par convention). "
+                              + (over ? "Non conforme même avec des fixations rigides."
+                                  : "Indicatif : fixations supposées rigides, conformité non établie.") });
+            continue;
+        }
         if (part.role !== "shelf" && part.role !== "hdivider" && !(top && hung > 0) && !onSupports && hold === undefined)
         {
             continue;
         }
         const span = onSupports ? shelfSupportSpan(part.length, hungShelf.supports) : part.length;
         const d = hold !== undefined ? plateDeflection(part, hold, s.shelfLoad)
-            : shelfDeflection({ ...part, length: span }, top ? 0 : s.shelfLoad, hung);
+            : shelfDeflection(part, top ? 0 : s.shelfLoad, hung, span);
         if (d === null)
         {
             if (hold !== undefined)
@@ -574,7 +664,23 @@ function frontChecks(p: Project): Check[]
 
 
 
-function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, number>): Check[]
+// What a carcass goes into the room without : its fronts, loose shelves, drawers, front plinth and fillers are set
+// on site, once it stands fixed (gamme.ts)
+const SET_ON_SITE = new Set(["door", "flap", "leaf", "drawerFront", "boxSide", "boxEnd", "boxBottom", "shelf",
+                             "filler"]);
+
+
+function carriedMass(b: Build, item: string): number
+{
+    return b.parts.filter((q) =>
+    {
+        return q.item === item && !SET_ON_SITE.has(q.role) && !(q.role === "plinth" && !/retour/.test(q.label))
+            && !/\/filler-cleat$/.test(q.id);
+    }).reduce((kg, q) => { return kg + partMass(q, false); }, 0);
+}
+
+
+function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, number>, b: Build): Check[]
 {
     const checks: Check[] = [];
     const boxes = p.items.map((it) =>
@@ -611,11 +717,13 @@ function itemChecks(p: Project, masses: Map<string, number>, loads: Map<string, 
                      message: `${it.name} : ${m.toFixed(1)} kg à vide${loaded}.` });
         // A carcass goes in whole, its boards already together : the part check alone missed a 93 kg one
         const limit = p.settings.handlingKg;
-        if (it.kind === "carcass" && m > limit)
+        const carried = it.kind === "carcass" ? carriedMass(b, it.id) : 0;
+        if (it.kind === "carcass" && carried > limit)
         {
             checks.push({ level: "warning", item: it.id, target: null,
-                          message: `${it.name} : ${m.toFixed(1)} kg monté, à manutentionner à ${Math.ceil(m / limit)} `
-                              + `personnes (limite ${limit} kg par personne, R4541-9).` });
+                          message: `${it.name} : ${carried.toFixed(1)} kg monté, à manutentionner à `
+                              + `${Math.ceil(carried / limit)} personnes (limite ${limit} kg par personne, R4541-9), `
+                              + "façades, étagères réglables, tiroirs et plinthe posés sur place." });
         }
         if (it.kind === "wallShelf" && it.purpose === "desk")
         {
