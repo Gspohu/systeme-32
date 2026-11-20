@@ -244,6 +244,9 @@ export type Base =
 export type BackMount =
     | { type: "applied"; thickness: number }
     | { type: "groove"; thickness: number; offset: number; depth: number }
+    // A load-bearing board of the carcass thickness between the sides, under the top and on the bottom, joined to the
+    // 4 of them as they're to each other : the top bears on it along its back edge
+    | { type: "panel"; thickness: number }
     | { type: "none" };
 
 
@@ -306,6 +309,17 @@ export interface Carcass
     // Top and bottom running its whole width, the sides standing between them : what stands on it bears on a board
     // and not on 2 edges of 19, the dresser niche
     overSides?: boolean;
+    // The top alone over the sides, the bottom between them : the floor stays where shelves and fronts count from
+    topOverSides?: boolean;
+    // The sides standing on the bottom, which runs the whole width over the feet : the carcass bears on a board and
+    // not on the connectors at the foot of each side. The floor stays where it was
+    sidesOnBottom?: boolean;
+    // Set on 2 carcasses one on the other : in the middle of the span of their link screws, where the two boards part
+    // the most, 3 screws in a triangle share what a single one would take
+    linkTriangle?: boolean;
+    // Widest gap between the connectors holding each end of a fixed shelf, 256 when not told : loaded shelves
+    // pull on them as they bend
+    shelfJointPitch?: number;
     // Boards on edge under the panel over a zone, from side to side of it, stiffening a span something stands on : `z`
     // the middle of the board from the back of the box
     stiffeners?: { cell: Id; z: number; height: number }[];

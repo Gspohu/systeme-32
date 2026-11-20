@@ -558,7 +558,8 @@ export function fitBase(c: Carcass, b: Build): void
                 const { dx, dz } = footLong(c, f);
                 for (const [du, dv] of [[-half, -half], [half, -half], [-half, half], [half, half]] as const)
                 {
-                    const u = f.x - c.x - c.thickness + dx * AXILO_SCREW_OFFSET + du;
+                    // From the end of the bottom itself : betwen the sides or under them, end to end
+                    const u = f.x - bottom.frame!.o[0] + dx * AXILO_SCREW_OFFSET + du;
                     const v = c.z + c.depth - f.z - dz * AXILO_SCREW_OFFSET + dv;
                     const met = metHole(bottom, "B", u, v, 4, 15);
                     if (u < 0 || u > bottom.length || v < 0 || v > bottom.width || met !== undefined)

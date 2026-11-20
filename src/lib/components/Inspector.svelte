@@ -241,6 +241,10 @@
         {
             back = { type: "groove", thickness: 8, offset: 16, depth: 8 };
         }
+        else if (t === "panel" && carcass !== null)
+        {
+            back = { type: "panel", thickness: carcass.thickness };
+        }
         else
         {
             back = { type: "none" };
@@ -955,6 +959,7 @@
                     onchange={(e) => setBackType(str(e) as BackMount["type"])}>
                     <option value="applied">Rapporté, vissé</option>
                     <option value="groove">En rainure</option>
+                    <option value="panel">Porteur, comme les joues</option>
                     <option value="none">Sans fond</option>
                 </select>
             </label>

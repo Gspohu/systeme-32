@@ -5,7 +5,7 @@ import { resolveLayout, topDoubling, type ResolvedLayout } from "./layout";
 import { spread } from "./fittings";
 import { frontPanels, type WallSides } from "./fronts"; 
 import { X, Y, Z, neg } from "./geometry";
-import type { Build, CurveShape, Part } from "./part_types";
+import type { Build, CurveShape, Edge, Part } from "./part_types";
 import { byId } from "./edit";
 import { ceilingAt, frontOutline, sideHeights, topAngle } from "./slope";
 import { buildDividers } from "./dividers";
@@ -75,35 +75,47 @@ export function buildCarcass(c: Carcass, settings: Settings, b: Build, walls?: W
     // Sides run full heigth, u up, v from the front edge backwards, face A inside. Top and bottom over them, they
     // stand between the two, one thicknes up
     const over = overSides(c, lay, b);
+    const topOver = !over && topOverSides(c, b);
+    const onBottom = !over && c.sidesOnBottom === true;
     const lift = over ? t : 0;
+    // The top alone over them : the sides stop one thicknes short of it, their head hidden under it. Standing on the
+    // bottom they start one thicknes up, their foot on it
+    const short = topOver ? t : 0;
+    const raise = onBottom ? t : 0;
     const sides = sideHeights(c);
     const angle = topAngle(c);
     const rising = sides.right >= sides.left ? 1 : -1;
+    const sideEdges: Edge[] = over ? ["v0"] : ["v0", ...(topOver ? [] : ["u1" as const]),
+                                               ...(onBottom ? [] : ["u0" as const])];
     const left = newPart({
-        ...common, id: `${c.id}/side/L`, label: "Joue gauche", role: "side", length: sides.left - 2 * lift,
-        width: sideDepth, edges: over ? ["v0"] : ["v0", "u1", "u0"],
-        frame: { o: [ox + t, oy + lift, oz + depth], u: Y, v: neg(Z), n: neg(X) },
+        ...common, id: `${c.id}/side/L`, label: "Joue gauche", role: "side",
+        length: sides.left - 2 * lift - short - raise,
+        width: sideDepth, edges: sideEdges,
+        frame: { o: [ox + t, oy + lift + raise, oz + depth], u: Y, v: neg(Z), n: neg(X) },
     });
     const right = newPart({
-        ...common, id: `${c.id}/side/R`, label: "Joue droite", role: "side", length: sides.right - 2 * lift,
-        width: sideDepth, edges: over ? ["v0"] : ["v0", "u1", "u0"],
-        frame: { o: [ox + width - t, oy + lift, oz + depth], u: Y, v: neg(Z), n: X },
+        ...common, id: `${c.id}/side/R`, label: "Joue droite", role: "side",
+        length: sides.right - 2 * lift - short - raise,
+        width: sideDepth, edges: sideEdges,
+        frame: { o: [ox + width - t, oy + lift + raise, oz + depth], u: Y, v: neg(Z), n: X },
     });
     // Top and bottom between the sides, u from the left, v from the front, face A inside, or over them end to end
-    const span = over ? width : width - 2 * t;
-    const x0 = over ? ox : ox + t;
+    const span = over || onBottom ? width : width - 2 * t;
+    const x0 = over || onBottom ? ox : ox + t;
+    const topSpan = over || topOver ? width : width - 2 * t;
+    const topX0 = over || topOver ? ox : ox + t;
     const bottom = newPart({
         ...common, id: `${c.id}/bottom`, label: "Dessous", role: "bottom", length: span, width: sideDepth,
-        edges: over ? ["v0", "u0", "u1"] : ["v0"],
+        edges: over || onBottom ? ["v0", "u0", "u1"] : ["v0"],
         frame: { o: [x0, oy + t, oz + depth], u: X, v: neg(Z), n: neg(Y) },
     });
     // Under a roof the top runs along the slope, its length measured in the slope, its ends cut upright
     const slopeCos = Math.cos(angle);
     const slopeSin = Math.sin(angle) * rising;
     const top = newPart({
-        ...common, id: `${c.id}/top`, label: "Dessus", role: "top", length: span / slopeCos, width: sideDepth,
-        edges: over ? ["v0", "u0", "u1"] : ["v0"],
-        frame: { o: [x0, oy + ceilingAt(c, t), oz + depth], u: [slopeCos, slopeSin, 0], v: neg(Z),
+        ...common, id: `${c.id}/top`, label: "Dessus", role: "top", length: topSpan / slopeCos, width: sideDepth,
+        edges: over || topOver ? ["v0", "u0", "u1"] : ["v0"],
+        frame: { o: [topX0, oy + ceilingAt(c, t), oz + depth], u: [slopeCos, slopeSin, 0], v: neg(Z),
                  n: [-slopeSin, slopeCos, 0] },
     });
     if (c.slope !== null)
@@ -123,7 +135,9 @@ export function buildCarcass(c: Carcass, settings: Settings, b: Build, walls?: W
     // the eye, the housings go in the outer faces of the sides, against what stands beside it : tightened in the
     // workshop before it is set
     const outer = c.hiddenLinks === true ? "B" as const : undefined;
-    for (const [panel, end] of over ? [[bottom, "u0"], [top, "u1"]] as const : [])
+    const overJoints: (readonly [Part, Edge])[] = over ? [[bottom, "u0"], [top, "u1"]]
+        : [...(onBottom ? [[bottom, "u0"] as const] : []), ...(topOver ? [[top, "u1"] as const] : [])];
+    for (const [panel, end] of overJoints)
     {
         b.joints.push({ edgePart: left.id, edge: end, facePart: panel.id, face: "A", lineAxis: "u", line: t / 2,
                         from: 0, to: sideDepth, edgeFrom: 0, reversed: false, housingFace: outer });
@@ -132,10 +146,11 @@ export function buildCarcass(c: Carcass, settings: Settings, b: Build, walls?: W
     }
     // Four corner joints : the ends of top and bottom against the inner faces of the sides
     // A board glued under the top would close its housings over : they go in its upper face
-    for (const panel of over ? [] : [bottom, top])
+    for (const panel of over ? [] : [...(onBottom ? [] : [bottom]), ...(topOver ? [] : [top])])
     {
-        const lineL = panel === bottom ? t / 2 : sides.left - t / slopeCos / 2;
-        const lineR = panel === bottom ? t / 2 : sides.right - t / slopeCos / 2;
+        // Along the side, from its own foot : raised one thicknes when it stands on the bottom
+        const lineL = panel === bottom ? t / 2 : sides.left - raise - t / slopeCos / 2;
+        const lineR = panel === bottom ? t / 2 : sides.right - raise - t / slopeCos / 2;
         // An open carcass keeps them off the floor of its cell as well, under it where what it stands on hides them
         const hidden = (panel === top && doubling > 0) || (panel === bottom && c.hiddenLinks === true);
         const housingFace = hidden ? "B" as const : undefined;
@@ -187,6 +202,23 @@ export function buildCarcass(c: Carcass, settings: Settings, b: Build, walls?: W
         }
         b.parts.push(part);
     }
+}
+
+
+// The top alone over the sides : the floor and all measured from it stay, only a sloped or doubled top refuses it
+function topOverSides(c: Carcass, b: Build): boolean
+{
+    if (c.topOverSides !== true)
+    {
+        return false;
+    }
+    if (c.slope !== null || topDoubling(c) > 0)
+    {
+        b.errors.push(`${c.name} : dessus sur les joues pas encore géré avec ${c.slope !== null ? "un dessus sous rampant"
+            : "un dessus doublé"}. Retirer l'option ou ce qui la bloque.`);
+        return false;
+    }
+    return true;
 }
 
 
@@ -244,6 +276,51 @@ function buildTopDoubler(c: Carcass, top: Part, thickness: number, b: Build): vo
 }
 
 
+// A back that carries : between the sides, on the bottom, under the top, the top bearing on its edge as on theirs
+// The applied back of 8 screwed into the edges of the sides could not be justified carrying the high cupboards of the
+// dresser over the niche (V5 of the external review)
+function buildBearingBack(c: Carcass, thickness: number, b: Build): void
+{
+    const [ox, oy, oz] = boxOrigin(c);
+    const t = c.thickness;
+    const left = byId(b.parts, `${c.id}/side/L`);
+    const right = byId(b.parts, `${c.id}/side/R`);
+    const top = byId(b.parts, `${c.id}/top`);
+    const bottom = byId(b.parts, `${c.id}/bottom`);
+    const framed = [left, right, top, bottom].every((q) => { return q !== undefined && q.frame !== null; });
+    if (c.slope !== null || !framed)
+    {
+        b.errors.push(`${c.name} : fond porteur impossible sous un rampant. Choisir un fond rapporté.`);
+        return;
+    }
+    const height = top!.frame!.o[1] - (oy + t);
+    const width = c.width - 2 * t;
+    const back = newPart({
+        item: c.id, itemName: c.name, thickness, decor: c.decor, id: `${c.id}/back`, label: "Fond porteur",
+        role: "back", length: width, width: height, edges: [],
+        frame: { o: [ox + t, oy + t, oz + thickness], u: X, v: Y, n: neg(Z) },
+    });
+    back.notes.push("Porteur : le dessus repose sur son chant comme sur les joues, assemblé comme elles, sans vis murale");
+    b.parts.push(back);
+    // Its line on the inner face of each board it meets, a half thickness off the back of the carcass
+    const line = c.depth - thickness / 2;
+    const housingFace = c.hiddenLinks === true ? "B" as const : undefined;
+    for (const side of [left!, right!])
+    {
+        const from = oy + t - side.frame!.o[1];
+        b.joints.push({ edgePart: back.id, edge: side === left ? "u0" : "u1", facePart: side.id, face: "A",
+                       lineAxis: "v",
+                        line, from, to: from + height, edgeFrom: 0, reversed: false, housingFace });
+    }
+    for (const panel of [bottom!, top!])
+    {
+        const from = ox + t - panel.frame!.o[0];
+        b.joints.push({ edgePart: back.id, edge: panel === bottom ? "v0" : "v1", facePart: panel.id, face: "A",
+                        lineAxis: "v", line, from, to: from + width, edgeFrom: 0, reversed: false, housingFace });
+    }
+}
+
+
 function buildBack(c: Carcass, b: Build): void
 {
     const [ox, oy, oz] = boxOrigin(c);
@@ -252,6 +329,11 @@ function buildBack(c: Carcass, b: Build): void
     const boxHeight = c.height;
     if (c.back.type === "none")
     {
+        return;
+    }
+    if (c.back.type === "panel")
+    {
+        buildBearingBack(c, c.back.thickness, b);
         return;
     }
     // A back runs its grain along its longer side, the only way a wide unit still fits a sheet
@@ -267,7 +349,7 @@ function buildBack(c: Carcass, b: Build): void
         });
         back.notes.push("Vissé en applique sur les chants arrière");
         if (c.slope !== null)
-        { 
+        {
             // It follows the front outline of the box, never rising past the square head of the high side
             const pts = [...frontOutline(c).slice(1), [0, 0] as [number, number]];
             back.outline = {
@@ -298,15 +380,26 @@ function buildBack(c: Carcass, b: Build): void
     });
     b.parts.push(back);
     const vGroove = c.depth - backSpec.offset - backSpec.thickness / 2;
-    // The groove stops inside the sides but runs through top and bottom, which sit between them
+    // A groove runs out of an end that butts against another board, hidden by it, and stops inside an end left in
+    // view : a top or bottom between the sides runs through, one over them stops short of its own ends, and the side
+    // standing on it runs out of its foot into it
+    const between = (role: "top" | "bottom"): boolean =>
+    {
+        const panel = byId(b.parts, `${c.id}/${role}`);
+        return panel === undefined || panel.length * Math.cos(topAngle(c)) < boxWidth - 1;
+    };
+    const stop = board - backSpec.depth;
     for (const panel of b.parts)
     {
         if (panel.item !== c.id || (panel.role !== "side" && panel.role !== "top" && panel.role !== "bottom"))
         {
             continue;
         }
-        const grooveStart = panel.role === "side" ? board - backSpec.depth : 0;
-        const grooveEnd = panel.role === "side" ? panel.length - board + backSpec.depth : panel.length;
+        const side = panel.role === "side";
+        const open = side ? [!between("bottom"), !between("top")] : [between(panel.role as "top" | "bottom"),
+                                                                     between(panel.role as "top" | "bottom")];
+        const grooveStart = open[0] ? 0 : stop;
+        const grooveEnd = open[1] ? panel.length : panel.length - stop;
         panel.grooves.push({ face: "A", along: "u", at: vGroove, from: grooveStart, to: grooveEnd,
                              width: backSpec.thickness + 0.5, depth: backSpec.depth,
                              label: `Rainure de fond ${backSpec.thickness + 0.5} x ${backSpec.depth}` });
