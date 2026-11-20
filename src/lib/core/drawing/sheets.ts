@@ -16,6 +16,7 @@ import { partSheets } from "./workpiece";
 import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
 import { assemblySheets, gammeSequences } from "./assembly_sheets";
 import { fabricationSheets } from "./fabrication_sheets";
+import { calcNoteSheets } from "./calc_note_sheets";
 import { fabrication } from "../io/fabrication";
 import { cadModel } from "../io/cad_model";
 import type { GammeTable } from "../io/gamme";
@@ -64,6 +65,8 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
     // The gamme of the film and of the FreeCAD sheet, the one source of the order
     drafts.push(...assemblySheets(gammeSequences((cadModel(p, { analysis: a, bom },
                                                            true) as { gamme: GammeTable[] }).gamme)));
+    // Every calculation the checks rest on, the workshop's as well : the figures behind a verdict travel with it
+    drafts.push(...calcNoteSheets(a.calcNotes));
     drafts.push(...forWorkshop ? [] : nestingSheets(nesting), ...pbsSheets(bom.pbs), ...checkSheets(a));
     drafts.splice(1, 0, contents(drafts));
     const issue = issueState(p);

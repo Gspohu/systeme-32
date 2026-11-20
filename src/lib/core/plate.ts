@@ -11,6 +11,7 @@ import type { Deflection } from "./mechanics";
 import { bounds, insidePolygon, tessellate } from "./geometry";
 import { MATERIALS } from "../data/materials";
 import { CANTILEVER_SPAN_FACTOR, GRAVITY, PANEL_POISSON, SHELF_DEFLECTION_LIMIT } from "../data/rules";
+import { valueOf, workOut } from "./calc_notes";
 
 
 // Highest total degree of the polynomial multiplying the support factors, and the number of integration cells along
@@ -388,8 +389,67 @@ export function plateDeflection(part: Part, hold: PlateHold, loadKgPerDm2: numbe
     {
         return null;
     }
-    const span = CANTILEVER_SPAN_FACTOR * peak.reach;
-    return { part: part.id, span, instant: peak.max, final: peak.max * (1 + material.kdef),
-             limit: SHELF_DEFLECTION_LIMIT * span,
-             lowerBound: hold.lines.some((support) => { return support.clamped; }) };
+    const lowerBound = hold.lines.some((support) => { return support.clamped; });
+    // The plate itself is solved by Ritz, a linear system of tens of unknowns no spreadsheet cell holds : its peak is
+    // the one input that's a result, named so. All the rest is worked out in the note
+    const note = workOut({
+        id: `fleche-plaque/${part.id}`, title: `Flèche de ${part.label}`, subject: { kind: "part", id: part.id,
+            item: part.item },
+        method: "Plaque mince de Kirchhoff sur ses appuis réels, méthode de Ritz, jugée sur deux fois la distance à l'appui "
+            + "le plus proche",
+        hypotheses: [
+            `Calcul du logiciel : la flèche est cherchée comme une somme de fonctions d'essai, produit des facteurs d'appui `
+                + `(nuls sur les bords tenus) par les polynômes en u et v de degré total ${hold.posts.length > 0
+                    ? POLYNOMIAL_DEGREE_WITH_POSTS : POLYNOMIAL_DEGREE}. Les coefficients sont ceux qui rendent minimale `
+                + `l'énergie de flexion moins le travail de la charge : un système linéaire dont la matrice et le second `
+                + `membre sont intégrés sur le contour réel de la tablette, découpé en ${CELLS_ALONG_LONGEST_SIDE} cellules `
+                + `sur son plus grand côté, puis résolu. Un montant est un appui ponctuel de raideur ${POST_PENALTY} fois `
+                + `celle de la plaque. La flèche retenue est le maximum relevé sur la grille`,"Panneau isotrope dans son plan", lowerBound ? "Un bord encastré : la flèche calculée est un minimum"
+            : "Bords en appui simple", "Charge d'essai répartie sur toute la tablette (EN 16122:2012)"],
+        inputs: [
+            { name: "charge_essai", label: "Charge d'essai", value: loadKgPerDm2, unit: "kg/dm²",
+              source: "Réglage du projet (UNI 11663)" },
+            { name: "masse_vol", label: "Masse volumique", value: material.density, unit: "kg/m^3",
+             source: material.source, link: { part: part.id, property: "density" } },
+            { name: "epaisseur", label: "Épaisseur", value: part.thickness, unit: "mm", source: "Modèle",
+              link: { part: part.id, size: "thickness" } },
+            { name: "pesanteur", label: "Pesanteur", value: GRAVITY, unit: "N/kg", source: "Valeur normale" },
+            { name: "module", label: "Module d'élasticité en flexion", value: material.modulus, unit: "N/mm²",
+              source: material.source, link: { part: part.id, property: "modulus" } },
+            { name: "poisson", label: "Coefficient de Poisson", value: PANEL_POISSON, unit: "-",
+             source: "data/rules.ts" },
+            { name: "fleche_ritz", label: "Flèche maximale de la plaque (résultat du calcul de Ritz)", value: peak.max,
+              unit: "mm", source: "Calcul du logiciel, méthode de Ritz (plate.ts), non reproductible en tableur",
+              result: "ritz" },
+            { name: "distance", label: "Distance du maximum à l'appui le plus proche", value: peak.reach, unit: "mm",
+              source: "Calcul du logiciel", result: "ritz" },
+            { name: "facteur", label: "Facteur de portée équivalente", value: CANTILEVER_SPAN_FACTOR, unit: "-",
+              source: "Convention des consoles de l'IBC" },
+            { name: "kdef", label: "Coefficient de fluage", value: material.kdef, unit: "-", source: material.source },
+            { name: "part_admise", label: "Flèche admise, part de la portée", value: SHELF_DEFLECTION_LIMIT, unit: "-",
+              source: "UNI 11663, essai EN 16122:2012" },
+        ],
+        steps: [
+            { name: "pression", label: "Pression d'essai et poids propre", unit: "N/mm²",
+              formula: "charge_essai * pesanteur / 10000 + masse_vol * 1e-9 * epaisseur * pesanteur",
+              source: "kg/dm² ramené au mm², plus le panneau" },
+            { name: "rigidite", label: "Rigidité en flexion de la plaque", unit: "N.mm",
+              formula: "module * epaisseur ^ 3 / (12 * (1 - poisson ^ 2))", source: "Plaque de Kirchhoff" },
+            { name: "portee_eq", label: "Portée équivalente", formula: "facteur * distance", unit: "mm",
+              source: "Deux fois la distance à l'appui le plus proche" },
+            { name: "fleche", label: "Flèche instantanée", formula: "fleche_ritz", unit: "mm",
+             source: "Calcul de Ritz" },
+            { name: "fleche_fin", label: "Flèche à long terme", formula: "fleche * (1 + kdef)", unit: "mm",
+              source: "EN 1995-1-1:2004, 2.3.2.2, information seulement" },
+            { name: "fleche_adm", label: "Flèche admise", formula: "part_admise * portee_eq", unit: "mm",
+             source: "UNI 11663" },
+        ],
+        check: { value: "fleche", limit: "fleche_adm" },
+        phrases: { pass: lowerBound ? "Conformité non établie : flèche minimale sous la flèche admise, encastrement "
+                       + "non prouvé" : "Conforme : flèche à l'essai sous la flèche admise",
+                   fail: "Non conforme : flèche à l'essai au-delà de la flèche admise",
+                   stale: "Périmé : la tablette a changé depuis le calcul de Ritz, le refaire dans le logiciel" },
+    });
+    return { part: part.id, span: valueOf(note, "portee_eq"), instant: valueOf(note, "fleche"),
+             final: valueOf(note, "fleche_fin"), limit: valueOf(note, "fleche_adm"), lowerBound, note };
 }
