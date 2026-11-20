@@ -14,7 +14,7 @@ import { EYE_LEVEL } from "../data/rules";
 import { sideFace } from "./locate";
 
 
-// 2 faces meet when they're closer than this, in mm
+// 2 faces meet when they're closer then this, in mm
 const TOUCH = 0.01;
 
 
@@ -163,13 +163,13 @@ function attachEnds(c: Carcass, lay: ResolvedLayout, part: Part,
     {
         const line = d.y + d.h / 2 - panelStartY(leftP, c);
         b.joints.push({ edgePart: part.id, edge: "u0", facePart: leftP.id, face: leftP.role === "side" ? "A" : "B",
-                       lineAxis: "u", line, ...span(leftP), reversed: false, housingFace });
+                       lineAxis: "u", line, ...span(leftP), reversed: false, housingFace, pitch: c.shelfJointPitch });
     }
     if (rightP !== undefined)
     {
         const line = d.y + d.h / 2 - panelStartY(rightP, c);
         b.joints.push({ edgePart: part.id, edge: "u1", facePart: rightP.id, face: "A", lineAxis: "u", line,
-                       ...span(rightP), reversed: false, housingFace });
+                       ...span(rightP), reversed: false, housingFace, pitch: c.shelfJointPitch });
     }
 }
 

@@ -17,14 +17,14 @@ const JOINT_END_CLEAR = 10;
 // of the dresser niche lay over the two front housings of its top
 const HOUSING_CLEAR = 2;
 
-function underLight(b: Build, ep: Part, face: "A" | "B", u: number, v: number): boolean
+function underLight(b: Build, edgePanel: Part, face: "A" | "B", u: number, v: number): boolean
 {
-    const f = ep.frame;
+    const f = edgePanel.frame;
     if (f === null)
     {
         return false;
     }
-    const q = at(f, u, v, face === "A" ? 0 : ep.thickness);
+    const q = at(f, u, v, face === "A" ? 0 : edgePanel.thickness);
     const reach = MINIFIX.housingDiameter / 2 + HOUSING_CLEAR;
     return b.fitted.some((x) =>
     {
@@ -49,16 +49,24 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
     let clamex = 0;
     for (const joint of joints)
     {
-        const ep = byId(b.parts, joint.edgePart);
+        const edgePanel = byId(b.parts, joint.edgePart);
         const fpart = byId(b.parts, joint.facePart);
-        if (ep === undefined || fpart === undefined)
+        if (edgePanel === undefined || fpart === undefined)
         {
             continue;
         }
         const len = joint.to - joint.from;
-        const edgeThickness = ep.thickness;
-        const edgeU = joint.edge === "u0" ? 0 : ep.length;
-        const inward = joint.edge === "u0" ? 1 : -1;
+        const edgeThickness = edgePanel.thickness;
+        // A point of the edge part, `along` its edge from edgeFrom and `inset` in from it : the ends u0 u1 of a board
+        // as before, its long edges v0 v1 for a bearing back joined by them (parts.ts, buildBearingBack)
+        const vEdge = joint.edge === "v0" || joint.edge === "v1";
+        const edgeAt = joint.edge === "u0" || joint.edge === "v0" ? 0 : vEdge ? edgePanel.width : edgePanel.length;
+        const inward = joint.edge === "u0" || joint.edge === "v0" ? 1 : -1;
+        const onEdge = (along: number, inset: number): { u: number; v: number } =>
+        {
+            return vEdge ? { u: joint.edgeFrom + along, v: edgeAt + inward * inset }
+                : { u: edgeAt + inward * inset, v: joint.edgeFrom + along };
+        };
         const alongU = joint.lineAxis === "u";
         const onFace = (pos: number): { u: number; v: number } =>
         {
@@ -75,11 +83,11 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                                      depth: LAMELLO_P14.grooveDepth, label: "Rainure P-System P-14" });
                 // Let into the butting edge, in the plane of the face groove : the joint line run at half the
                 // thicknes of the edge part (Joint.line)
-                ep.pockets = [...(ep.pockets ?? []), { edge: joint.edge, at: joint.edgeFrom + pos, length: 70,
-                                                      across: LAMELLO_P14.grooveWidth, w: edgeThickness / 2,
+                edgePanel.pockets = [...(edgePanel.pockets ?? []), { edge: joint.edge, at: joint.edgeFrom + pos,
+                                                      length: 70, across: LAMELLO_P14.grooveWidth, w: edgeThickness / 2,
                                                       depth: LAMELLO_P14.grooveDepth,
                                                       label: "Rainure P-System P-14 dans le chant" }];
-                ep.holes.push({ u: edgeU + inward * 13.5, v: joint.edgeFrom + pos,
+                edgePanel.holes.push({ ...onEdge(pos, 13.5),
                                 diameter: LAMELLO_P14.accessDiameter, depth: 0, face: "A",
                                 label: `Accès levier Clamex ${DIAM}6, position selon notice Lamello`,
                                 purpose: "clamex-access" });
@@ -90,7 +98,7 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
         // One connector on each 37 row, those between on the system 32 grid counted from the front one. The line
         // is the face part's : a piece standing back starts its joint further in, its first connector goes to
         // the next hole of that line
-        const even = spread(len, s.connectorInset, 256);
+        const even = spread(len, s.connectorInset, joint.pitch ?? 256);
         const toLine = (x: number, up: boolean): number =>
         {
             const k = (joint.from + x - s.connectorInset) / s.grid;
@@ -122,13 +130,14 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
                     // through the board on its way, the lead of a light by the end of a side, cuts it
                     const passage = [4, 14, 24, MINIFIX.distanceB].every((d) =>
                     {
-                        return !meets(ep, "A", edgeU + inward * d, joint.edgeFrom + q, 8, edgeThickness / 2 + 4);
+                        const at = onEdge(q, d);
+                        return !meets(edgePanel, "A", at.u, at.v, 8, edgeThickness / 2 + 4);
                     });
+                    const housing = onEdge(q, MINIFIX.distanceB);
                     return passage && !meets(fpart, joint.face, g.u, g.v, MINIFIX.boltPilot, MINIFIX.boltDepth)
-                        && !meets(ep, joint.housingFace ?? "A", edgeU + inward * MINIFIX.distanceB, joint.edgeFrom + q,
-                                  MINIFIX.housingDiameter, MINIFIX.housingDepth)
-                        && !underLight(b, ep, joint.housingFace ?? "A", edgeU + inward * MINIFIX.distanceB,
-                                       joint.edgeFrom + q);
+                        && !meets(edgePanel, joint.housingFace ?? "A", housing.u, housing.v, MINIFIX.housingDiameter,
+                                  MINIFIX.housingDepth)
+                        && !underLight(b, edgePanel, joint.housingFace ?? "A", housing.u, housing.v);
                 }
                 return !meets(fpart, joint.face, g.u, g.v, 8, s.dowelFaceDepth);
             };
@@ -149,7 +158,7 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
             const pos = grid.find(free) ?? half.find(free) ?? positions[k]!;
             if (!free(pos))
             {
-                b.errors.push(`${itemName}, ${ep.label.toLowerCase()} contre ${fpart.label.toLowerCase()} : le `
+                b.errors.push(`${itemName}, ${edgePanel.label.toLowerCase()} contre ${fpart.label.toLowerCase()} : le `
                     + `connecteur à ${Math.round(positions[k]!)} mm tombe sur un perçage voisin, sans place libre à `
                     + "96 mm près. Déplacer l'un des deux panneaux.");
             }
@@ -158,11 +167,11 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
             {
                 fpart.holes.push({ ...f, diameter: MINIFIX.boltPilot, depth: MINIFIX.boltDepth, face: joint.face,
                                    label: `Goujon Minifix 262.28.020, avant-trou ${DIAM}5`, purpose: "minifix-bolt" });
-                ep.holes.push({ u: edgeU + inward * MINIFIX.distanceB, v: joint.edgeFrom + pos,
+                edgePanel.holes.push({ ...onEdge(pos, MINIFIX.distanceB),
                                 diameter: MINIFIX.housingDiameter, depth: MINIFIX.housingDepth,
                                 face: joint.housingFace ?? "A",
                                 label: `Boîtier Minifix 262.26.535 ${DIAM}15`, purpose: "minifix-housing" });
-                ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: MINIFIX.distanceB,
+                edgePanel.holes.push({ ...onEdge(pos, 0), diameter: 8, depth: MINIFIX.distanceB,
                                 face: joint.edge, w: edgeThickness / 2, label: `Passage du goujon ${DIAM}8`,
                                 purpose: "minifix-passage" });
                 minifix++;
@@ -171,8 +180,9 @@ export function fitJoints(joints: Joint[], s: Settings, b: Build, itemId: string
             {
                 fpart.holes.push({ ...f, diameter: 8, depth: s.dowelFaceDepth, face: joint.face,
                                    label: `Tourillon ${DIAM}8 x 35`, purpose: "dowel" });
-                ep.holes.push({ u: edgeU, v: joint.edgeFrom + pos, diameter: 8, depth: s.dowelEdgeDepth,
-                                face: joint.edge, w: edgeThickness / 2, label: `Tourillon ${DIAM}8 x 35`, purpose: "dowel" });
+                edgePanel.holes.push({ ...onEdge(pos, 0), diameter: 8, depth: s.dowelEdgeDepth,
+                                face: joint.edge, w: edgeThickness / 2, label: `Tourillon ${DIAM}8 x 35`,
+                                purpose: "dowel" });
                 dowels++;
             }
             k++;

@@ -107,6 +107,8 @@ export interface Part
     // Where each end of the board lies on face B, along u, measured from where it lies on face A : a plumb cut
     // under a roof or a chamfered head, the outline being face A only
     bevel: { u0: number; u1: number };
+    // Down to the floor under a carcass on adjustable feet : its height set in the workshop, the feet set on site
+    toFloor?: boolean;
 }
 
 export interface CurveShape
@@ -148,6 +150,8 @@ export interface Joint
     housingFace?: "A" | "B";
     // In plain sight : glued dowels alone, whatever the joinery of the carcass
     dowelsOnly?: boolean;
+    // Widest gap between 2 connectors along it, 256 when not told
+    pitch?: number;
 }
 
 export interface HardwareLine
