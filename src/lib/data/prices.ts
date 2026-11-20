@@ -183,6 +183,10 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                                 READ_ON, 500),
     "hw:WALL_SCREW_5x50_PAN": entry(ht(34.9 / 500), "u", "Prix de la boîte de 500 vis fischer 5 x 50 de Brico Dépôt, "
                                     + "tête cylindrique non relevée", "2026-11-09", 500),
+    "hw:RESIN_SIEVE": entry(ht(33.10 / 50), "u", "Domomat, lot de 50 tamis fischer FIS H 12 x 50 K à 33,10 EUR TTC",
+                            "2026-11-18", 50),
+    "hw:WALL_SCREW_5x60_PAN": entry(ht(13.89 / 50), "u", "Alternate, boîte de 50 fischer PowerFast 5 x 60 tête "
+                                    + "demi-ronde à 13,89 EUR TTC, momentanément indisponible", "2026-11-18", 50),
     "hw:PLUG_DUOPOWER_8x40": entry(ht(8.52 / 100), "u",
                                    "Boîte de 100 à 8,52 EUR relevée sur un comparateur, sans date ni "
         + "vendeur : prix indicatif", "2026-11-04", 100),

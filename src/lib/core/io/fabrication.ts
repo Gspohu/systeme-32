@@ -10,7 +10,7 @@ import { DIAM, round1 } from "../text";
 
 export interface Supply
 {
-    kind: "Panneau" | "Chant" | "Quincaillerie" | "Hors plaque" | "Verre" | "Laque";
+    kind: "Panneau" | "Chant" | "Quincaillerie" | "Hors plaque" | "Verre" | "Laque" | "Vernis";
     brand: string;
     ref: string;
     label: string;
@@ -110,7 +110,9 @@ function routeOf(r: CutRow): FabRoute
     const scribe = extra === 0 ? ""
         : `. Surlargeur de ${n1(extra)} comprise, à garder : chant ajusté au mur sur place, pas en atelier`;
     const flat = curvedSkin && !profile ? ". Livrée à plat : cintrée au montage, pas en atelier" : "";
-    steps.push({ phase: PHASE_DEBIT, title: "Débit", spec: `${debit}${grain}, épaisseur ${r.thickness}${scribe}${flat}`,
+    const floor = part.toFloor === true ? ". Descend au sol sous un meuble sur pieds réglables : débitée à la cote du "
+        + "plan, un ajustement sur place peut être possible ou nécessaire après le réglage des pieds" : "";
+    steps.push({ phase: PHASE_DEBIT, title: "Débit", spec: `${debit}${grain}, épaisseur ${r.thickness}${scribe}${flat}${floor}`,
                  after: [], why: "" });
     if (shaped)
     {
@@ -330,7 +332,26 @@ function suppliesOf(bom: Bom, nesting: NestResult): Supply[]
         return { kind: "Quincaillerie", brand: item.brand, ref: item.ref, label: item.label, qty: String(item.qty),
                  unit: item.unit, note: item.code };
     });
-    return [...sheetsToBuy(nesting), ...piecesToBuy(bom), ...bandsToBuy(bom), ...hardware, ...lacquerToBuy(bom)];
+    return [...sheetsToBuy(nesting), ...piecesToBuy(bom), ...bandsToBuy(bom), ...hardware, ...lacquerToBuy(bom),
+            ...varnishToBuy(bom)];
+}
+
+
+// The varnish the route of a veneered part prescribes, by the area it covers : the product is the workshop's choice
+function varnishToBuy(bom: Bom): Supply[]
+{
+    let area = 0;
+    for (const part of [...bom.cut, ...bom.offSheet].flatMap((row) => { return row.parts; }))
+    {
+        if (MATERIALS[part.material]?.veneer === true)
+        {
+            area += part.length * part.width * 1e-6 * part.quantity;
+        }
+    }
+    return area === 0 ? [] : [{ kind: "Vernis", brand: "", ref: "",
+                               label: "Vernis incolore mat, produit au choix de l'atelier",
+                                qty: comma(area, 2), unit: "m² de panneau",
+                                note: "Surface d'une face, deux couches : seconde face et chants vus en plus" }];
 }
 
 

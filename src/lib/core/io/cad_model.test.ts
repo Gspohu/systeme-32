@@ -127,9 +127,9 @@ describe("the bought articles of the CAD export", () =>
             // on site, a glue
             // is no solid
             const apart = new Set(["609.1500", "606N", "SCREW_4x35", "SCREW_4x30", "SCREW_2.5x16", "SCREW_4x16",
-                                   "WALL_SCREW_5x50", "WALL_SCREW_5x50_PAN",
+                                   "WALL_SCREW_5x50", "WALL_SCREW_5x50_PAN", "WALL_SCREW_5x60_PAN",
                                    "WASHER_5x20", "LED_LEAD", "GLUE_PU", "GLUE_WOOD", "GLUE_CYANO", "TAPE_DOUBLE",
-                                   "RESIN_CHEM"]);
+                                   "RESIN_CHEM", "RESIN_SIEVE"]);
             expect([...new Set(b.hardware.map((h) => { return h.ref; }))].filter((r) =>
             {
                 return !placedRefs.has(r) && !apart.has(r);
@@ -154,6 +154,9 @@ describe("the bought articles of the CAD export", () =>
         // By their heads : a countersunk one in the plate of a shelf support bit into it (essai25)
         expect(size(5, 50, "countersunk")).toBe(listed(b, "WALL_SCREW_5x50"));
         expect(size(5, 50, "pan")).toBe(listed(b, "WALL_SCREW_5x50_PAN"));
+        // Through a back into its plug, fischer's length (T9 of the external review)
+        expect(size(5, 60, "pan")).toBe(listed(b, "WALL_SCREW_5x60_PAN"));
+        expect(listed(b, "WALL_SCREW_5x60_PAN")).toBeGreaterThan(0);
         expect(size(3.5, 15)).toBe(listed(b, "609.1500"));
         // The couplings take the 606N of Blum's notice, a #6 flat head of ASME B18.6.1 : the Ø7 of the DIN 7505:1986
         // drawn
@@ -245,6 +248,23 @@ describe("the screws of the CAD export", () =>
             expect(placed.length).toBe(listed);
         });
     }
+
+    // Counted as the length of a clearance hole, the 12 mm of a pilot let the check of the voids start past the
+    // middle of a 15 mm runner screw
+    it("lets no hardware screw run free in the pilot it bites from its mouth", () =>
+    {
+        for (const make of [tvWall, dresser])
+        {
+            const piloted = screwPlaces(analyse(make()).build.parts).filter((s) =>
+            {
+                return ["runner-screw", "cup-screw", "plate-screw"].includes(s.purpose ?? "");
+            });
+            expect(piloted.length, make.name).toBeGreaterThan(0);
+            expect(piloted.filter((s) => { return s.free > 2; }).map((s) => { return `${s.part} ${s.label} ${s.free}`; }),
+                   make.name).toEqual([]);
+        }
+    });
+
 
     it("takes the screws of the plinth return from inside the plinth into the low board of the round end", () =>
     {

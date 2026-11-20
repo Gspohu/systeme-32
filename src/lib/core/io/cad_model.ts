@@ -12,6 +12,7 @@ import { CAD_MODELS, type CadModel } from "../../data/cad_models";
 import { cadHardware, DOWEL_LENGTH, handleSection, sameBolt, type CadInstance } from "./cad_hardware";
 import { gamme } from "./gamme";
 import { benchOfPart } from "../bench";
+import { drilledHoles, exportedParts } from "./export_selection";
 
 export const CAD_SCHEMA = 1;
 // The plug drawn behind each screw into the wall, the one the hardware list buys (wall_load.ts)
@@ -84,7 +85,9 @@ export function screwPlaces(parts: Part[]): ScrewPlace[]
                 }
                 bolts.push(point);
             }
-            out.push({ ...spec, item: board.item, point, out: way, free: hole.depth + Math.max(seat, 0),
+            // A pilot narrower than the screw is bitten from its mouth : no length of it runs free (pilots.ts)
+            const clearance = hole.diameter >= spec.diameter ? hole.depth : 0;
+            out.push({ ...spec, item: board.item, point, out: way, free: clearance + Math.max(seat, 0),
                        part: board.label, label: hole.label,
                        purpose: hole.purpose,
                        holds: SCREW_HOLDS[hole.purpose], joins: hole.countersink !== undefined });
@@ -221,10 +224,7 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
     const materials = new Map<string, object>();
     const glued = new Set(build.hardware.filter((h) => { return h.ref === "GLUE_PU" &&
                                                         h.target !== null; }).map((h) => { return h.target!; }));
-    const parts = build.parts.filter((q) =>
-    {
-        return q.frame !== null && q.curve === null;
-    }).map((q) =>
+    const parts = exportedParts(build).map((q) =>
     {
         const decor = decorById(q.decor);
         const stock = materialOfDecor(decor);
@@ -247,17 +247,14 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
             frame: q.frame,
             outline: q.outline,
             cutouts: q.cutouts,
-            // Screw marks hold no diameter : no machining, they stay on the tables of the drawings
-            holes: q.holes.filter((h) =>
-            {
-                return h.diameter > 0 && h.depth > 0;
-            }).map((h) =>
+            holes: drilledHoles(q).map((h) =>
             {
                 return { u: h.u, v: h.v, w: h.w, diameter: h.diameter, depth: h.depth, face: h.face, label: h.label,
                          purpose: h.purpose, countersink: h.countersink };
             }),
             grooves: q.grooves,
             pockets: q.pockets ?? [],
+            toFloor: q.toFloor === true,
             // Each banded edge, a solid of its own in the finished size, on a plain rectangle only : any other outline
             // the quarter rounds included, is banded by hand
             bands: decor.edgeThickness === undefined || !plainRectangle(q.outline, q.length, q.width) ? []
@@ -365,5 +362,7 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
     }));
     return { schema: CAD_SCHEMA, name: p.name, parts, left, fitted, screws: every, listed, instances, standing, models,
              assemblies: pbs, gamme: withGamme ? gamme(p, parts, instances, every, models, pbs, stops) : null,
-             sections: handleSection(build.fitted), dowelLength: DOWEL_LENGTH, materials: [...materials.values()] };
+             sections: handleSection(build.fitted), dowelLength: DOWEL_LENGTH, materials: [...materials.values()],
+             // Each calculation of the checks, its inputs and its formulas : the FreeCAD sheet works them out again
+             calcNotes: o.analysis.calcNotes };
 }

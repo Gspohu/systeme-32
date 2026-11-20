@@ -10,19 +10,21 @@ describe("cales de coulisse du tiroir intérieur", () =>
     const a = analyse(dresser());
     const spacers = a.build.parts.filter((q) => { return /^Cale de coulisse/.test(q.label); });
 
-    it("ont chacune de leurs vis en face d'un avant-trou Ø2,5 du montant, percé à l'atelier", () =>
+    it("ont chacune de leurs vis en face d'un avant-trou Ø2,5 de ce qu'elles vissent, percé à l'atelier", () =>
     {
-        expect(spacers).toHaveLength(2);
+        // 2 thicknesses a side : the first into its upright, the second into the first
+        expect(spacers).toHaveLength(4);
         for (const spacer of spacers)
         {
             const screws = spacer.holes.filter((h) => { return h.purpose === "spacer-screw"; });
-            expect(screws).toHaveLength(6);
+            expect(screws.length).toBeGreaterThan(0);
             const upright = a.build.parts.find((q) =>
             {
-                return q.item === spacer.item && screws[0]!.label.includes(q.label.toLowerCase()) && /^Montant/.test(q.label);
+                return q.item === spacer.item && q !== spacer && screws[0]!.label.includes(` dans ${q.label.toLowerCase()} :`);
             })!;
-            const pilots = upright.holes.filter((h) => { return /Cale de coulisse/.test(h.label); });
-            expect(pilots).toHaveLength(6);
+            expect(/^(Montant|Cale de coulisse)/.test(upright.label), spacer.label).toBe(true);
+            const pilots = upright.holes.filter((h) => { return h.label.startsWith(`${spacer.label} dans `); });
+            expect(pilots).toHaveLength(screws.length);
             for (const s of screws)
             {
                 // The point the screw leaves the spacer by, in the upright's own axes

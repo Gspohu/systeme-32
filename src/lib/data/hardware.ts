@@ -182,6 +182,12 @@ add({ id: "WALL_SCREW_5x50", family: "D60", label: "Vis 5 x 50 tête fraisée, e
 // The same length with a pan head : on the large washer of a back, in the straight slot of a shelf support plate
 add({ id: "WALL_SCREW_5x50_PAN", family: "D60", label: "Vis 5 x 50 tête cylindrique, au mur sur rondelle large ou "
          + "dans la lumière d'une platine", brand: "", ref: "Générique", source: ANTI_TIP });
+// Through a back of 8 and its washer of 2 into a plug of 40 : fischer has the screw as long as the plug, the part fixed
+// and one diameter, 55 at least. Threaded over 56, its plain shank of 4 shorter than the 10 it holds, as the push
+// through fixing of the DuoPower asks
+add({ id: "WALL_SCREW_5x60_PAN", family: "D60", label: "Vis fischer PowerFast 5 x 60 tête demi-ronde TX, inox A2, au "
+         + "mur à travers le fond sur rondelle large",
+     brand: "fischer", ref: "657385", source: "Alternate, fiche produit EAN 4048962050783 lue le 2026-11-18" });
 // Slat walls : a 20 mm cleat before the 40 mm plug asks for a 70 mm screw, the slats are glued and pinned
 const SLATS = ("Convention d'atelier, pas une donnée fabricant, référence au choix du distributeur");
 add({ id: "WALL_SCREW_5x70", family: "D60", label: "Vis 5 x 70, liteau ou lisse dans le mur, le sol ou le plafond",
@@ -302,7 +308,7 @@ add({ id: "EDGE_CAP", family: "D60", label: `Cache-vis ${DIAM}14 découpé à l'
          + "orienté comme le panneau : double face sur une vis à démonter, cyanoacrylate sinon",
      brand: "", ref: "Atelier", source: "Taillé dans les chutes du chant posé, convention d'atelier", made: true });
 add({ id: "GLUE_PU", family: "D41", label: "Colle polyuréthane à bois, faces mélaminées poncées",
-     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant" });
+     brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
 add({ id: "GLUE_WOOD", family: "D41", label: "Colle à bois vinylique, flacon, pour les tourillons collés",
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
 add({ id: "GLUE_CYANO", family: "D60", label: "Colle cyanoacrylate, tube, pour les cache-vis des vis définitives",
@@ -311,6 +317,11 @@ add({ id: "RESIN_CHEM", family: "D60", label: "Résine polyester de scellement c
          + "au pistolet à silicone : chevilles des platines noyées dans la résine en mur creux",
      brand: "fischer", ref: "4048962519471", source: "Brico Dépôt, fiche produit lue le 2026-11-17",
      perProject: true });
+// Made for threaded rods M6 to M8 : the plug of 8 goes into it, no figure of fischer for a plug so set
+add({ id: "RESIN_SIEVE", family: "D60", label: "Tamis d'injection fischer FIS H 12 x 50 K",
+     brand: "fischer", ref: "41900", source: "Domomat, fiche produit EAN 8001132419007 lue le 2026-11-18" });
+// The hole it takes, from the same sheet : drilled 12, 60 deep at least
+export const SIEVE_BORE = { diameter: 12, depth: 60 };
 add({ id: "TAPE_DOUBLE", family: "D60", label: "Adhésif double face mince, rouleau, pour les cache-vis des vis à démonter",
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
 

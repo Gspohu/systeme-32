@@ -296,8 +296,9 @@ describe("gamme de fabrication, cas que les deux meubles n'ont pas", () =>
             return clamex.map((k) => { return { q, k }; });
         });
         expect(pockets.length).toBeGreaterThan(0);
-        expect(pockets.every(({ q, k }) => { return (k.edge === "u0" || k.edge === "u1") &&
-                                            k.w === q.thickness / 2; })).toBe(true);
+        // The long edges v0 v1 of a bearing back are joined as the ends of the boards
+        expect(pockets.every(({ q, k }) => { return k.w === q.thickness / 2; })).toBe(true);
+        expect(pockets.some(({ k }) => { return k.edge === "v0" || k.edge === "v1"; })).toBe(true);
         const asGroove = parts.some((q) => { return q.grooves.some((g) => { return CLAMEX_EDGE.test(g.label); }); });
         expect(asGroove).toBe(false);
         expect(said).toContain("Poche 70 x 7 prof. 14 dans le chant");
