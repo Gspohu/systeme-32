@@ -13,9 +13,11 @@ describe("manutention d'un caisson monté", () =>
         const lower = said.find((c) => { return c.message.startsWith("Placards et tiroirs :"); })!;
         expect(lower.level).toBe("warning");
         expect(lower.target).toBeNull();
-        // 92.7 kg empty for 25 kg a person (settings handlingKg)
+        // 58.8 kg as it goes into the room, its fronts, loose shelves, drawers and plinth set there, for 25 kg a
+        // person (settings handlingKg) : 92.7 with them
         expect(p.settings.handlingKg).toBe(25);
-        expect(lower.message).toMatch(/92[.,]7 kg monté, à manutentionner à 4 personnes/);
+        expect(lower.message).toMatch(/58[.,]8 kg monté, à manutentionner à 3 personnes/);
+        expect(lower.message).toContain("posés sur place");
     });
 
     it("se tait sous la limite", () =>

@@ -57,16 +57,26 @@ describe("system 32 line", () =>
         {
             const off: string[] = [];
             let seen = 0;
-            for (const q of analyse(make()).build.parts)
+            let onBack = 0;
+            const parts = analyse(make()).build.parts;
+            // A bearing back is joined along its own line, at half its thickness from the back edge, not on the rows
+            const bearing = parts.filter((q) => { return q.label === "Fond porteur"; });
+            for (const q of parts)
             {
                 if (!["side", "top", "bottom", "vdivider", "hdivider"].includes(q.role))
                 {
                     continue;
                 }
+                const back = bearing.find((p) => { return p.item === q.item; });
                 for (const h of q.holes)
                 {
                     if ((h.face === "A" || h.face === "B") && /^(Tourillon|Goujon)/.test(h.label))
                     {
+                        if (back !== undefined && Math.abs(h.v - (q.width - back.thickness / 2)) < 0.01)
+                        {
+                            onBack++;
+                            continue;
+                        }
                         seen++;
                         const onRow = [37, q.width - 37].some((r) =>
                         {
@@ -82,6 +92,7 @@ describe("system 32 line", () =>
             }
             expect(seen).toBeGreaterThan(40);
             expect(off).toEqual([]);
+            expect(onBack > 0).toBe(bearing.length > 0);
         });
     }
 

@@ -48,7 +48,8 @@ describe("a screen on a wall arm", () =>
 
     it("says when the arm cannot reach where the screen is swung, or fold as close as it is put away", () =>
     {
-        expect(said(withArm({}, { out: { cx: 600, z: 400 } }))).toMatch(/^error Écran sorti à \d+ mm de la platine.*393/m);
+        expect(said(withArm({}, { out: { cx: 600,
+                                        z: 400 } }))).toMatch(/^error Écran sorti à \d+ mm de la platine.*393/m);
         expect(said(withArm({ z: 60 }))).toMatch(/^error Écran rangé à 30 mm du mur.*replié en tient 49/m);
     });
 

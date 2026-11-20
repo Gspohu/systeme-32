@@ -8,12 +8,13 @@ import { box } from "./fitted";
 import { boxesMeet, wallBox, type Box3 } from "./room";
 import { spread } from "./fittings";
 import { wallPlug } from "./wall_load";
+import { HARDWARE } from "../data/hardware";
 import { at, type Vec3 } from "./geometry";
 
 // The opening a fist needs, A = d3 (P95) + x of ISO 15534-2:2000 4.7 : d3 = 120 in ISO 15534-3:2000 Table 1
 // x = 10 the basic allowance for movement (A.3.7). The project yml gives the CAD checks the same hand_allowance
 export const FIST_OPENING = 130;
-// Blade of a catalogue PZ2 driver (Wiha), the fist around the handle beyond it
+// Blade of a catalogue PZ2 driver (Wiha), the fist arround the handle beyond it
 const PZ2_BLADE = 100;
 // The wide washer under the head, d2 = 18 of an M5 in ISO 7094:2000 table 1
 const WASHER_RADIUS = 9;
@@ -172,10 +173,16 @@ export function fitBackWallScrews(c: Carcass, s: Settings, b: Build): void
         return;
     }
     const wide = c.width > c.height;
+    // Drilled to the plug : the wall is drilled through it once the carcass stands levelled, the plug pushed through
+    // to the wall (fischer DuoPower, push-through installation, art. 535455). The screw's own size
+    // when the plug has none
+    const plug = wallPlug(s);
+    const plugSize = plug === null ? undefined : /Ø(\d+)/.exec(HARDWARE[plug]?.label ?? "")?.[1];
+    const bore = plugSize === undefined ? 5 : Number(plugSize);
     for (const { x, y } of places)
     {
-        back.holes.push({ u: wide ? x : y, v: wide ? y : x, diameter: 5, depth: back.thickness, face: "A",
-                          label: "Fixation au mur : vis 5 x 50, rondelle large, cheville", purpose: "wall-screw" });
+        back.holes.push({ u: wide ? x : y, v: wide ? y : x, diameter: bore, depth: back.thickness, face: "A",
+                          label: "Fixation au mur : vis 5 x 60, rondelle large, cheville", purpose: "wall-screw" });
     }
     const boards = b.parts.filter((q) =>
     {
@@ -203,10 +210,9 @@ export function fitBackWallScrews(c: Carcass, s: Settings, b: Build): void
                           note: "à travers le fond", purpose: "wall-fixing" });
     };
     line("WASHER_5x20");
-    const plug = wallPlug(s);
     if (plug !== "PLUG_HOLLOW_METAL")
     {
-        line("WALL_SCREW_5x50_PAN");
+        line("WALL_SCREW_5x60_PAN");
     }
     if (plug !== null)
     {

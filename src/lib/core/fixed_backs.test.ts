@@ -13,9 +13,16 @@ describe("applied backs", () =>
     {
         it(`screws every applied back of ${name}`, () =>
         {
-            const backs = analyse(make()).build.parts.filter((q) =>
+            const parts = analyse(make()).build.parts;
+            // A bearing back is joined to the sides by their connectors, not screwed on their edges
+            const bearing = parts.filter((q) => { return q.role === "back" && q.label === "Fond porteur"; });
+            expect(bearing.filter((q) =>
             {
-                return q.role === "back" && !q.label.includes("rainure");
+                return !q.holes.some((h) => { return h.purpose === "minifix-housing" || h.purpose === "dowel"; });
+            })).toEqual([]);
+            const backs = parts.filter((q) =>
+            {
+                return q.role === "back" && !q.label.includes("rainure") && !bearing.includes(q);
             });
             expect(backs.length).toBeGreaterThan(0);
             expect(backs.filter((q) =>

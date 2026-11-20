@@ -5,10 +5,15 @@ import type { Build, Part } from "./part_types";
 import { byId } from "./edit";
 import { meets } from "./drilling";
 import { DIAM } from "./text";
-import { at } from "./geometry";
+import { at, neg, type Vec3 } from "./geometry";
 import { FIST_OPENING } from "./wall_fixing";
+import { HEAD_RATIO, HEAD_SINK } from "./screw_heads";
+import { round1 } from "./text";
 
 const HOLE = 5;
+// Centres 2 countersinks apart : one countersink of solid wood left between the heads
+const MIN_GAP = 2 * (HOLE * HEAD_RATIO + 2 * HEAD_SINK);
+const SPOT_STEP = 1;
 const TOP_SCREW_LENGTH = 50;
 // Workshop conventions : each tie need 2 screws throught a side at these distances from the wall, 2 up through a top
 const SIDE_SCREWS_Z = [60, 190];
@@ -100,38 +105,95 @@ function roomUnderTop(c: Carcass, top: Part, b: Build): [number, number][]
 }
 
 
+// Whether a screw driven along `way` from `from` over `length` runs into a drilling of the shelf it holds : a steel
+// pin of its wall fixing sat 0.3 mm off the axis of one (T1 of the external review)
+function meetsShelf(shelf: Part, from: Vec3, way: Vec3, length: number): boolean
+{
+    const f = shelf.frame!;
+    return shelf.holes.some((h) =>
+    {
+        if (h.diameter <= 0)
+        {
+            return false;
+        }
+        const mid = h.w ?? shelf.thickness / 2;
+        const [start, dir]: [Vec3, Vec3] = h.face === "A" ? [at(f, h.u, h.v, 0), f.n]
+            : h.face === "B" ? [at(f, h.u, h.v, shelf.thickness), neg(f.n)]
+            : h.face === "u0" ? [at(f, 0, h.v, mid), f.u] : h.face === "u1" ? [at(f, shelf.length, h.v, mid), neg(f.u)]
+            : h.face === "v0" ? [at(f, h.u, 0, mid), f.v] : [at(f, h.u, shelf.width, mid), neg(f.v)];
+        for (let step = 0; step <= length; step++)
+        {
+            const p = [0, 1, 2].map((k) => { return from[k]! + way[k]! * step - start[k]!; });
+            const along = Math.max(0, Math.min(h.depth, p[0]! * dir[0] + p[1]! * dir[1] + p[2]! * dir[2]));
+            const off = Math.hypot(p[0]! - dir[0] * along, p[1]! - dir[1] * along, p[2]! - dir[2] * along);
+            if (off < h.diameter / 2 + HOLE / 2)
+            {
+                return true;
+            }
+        }
+        return false;
+    });
+}
+
+
 // Lying on the top of the carcass : screwed up through it, heads seen from under it
 function screwsThroughTop(w: WallShelf, c: Carcass, top: Part, b: Build): number
 {
     let n = 0;
     const cells = roomUnderTop(c, top, b);
-    // Each screw where it was meant, or the nearest third of a cell high enough to drive it from
-    const spots = cells.flatMap(([a, z]) => { return [a + (z - a) / 3, a + 2 * (z - a) / 3]; });
-    const taken = new Set<number>();
+    const shelf = byId(b.parts, `${w.id}/shelf`);
+    const v = top.width / 2;
+    // Clear of the top's drillings and of the shelf's, and a countersink apart from the other : 2 screws 15.8 apart
+    // in the same line of chipboard held as one
+    const clear = (u: number, placed: number[]): boolean =>
+    {
+        if (meets(top, "A", u, v, HOLE, top.thickness) || placed.some((x) => { return Math.abs(x - u) < MIN_GAP; }))
+        {
+            return false;
+        }
+        const from = at(top.frame!, u, v, 0);
+        const way = top.frame!.n;
+        return shelf === undefined || shelf.frame === null || !meetsShelf(shelf, from, way, TOP_SCREW_LENGTH);
+    };
+    const placed: number[] = [];
+    // Every spot of a cell high enough to drive a screw from, along the top
+    const spots = cells.flatMap(([a, z]) =>
+    {
+        const out: number[] = [];
+        for (let u = a + HOLE; u <= z - HOLE; u += SPOT_STEP)
+        {
+            out.push(u);
+        }
+        return out;
+    }).sort((x, y) => { return x - y; });
     for (const f of TOP_SCREWS_AT)
     {
         const wanted = top.length * f;
-        const fits = cells.some(([a, z]) => { return wanted > a + HOLE && wanted < z - HOLE; });
-        const near = spots.filter((s) => { return !taken.has(s); }).reduce<number | undefined>((best, s) =>
+        // Where it was meant, or the nearest free spot walking out from it both ways, the lower one first on a tie
+        let right = spots.findIndex((u) => { return u >= wanted; });
+        right = right === -1 ? spots.length : right;
+        let left = right - 1;
+        let pick: number | undefined;
+        while (pick === undefined && (left >= 0 || right < spots.length))
         {
-            return best === undefined || Math.abs(s - wanted) < Math.abs(best - wanted) ? s : best;
-        }, undefined);
-        if (!fits && near === undefined)
+            const takeLeft = right >= spots.length || (left >= 0 && wanted - spots[left]! <= spots[right]! - wanted);
+            const u = takeLeft ? spots[left--]! : spots[right++]!;
+            if (clear(u, placed))
+            {
+                pick = u;
+            }
+        }
+        if (pick === undefined)
         {
-            b.errors.push(`${w.name} : aucune case sous le dessus de ${c.name} n'a ${TOP_SCREW_LENGTH + FIST_OPENING} mm `
-                + "pour visser par-dessous. Monter une tablette ou fixer l'étagère autrement.");
+            b.errors.push(cells.length === 0
+                ? `${w.name} : aucune case sous le dessus de ${c.name} n'a ${TOP_SCREW_LENGTH + FIST_OPENING} mm pour `
+                    + "visser par-dessous. Monter une tablette ou fixer l'étagère autrement."
+                : `${w.name} : plus de place sous le dessus de ${c.name} pour une vis de liaison hors des perçages et à `
+                    + `${round1(MIN_GAP)} mm de l'autre. Une seule vis la tient : déplacer un connecteur ou une fixation.`);
             break;
         }
-        const pick = fits ? wanted : near!;
-        taken.add(pick);
-        const [u, v] = [pick, top.width / 2];
-        if (meets(top, "A", u, v, HOLE, top.thickness))
-        {
-            b.errors.push(`${w.name} : une vis vers ${c.name} tombe sur un perçage de ${top.label.toLowerCase()}. Déplacer `
-                + "un connecteur.");
-            continue;
-        }
-        top.holes.push({ u, v, diameter: HOLE, depth: top.thickness, face: "A", purpose: "wall-fixing",
+        placed.push(pick);
+        top.holes.push({ u: pick, v, diameter: HOLE, depth: top.thickness, face: "A", purpose: "wall-fixing",
                          label: `Vis 5 x 50 dans ${w.name.toLowerCase()}, ${DIAM}${HOLE} traversant, tête fraisée` });
         n++;
     }
