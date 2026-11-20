@@ -292,6 +292,14 @@ function dresserFrame(name: string, upper: Carcass[], bottles = false): Project
         low.fronts.push(newFront(c.id, { type: "drawers", count: 1, loadKg: 10, boxDecor: BOX }, { decor: GREEN }));
     }
 
+    // Standing on feet, their sides on the bottom : 1000 N went through the connector at the foot of a side
+    for (const standing of [kl, low, kr])
+    {
+        standing.sidesOnBottom = true;
+        // Their fixed shelves tie sides that spread under load, up to 430 N along one connector
+        standing.shelfJointPitch = 128;
+    }
+    low.linkTriangle = true;
     project.items.push(kl, low, ...upper, kr);
     // Their alcove as measured : 3010 wide, 2440 under the ceiling, returns 660 on the left and 610 on the right
     // the 2880 of the piece centred in it
@@ -313,27 +321,28 @@ export function dresser(): Project
 {
     const box = dresserBox;
     // 2 small columns loose in the niche : 220 clear inside, 300 deep, 5 under the niche top
-    // to slide in (10 showed, 2026-11-06), 6 forward of the back to clear the wall screw heads they hide
+    // to slide in (10 showed), 6 forward of its bearing back of 19 to slide in as well
+    // 2 under the top of the niche : slid in all the same, it bears that top once it sags that much
+    const columnClear = 2;
     const looseColumn = (name: string, x: number): Carcass =>
     {
-        const c = box(name, x, 960 + 19, 258, 680 - 2 * 19 - 5, split("h", [179, 377], [cell(), cell(), cell()]), true);
+        const c = box(name, x, 960 + 19, 258, 680 - 2 * 19 - columnClear, split("h", [179, 377], [cell(), cell(),
+            cell()]),
+                      true);
         // Dowelled and glued in the workshop : small enough to carry whole, every shelf in the open. No back : its
         // glued top, bottom and fixed shelves keep it square, the back of the niche is behind it
-        return Object.assign(c, { depth: 300, z: 8 + 6, fixToWall: false, freeStanding: true, joinery: "dowel" as const,
+        return Object.assign(c, { depth: 300, z: 19 + 6, fixToWall: false, freeStanding: true, joinery: "dowel" as const,
                                   back: { type: "none" as const } });
     };
     const opening = cell();
     const niche = box("Niche", 600, 960, DRESSER_MIDDLE, 680, opening, true);
-    // No doubled top : the high cupboards span the niche, 0.3 mm under their dishes, 1 mm with
-    // creep (Kser EN 1995-1-1 7.1, gamma method annex B). Top and bottom over the sides : cupboard sides stand on a
-    // full width board
+    // A back of 19 bearing the top along its back edge, joined as the sides are. Top and bottom over the sides : the
+    // cupboard sides stand on a full width board
+    niche.back = { type: "panel", thickness: niche.thickness };
     niche.hiddenLinks = true;
     niche.overSides = true;
-    // Held by the wall in the middle of the piece, tying all it's screwed to : next to its sides, behind the columns
-    niche.backWallScrews = [79, DRESSER_MIDDLE - 79].flatMap((x) =>
-    {
-        return [{ x, y: 140 }, { x, y: 480 }];
-    });
+    niche.linkTriangle = true;
+    // No screw into the wall : held by the columns and cupboards it's tied to all round
     // A LED strip let into the underside of its top, lighting the opening, switched and dimmed over Wi-Fi
     // Its driver and controller behind the door of the left column, by the mains hole of that cell
     niche.lights.push({ id: newId("li"), cell: opening.id, kind: "strip", spots: 0, setback: 30, kelvin: 3000,
@@ -350,6 +359,10 @@ export function dresser(): Project
     // Through its back from inside, one in the upper cell of each bay : 84 mm under the ceiling left no room for a
     // bracket on its top
     high.backWallScrews = [79, 772, DRESSER_MIDDLE - 79].map((x) => { return { x, y: 640 }; });
+    // Its top over the sides, bearing on their heads. Its fixed shelves held by 2 dowels more at each end : the
+    // finite element model of the dresser had the end ones pulling 14 kg out of a single dowel
+    high.topOverSides = true;
+    high.shelfJointPitch = 128;
     high.fronts.push(
         newFront(top[0]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),
         newFront(top[1]!.id, { type: "door", hinge: "left" }, PUSH_DOOR),

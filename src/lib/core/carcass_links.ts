@@ -18,6 +18,9 @@ const LINK_INSET = 50;
 // 12 clear
 const DEEP_FRONT_INSET = 60;
 const LINK_MAX = 800;
+// The triangle of a middle station : 2 screws on the row 32 either side, the third 55 in, sides of 64 (2 pitches of 32)
+const TRIANGLE_HALF = 32;
+const TRIANGLE_DEPTH = 55;
 const BLIND_SCREW_HOLE = 5;
 const BLIND_SCREW_HOLE_SHORT = 4;
 
@@ -303,14 +306,22 @@ function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message
     const [l0, l1, w0, w1] = alongU ? [u0, u1, v0, v1] : [v0, v1, u0, u1];
     const systemRow = systemLine(panelA, panelC, blind ? (blindA ? panelC : panelA) : panelA, p, alongU, [w0, w1]);
     let placed = 0;
-    for (const station of spread(l1 - l0, LINK_INSET, LINK_MAX))
+    // Both carcasses of the pair ask for it : the one it stands on and the one over, not each of their neighbours
+    const triangle = [panelA.item, panelC.item].every((id) =>
+    {
+        const it = p.items.find((x) => { return x.id === id; });
+        return it?.kind === "carcass" && it.linkTriangle === true;
+    });
+    const stations = spread(l1 - l0, LINK_INSET, LINK_MAX);
+    for (const [index, station] of stations.entries())
     {
         // A board counts its width from the front : the screws clear the LED groove there, in a doubled top or not
         const rows = systemRow?.rows ?? [w0 + (deep || grooved ? DEEP_FRONT_INSET : LINK_INSET), w1 - LINK_INSET];
         for (const across of rows)
         {
             const start = systemRow === null ? l0 + station : systemRow.snap(l0 + station, across);
-            const tries = [0, 32, -32, 64, -64].map((step) =>
+            // 96 off last : the head of a side under a top over it holds a Minifix by the plate of the top hinge
+            const tries = [0, 32, -32, 64, -64, 96, -96].map((step) =>
             {
                 return start + step;
             }).filter((x) =>
@@ -328,26 +339,56 @@ function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message
                     + "Déplacer la quincaillerie." });
                 continue;
             }
-            const [u, v] = alongU ? [at0, across] : [across, at0];
-            const [uc, vc] = local(panelC, at(frameA, u, v, 0));
-            if (blind)
+            // In the middle of the span a triangle, its third screw towards the inside of the shared area, when all 3
+            // find room
+            let spots: [number, number][] = [[at0, across]];
+            const middle = index > 0 && index < stations.length - 1;
+            if (triangle && middle)
             {
-                const through = blindA ? panelC : panelA;
-                through.holes.push({ u: blindA ? uc : u, v: blindA ? vc : v, diameter: blindHole,
-                                     depth: through.thickness, face: blindA ? cInner : aInner,
-                                     label: `Vis ${deep ? "5 x 50" : "4 x 30"} vers ${(blindA ? panelA : panelC).itemName}, `
-                                         + `${DIAM}${blindHole} traversant, tête fraisée`, purpose: "link-screw" });
-                placed++;
-                continue;
+                const inward = across < (w0 + w1) / 2 ? 1 : -1;
+                const three: [number, number][] = [[at0 - TRIANGLE_HALF, across], [at0 + TRIANGLE_HALF, across],
+                                                   [at0, across + inward * TRIANGLE_DEPTH]];
+                // Each one inside the area the 2 panels share, as clear of its edges as a single screw
+                const inside = (l: number, w: number): boolean =>
+                {
+                    return l >= l0 + CONNECTING_SCREW_HEAD && l <= l1 - CONNECTING_SCREW_HEAD
+                        && w >= w0 + CONNECTING_SCREW_HEAD && w <= w1 - CONNECTING_SCREW_HEAD;
+                };
+                if (three.every(([l, w]) => { return inside(l, w) && (alongU ? free(l, w) : free(w, l)); }))
+                {
+                    spots = three;
+                }
+                else
+                {
+                    out.push({ item: panelA.item, message: `${panelA.itemName} et ${panelC.itemName} : pas de place pour `
+                        + `3 vis en triangle près de ${Math.round(station)} mm, une seule posée. Déplacer la quincaillerie.` });
+                }
             }
-            const label = `Vis de liaison ${screw.ref} vers ${panelC.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} traversant`;
-            panelA.holes.push({ u, v, diameter: CONNECTING_SCREW_HOLE, depth: panelA.thickness, face: aInner, label,
-                                purpose: "link-screw" });
-            panelC.holes.push({ u: uc, v: vc, diameter: CONNECTING_SCREW_HOLE, depth: panelC.thickness, face: cInner,
-                                label: `Vis de liaison ${screw.ref} vers ${panelA.itemName}, `
-                                    + `${DIAM}${CONNECTING_SCREW_HOLE} traversant`,
-                                purpose: "link-screw" });
-            placed++;
+            for (const [l, w] of spots)
+            {
+                const [u, v] = alongU ? [l, w] : [w, l];
+                const [uc, vc] = local(panelC, at(frameA, u, v, 0));
+                if (blind)
+                {
+                    const through = blindA ? panelC : panelA;
+                    through.holes.push({ u: blindA ? uc : u, v: blindA ? vc : v, diameter: blindHole,
+                                         depth: through.thickness, face: blindA ? cInner : aInner,
+                                         label: `Vis ${deep ? "5 x 50" : "4 x 30"} vers ${(blindA ? panelA : panelC)
+                                             .itemName}, ${DIAM}${blindHole} traversant, tête fraisée`,
+                                         purpose: "link-screw" });
+                    placed++;
+                    continue;
+                }
+                const label = `Vis de liaison ${screw.ref} vers ${panelC.itemName}, ${DIAM}${CONNECTING_SCREW_HOLE} `
+                    + "traversant";
+                panelA.holes.push({ u, v, diameter: CONNECTING_SCREW_HOLE, depth: panelA.thickness, face: aInner, label,
+                                    purpose: "link-screw" });
+                panelC.holes.push({ u: uc, v: vc, diameter: CONNECTING_SCREW_HOLE, depth: panelC.thickness,
+                                    face: cInner, label: `Vis de liaison ${screw.ref} vers ${panelA.itemName}, `
+                                        + `${DIAM}${CONNECTING_SCREW_HOLE} traversant`,
+                                    purpose: "link-screw" });
+                placed++;
+            }
         }
     }
     if (placed > 0)

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { analyse } from "./analysis";
 import { dresser, tvWall } from "./templates";
 import { resolveLayout } from "./layout";
+import { spread } from "./fittings";
 import { footPlaces } from "./feet";
 import { computeBom, sawSize } from "./bom";
 import { computeOutputs } from "./outputs";
@@ -122,7 +123,8 @@ describe("the sketch templates", () =>
             expect(backs.length).toBeGreaterThan(1);
             for (const q of backs)
             {
-                expect([q.decor, q.thickness]).toEqual([decor, 8]);
+                // A bearing back is a board of the carcass, seen in the open niche like its sides
+                expect([q.decor, q.thickness]).toEqual(q.label === "Fond porteur" ? ["H1180_ST37", 19] : [decor, 8]);
             }
         });
     }
@@ -656,15 +658,124 @@ describe("the sketch templates", () =>
         const p = dresser();
         const low = p.items.find((it) => { return it.name === "Placards et tiroirs"; }) as Carcass;
         low.overSides = true;
+        low.sidesOnBottom = false;
         const a = analyse(p);
         expect(a.build.errors.some((e) => { return e.startsWith("Placards et tiroirs : dessus et dessous sur les joues"); })).toBe(true);
         expect(a.build.parts.find((q) => { return q.id === `${low.id}/side/L`; })!.length).toBe(low.height);
     });
 
 
-    it("slides each small column under the top of the niche with 5 mm to spare", () =>
+    it("bears the top of the high cupboards on their sides, and holds each end of every fixed shelf of the dresser by 3 dowels", () =>
     {
-        // 10 showed, 5 wanted. The doubling of the top gone on 2026-11-08 left them 24 short
+        const p = dresser();
+        const parts = analyse(p).build.parts;
+        const high = p.items.find((it) => { return it.name === "Placards hauts"; }) as Carcass;
+        const of = (label: string): Part => { return parts.find((q) => { return q.item === high.id &&
+                                                                        q.label === label; })!; };
+        expect(of("Joue gauche").length).toBe(high.height - high.thickness);
+        expect(of("Dessus").length).toBe(high.width);
+        expect(of("Dessous").length).toBe(high.width - 2 * high.thickness);
+        // The heads of the sides go into the top, their Minifix housings in them
+        expect(of("Joue droite").holes.some((h) => { return h.purpose === "minifix-housing" && h.u > high.height -
+                                                    60; }))
+            .toBe(true);
+        // Each end of a fixed shelf : 2 Minifix and 3 dowels over the 3 shelves of the high cupboards, 2 and 1 elsewhere
+        const ends = (shelf: Part): number[] =>
+        {
+            return ["u0", "u1"].map((edge) =>
+            {
+                return shelf.holes.filter((h) => { return h.face === edge && h.purpose === "dowel"; }).length;
+            });
+        };
+        const shelves = (items: string[]): Part[] =>
+        {
+            return parts.filter((q) => { return q.role === "hdivider" && items.includes(q.itemName); });
+        };
+        // Every fixed shelf of the dresser : the 3 of the high cupboards, the 2 of each column, the 5 of the low ones
+        const dresserShelves = ["Placards hauts", "Colonne gauche", "Colonne droite", "Placards et tiroirs"];
+        expect(shelves(["Placards hauts"]).length).toBe(3);
+        expect(shelves(dresserShelves).length).toBe(12);
+        for (const shelf of shelves(dresserShelves))
+        {
+            expect(ends(shelf), `${shelf.itemName} ${shelf.label}`).toEqual([3, 3]);
+        }
+        // The adjustable shelves on their pins have no connector to space
+        expect(parts.filter((q) => { return q.role === "shelf" && q.holes.some((h) => { return h.purpose === "dowel"; });
+        })).toEqual([]);
+        // The fixed shelves of the TV wall keep the usual pitch of 256 : as many connectors at an end as it spreads
+        const connectors = (shelf: Part, edge: string): number =>
+        {
+            return shelf.holes.filter((h) => { return h.face === edge && (h.purpose === "dowel" ||
+                h.purpose === "minifix-passage"); }).length;
+        };
+        const tv = tvWall();
+        const others = analyse(tv).build.parts.filter((q) => { return q.role === "hdivider"; });
+        expect(others.length).toBeGreaterThan(0);
+        for (const shelf of others)
+        {
+            const usual = spread(shelf.width, tv.settings.connectorInset, 256).length;
+            expect(Math.max(connectors(shelf, "u0"), connectors(shelf, "u1")),
+                   `${shelf.itemName} ${shelf.label}`).toBeLessThanOrEqual(usual);
+        }
+    });
+
+
+    it("stands the sides of the columns and the low cupboards on their bottom, every other drilling where it was", () =>
+    {
+        const standing = ["Colonne gauche", "Colonne droite", "Placards et tiroirs"];
+        // Each hole in the room, by board and purpose : what moved with the sides shows as a key in one set only
+        const drilled = (on: boolean): Set<string> =>
+        {
+            const p = dresser();
+            for (const it of p.items)
+            {
+                if (it.kind === "carcass" && standing.includes(it.name))
+                {
+                    expect(it.sidesOnBottom).toBe(true);
+                    it.sidesOnBottom = on;
+                }
+            }
+            const out = new Set<string>();
+            for (const q of analyse(p).build.parts)
+            {
+                const f = q.frame!;
+                for (const h of q.holes)
+                {
+                    const w = h.face === "A" ? 0 : h.face === "B" ? q.thickness : h.w ?? q.thickness / 2;
+                    const at = [0, 1, 2].map((k) => { return (f.o[k]! + f.u[k]! * h.u + f.v[k]! * h.v + f.n[k]! * w)
+                        .toFixed(1); });
+                    out.add(`${q.itemName}/${q.label} ${h.purpose} ${at.join(",")}`);
+                }
+            }
+            return out;
+        };
+        const [whole, raised] = [drilled(false), drilled(true)];
+        const moved = [...whole].filter((k) => { return !raised.has(k); })
+            .concat([...raised].filter((k) => { return !whole.has(k); }));
+        // Only the joints of a side to its bottom change, and the screws to the next carcass that make room for them
+        const joints = /^(Colonne gauche|Colonne droite|Placards et tiroirs)\/(Joue gauche|Joue droite|Dessous) (minifix-housing|minifix-passage|minifix-bolt|dowel|link-screw) /;
+        expect(moved.length).toBeGreaterThan(0);
+        expect(moved.filter((k) => { return !joints.test(k); })).toEqual([]);
+        // The bottom end to end, the sides one thickness shorter on it, its Minifix bolts in its upper face
+        const p = dresser();
+        const parts = analyse(p).build.parts;
+        for (const name of standing)
+        {
+            const c = p.items.find((it) => { return it.name === name; }) as Carcass;
+            const of = (label: string): Part => { return parts.find((q) => { return q.item === c.id &&
+                q.label === label; })!; };
+            expect(of("Dessous").length, name).toBe(c.width);
+            expect(of("Joue gauche").length, name).toBe(c.height - c.thickness);
+            // Under the thickness of a side, its uprights keep theirs inside
+            expect(of("Dessous").holes.filter((h) => { return h.purpose === "minifix-bolt" && h.face === "A"
+                && (h.u < c.thickness || h.u > c.width - c.thickness); }).length, name).toBe(4);
+        }
+    });
+
+
+    it("slides each small column under the top of the niche with 2 mm to spare", () =>
+    {
+        // 2 : enough to slide them in, and they bear the top of the niche once it sags that much
         const p = dresser();
         const a = analyse(p);
         const top = (item: string, label: string): number =>
@@ -675,7 +786,7 @@ describe("the sketch templates", () =>
         };
         for (const name of ["Petite colonne gauche", "Petite colonne droite"])
         {
-            expect(top("Niche", "Dessus") - top(name, "Dessus")).toBeCloseTo(5, 3);
+            expect(top("Niche", "Dessus") - top(name, "Dessus")).toBeCloseTo(2, 3);
         }
     });
 
@@ -761,8 +872,8 @@ describe("the sketch templates", () =>
                 return h.item === c.id && (h.purpose === "anti-tip" || h.purpose === "link-screw");
             })).toEqual([]);
             expect(c.depth).toBe(300);
-            // Under the top of the niche with 5 of room to slide in
-            expect(c.y + c.height).toBe(named("Niche").y + 680 - 19 -5);
+            // Under the top of the niche with 2 of room to slide in, bearing it once it sags that much
+            expect(c.y + c.height).toBe(named("Niche").y + 680 - 19 - 2);
         }
         expect(a.build.hardware.filter((h) =>
         {
@@ -790,7 +901,7 @@ describe("the sketch templates", () =>
     });
 
 
-    it("screws the niche to the wall behind the loose columns, every back listed with its screws", () =>
+    it("bears the niche top on a back of 19 with no wall screw, the loose columns slid in front of it, every back listed with its screws", () =>
     {
         const p = dresser();
         const a = analyse(p);
@@ -802,36 +913,25 @@ describe("the sketch templates", () =>
             }) as Carcass;
         };
         const niche = named("Niche");
+        // The high cupboards over the open niche hung on their applied back of 8 alone (V5 of the external review)
+        expect(niche.back).toEqual({ type: "panel", thickness: niche.thickness });
         const back = a.build.parts.find((q) =>
         {
             return q.id === `${niche.id}/back`;
         })!;
-        const wall = back.holes.filter((h) =>
+        expect([back.label, back.thickness, back.length, back.width])
+            .toEqual(["Fond porteur", niche.thickness, niche.width - 2 * niche.thickness, niche.height -
+                      2 * niche.thickness]);
+        // Joined to the 4 boards round it, the top bearing on it : no screw into the wall, the pieces round it hold it
+        expect(a.build.joints.filter((j) => { return j.edgePart === back.id; }).map((j) => { return j.edge; }).sort())
+            .toEqual(["u0", "u1", "v0", "v1"]);
+        expect(back.holes.some((h) => { return h.purpose === "wall-screw"; })).toBe(false);
+        expect(a.build.hardware.some((h) => { return h.item === niche.id && h.purpose === "wall-fixing"; })).toBe(false);
+        for (const c of [named("Petite colonne gauche"), named("Petite colonne droite")])
         {
-            return h.purpose === "wall-screw";
-        });
-        expect(wall).toHaveLength(4);
-        // Every screw under one of the columns, in world x, and clear of it by the room left for head and washer
-        const columns = [named("Petite colonne gauche"), named("Petite colonne droite")];
-        for (const h of wall)
-        {
-            const x = niche.x + h.u;
-            expect(columns.some((c) =>
-            {
-                return x > c.x && x < c.x + c.width && niche.y + h.v > c.y && niche.y + h.v < c.y + c.height;
-            })).toBe(true);
+            expect(c.z).toBe(niche.thickness + 6);
         }
-        for (const c of columns)
-        {
-            expect(c.z).toBe(niche.back.type === "applied" ? niche.back.thickness + 6 : -1);
-        }
-        for (const ref of ["WASHER_5x20", "WALL_SCREW_5x50_PAN", "PLUG_NYLON_8x40"])
-        {
-            expect(a.build.hardware.find((h) =>
-            {
-                return h.ref === ref && h.item === niche.id;
-            })?.qty).toBe(4);
-        }
+        expect(a.build.errors).toEqual([]);
         // One line of screws per applied back, closer on the long carcasses. The small columns have none (2026-11-09)
         for (const it of p.items)
         {
@@ -1240,7 +1340,9 @@ describe("the sketch templates", () =>
                     return h.purpose === "push-latch";
                 }).map((h) =>
                 {
-                    return Math.round(h.u + c.y);
+                    // Off the floor of the room through the frame of the board : a side standing on its bottom starts
+                    // one thickness up
+                    return Math.round(q.frame!.o[1] + h.u * q.frame!.u[1] + h.v * q.frame!.v[1]);
                 });
             }).sort((x, y) =>
             {
@@ -1319,10 +1421,12 @@ describe("the sketch templates", () =>
             return h.purpose === "foot-mount-screw";
         });
         expect(screws).toHaveLength(16);
+        // Its sides stand on it : the inner face of the left one is a thickness in from its end
+        expect(c.sidesOnBottom).toBe(true);
         expect(Math.min(...screws.map((h) =>
         {
             return h.u;
-        }))).toBe(23);
+        })) - c.thickness).toBe(23);
         const us = [...new Set(screws.map((h) =>
         {
             return h.u;
@@ -1334,7 +1438,7 @@ describe("the sketch templates", () =>
         // Each square sits 13 on the middle side of its foot, on both sides of the carcass
         const axes = footPlaces(c).map((f) =>
         {
-            return f.x - c.x - c.thickness;
+            return f.x - bottom.frame!.o[0];
         });
         const centres = [(us[0]! + us[1]!) / 2, (us.at(-2)! + us.at(-1)!) / 2];
         expect(centres[0]! - Math.min(...axes)).toBe(13);
@@ -1418,7 +1522,8 @@ describe("the sketch templates", () =>
         {
             return q.holes.filter((h) => { return h.purpose === "minifix-housing"; }).map((h) => { return `${q.role} ${h.face}`; });
         });
-        expect(housings).toEqual(new Array(8).fill("side B"));
+        // Those of the bearing back open on its face against the wall
+        expect(housings.sort()).toEqual([...new Array(8).fill("back B"), ...new Array(8).fill("side B")]);
         expect(a.checks.filter((k) =>
         {
             return k.level === "error";
@@ -1606,14 +1711,15 @@ describe("the spacers of the dresser pull-out", () =>
     {
         // essai25 : one 4 x 30 of each spacer ran into a Minifix housing, drilled after the flap was fitted
         const b = analyse(dresser()).build;
+        // 2 thicknesses a side, the second screwed into the first
         const spacers = b.parts.filter((q) => { return q.label.startsWith("Cale de coulisse"); });
-        expect(spacers).toHaveLength(2);
+        expect(spacers).toHaveLength(4);
         const met: string[] = [];
         for (const sp of spacers)
         {
             for (const h of sp.holes.filter((x) => { return x.purpose === "spacer-screw"; }))
             {
-                const name = /dans (montant \d+)/.exec(h.label)![1]!;
+                const name = / dans (.+) : vis/.exec(h.label)![1]!;
                 const side = b.parts.find((q) => { return q.item === sp.item && q.label.toLowerCase() === name; })!;
                 const p = at(sp.frame!, h.u, h.v, 0);
                 const f = side.frame!;
