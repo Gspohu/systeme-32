@@ -35,16 +35,22 @@ export const FLAP_HINGE = {
 };
 // Workshop choice : each hinge 100 in from the side of the cell, clear of the stays agaisnt them
 const HINGE_INSET = 100;
-// Häfele gas stay 365.01.901 (LGH-M 2017 p. MB 5.313), flap shut : pivots 238 and 65 over its lower edge, 18 and
-// 16 behind its back, 25 off the side, strut 15, sockets 16.5. 2 past 400 high, 10 kg and 600 high at most
-// Bracket in its STEP : plate 46 x 31 x 3, 2 screws 32 apart, 19 off the pivot
-export const GAS_STAY = { ref: "365.01.901", sideUp: 238, flapUp: 65, sideBehind: 18, flapBehind: 16, offSide: 25,
-                          strut: 15, socket: 16.5, pin: 8, maxHigh: 600, maxKg: 10,
-                          plate: { long: 46, wide: 31, thick: 3, screws: 32, offPivot: 19 } };
+// Häfele gas stay 365.01.901 (LGH-M 2017 p. MB 5.313), flap shut : pivots 238 and 65 over its lower edge, the
+// cabinet one 18 behind its back. Strut 15, sockets 16.5. 2 past 400 high, 10 kg and 600 high at most
+export const GAS_STAY = { ref: "365.01.901", sideUp: 238, flapUp: 65, sideBehind: 18,
+                          // Off its STEP rebuilt (scripts/gas_stay_step.py), brackets laid flat : the ball 16 off the
+                          // side, the flap one 14.5 behind the flap, not the 25 and 16 of the montage drawing
+                          flapBehind: 14.5, offSide: 16,
+                          strut: 15, socket: 16.5, pin: 10, maxHigh: 600, maxKg: 10,
+                          // Flap plate 46 x 31 x 3, 2 screws 32 apart, 19 off the pivot. Cabinet plate 46 x 14 x 3
+                          // from 1 to 15 in front of its ball, its foot 15 in front
+                          plate: { long: 46, wide: 31, thick: 3, screws: 32, offPivot: 19 },
+                          cabinet: { deep: 14, front: 1, foot: 15 } };
 // Workshop choices for the pull-out : spacers of the carcass board under its runners, clear of the stays, its box
 // raised over the bracket of the stay standing on the open flap, its front back off the front edge, its sides
 // holding bottles
 const SPACER_HEIGHT = 80;
+const SPACER_LAYERS = 2;
 // The box 3 over the hinge collars, 3.35 proud of the floor and of the open flap. Its edge passes over the plate of
 // the stay on the open flap too, the struts stay outside its sides
 // TODO the stays are only built shut : their swing over the open flap, past the box, isn't checked
@@ -205,10 +211,11 @@ function faceToward(q: Part, dir: Vec3): "A" | "B"
 // What each hinge is set by to bring the flap where the doors are, along the depth and the height of its frame
 export function hingeSetting(c: Carcass, fp: FrontPanel, floor: Part): { depth: number; lift: number; bore: number }
 {
-    const h = FLAP_HINGE;
+    const hinge = FLAP_HINGE;
     const { front, top } = floorEdge(floor);
-    const bore = front - h.offEdge;
-    return { bore, depth: c.z + fp.z - bore - h.flapBack, lift: c.y + fp.rect.y + h.offEdge - top - h.flapBore };
+    const bore = front - hinge.offEdge;
+    return { bore, depth: c.z + fp.z - bore - hinge.flapBack,
+             lift: c.y + fp.rect.y + hinge.offEdge - top - hinge.flapBore };
 }
 
 
@@ -217,16 +224,16 @@ export function hingeSetting(c: Carcass, fp: FrontPanel, floor: Part): { depth: 
 // hinge's own settings, the rest is refused
 function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part, b: Build, name: string): boolean
 {
-    const h = FLAP_HINGE;
+    const hinge = FLAP_HINGE;
     const { top } = floorEdge(floor);
     const { bore, depth, lift } = hingeSetting(c, fp, floor);
     const back = c.z + fp.z;
     const bottom = c.y + fp.rect.y;
-    if (lift < h.lift[0] || lift > h.lift[1] || depth < h.depth[0] || depth > h.depth[1])
+    if (lift < hinge.lift[0] || lift > hinge.lift[1] || depth < hinge.depth[0] || depth > hinge.depth[1])
     {
-        b.errors.push(`${name} : les charnières ${h.ref} devraient être réglées de ${round1(lift)} mm en hauteur et `
-            + `${round1(depth)} mm en profondeur, hors de leurs ${h.lift[1]} et ${h.depth[1]} mm (Häfele MB 5.318). `
-            + "Revoir la hauteur ou le jeu de l'abattant.");
+        b.errors.push(`${name} : les charnières ${hinge.ref} devraient être réglées de ${round1(lift)} mm en hauteur `
+            + `et ${round1(depth)} mm en profondeur, hors de leurs ${hinge.lift[1]} et ${hinge.depth[1]} mm `
+            + "(Häfele MB 5.318). Revoir la hauteur ou le jeu de l'abattant.");
         return false;
     }
     const up = faceToward(floor, Y);
@@ -235,41 +242,42 @@ function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part
     {
         const [u, v] = onPart(q, p);
         q.holes.push({ u, v, diameter, depth: deep, face,
-                      purpose: diameter === h.bore ? "flap-hinge" : "flap-hinge-pilot",
-                       fixes: h.ref, label: `Charnière d'abattant ${h.ref} : ${what}` });
+                      purpose: diameter === hinge.bore ? "flap-hinge" : "flap-hinge-pilot",
+                       fixes: hinge.ref, label: `Charnière d'abattant ${hinge.ref} : ${what}` });
     };
     for (const [k, x] of [c.x + nb.x + HINGE_INSET, c.x + nb.x + nb.w - HINGE_INSET].entries())
     {
-        drill(floor, [x, top, bore], up, h.bore, h.floorDepth,
-              `logement ${DIAM}26 x ${h.floorDepth}, débouchant sur le chant`);
-        drill(flap, [x, bottom + h.offEdge, back], behind, h.bore, h.flapDepth,
-              `logement ${DIAM}26 x ${h.flapDepth}, débouchant sur le chant bas`);
+        drill(floor, [x, top, bore], up, hinge.bore, hinge.floorDepth,
+              `logement ${DIAM}26 x ${hinge.floorDepth}, débouchant sur le chant`);
+        drill(flap, [x, bottom + hinge.offEdge, back], behind, hinge.bore, hinge.flapDepth,
+              `logement ${DIAM}26 x ${hinge.flapDepth}, débouchant sur le chant bas`);
+        const pilot = hinge.pilot;
         for (const s of [-1, 1])
         {
-            const across = x + s * h.pilot.across;
-            drill(floor, [across, top, bore - h.pilot.offBore], up, h.pilot.diameter, h.pilot.floor,
+            const across = x + s * pilot.across;
+            drill(floor, [across, top, bore - pilot.offBore], up, pilot.diameter, pilot.floor,
                   "avant-trou de vis HOSPA 3");
-            drill(flap, [across, bottom + h.offEdge + h.pilot.offBore, back], behind, h.pilot.diameter, h.pilot.flap,
+            drill(flap, [across, bottom + hinge.offEdge + pilot.offBore, back], behind, pilot.diameter, pilot.flap,
                   "avant-trou de vis HOSPA 3");
         }
         // Its collars in the cell for the checks of clashes, the flap side moved by the settings
         const room = (p: Vec3, dx: number, dz: number): Vec3 => { return [x + p[1], top + p[2] + dz, bore +
             p[0] + dx]; };
-        for (const [part, box, host, dx, dz] of [["fond", h.floorCollar, floor, 0, 0],
-                                                  ["abattant", h.flapCollar, flap, depth, lift]] as const)
+        for (const [part, box, host, dx, dz] of [["fond", hinge.floorCollar, floor, 0, 0],
+                                                  ["abattant", hinge.flapCollar, flap, depth, lift]] as const)
         {
             const mid = box.map(([a, z]) => { return (a + z) / 2; }) as Vec3;
             const half = box.map(([a, z]) => { return (z - a) / 2; });
-            b.fitted.push({ key: `${c.id}/drop/${fp.id}/charniere${k}/${part}`, item: c.id, ref: h.ref,
+            b.fitted.push({ key: `${c.id}/drop/${fp.id}/charniere${k}/${part}`, item: c.id, ref: hinge.ref,
                             label: `${c.name}, charnière d'abattant, côté ${part === "fond" ? "meuble" : "abattant"}`,
                             purpose: "flap-hinge", shape: "box", centre: room(mid, dx, dz), axes: [X, Y, Z],
                             half: [half[1]!, half[2]!, half[0]!], host: host.id, hidden: true });
         }
     }
-    b.hardware.push({ ref: h.ref, qty: 2, item: c.id, itemName: c.name, target: flap.id, purpose: "flap-hinge",
+    b.hardware.push({ ref: hinge.ref, qty: 2, item: c.id, itemName: c.name, target: flap.id, purpose: "flap-hinge",
                       note: `charnières d'abattant en applique, réglées de +${round1(lift)} mm en hauteur, vis HOSPA 3` });
-    flap.notes.push(`Abattant en applique dans le plan des portes voisines, sur 2 charnières ${h.ref} (Häfele MB 5.318) `
-        + `: logements ${DIAM}26 à ${h.offEdge} mm du chant avant du fond et du chant bas de l'abattant, réglage en hauteur `
+    flap.notes.push(`Abattant en applique dans le plan des portes voisines, sur 2 charnières ${hinge.ref} `
+        + `(Häfele MB 5.318) : logements ${DIAM}26 à ${hinge.offEdge} mm du chant avant du fond et du chant bas de l'abattant, réglage en hauteur `
         + `de +${round1(lift)} mm et en profondeur de ${round1(depth)} mm pour l'aligner sur les portes`);
     return true;
 }
@@ -279,8 +287,8 @@ function hinges(c: Carcass, nb: NodeBox, fp: FrontPanel, floor: Part, flap: Part
 // sets them by trial (the cabinet first, the flap bracket once the flap is open) : screw places, nothing drilled
 function stays(c: Carcass, nb: NodeBox, fp: FrontPanel, faces: FaceRef[], flap: Part, b: Build): void
 {
-    const g = GAS_STAY;
-    const p = g.plate;
+    const stay = GAS_STAY;
+    const plate = stay.plate;
     const back = c.z + fp.z;
     const edge = c.y + fp.rect.y;
     for (const [k, fr] of faces.entries())
@@ -289,54 +297,61 @@ function stays(c: Carcass, nb: NodeBox, fp: FrontPanel, faces: FaceRef[], flap: 
         const hand = left ? "gauche" : "droit";
         const inward = left ? 1 : -1;
         const sideX = left ? nb.x : nb.x + nb.w;
-        const axisX = sideX + inward * g.offSide;
-        const upper: Vec3 = [c.x + axisX, edge + g.sideUp, back - g.sideBehind];
-        const lower: Vec3 = [c.x + axisX, edge + g.flapUp, back - g.flapBehind];
-        fr.part.holes.push({ u: fp.rect.y + g.sideUp - fr.uOrigin, v: c.depth - (fp.z - g.sideBehind) - fr.vOrigin,
-                             diameter: 0, depth: 0, face: fr.face, purpose: "flap-screw", fixes: g.ref,
-                             label: `Compas ${g.ref} ${hand} : axe de l'équerre de corps, posée par essai (Häfele)` });
+        const axisX = sideX + inward * stay.offSide;
+        const upper: Vec3 = [c.x + axisX, edge + stay.sideUp, back - stay.sideBehind];
+        const lower: Vec3 = [c.x + axisX, edge + stay.flapUp, back - stay.flapBehind];
+        fr.part.holes.push({ u: fp.rect.y + stay.sideUp - fr.uOrigin,
+                             v: c.depth - (fp.z - stay.sideBehind) - fr.vOrigin,
+                             diameter: 0, depth: 0, face: fr.face, purpose: "flap-screw", fixes: stay.ref,
+                             label: `Compas ${stay.ref} ${hand} : axe de l'équerre de corps, posée par essai (Häfele)` });
         // The plate on the flap reachs 26 in from its pivot and 5 out, its screws 19 in
-        const screwsX = axisX + inward * p.offPivot - fp.rect.x;
-        for (const du of [-p.screws / 2, p.screws / 2])
+        const screwsX = axisX + inward * plate.offPivot - fp.rect.x;
+        for (const du of [-plate.screws / 2, plate.screws / 2])
         {
-            flap.holes.push({ u: g.flapUp + du, v: screwsX, diameter: 0, depth: 0, face: "A", purpose: "flap-screw",
-                              fixes: g.ref, label: `Compas ${g.ref} ${hand} : équerre d'abattant, vissée abattant ouvert` });
+            flap.holes.push({ u: stay.flapUp + du, v: screwsX, diameter: 0, depth: 0, face: "A", purpose: "flap-screw",
+                              fixes: stay.ref,
+                              label: `Compas ${stay.ref} ${hand} : équerre d'abattant, vissée abattant ouvert` });
         }
-        const d: Vec3 = [upper[0] - lower[0], upper[1] - lower[1], upper[2] - lower[2]];
-        const len = Math.hypot(...d);
-        const axis: Vec3 = [d[0] / len, d[1] / len, d[2] / len];
+        const rise: Vec3 = [upper[0] - lower[0], upper[1] - lower[1], upper[2] - lower[2]];
+        const len = Math.hypot(...rise);
+        const axis: Vec3 = [rise[0] / len, rise[1] / len, rise[2] / len];
         const across: Vec3 = [0, axis[2], -axis[1]];
         const key = `${c.id}/drop/${fp.id}/compas-${hand}`;
-        const plateX = c.x + axisX + inward * (p.wide / 2 - 5);
+        const plateX = c.x + axisX + inward * (plate.wide / 2 - 5);
         b.fitted.push(
-            { key: `${key}/verin`, item: c.id, ref: g.ref, label: `${c.name}, compas ${g.ref} ${hand} : vérin`,
-              purpose: "flap-stay", shape: "cylinder", centre: [lower[0] + d[0] / 2, lower[1] + d[1] / 2,
-                                                                lower[2] + d[2] / 2],
-              axes: [X, across, axis], half: [g.strut / 2, g.strut / 2, len / 2 - g.socket / 2], host: null,
+            { key: `${key}/verin`, item: c.id, ref: stay.ref, label: `${c.name}, compas ${stay.ref} ${hand} : vérin`,
+              purpose: "flap-stay", shape: "cylinder", centre: [lower[0] + rise[0] / 2, lower[1] + rise[1] / 2,
+                                                                lower[2] + rise[2] / 2],
+              axes: [X, across, axis], half: [stay.strut / 2, stay.strut / 2, len / 2 - stay.socket / 2], host: null,
               hidden: true },
-            { key: `${key}/equerre-abattant`, item: c.id, ref: g.ref, host: flap.id, hidden: true,
-              label: `${c.name}, compas ${g.ref} ${hand} : équerre d'abattant`, purpose: "flap-stay", shape: "box",
-              centre: [plateX, lower[1], back - p.thick / 2], axes: [X, Y, Z], half: [p.wide / 2, p.long / 2,
-                                                                                      p.thick / 2] },
-            // Not in the STEP : a plate as large as the flap one on the side, a pin out to the pivot. A real bracket
-            // supplied with the stay and screwed to the side, only its shape is guessed
-            { key: `${key}/equerre-corps`, item: c.id, ref: g.ref, host: fr.part.id, hidden: true,
-              label: `${c.name}, compas ${g.ref} ${hand} : équerre de corps`, purpose: "flap-stay",
-              shape: "box", centre: [c.x + sideX + inward * p.thick / 2, upper[1], upper[2]], axes: [X, Y, Z],
-              half: [p.thick / 2, p.long / 2, p.wide / 2] },
-            { key: `${key}/teton`, item: c.id, ref: g.ref, host: null, hidden: true,
-              label: `${c.name}, compas ${g.ref} ${hand} : téton de l'équerre de corps (encombrement)`,
-              purpose: "flap-stay", shape: "box", centre: [c.x + sideX + inward * (p.thick + g.offSide) / 2, upper[1],
-                                                           upper[2]], axes: [X, Y, Z],
-              half: [(g.offSide - p.thick) / 2, g.pin / 2, g.pin / 2] },
+            { key: `${key}/equerre-abattant`, item: c.id, ref: stay.ref, host: flap.id, hidden: true,
+              label: `${c.name}, compas ${stay.ref} ${hand} : équerre d'abattant`, purpose: "flap-stay", shape: "box",
+              centre: [plateX, lower[1], back - plate.thick / 2], axes: [X, Y, Z],
+              half: [plate.wide / 2, plate.long / 2, plate.thick / 2] },
+            // Its plate flat on the side, in front of the ball, as its STEP rebuilt draws it
+            { key: `${key}/equerre-corps`, item: c.id, ref: stay.ref, host: fr.part.id, hidden: true,
+              label: `${c.name}, compas ${stay.ref} ${hand} : équerre de corps`, purpose: "flap-stay",
+              shape: "box", centre: [c.x + sideX + inward * plate.thick / 2, upper[1],
+                                     upper[2] + stay.cabinet.front + stay.cabinet.deep / 2], axes: [X, Y, Z],
+              half: [plate.thick / 2, plate.long / 2, stay.cabinet.deep / 2] },
+            // Its foot and stud : from the plate past the ball, from behind the ball to the foot, as high as the
+            // ball. The strut starts half a socket under it
+            { key: `${key}/teton`, item: c.id, ref: stay.ref, host: null, hidden: true,
+              label: `${c.name}, compas ${stay.ref} ${hand} : téton de l'équerre de corps (encombrement)`,
+              purpose: "flap-stay", shape: "box",
+              centre: [c.x + sideX + inward * (plate.thick + stay.offSide + stay.pin / 2) / 2, upper[1],
+                       upper[2] + (stay.cabinet.foot - stay.pin / 2) / 2], axes: [X, Y, Z],
+              half: [(stay.offSide + stay.pin / 2 - plate.thick) / 2, stay.pin / 2,
+                     (stay.cabinet.foot + stay.pin / 2) / 2] },
         );
-        b.hardware.push({ ref: g.ref, qty: 1, item: c.id, itemName: c.name, target: flap.id, purpose: "flap",
+        b.hardware.push({ ref: stay.ref, qty: 1, item: c.id, itemName: c.name, target: flap.id, purpose: "flap",
                           note: `compas à vérin à gaz ${hand}, équerres fournies, disponibilité sur demande chez Häfele` });
     }
-    flap.notes.push(`2 compas à vérin à gaz ${g.ref} : axes à ${g.sideUp} et ${g.flapUp} mm du chant bas de l'abattant, `
-        + `à ${g.sideBehind} et ${g.flapBehind} mm derrière lui, à ${g.offSide} mm des joues (Häfele MB 5.313). `
+    flap.notes.push(`2 compas à vérin à gaz ${stay.ref} : axes à ${stay.sideUp} et ${stay.flapUp} mm du chant bas de `
+        + `l'abattant, à ${stay.sideBehind} et ${stay.flapBehind} mm derrière lui, à ${stay.offSide} mm des joues `
+        + "(Häfele MB 5.313, équerres posées à plat). "
         + "Position exacte à la pose : équerres de corps d'abord, équerres d'abattant vissées l'abattant ouvert. "
-        + `${g.maxKg} kg et ${g.maxHigh} mm de haut au plus pour la paire : essai de butée avant pose`);
+        + `${stay.maxKg} kg et ${stay.maxHigh} mm de haut au plus pour la paire : essai de butée avant pose`);
 }
 
 
@@ -345,7 +360,7 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
     front: Parameters<typeof buildPullOut>[4], nb: NodeBox, sides: FaceRef[],
     { loadKg, boxDecor }: { loadKg: number; boxDecor?: string }): void
 {
-    const t = c.thickness;
+    const board = c.thickness;
     // The setback off the front edge, and behind the struts of the gas stays, flap shut : the box and its spacers ran
     // into them in the clash check of the dresser
     const zFront = Math.min(c.depth - PULL_OUT_SETBACK, fp.z - GAS_STAY.sideBehind - GAS_STAY.strut / 2 -
@@ -368,33 +383,48 @@ function pullOut(c: Carcass, lay: ResolvedLayout, s: Settings, b: Build, fp: Par
                          nb.y + SPACER_HEIGHT / 2 - MOVENTO.screwAxisAboveLower);
     const y0 = low + MOVENTO.screwAxisAboveLower - SPACER_HEIGHT / 2;
     const faces: FaceRef[] = [];
+    let screws = 0;
     for (const [k, side] of sides.entries())
     {
         const left = k === 0;
-        const x = left ? nb.x : nb.x + nb.w - t;
-        const spacer = newPart({
-            item: c.id, itemName: c.name, thickness: t, decor: c.decor, id: `${c.id}/pull-out/${fp.id}/spacer/${left ? "L" : "R"}`,
-            label: `Cale de coulisse ${left ? "gauche" : "droite"}`, role: "cleat", length: SPACER_HEIGHT, width: runner.nl,
-            edges: [], frame: { o: [ox + x, oy + y0, oz + runnerFront], u: Y, v: neg([0, 0, 1]), n: X },
-        });
-        // Face B looks into the cell on the left, face A on the right : screwed through into the side from there
+        // Face B looks into the cell on the left, face A on the right : screwed through into what it lies on from there
         const face = left ? "B" as const : "A" as const;
-        for (const u of [8, SPACER_HEIGHT - 8])
+        // 2 layers of the carcass board : with one, the box side stood 8.5 mm into the swing of the strut, the flap
+        // open (V1 of the external review)
+        let under: FaceRef = side;
+        for (let layer = 0; layer < SPACER_LAYERS; layer++)
         {
-            for (const v of [30, runner.nl / 2, runner.nl - 30])
+            const x = left ? nb.x + layer * board : nb.x + nb.w - (layer + 1) * board;
+            const tag = `${left ? "L" : "R"}${layer === 0 ? "" : layer + 1}`;
+            const name = `Cale de coulisse ${left ? "gauche" : "droite"}${layer === 0 ? "" : `, ${layer +
+                1}e épaisseur`}`;
+            const spacer = newPart({
+                item: c.id, itemName: c.name, thickness: board, decor: c.decor, id: `${c.id}/pull-out/${fp.id}/spacer/${tag}`,
+                label: name, role: "cleat", length: SPACER_HEIGHT, width: runner.nl,
+                edges: [], frame: { o: [ox + x, oy + y0, oz + runnerFront], u: Y, v: neg([0, 0, 1]), n: X },
+            });
+            // The second layer's screws a third along from the first's : they would meet head on
+            const along = layer === 0 ? [30, runner.nl / 2, runner.nl - 30] : [runner.nl / 4, 3 * runner.nl / 4];
+            for (const u of [8, SPACER_HEIGHT - 8])
             {
-                spacer.holes.push({ u, v, diameter: 0, depth: 0, face,
-                                   label: `Cale de coulisse dans ${side.part.label.toLowerCase()} : vis 4 x 30`,
-                                    purpose: "spacer-screw" });
+                for (const v of along)
+                {
+                    spacer.holes.push({ u, v, diameter: 0, depth: 0, face,
+                                       label: `${name} dans ${under.part.label.toLowerCase()} : vis 4 x 30`,
+                                        purpose: "spacer-screw" });
+                    screws++;
+                }
             }
+            spacers.set(spacer, under);
+            spacer.notes.push(`Bande de ${SPACER_HEIGHT} mm débitée dans le panneau de la caisse : écarte la coulisse du `
+                + "compas");
+            b.parts.push(spacer);
+            under = { part: spacer, face, uOrigin: y0, vOrigin: 0 };
         }
-        spacers.set(spacer, side);
-        spacer.notes.push(`Bande de ${SPACER_HEIGHT} mm débitée dans le panneau de la caisse : écarte la coulisse du compas`);
-        b.parts.push(spacer);
-        faces.push({ part: spacer, face, uOrigin: y0, vOrigin: 0 });
+        faces.push(under);
     }
-    b.hardware.push({ ref: "SCREW_4x30", qty: 12, item: c.id, itemName: c.name, target: fp.id,
+    b.hardware.push({ ref: "SCREW_4x30", qty: screws, item: c.id, itemName: c.name, target: fp.id,
                       note: "cales de coulisse du tiroir intérieur", purpose: "spacer-screw" });
-    buildPullOut(c, s, b, fp, front, nb, { loadKg, faces, spacer: t, low, zFront, hs: PULL_OUT_SIDE, runner,
-                                         boxDecor });
+    buildPullOut(c, s, b, fp, front, nb, { loadKg, faces, spacer: SPACER_LAYERS * board, low, zFront, hs: PULL_OUT_SIDE,
+                                         runner, boxDecor });
 }

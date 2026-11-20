@@ -5,7 +5,7 @@ import type { Build, Fitted, Hole, Part } from "../part_types";
 import type { Carcass, Project } from "../model";
 import { CLIP_RETURN_DROP, clipDrop, footLong, footPlaces } from "../feet";
 import { lightsInTheWay } from "../loose";
-import { FLAP_HINGE } from "../drop_flaps";
+import { FLAP_HINGE, GAS_STAY } from "../drop_flaps";
 import { decorById } from "../../data/materials";
 import { FRONT_GAP, MINIFIX, MOVENTO, TIPON_ADAPTER } from "../../data/rules";
 import { screwOf, type ScrewSpec } from "../../data/screws";
@@ -696,7 +696,9 @@ function capModels(b: Build, out: CadInstance[], drawn: Record<string, CadModel>
         const decor = decorById(board?.decor ?? "");
         const [r, h] = [f.half[0], 2 * f.half[2]];
         const key = `EDGE_CAP@${Math.round(2 * r)}x${h}@${decor.id}`;
-        drawn[key] = { ref: "EDGE_CAP", label: `Cache-vis ${decor.ref} ${decor.label}`.trim(), rgb: decor.rgb,
+        // A disc over a Minifix housing named apart : of one name with the caps of the screws, one pattern took both
+        const what = f.key.includes("/cap/minifix-housing/") ? "Cache-boîtier" : "Cache-vis";
+        drawn[key] = { ref: "EDGE_CAP", label: `${what} ${decor.ref} ${decor.label}`.trim(), rgb: decor.rgb,
                        draw: { cylinder: [r, h] } };
         const z = f.axes[2];
         const o: Vec3 = [0, 1, 2].map((k) => { return f.centre[k]! - z[k]! * h / 2; }) as Vec3;
@@ -706,37 +708,44 @@ function capModels(b: Build, out: CadInstance[], drawn: Record<string, CadModel>
 }
 
 
-// The gas stays of a drop flap, drawn off their volumes (drop_flaps.ts) : the STEP of 365.01.901 holds an open shell
-// for its strut and no cabinet bracket, no solid to check a clash against
-function gasStays(b: Build, out: CadInstance[], drawn: Record<string, CadModel>): void
+// The gas stays of a drop flap : the 4 articles scripts/gas_stay_step.py rebuilt off the STEP, set on the pivots
+// drop_flaps.ts lays. Each strut half has z along the stay down to the flap, x along the studs toward the wall
+function gasStays(b: Build, out: CadInstance[]): void
 {
+    const unitOf = (v: Vec3): Vec3 =>
+    {
+        const n = Math.hypot(...v);
+        return [v[0] / n, v[1] / n, v[2] / n];
+    };
+    const cross = (a: Vec3, c: Vec3): Vec3 => { return [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2],
+                                                          a[0] * c[1] - a[1] * c[0]]; };
     for (const f of b.fitted)
     {
-        if (f.purpose !== "flap-stay")
+        if (f.purpose !== "flap-stay" || f.shape !== "cylinder")
         {
             continue;
         }
-        const [a, w, h] = [2 * f.half[0], 2 * f.half[1], 2 * f.half[2]];
-        const z = f.axes[2];
         const unit = f.key.slice(0, f.key.lastIndexOf("/"));
-        if (f.shape === "cylinder")
-        {
-            const key = `${f.ref}@verin${Math.round(h)}`;
-            drawn[key] = { ref: f.ref, label: `Compas ${f.ref}, vérin`, rgb: STEEL, draw: { cylinder: [a / 2, h] } };
-            const o: Vec3 = [0, 1, 2].map((k) => { return f.centre[k]! - z[k]! * h / 2; }) as Vec3;
-            out.push({ model: key, item: f.item, part: f.label, o, x: f.axes[0], y: f.axes[1], z, unit });
-            continue;
-        }
-        // A box : its section across the first 2 axes, padded along the third
-        const key = `${f.ref}@${Math.round(a)}x${Math.round(w)}x${Math.round(h * 10) / 10}`;
-        drawn[key] = { ref: f.ref, label: `Compas ${f.ref}, équerre`, rgb: ZINC,
-                       draw: { section: [[0, 0], [a, 0], [a, w], [0, w]], length: h } };
-        const [x, y] = [f.axes[0], f.axes[1]];
-        const o: Vec3 = [0, 1, 2].map((k) =>
-        {
-            return f.centre[k]! - x[k]! * a / 2 - y[k]! * w / 2 - z[k]! * h / 2;
-        }) as Vec3;
-        out.push({ model: key, item: f.item, part: f.label, o, x, y, z, unit });
+        const name = f.label.slice(0, f.label.lastIndexOf(" : "));
+        // The strut volume runs between the sockets less half a socket at each end, its axis up to the side bracket
+        const reach = f.half[2] + GAS_STAY.socket / 2;
+        const up = f.axes[2];
+        const upper: Vec3 = [0, 1, 2].map((k) => { return f.centre[k]! + up[k]! * reach; }) as Vec3;
+        const lower: Vec3 = [0, 1, 2].map((k) => { return f.centre[k]! - up[k]! * reach; }) as Vec3;
+        const along = neg(up);
+        const lean = along[2];
+        // Toward the wall, square to the stay
+        const studs = unitOf([lean * along[0], lean * along[1], -1 + lean * along[2]]);
+        const strut = { x: studs, y: cross(along, studs), z: along };
+        // Right hand : the cabinet plate toward +x. Left hand : each bracket turned half round about its stud
+        const right = unit.endsWith("droit");
+        const brackets = { x: neg(Z), y: right ? X : neg(X), z: right ? neg(Y) : Y };
+        out.push({ model: "365.01.901.rod", item: f.item, part: `${name} : vérin, tige`, o: upper, ...strut, unit },
+                 { model: "365.01.901.body", item: f.item, part: `${name} : vérin, corps`, o: lower, ...strut, unit },
+                 { model: "365.01.901.cabinet", item: f.item, part: `${name} : équerre de corps`, o: upper, ...brackets,
+                   unit },
+                 { model: "365.01.901.flap", item: f.item, part: `${name} : équerre d'abattant`, o: lower, ...brackets,
+                   unit });
     }
 }
 
@@ -800,7 +809,7 @@ export function cadHardware(p: Project, b: Build): { instances: CadInstance[]; s
     const drawn: Record<string, CadModel> = {};
     lightModels(p, b, instances, drawn);
     capModels(b, instances, drawn);
-    gasStays(b, instances, drawn);
+    gasStays(b, instances);
     return { instances, screws, drawn };
 }
 

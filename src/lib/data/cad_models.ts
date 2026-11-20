@@ -34,13 +34,9 @@ export interface Fixing
     source: string;
 }
 
-// The T51.7601 comes without screws : Blum's MOVENTO notice LIT.MOV5000.09.16 p. 2 drives 606N ones at 75 degrees to
-// the front, pre-bored with the T65.1600.01 template. Its file has 2 slots of Ø4 at 23 apart through a lip of 2 against
-// the back of the front, a pocket behind it 2.5 under the body of the coupling : the DIN 7505:1986 head of Ø7 wedged in
-// it
-// The 606N is a #6 flat head wood screw of ASME B18.6.1, drawn so : 6.64 at 82 degrees, 1.81 high. Its head was moved
-// back along the axis on the file until it came free, the slot crossed where its core stays clear (backed 0.1 mm the
-// head leaves the plastic 0.027)
+// The T51.7601 comes without screws : 606N at 75 degrees into the front, pre-bored with the T65.1600.01 template
+// through 2 slots of Ø4 23 apart in a lip of 2. The 606N, a #6 flat head of ASME B18.6.1 drawn 6.64 at 82 degrees
+// and 1.81 high, set back on its axis till it came free of the plastic
 const COUPLING_SOURCE = "Notice Blum MOVENTO LIT.MOV5000.09.16 p. 2 (vis 606N à 75°, gabarit T65.1600.01) ; "
     + "fiche Würth B606N-100 (#6 x 5/8\", fraisée, tête Ø6,5) ; fichier STEP Blum T51.7601 (2 oblongs Ø4, entraxe 23)";
 const COUPLING_TILT = 15 * Math.PI / 180;
@@ -75,10 +71,9 @@ const runnerFixing = (ref: string, hand: string): Fixing =>
 // The cup of a CLIP top screwed into the door, its 2 screws placed by the export (cad_hardware.ts, cupScrews)
 const CUP_FIXING: Fixing = { screws: { label: "Cuvette de charnière" },
                             source: "Blum CLIP top à visser, 2 vis par cuvette" };
-// Pressed into its 2 bores of 5, then its screws turned : they spread the split dowels they come in. The tool is the
-// Pozidriv 2 sellers bundle with these plates, Blum's own assembly sheet not read
-// Its 2 screws on the line of the system holes, 32 apart, their heads 11.1 off the face (read off the file) : the film
-// drew one screwdriver in the middle of the plate
+// Pressed into its 2 bores of 5, then its screws turned to spread the split dowels they come in, with the Pozidriv 2
+// sellers bundle with these plates (Blum's sheet not read). Its 2 screws 32 apart on the line of the system holes
+// their heads 11.1 off the face
 const EXPANDO_FIXING: Fixing = { tighten: { operation: "Serrer les vis EXPANDO de chaque embase, elles écartent leurs chevilles",
                                             tool: "pozidriv2", once: "set", at: [[11.1, 16, 0], [11.1, -16, 0]],
                                             away: [1, 0, 0] },
@@ -173,6 +168,16 @@ export const CAD_MODELS: Record<string, CadModel> = {
                          file: `${HAFELE}/step/342_78_700_1_meuble.stp`, rgb: NICKEL },
     "342.78.700.flap": { ref: "342.78.700", label: "Charnière d'abattant, côté abattant",
                         file: `${HAFELE}/step/342_78_700_1_abattant.stp`, rgb: NICKEL },
+    // Its STEP gives the strut as an open shell crossing itself : rebuilt in sound solids by scripts/gas_stay_step.py
+    // each framed on its joint. Rod and body : origin at the socket, z along the stay. Brackets : origin at the ball
+    "365.01.901.rod": { ref: "365.01.901", label: "Compas 365.01.901, vérin, tige",
+                       file: `${HAFELE}/step/365_01_901_tige.step`, rgb: STEEL },
+    "365.01.901.body": { ref: "365.01.901", label: "Compas 365.01.901, vérin, corps",
+                        file: `${HAFELE}/step/365_01_901_corps.step`, rgb: STEEL },
+    "365.01.901.cabinet": { ref: "365.01.901", label: "Compas 365.01.901, équerre de corps",
+                           file: `${HAFELE}/step/365_01_901_equerre_corps.step`, rgb: ZINC },
+    "365.01.901.flap": { ref: "365.01.901", label: "Compas 365.01.901, équerre d'abattant",
+                        file: `${HAFELE}/step/365_01_901_equerre_abattant.step`, rgb: ZINC },
     "637.38.054": { ref: "637.38.054", label: "Clip de plinthe AXILO", file: `${HAFELE}/637_38_054_2.stp`,
                    rgb: [235, 235, 230],
                    fixing: { screws: { label: "Clip de plinthe : vis" },
