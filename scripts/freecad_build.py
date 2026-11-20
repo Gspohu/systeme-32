@@ -113,13 +113,21 @@ def make_sheet(doc, model):
             sheet.set(f"C{row}", "mm")
             sheet.set(f"D{row}", "saisie")
             sheet.set(f"E{row}", f"{p['decor']}, plan {p['code']}")
-            flag = unchanged(f"B{row}", float(value))
+            # Each link of the chain read by its alias, never by its address : a row inserted would shift it
+            flag = unchanged(alias, float(value))
             sheet.set(f"F{row}", f"={flag}" if running is None else f"={running} * {flag}")
-            running = f"F{row}"
+            sheet.setAlias(f"F{row}", f"{alias}_ok")
+            running = f"{alias}_ok"
             aliases[(k, key)] = alias
             row += 1
     if running is not None:
-        sheet.setAlias(running, "cotes_inchangees")
+        row += 1
+        sheet.set(f"A{row}", "Cotes inchangées")
+        sheet.set(f"B{row}", f"={running}")
+        sheet.setAlias(f"B{row}", "cotes_inchangees")
+        sheet.set(f"C{row}", "-")
+        sheet.set(f"D{row}", "calculé")
+        sheet.set(f"E{row}", "1 tant que toutes les cotes sont celles de la construction, lu par les notes de calcul")
     sheet.recompute()
     return aliases
 
@@ -828,7 +836,9 @@ def make_calc_notes(doc, model, aliases, bodies):
     text("A1", f"{model['name']} : notes de calcul. Cotes et fiches matériau liées : les changer refait le calcul, "
                "et un résultat de simulation ou de Ritz passe à 'Périmé'.")
     sheet.setStyle("A1", "bold")
-    for col, title in zip("ABCDEF", ("Grandeur", "Nom", "Valeur", "Unité", "Formule, lien", "Source")):
+    text("A2", "Une note par contrôle : ses entrées, ses étapes en formules et son verdict. Chaque valeur porte "
+               "l'alias <numéro de la note>_<nom>, le nom donné dans l'explication.")
+    for col, title in zip("ABCDE", ("Grandeur", "Valeur", "Unité", "Type", "Explication, source")):
         text(f"{col}3", title)
         sheet.setStyle(f"{col}3", "bold")
     index = {p["id"]: k for k, p in enumerate(model["parts"])}
@@ -859,13 +869,24 @@ def make_calc_notes(doc, model, aliases, bodies):
             m = stock[p["material"]]
             flag = (unchanged(f"({card_formula(body, 'modulus')[1:]})", float(m["modulus"])) + " * "
                     + unchanged(f"({card_formula(body, 'density')[1:]})", float(m["density"])))
+            alias = f"fiche_{row}"
             text(f"A{row}", f"{body.Label} ({p['id']}), module {m['modulus']} et masse volumique {m['density']}")
-            sheet.set(f"C{row}", f"={flag}" if running is None else f"={running} * {flag}")
+            sheet.set(f"B{row}", f"={flag}" if running is None else f"={running} * {flag}")
+            sheet.setAlias(f"B{row}", alias)
+            text(f"C{row}", "-")
+            text(f"D{row}", "calculé")
             text(f"E{row}", f"fiche matériau de {body.Label} : 1 tant que toutes les fiches jusqu'ici sont inchangées")
-            running = f"C{row}"
+            running = alias
             row += 1
         if running is not None:
-            sheet.setAlias(running, "fiches_inchangees")
+            # The last link of the chain, under the name the notes read it by
+            text(f"A{row}", "Fiches inchangées")
+            sheet.set(f"B{row}", f"={running}")
+            sheet.setAlias(f"B{row}", "fiches_inchangees")
+            text(f"C{row}", "-")
+            text(f"D{row}", "calculé")
+            text(f"E{row}", "1 tant que toutes les fiches des pièces sont celles de la construction")
+            row += 1
             cards_kept = True
     for note in notes:
         prefix = note["number"]
@@ -874,8 +895,9 @@ def make_calc_notes(doc, model, aliases, bodies):
         sheet.setStyle(f"A{row}", "bold")
         text(f"E{row}", note["method"])
         row += 1
+        # In the explanation, the name column left empty : a name alone would read as the title of a section
         for hypothesis in note["hypotheses"]:
-            text(f"A{row}", f"Hypothèse : {hypothesis}")
+            text(f"E{row}", f"Hypothèse : {hypothesis}")
             row += 1
         # Each name of the note becomes an alias of its own, the number of the note before it
         local = lambda formula: CALC_NAME_RE.sub(lambda m: f"{prefix}_{m.group(0)}", formula)
@@ -884,20 +906,19 @@ def make_calc_notes(doc, model, aliases, bodies):
         for value in note["inputs"]:
             name = f"{prefix}_{value['name']}"
             text(f"A{row}", value["label"])
-            text(f"B{row}", value["name"])
             made = linked(value["link"]) if value.get("link") else None
             if made:
-                sheet.set(f"C{row}", made[0])
-                text(f"E{row}", made[1])
+                sheet.set(f"B{row}", made[0])
+                where = f"lu dans {made[1]}"
             else:
-                sheet.set(f"C{row}", repr(value["value"]))
-                if value.get("link"):
-                    text(f"E{row}", "saisie : pièce sans corps dans ce document, lien impossible")
-                elif value.get("result"):
-                    text(f"E{row}", "résultat figé, valable tant que la ligne 'Résultat valable' vaut 1")
-            sheet.setAlias(f"C{row}", name)
-            text(f"D{row}", value["unit"])
-            text(f"F{row}", value["source"])
+                sheet.set(f"B{row}", repr(value["value"]))
+                where = ("pièce sans corps dans ce document, lien impossible" if value.get("link")
+                         else "résultat figé, valable tant que la ligne 'Résultat valable' vaut 1" if value.get("result")
+                         else "")
+            sheet.setAlias(f"B{row}", name)
+            text(f"C{row}", value["unit"])
+            text(f"D{row}", "calculé" if made else "saisie")
+            text(f"E{row}", ", ".join(x for x in (value["name"], where, value["source"]) if x))
             if (result and not value.get("result")):
                 kept.append(unchanged(name, value["value"]))
             row += 1
@@ -905,30 +926,32 @@ def make_calc_notes(doc, model, aliases, bodies):
             kept += ["Cotes.cotes_inchangees"] if doc.getObject("Cotes") is not None else []
             kept += ["fiches_inchangees"] if cards_kept else []
             text(f"A{row}", "Résultat valable")
-            sheet.set(f"C{row}", "=" + " * ".join(kept))
-            sheet.setAlias(f"C{row}", f"{prefix}_valide")
+            sheet.set(f"B{row}", "=" + " * ".join(kept))
+            sheet.setAlias(f"B{row}", f"{prefix}_valide")
+            text(f"C{row}", "-")
+            text(f"D{row}", "calculé")
             text(f"E{row}", "1 tant que les entrées, les cotes et les fiches sont celles du calcul")
             row += 1
         for step in note["steps"]:
             text(f"A{row}", step["label"])
-            text(f"B{row}", step["name"])
-            sheet.set(f"C{row}", "=" + local(step["formula"]))
-            sheet.setAlias(f"C{row}", f"{prefix}_{step['name']}")
-            text(f"D{row}", step["unit"])
-            text(f"E{row}", step["formula"])
-            text(f"F{row}", step["source"])
+            sheet.set(f"B{row}", "=" + local(step["formula"]))
+            sheet.setAlias(f"B{row}", f"{prefix}_{step['name']}")
+            text(f"C{row}", step["unit"])
+            text(f"D{row}", "calculé")
+            text(f"E{row}", f"{step['name']} = {step['formula']}, {step['source']}")
             row += 1
         check = note["check"]
-        text(f"A{row}", "Verdict")
-        sheet.set(f"C{row}", f"={prefix}_{check['value']} <= {prefix}_{check['limit']} ? 1 : 0")
-        sheet.setAlias(f"C{row}", f"{prefix}_verdict")
-        text(f"E{row}", f"{check['value']} <= {check['limit']}")
+        text(f"A{row}", f"Verdict : {check['value']} <= {check['limit']}")
+        sheet.set(f"B{row}", f"={prefix}_{check['value']} <= {prefix}_{check['limit']} ? 1 : 0")
+        sheet.setAlias(f"B{row}", f"{prefix}_verdict")
+        text(f"C{row}", "-")
+        text(f"D{row}", "calculé")
         phrases = note["phrases"]
         said = f"({prefix}_verdict == 1 ? <<{phrases['pass']}>> : <<{phrases['fail']}>>)"
-        sheet.set(f"F{row}", f"={prefix}_valide == 1 ? {said} : <<{phrases['stale']}>>" if result else "=" + said)
-        sheet.setAlias(f"F{row}", f"{prefix}_phrase")
+        sheet.set(f"E{row}", f"={prefix}_valide == 1 ? {said} : <<{phrases['stale']}>>" if result else "=" + said)
+        sheet.setAlias(f"E{row}", f"{prefix}_phrase")
         row += 1
-    for col, width in zip("ABCDEF", (330, 120, 110, 70, 420, 420)):
+    for col, width in zip("ABCDE", (330, 110, 70, 80, 560)):
         sheet.setColumnWidth(col, width)
     sheet.recompute()
     return len(notes)
