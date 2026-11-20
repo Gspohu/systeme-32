@@ -125,7 +125,8 @@ def check_screws(screws, shapes, extra=0.0):
             continue
         if not filled(tip):
             out["tips_in_pilot"] += 1
-        if not filled(origin - way * (length + SKIN_LEFT)):
+        # Its pilot may be bored past the tip (the plinth return's, by 4) : the skin is the wood round the axis too
+        if not bites(origin - way * (length + SKIN_LEFT), way, radius):
             out["no_skin"].append(name)
         # A screw runs free in its own clearance hole : what it must bite starts past it
         depth = s["free"] + TIP_PROBE
@@ -470,7 +471,139 @@ def check_hardware(bought, shapes, model):
 
 # What fails the build : a list of defects not empty, or a proof at nought, a check that saw nothing when it had to
 # It measured and wrote FIN whatever it found (review of 2026-11-09)
-FAILING = ("misplaced", "probes_bad", "crossing", "cup_off", "head_in_wood", "head_clear")
+FAILING = ("misplaced", "probes_bad", "crossing", "cup_off", "head_in_wood", "head_clear", "calc_notes_off")
+
+
+def check_calc_notes(doc, model):
+    """Each step the sheet worked out against the software's own figure, to 1e-9 of it, and each verdict the same"""
+    notes = model.get("calcNotes") or []
+    sheet = doc.getObject("NotesDeCalcul")
+    if (sheet is None):
+        return ([f"feuille absente, {len(notes)} notes exportées"] if notes else []), 0
+    sheet.recompute()
+    off, compared = [], 0
+    for note in notes:
+        prefix = note["number"]
+        for step in note["steps"]:
+            got = float(sheet.get(f"{prefix}_{step['name']}"))
+            want = step["value"]
+            compared += 1
+            # A NaN fails every comparison : agreement said the right way round, finite values first
+            agree = math.isfinite(got) and math.isfinite(want) and abs(got - want) <= 1e-9 * max(1.0, abs(want))
+            if not agree:
+                off.append(f"{prefix} {step['name']} : {got} pour {want}")
+        flag = float(sheet.get(f"{prefix}_verdict"))
+        if (not math.isfinite(flag) or bool(round(flag)) != note["ok"]):
+            off.append(f"{prefix} verdict : la feuille dit {sheet.get(prefix + '_verdict')}, le logiciel {note['ok']}")
+        # A phrase typed in reads right today and never turns : a formula only
+        phrase_cell = sheet.getCellFromAlias(f"{prefix}_phrase")
+        if (str(sheet.get(f"{prefix}_phrase")) != note["verdict"] or not sheet.getContents(phrase_cell).startswith("=")):
+            off.append(f"{prefix} phrase : '{sheet.get(prefix + '_phrase')}' pour '{note['verdict']}', ou figée")
+        for value in note["inputs"]:
+            cell = sheet.getCellFromAlias(f"{prefix}_{value['name']}")
+            if (value.get("link") and not sheet.getContents(cell).startswith("=")):
+                off.append(f"{prefix} {value['name']} : saisi, pas lu dans sa cote ou sa fiche")
+        if (any(value.get("result") for value in note["inputs"]) and float(sheet.get(f"{prefix}_valide")) != 1.0):
+            off.append(f"{prefix} : résultat déjà périmé à la construction")
+    return off, compared
+
+
+def prove_calc_notes_live(doc, model):
+    """A linked size moved by 1 mm : its input must follow and every result go stale, then all back as it was"""
+    notes = model.get("calcNotes") or []
+    sheet, sizes = doc.getObject("NotesDeCalcul"), doc.getObject("Cotes")
+    if (sheet is None or sizes is None):
+        return [], 0, 0
+    target = next(((note, value) for note in notes for value in note["inputs"]
+                   if "size" in (value.get("link") or {})), None)
+    if target is None:
+        return ["aucune entrée liée à une cote"], 0, 0
+    note, value = target
+    name = f"{note['number']}_{value['name']}"
+    contents = sheet.getContents(sheet.getCellFromAlias(name))
+    source = contents[len("=Cotes."):] if contents.startswith("=Cotes.") else ""
+    cell = sizes.getCellFromAlias(source) if source else None
+    if cell is None:
+        return [f"{name} ne lit pas sa cote dans Cotes ({contents})"], 0, 0
+    before = sizes.getContents(cell)
+    with_result = [n for n in notes if any(v.get("result") for v in n["inputs"])]
+    off, followed, stale = [], 0, 0
+    try:
+        sizes.set(cell, repr(float(before) + 1.0))
+        doc.recompute()
+        if (abs(float(sheet.get(name)) - (value["value"] + 1.0)) <= 1e-9 * (1 + abs(value["value"]))):
+            followed = 1
+        else:
+            off.append(f"{name} n'a pas suivi la cote {source}")
+        for n in with_result:
+            gone = float(sheet.get(f"{n['number']}_valide")) == 0.0
+            said = str(sheet.get(f"{n['number']}_phrase")) == n["phrases"]["stale"]
+            stale += 1 if (gone and said) else 0
+            if (not (gone and said)):
+                off.append(f"{n['number']} pas passé à 'Périmé' après la cote {source} déplacée")
+    finally:
+        sizes.set(cell, before)
+        doc.recompute()
+    back = [n["number"] for n in with_result if float(sheet.get(f"{n['number']}_valide")) != 1.0]
+    off += [f"{number} toujours périmé, la cote remise" for number in back]
+    # 2 sizes moved by + r2 and - r1, r1 and r2 their rows : a sum weighed by the rows stayed as it was
+    pair = [sizes.getCellFromAlias(alias) for alias in ("p0_L", "p1_W")]
+    if (with_result and all(pair)):
+        (c1, r1), (c2, r2) = [(c, int("".join(ch for ch in c if ch.isdigit()))) for c in pair]
+        v1, v2 = sizes.getContents(c1), sizes.getContents(c2)
+        try:
+            sizes.set(c1, repr(float(v1) + r2))
+            sizes.set(c2, repr(float(v2) - r1))
+            doc.recompute()
+            kept = [n["number"] for n in with_result if float(sheet.get(f"{n['number']}_valide")) != 0.0]
+            off += [f"{number} toujours valable après deux cotes qui se compensent" for number in kept]
+            stale = stale if not kept else 0
+        finally:
+            sizes.set(c1, v1)
+            sizes.set(c2, v2)
+            doc.recompute()
+    elif with_result:
+        # An alias renamed would skip this proof without a word
+        off.append("épreuve des cotes qui se compensent impossible : alias p0_L ou p1_W absent de Cotes")
+        stale = 0
+    off_cards, cards = prove_cards_stale(doc, model, sheet, with_result)
+    # No result to turn stale : nothing to prove there, not a failure
+    return off + off_cards, followed, min(stale, cards) if with_result else 1
+
+
+def prove_cards_stale(doc, model, sheet, with_result):
+    """One body given the card of a body of another material : every result must go stale, then all back"""
+    if not with_result:
+        return [], 1
+    ids = {p["id"] for p in model["parts"]}
+    bodies = [o for o in doc.Objects if o.TypeId == "PartDesign::Body" and o.Label2 in ids and o.ShapeMaterial]
+    if not bodies:
+        return ["aucun corps à fiche pour éprouver les fiches"], 0
+    # The last body : the first of each material was all an earlier sheet watched, a proof on it would pass that too
+    body = bodies[-1]
+    # Another card of the piece, or of the library when the piece is all of one material, the dresser all P2
+    import Materials
+    library = [m for m in Materials.MaterialManager().Materials.values()
+               if {"YoungsModulus", "Density"} <= set(m.PhysicalProperties)]
+    other = next((o.ShapeMaterial for o in bodies if o.ShapeMaterial.UUID != body.ShapeMaterial.UUID),
+                 next((m for m in library if m.UUID != body.ShapeMaterial.UUID), None))
+    if other is None:
+        return ["aucune autre fiche à module et masse volumique pour éprouver les fiches"], 0
+    kept, off, stale = body.ShapeMaterial, [], 0
+    try:
+        body.ShapeMaterial = other
+        doc.recompute()
+        for n in with_result:
+            gone = float(sheet.get(f"{n['number']}_valide")) == 0.0
+            stale += 1 if gone else 0
+            if not gone:
+                off.append(f"{n['number']} pas passé à 'Périmé' après la fiche de {body.Label} changée")
+    finally:
+        body.ShapeMaterial = kept
+        doc.recompute()
+    off += [f"{n['number']} toujours périmé, la fiche remise" for n in with_result
+            if float(sheet.get(f"{n['number']}_valide")) != 1.0]
+    return off, stale
 FAILING_IN = {"held": ("head_bites", "core_bites", "head_apart", "head_sunk"),
               "screws": ("tip_in_air", "no_skin", "voids", "clash"),
               "interfaces": ("head_off", "head_buried", "no_wood", "one_board"),
@@ -609,6 +742,12 @@ def main():
     out["proof_longer_screws_tips_out"] = len(check_screws(model["screws"], shapes, 25.0)["tip_in_air"])
     total = sum(shape.Volume for _, _, shape in shapes)
     out["volume_dm3"] = round(total / 1e6, 2)
+    out["calc_notes_off"], compared = check_calc_notes(doc, model)
+    # A sheet that compared nothing proves nothing, notes or not
+    out["proof_calc_notes_compared"] = compared if model.get("calcNotes") else 1
+    if model.get("calcNotes"):
+        live_off, out["proof_calc_notes_followed"], out["proof_calc_notes_stale"] = prove_calc_notes_live(doc, model)
+        out["calc_notes_off"] += live_off
     out["verdict"] = verdict(out)
     with open(DOC.replace(".FCStd", "_controle.json"), "w", encoding="utf-8") as report:
         json.dump(out, report, ensure_ascii=False, indent=1)

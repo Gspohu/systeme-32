@@ -6,6 +6,7 @@
 import json
 import math
 import os
+import re
 import sys
 import time
 import uuid
@@ -20,6 +21,7 @@ from JointObject import GroundedJoint, Joint
 
 # Run by exec, the script has no __file__ : the folder of its neighbours comes from the launcher
 sys.path.insert(0, os.environ.get("S32_SCRIPTS", os.getcwd()))
+from stay_joints import stay_joints
 
 SOURCE = os.environ["S32_JSON"]
 OUT = os.environ["S32_OUT"]
@@ -78,7 +80,8 @@ def make_sheet(doc, model):
     sheet.set("A1", model["name"])
     sheet.setStyle("A1", "bold")
     sheet.set("A2", "Modifier une valeur ici recalcule la pièce. Fichier généré par systeme-32.")
-    for col, title in zip("ABCDE", ("Grandeur", "Valeur", "Unité", "Type", "Explication, source")):
+    for col, title in zip("ABCDEF", ("Grandeur", "Valeur", "Unité", "Type", "Explication, source",
+                                     "Inchangées jusqu'ici")):
         sheet.set(f"{col}4", title)
         sheet.setStyle(f"{col}4", "bold")
     sheet.setColumnWidth("A", 330)
@@ -86,6 +89,9 @@ def make_sheet(doc, model):
     row = 5
     last = None
     aliases = {}
+    # 1 while every size down to this row is the one it was built with, multiplied down the column : any size moved
+    # turns the results of a simulation or of a Ritz plate stale, a weighed sum let 2 moves cancel out
+    running = None
     # The code of the item : a part may be coded after the drawer it's built into, #130
     item_code = {a["item"]: a["code"][:4] for a in model["assemblies"] if not a.get("parent")}
     for k, p in enumerate(model["parts"]):
@@ -101,13 +107,19 @@ def make_sheet(doc, model):
                                  ("T", "épaisseur", p["thickness"])):
             alias = f"p{k}_{key}"
             sheet.set(f"A{row}", f"{name}, {word}")
-            sheet.set(f"B{row}", f"{round(value, 3)}") 
+            # Full precision : the notes compare their linked sizes to the software's to 1e-9
+            sheet.set(f"B{row}", repr(float(value)))
             sheet.setAlias(f"B{row}", alias)
             sheet.set(f"C{row}", "mm")
             sheet.set(f"D{row}", "saisie")
             sheet.set(f"E{row}", f"{p['decor']}, plan {p['code']}")
+            flag = unchanged(f"B{row}", float(value))
+            sheet.set(f"F{row}", f"={flag}" if running is None else f"={running} * {flag}")
+            running = f"F{row}"
             aliases[(k, key)] = alias
             row += 1
+    if running is not None:
+        sheet.setAlias(running, "cotes_inchangees")
     sheet.recompute()
     return aliases
 
@@ -731,6 +743,8 @@ def place_hardware(model, models, hardware):
     turn = App.Placement(App.Vector(0, 0, 0), App.Rotation(App.Vector(1, 0, 0), 90))
     fallback = next(iter(hardware.values()))
     unrouted = []
+    # The 4 articles of each gas stay, by their bought unit : jointed once all are placed
+    stays = {}
     for k, i in enumerate(model["instances"]):
         base = models.get(i["model"])
         if base is None:
@@ -762,6 +776,16 @@ def place_hardware(model, models, hardware):
             link.ToolAway = base.Placement.Rotation.multVec(App.Vector(*tighten["away"]))
         link.Placement = turn.multiply(App.Placement(m))
         link.Visibility = True
+        if i["model"].startswith("365.01.901."):
+            stays.setdefault(i["unit"], (group, {}))[1][i["model"].rsplit(".", 1)[1]] = link
+    joint_groups = {}
+    for group, parts in stays.values():
+        if (len(parts) != 4):
+            unrouted.append(f"compas incomplet : {sorted(parts)}")
+            continue
+        if group.Name not in joint_groups:
+            joint_groups[group.Name] = group.newObject("Assembly::JointGroup", "Liaisons")
+        stay_joints(group, joint_groups[group.Name], parts["cabinet"], parts["rod"], parts["body"], parts["flap"])
     return unrouted
 
 
@@ -770,6 +794,142 @@ def report_state(doc, built):
     bad = [o.Label for o in doc.Objects if "Invalid" in o.State or "Error" in o.State]
     several = [b.Label for b, _, _ in built if len(b.Shape.Solids) != 1]
     return bad, several
+
+
+# A name of a formula, never the exponent of a figure : the e of 1e-9 follows a digit
+CALC_NAME_RE = re.compile(r"(?<![0-9.])[A-Za-z_][A-Za-z0-9_]*")
+
+
+# A property of a material card, as a plain number in the unit of the notes
+CARD_PROPERTY = {"modulus": ("YoungsModulus", "1MPa"), "density": ("Density", "1 (kg/m^3)")}
+SIZE_KEY = {"length": "L", "width": "W", "thickness": "T"}
+
+
+def card_formula(body, prop):
+    key, unit = CARD_PROPERTY[prop]
+    return f"=parsequant(hiddenref({body.Name}.ShapeMaterial.PhysicalProperties[<<{key}>>])) / {unit}"
+
+
+# 1 while a cell still holds the figure it had when the sheet was built, 0 once it moved
+def unchanged(name, value):
+    return f"(abs({name} - {value!r}) <= 1e-9 * (1 + abs({value!r})) ? 1 : 0)"
+
+
+def make_calc_notes(doc, model, aliases, bodies):
+    """Each calculation of the checks : its inputs read off the sizes and the material cards, its steps live formulas"""
+    notes = model.get("calcNotes") or []
+    if not notes:
+        return 0
+    sheet = doc.addObject("Spreadsheet::Sheet", "NotesDeCalcul")
+    sheet.Label = "Notes de calcul"
+    text = lambda cell, value: sheet.set(cell, "'" + str(value))
+    text("A1", f"{model['name']} : notes de calcul. Cotes et fiches matériau liées : les changer refait le calcul, "
+               "et un résultat de simulation ou de Ritz passe à 'Périmé'.")
+    sheet.setStyle("A1", "bold")
+    for col, title in zip("ABCDEF", ("Grandeur", "Nom", "Valeur", "Unité", "Formule, lien", "Source")):
+        text(f"{col}3", title)
+        sheet.setStyle(f"{col}3", "bold")
+    index = {p["id"]: k for k, p in enumerate(model["parts"])}
+
+    def linked(link):
+        """The formula of a linked input and where it reads, or None : a part with no body, a size with no alias"""
+        if "size" in link:
+            alias = aliases.get((index.get(link["part"]), SIZE_KEY[link["size"]]))
+            return (f"=Cotes.{alias}", f"Cotes.{alias}") if alias else None
+        body = bodies.get(link["part"])
+        return (card_formula(body, link["property"]), f"fiche matériau de {body.Label}") if body else None
+    row = 4
+    # The card of every body against the figures it was written with, multiplied down the column : any card changed
+    # turns the results stale as a size does, a simulation leaning on every board and not on its own top alone
+    with_result = any(value.get("result") for note in notes for value in note["inputs"])
+    stock = {m["id"]: m for m in model["materials"]}
+    cards_kept = False
+    if with_result:
+        row += 1
+        text(f"A{row}", "Fiches matériau de chaque pièce, pour la péremption des résultats de simulation et de Ritz")
+        sheet.setStyle(f"A{row}", "bold")
+        row += 1
+        running = None
+        for p in model["parts"]:
+            body = bodies.get(p["id"])
+            if (body is None or p["material"] not in stock):
+                continue
+            m = stock[p["material"]]
+            flag = (unchanged(f"({card_formula(body, 'modulus')[1:]})", float(m["modulus"])) + " * "
+                    + unchanged(f"({card_formula(body, 'density')[1:]})", float(m["density"])))
+            text(f"A{row}", f"{body.Label} ({p['id']}), module {m['modulus']} et masse volumique {m['density']}")
+            sheet.set(f"C{row}", f"={flag}" if running is None else f"={running} * {flag}")
+            text(f"E{row}", f"fiche matériau de {body.Label} : 1 tant que toutes les fiches jusqu'ici sont inchangées")
+            running = f"C{row}"
+            row += 1
+        if running is not None:
+            sheet.setAlias(running, "fiches_inchangees")
+            cards_kept = True
+    for note in notes:
+        prefix = note["number"]
+        row += 1
+        text(f"A{row}", f"{prefix} {note['title']}")
+        sheet.setStyle(f"A{row}", "bold")
+        text(f"E{row}", note["method"])
+        row += 1
+        for hypothesis in note["hypotheses"]:
+            text(f"A{row}", f"Hypothèse : {hypothesis}")
+            row += 1
+        # Each name of the note becomes an alias of its own, the number of the note before it
+        local = lambda formula: CALC_NAME_RE.sub(lambda m: f"{prefix}_{m.group(0)}", formula)
+        result = any(value.get("result") for value in note["inputs"])
+        kept = []
+        for value in note["inputs"]:
+            name = f"{prefix}_{value['name']}"
+            text(f"A{row}", value["label"])
+            text(f"B{row}", value["name"])
+            made = linked(value["link"]) if value.get("link") else None
+            if made:
+                sheet.set(f"C{row}", made[0])
+                text(f"E{row}", made[1])
+            else:
+                sheet.set(f"C{row}", repr(value["value"]))
+                if value.get("link"):
+                    text(f"E{row}", "saisie : pièce sans corps dans ce document, lien impossible")
+                elif value.get("result"):
+                    text(f"E{row}", "résultat figé, valable tant que la ligne 'Résultat valable' vaut 1")
+            sheet.setAlias(f"C{row}", name)
+            text(f"D{row}", value["unit"])
+            text(f"F{row}", value["source"])
+            if (result and not value.get("result")):
+                kept.append(unchanged(name, value["value"]))
+            row += 1
+        if result:
+            kept += ["Cotes.cotes_inchangees"] if doc.getObject("Cotes") is not None else []
+            kept += ["fiches_inchangees"] if cards_kept else []
+            text(f"A{row}", "Résultat valable")
+            sheet.set(f"C{row}", "=" + " * ".join(kept))
+            sheet.setAlias(f"C{row}", f"{prefix}_valide")
+            text(f"E{row}", "1 tant que les entrées, les cotes et les fiches sont celles du calcul")
+            row += 1
+        for step in note["steps"]:
+            text(f"A{row}", step["label"])
+            text(f"B{row}", step["name"])
+            sheet.set(f"C{row}", "=" + local(step["formula"]))
+            sheet.setAlias(f"C{row}", f"{prefix}_{step['name']}")
+            text(f"D{row}", step["unit"])
+            text(f"E{row}", step["formula"])
+            text(f"F{row}", step["source"])
+            row += 1
+        check = note["check"]
+        text(f"A{row}", "Verdict")
+        sheet.set(f"C{row}", f"={prefix}_{check['value']} <= {prefix}_{check['limit']} ? 1 : 0")
+        sheet.setAlias(f"C{row}", f"{prefix}_verdict")
+        text(f"E{row}", f"{check['value']} <= {check['limit']}")
+        phrases = note["phrases"]
+        said = f"({prefix}_verdict == 1 ? <<{phrases['pass']}>> : <<{phrases['fail']}>>)"
+        sheet.set(f"F{row}", f"={prefix}_valide == 1 ? {said} : <<{phrases['stale']}>>" if result else "=" + said)
+        sheet.setAlias(f"F{row}", f"{prefix}_phrase")
+        row += 1
+    for col, width in zip("ABCDEF", (330, 120, 110, 70, 420, 420)):
+        sheet.setColumnWidth(col, width)
+    sheet.recompute()
+    return len(notes)
 
 
 def main():
@@ -817,6 +977,9 @@ def main():
             elif (child.TypeId == ASSEMBLY and not child.Placement.isIdentity()):
                 moved += 1
     steps = make_gamme(doc, model)
+    # The body of each part by its id : its bands carry #chant- after it
+    part_bodies = {b.Label2: b for b, _, _ in built if "#chant-" not in b.Label2}
+    notes = make_calc_notes(doc, model, aliases, part_bodies)
     # Each board seen with its edge bands, the finished outline the sheet draw
     bodies = {}
     for b, _, _ in built:
@@ -832,7 +995,8 @@ def main():
               "invalid": bad,
               "not_one_solid": several, "drawings": drawings,
               "missing_models": missing, "unrouted": unrouted, "instances": len(model["instances"]),
-              "solve": status, "moved_by_solver": moved, "gamme_steps": steps, "left_out": model["left"],
+              "solve": status, "moved_by_solver": moved, "gamme_steps": steps, "calc_notes": notes,
+              "left_out": model["left"],
               "seconds": round(time.perf_counter() - t0),
               "volume": sum(b.Shape.Volume for b, _, _ in built)}
     with open(os.path.join(OUT, f"{name}_rapport.json"), "w", encoding="utf-8") as f:
