@@ -3,6 +3,7 @@ import { computeOutputs } from "../outputs";
 import { dresser, tvWall } from "../templates";
 import { cadModel } from "./cad_model";
 import { ACTIONS, POSITION, type GammeTable } from "./gamme";
+import type { Carcass } from "../model";
 import { CAD_MODELS } from "../../data/cad_models";
 import { drawingSet } from "./workshop";
 import { gammeSequences } from "../drawing/assembly_sheets";
@@ -408,24 +409,30 @@ describe(`the assembly sequence of the ${name}`, () =>
         let checked = 0;
         for (const t of m.gamme)
         {
-            const rows = (re: RegExp): number[] =>
+            // The whole sets the fronts of one item after another : each item on its own
+            const itemOf = (r: { pbs: string[] }): string => { return /#([0-9A-Z])/.exec(r.pbs.join(" "))?.[1] ?? ""; };
+            for (const item of new Set(t.rows.map(itemOf)))
             {
-                return t.rows.map((r, k) => { return re.test(`${r.type} | ${r.operation}`) ? k : -1; })
-                    .filter((k) => { return k >= 0; });
-            };
-            const shelves = rows(/^Pose sur taquets/);
-            const pins = rows(/Taquet/);
-            const doors = rows(/#[0-9A-Z]{3}-000 (Porte|Abattant)/);
-            if (shelves.length === 0)
-            {
-                continue;
-            }
-            checked++;
-            // The pins go in first, the shelf is laid on them
-            expect(Math.max(...pins), `${t.code}`).toBeLessThan(Math.min(...shelves));
-            if (doors.length > 0)
-            {
-                expect(Math.max(...shelves), `${t.code}`).toBeLessThan(Math.min(...doors));
+                const rows = (re: RegExp): number[] =>
+                {
+                    return t.rows.map((r, k) => { return itemOf(r) === item &&
+                                                 re.test(`${r.type} | ${r.operation}`) ? k : -1; })
+                        .filter((k) => { return k >= 0; });
+                };
+                const shelves = rows(/^Pose sur taquets/);
+                const pins = rows(/Taquet/);
+                const doors = rows(/#[0-9A-Z]{3}-000 (Porte|Abattant)/);
+                if (shelves.length === 0)
+                {
+                    continue;
+                }
+                checked++;
+                // The pins go in first, the shelf is laid on them
+                expect(Math.max(...pins), `${t.code} #${item}00`).toBeLessThan(Math.min(...shelves));
+                if (doors.length > 0)
+                {
+                    expect(Math.max(...shelves), `${t.code} #${item}00`).toBeLessThan(Math.min(...doors));
+                }
             }
         }
         expect(checked).toBeGreaterThan(0);
@@ -451,11 +458,12 @@ describe(`the assembly sequence of the ${name}`, () =>
             stays++;
             expect(Math.min(...struts)).toBeGreaterThan(Math.max(...at(/Compas 365\.01\.901, équerre/)));
             expect(struts.every((k) => { return t.rows[k]!.type === "Clipsage"; })).toBe(true);
-            // The drawer behind the flap slides in from the whole, after every carcass table : never in this one, where
-            // it could come before the strut it has to pass. Searched here, an empty list made a min of Infinity
-            expect(at(/Tiroir intérieur \d+, monté/)).toEqual([]);
+            // The drawer behind the flap slides in from the whole, past the strut it has to pass. Searched here, an
+            // empty list made a min of Infinity
             const whole = m.gamme.at(-1)!;
-            expect(whole.rows.some((r) => { return /Tiroir intérieur \d+, monté/.test(r.operation); })).toBe(true);
+            const drawer = whole.rows.findIndex((r) => { return /Tiroir intérieur \d+, monté/.test(r.operation); });
+            expect(drawer).toBeGreaterThanOrEqual(0);
+            expect(t === whole ? drawer > Math.max(...struts) : at(/Tiroir intérieur \d+, monté/).length === 0).toBe(true);
         }
         expect(stays).toBe(name === "dresser" ? 1 : 0);
     });
@@ -521,10 +529,17 @@ describe(`the assembly sequence of the ${name}`, () =>
                 continue;
             }
             plinths++;
-            const order = [back, at(/Embase AXILO à visser/), at(/Clip de plinthe AXILO sur .*retour/), at(/Pied AXILO/),
-                           at(/Plinthe avant, monté à l'établi/)];
+            const order = [back, at(/Embase AXILO à visser/), at(/Clip de plinthe AXILO sur .*retour/),
+                           at(/Pied AXILO/)];
             expect(order.every((k) => { return k >= 0; }), `${t.code} ${order}`).toBe(true);
             expect([...order].sort((a, b) => { return a - b; })).toEqual(order);
+            // The front plinth last of all, in the room once the feet are levelled
+            const whole = m.gamme.at(-1)!.rows;
+            const levelled = whole.findIndex((r) => { return r.operation.startsWith(`Régler à niveau les pieds AXILO de ${t.code}-000`); });
+            const front = whole.findIndex((r) => { return /Plinthe avant, monté à l'établi/.test(r.operation)
+                && r.pbs[0]!.startsWith(t.code.slice(0, 2)); });
+            expect(levelled, t.code).toBeGreaterThanOrEqual(0);
+            expect(front, t.code).toBeGreaterThan(levelled);
             // The front plinth gets its clips in hand on the bench, laid first, before the carcass table
             const bench = m.gamme.findIndex((x) => { return x.name === "Plinthe avant"; });
             const own = m.gamme[bench]!.rows;
@@ -550,7 +565,7 @@ describe(`the assembly sequence of the ${name}`, () =>
 
 
     // The front plinths of both dresser columns clipped in their carcass table, on feet set only once they stood
-    it("clips a front plinth after every foot of its item, in the same table", () =>
+    it("clips a front plinth after every foot of its item, in a table before or earlier in its own", () =>
     {
         let plinths = 0;
         for (const t of m.gamme)
@@ -572,10 +587,13 @@ describe(`the assembly sequence of the ${name}`, () =>
                     });
                 });
                 expect(feet.length, `${t.code} ${r.operation}`).toBeGreaterThan(0);
+                const here = m.gamme.indexOf(t);
                 for (const f of feet)
                 {
-                    expect(f.table, `${r.operation} : pieds de ${item} dans une autre table`).toBe(t.code);
-                    expect(f.j, `${r.operation} : clipsée avant les pieds de ${item}`).toBeLessThan(k);
+                    const there = m.gamme.findIndex((x) => { return x.code === f.table; });
+                    expect(there < here || (there === here && f.j < k),
+                           `${r.operation} : clipsée avant les pieds de ${item}`)
+                        .toBe(true);
                 }
             })
                 {
@@ -697,8 +715,7 @@ describe(`the assembly sequence of the ${name}`, () =>
                 }
                 else if (fixing.tighten?.once === "mate")
                 {
-                    // TODO no template puts a Minifix bolt in another table than its housing : fixedInTurn then skips
-                    // the turn without a word, and nothing here would see it. Throw there, or a check of its own ?
+                    // A bolt in another table than its housing is turned all the same, said so (gamme.ts, fixedInTurn)
                     const board = / sur (#[0-9A-Z]{3}-\d{3} .+)$/.exec(r.operation)![1]!;
                     const turns = t.rows.map((x, j) =>
                     {
@@ -861,7 +878,9 @@ describe("the drop-down flap of the dresser built on the bench", () =>
             const rows = m.gamme.find((t) => { return t.code === x.t; })!.rows;
             const hung = rows.findIndex((r) => { return /Abattant tombant/.test(r.operation) &&
                                                 /-000$/.test(r.pbs[0]!); });
-            expect(x.r.operation).toMatch(/^Équiper l'intérieur/);
+            // The cabinet bracket in the workshop, the flap bracket and the strut on site once the flap hangs
+            expect(x.r.operation).toMatch(/équerre de corps/.test(x.r.pbs.join(" ")) ? /^Équiper l'intérieur/
+                : /^Poser les étagères et les façades/);
             expect(rows.indexOf(x.r)).toBeGreaterThan(hung);
         }
     });
@@ -951,11 +970,21 @@ describe("the heights the TV wall is set to on site", () =>
     const p = tvWall();
     const rows = (cadModel(p, computeOutputs(p), true) as { gamme: GammeTable[] }).gamme.at(-1)!.rows;
 
-    it("says the room left over the column with the cleat of its filler already on its top", () =>
+    // Screwed on the bench, the cleat went up with the column and left 6 mm under the ceiling (T6 of the external
+    // review)
+    it("says the room left over the column, the cleat of its filler screwed on once it stands", () =>
     {
-        const column = rows.find((r) => { return /Mettre en place .* Colonne gauche$/.test(r.operation); })!;
+        const set = rows.findIndex((r) => { return /Mettre en place .* Colonne gauche$/.test(r.operation); });
+        const column = rows[set]!;
+        const top = p.items.find((it) => { return it.name === "Colonne gauche"; }) as Carcass;
         expect(column.direction).toBe("-z puis +y");
-        expect(column.comment).toContain(": 6 mm sous le plafond, tasseau du fileur compris");
+        expect(column.comment).toContain(`: ${Math.round(p.room.height - (top.y + top.height))} mm sous le plafond`);
+        expect(column.comment).not.toContain("tasseau");
+        const cleat = rows.findIndex((r) => { return /Tasseau du fileur$/.test(r.operation); });
+        const screws = rows.findIndex((r) => { return /Tasseau du fileur de plafond depuis le dessus/.test(r.operation); });
+        const strip = rows.findIndex((r) => { return /Fileur de plafond$/.test(r.operation); });
+        expect([set, cleat, screws, strip].every((k, n, all) => { return n === 0 || k > all[n - 1]!; }),
+               `${set} ${cleat} ${screws} ${strip}`).toBe(true);
     });
 
     it("measures the top of the book column before drilling for the shelf screwed onto it", () =>
@@ -1027,11 +1056,12 @@ describe("the fillers, measured on site", () =>
             for (const k of measured)
             {
                 const code = rows[k]!.pbs[0]!;
-                // Right after it is set, or after what still goes under it before it's fixed : its feet clipped in
-                // once it stands, levelled, its plinth on them. Never once a screw holds it to the wall
+                // Right after it is set, or after what still goes under it before it's fixed : levelled, its plinth on
+                // its feet, tied to the item already standing. Never once a screw holds it to the wall
                 let j = k - 1;
-                while (j > 0 && /^(Poser les pieds une fois|Régler à niveau|Clipser la plinthe)/.test(rows[j]!.operation)
-                    && rows[j]!.pbs.some((s) => { return s.includes(code.slice(0, 2)); }))
+                while (j > 0 && (/^(Régler à niveau|Clipser la plinthe)/.test(rows[j]!.operation)
+                    && rows[j]!.pbs.some((s) => { return s.includes(code.slice(0, 2)); })
+                    || /^Lier les meubles/.test(rows[j]!.operation)))
                 {
                     j--;
                 }
@@ -1050,11 +1080,15 @@ describe("the fillers, measured on site", () =>
                     expect(set).toBeGreaterThan(fixed);
                 }
             }
-            // No filler left among the boards of its carcass, its cleat there still
+            // No filler left among the boards of its carcass. The cleat of a side filler stays there, that of a ceiling
+            // filler is screwed on in the room : on the bench it went up with the carcass
             const carcasses = m.gamme.filter((t) => { return t.code !== "#000"; });
             const boards = carcasses.flatMap((t) => { return t.rows.flatMap((r) => { return r.pbs; }); });
             expect(boards.filter((s) => { return /^#[0-9A-Z]{3}-\d{3} Fileur/.test(s); })).toEqual([]);
-            expect(boards.some((s) => { return /^#[0-9A-Z]{3}-\d{3} Tasseau du fileur/.test(s); })).toBe(true);
+            const sideCleats = boards.filter((s) => { return /^#[0-9A-Z]{3}-\d{3} Tasseau du fileur (gauche|droit)/.test(s); });
+            const ceilingCleat = rows.some((r) => { return /^#[0-9A-Z]{3}-\d{3} Tasseau du fileur$/.test(r.pbs[0]!); });
+            expect(sideCleats.length > 0 || ceilingCleat).toBe(true);
+            expect(boards.some((s) => { return /^#[0-9A-Z]{3}-\d{3} Tasseau du fileur$/.test(s); })).toBe(false);
         });
     }
 });

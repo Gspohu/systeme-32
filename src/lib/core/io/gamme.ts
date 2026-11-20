@@ -6,8 +6,9 @@ import type { Frame, Vec3 } from "../geometry";
 import { assemblyOrder } from "../assembly";
 // Past this margin under the ceiling a carcass goes down onto the one under it, short of it it's
 // slid back from its front
-import { CLEAT_WIDTH, STAND_UP_MARGIN } from "../ceiling";
+import { STAND_UP_MARGIN } from "../ceiling";
 import { CAD_MODELS } from "../../data/cad_models";
+import { SIEVE_BORE } from "../../data/hardware";
 
 
 export interface GammeRow
@@ -37,7 +38,7 @@ export interface GammeTable
 // assembly : the item or the sub-assembly built on the bench it goes into, its table (#100, #110)
 interface Board { code: string; item: string; label: string; role: string; id: string; frame: Frame | null;
                  length: number; width: number; thickness: number; bands?: { edge: string }[]; bandInner?: unknown;
-                 assembly?: string }
+                 assembly?: string; holes?: { purpose: string }[]; toFloor?: boolean }
 interface Placed { model: string; item: string; part: string; o: Vec3; x: Vec3; z: Vec3; after?: string[]; covers?: string;
                    assembly?: string }
 interface Screwed { item: string; label: string; tag: string; out: Vec3; kind: string; diameter: number; washer?: boolean;
@@ -66,18 +67,25 @@ const PHASE_TITLE: Record<Phase, string> = {
 // What wiats for the room : the plugs, the wall screws before and after the item, the ties once both stand. The
 // drawers last, into carcasses carried empty : a screw to the niche went through the bottom of the top drawer
 type Room = "plug" | "before" | "wall" | "link" | "loose" | "ceiling" | "scribe" | "drawers" | "finish" | "feet"
-    | "plinth";
+    | "plinth" | "fronts";
 const ROOM_TITLE: Record<Room, string> = { plug: "Percer et cheviller le mur", before: "Fixer au mur",
                                           feet: "Poser les pieds une fois le meuble relevé",
                                           plinth: "Clipser la plinthe sur les pieds réglés",
+                                          fronts: "Poser les étagères et les façades",
                                           wall: "Fixer au mur", scribe: "Poser le fileur à sa mesure",
                                            link: "Lier les meubles", loose: "Poser une fois les caissons libres en place",
                                            ceiling: "Fermer jusqu'au plafond", drawers: "Mettre les tiroirs",
                                            finish: "Poser les cache-vis" };
+// The fronts and the loose shelves go into a carcass standing fixed, emptied of all a fitter would carry or stand
+// up. A flap first, its stays at once : nothing else holds it open, the doors after
+const FRONT_RANK = { pin: 0, shelf: 1, flap: 2, flapBracket: 3, strut: 4, door: 5 } as const;
+// Up to the ceiling once the carcass stands : the cleat laid, screwed from under, the strip glued on it, then what
+// goes into the strip
+const CEILING_RANK = { cleat: 0, cleatScrew: 1, filler: 2, intoFiller: 3 } as const;
 // The screws driven in the room, between items : the caps over them wait for them (screw_caps.ts)
 const ROOM_SCREWS = new Set(["link-screw", "wall-fixing"]);
 // Those meant to come out : their caps on double sided tape, the others glued
-const TAPED = new Set(["link-screw", "wall-fixing", "lining-screw", "back-screw", "plinth-screw"]);
+const TAPED = new Set(["link-screw", "wall-fixing", "lining-screw", "back-screw", "plinth-screw", "minifix-housing"]);
 // The way they go into the wood the dowels and the Minifix bolts tie 2 boards, and how far past their mouth
 const CONNECTORS: Record<string, { axis: "x" | "z"; reach: number }> = {
     "DOWEL_8x35": { axis: "z", reach: 30 },
@@ -138,15 +146,16 @@ function inBoard(q: Board, p: Vec3): boolean
 // plinth its clips on the feet, a drop flap is screwed on its hinges held open
 function specialMove(type: string, phase: Phase | Room): string
 {
-    if (type === "Clipsage" && phase === PHASE.doors)
+    const hung = phase === PHASE.doors || phase === "fronts";
+    if (type === "Clipsage" && hung)
     {
         return "Accrocher le bras de chaque charnière sur son embase par l'avant, puis presser l'arrière jusqu'au clic";
     }
-    if (type === "Clipsage" && phase === PHASE.plinth)
+    if (type === "Clipsage" && (phase === PHASE.plinth || phase === "plinth"))
     {
         return "Présenter la plinthe, chaque clip en face de son pied, puis la pousser vers l'arrière jusqu'au clic";
     }
-    if (type === "Vissage" && phase === PHASE.doors)
+    if (type === "Vissage" && hung)
     {
         return "Présenter l'abattant ouvert, tenu par un aide, ses charnières dans leurs logements Ø26 du dessous, "
             + "puis visser les vis HOSPA 3 (fournies). Le garder tenu ouvert ou calé jusqu'à la pose de ses deux compas : "
@@ -184,13 +193,23 @@ function boardStep(q: Board): { phase: Phase; direction: string; type: string }
         case "bottom": case "top": case "hdivider": case "vdivider": case "stiffener": case "side":
             return { phase: PHASE.shell, direction: NA, type: "Assemblage Minifix ou tourillons" };
         case "back":
-            // The abck of a rounded end is screwed into the abck edge of its shaped boards : after them
-            return { phase: q.id.includes("/end/") ? PHASE.end : PHASE.back, direction: "-y", type: "Vissage" };
+            // A bearing back goes in with the shell, joined as the sides are. The back of a rounded end is screwed
+            // into the back edge of its shaped boards : after them
+            return q.label === "Fond porteur" ? { phase: PHASE.shell, direction: NA,
+                                                 type: "Assemblage Minifix ou tourillons" }
+                : { phase: q.id.includes("/end/") ? PHASE.end : PHASE.back, direction: "-y", type: "Vissage" };
         case "endPanel": case "former":
-            return { phase: PHASE.end, direction: NA, type: "Tourillons collés" };
+            // Held by what screws into it a few steps later, a board with no dowel stands on a block till then
+            return { phase: PHASE.end, direction: NA,
+                     type: q.holes?.some((h) => { return h.purpose === "dowel"; }) === false ? "Pose sur cale"
+                         : "Tourillons collés" };
         case "plinth":
-            // A return is screwed into the bottom shaped board first, its clips on it, the feet clipped in after
+            // A return is screwed into the bottom shaped board first, its clips on it, the feet clipped in after. The
+            // plinth of a side filler slides along the wall onto the dowels in the end of the front plinth, glued
             return /retour/.test(q.label) ? { phase: PHASE.feet, direction: NA, type: "Vissage" }
+                : q.id.includes("/side-filler/") ? { phase: PHASE.plinth,
+                                                    direction: q.id.includes("/left/") ? "+x" : "-x",
+                                                      type: "Tourillons collés" }
                 : { phase: PHASE.plinth, direction: SPECIAL, type: "Clipsage" };
         case "boxSide": case "boxEnd": case "boxBottom":
             return { phase: PHASE.drawers, direction: NA, type: "Tourillons collés" };
@@ -333,6 +352,13 @@ const TOOL = {
     tapeAndLevel: "Mètre ruban et niveau à bulle",
     level: "Niveau à bulle",
     clamps: "Serre-joints",
+    saw: "Scie plongeante sur rail ou scie égoïne à denture fine",
+    // A hammer action breaks the webs of a hollow brick, the plug then holds on nothing
+    drillHollow: "Perceuse sans percussion",
+    drillSolid: "Perceuse à percussion",
+    resinGun: "Pistolet à cartouche",
+    // No room for a clamp between a filler and the wall or the ceiling it closes on
+    maskingTape: "Ruban de masquage, pour le maintien pendant la prise",
     // What makers recommend for furniture : it strikes without marking, the block spreads the blow on a decor
     mallet: "Maillet à tête caoutchouc (cale de bois sur un panneau fragile)",
 };
@@ -342,8 +368,16 @@ const AXILO_FOOT = ("637.76.353");
 const END_CHOICE = "À l'atelier ou sur place, au choix du poseur selon l'accès : les fileurs et les fixations murales "
     + "se posent de toute façon sur place";
 // A recommendation, the wall was never sounded : the fitter may choose another way on the spot
-const RESIN_NOTE = "Recommandé : trou rempli de résine de scellement, cheville enfoncée dans la résine fraîche, platine "
-    + "vissée après la prise. Le mur n'a pas été sondé : le poseur peut choisir un autre scellement sur place";
+const RESIN_NOTE = "Recommandé : tamis glissé dans le trou et rempli de résine de scellement, cheville enfoncée dans la "
+    + "résine fraîche, platine vissée après la prise. Le mur n'a pas été sondé : le poseur peut choisir un autre "
+    + "scellement sur place";
+// A board down to the floor keeps the height of the drawing whatever the feet are set to (analysis.ts)
+const FLOOR_NOTE = "Descend au sol, cotée pour des pieds à leur hauteur nominale : après le réglage des pieds, un "
+    + "ajustement sur place peut être possible ou nécessaire";
+// A carcass is fixed through its back : drilled in the workshop to the size of the plug, the wall drilled through it
+// once the carcass stands levelled, the plug pushed through to the wall
+const THROUGH_NOTE = "Montage traversant, meuble en place et réglé : percer le mur à travers le trou du fond, pousser la "
+    + "cheville à travers le fond jusqu'au mur, puis visser avec sa rondelle";
 // A board going onto its dowels, a dowel tapped into its bore
 const ON_DOWELS = /ourillons/;
 
@@ -513,6 +547,26 @@ function linkedItem(s: Screwed, boards: Board[]): string | undefined
 }
 
 
+// The other item a connecting bolt goes into, found along its axis either way from where it's placed
+function boltedItem(i: Placed, boards: Board[]): string | undefined
+{
+    for (let reach = 5; reach <= 60; reach += 5)
+    {
+        for (const way of [1, -1])
+        {
+            const spot: Vec3 = [i.o[0] + i.z[0] * reach * way, i.o[1] + i.z[1] * reach * way, i.o[2] + i.z[2] *
+                                reach * way];
+            const hit = boards.find((q) => { return q.item !== i.item && q.frame !== null && inBoard(q, spot); });
+            if (hit !== undefined)
+            {
+                return hit.item;
+            }
+        }
+    }
+    return undefined;
+}
+
+
 // The board a pattern names, after its first ", #" : "#130-002 Tiroir 1, côté gauche"
 function tagOf(pattern: string): string  
 {
@@ -522,7 +576,7 @@ function tagOf(pattern: string): string
 
 // Each article held the moment it can be, as its catalogue entry says : its screws right fater it, what's tightened in
 // it as soon as it's set, or as soon as the board of its bolt is in. Set and left loose, it fell at the next step
-function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, tighten: string): GammeRow[]
+export function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, tighten: string): GammeRow[]
 {
     const held = Object.values(CAD_MODELS).filter((m) => { return m.fixing !== undefined; }).map((m) =>
     {
@@ -609,16 +663,21 @@ function fixedInTurn(rows: GammeRow[], ties: Map<string, Map<string, number>>, t
         const housed = tagOf(row.pbs[0]!);
         for (const [bolted, count] of ties.get(housed) ?? new Map<string, number>())
         {
-            const placed = out.findIndex((r) => { return r.pbs.includes(literal(bolted)); });
-            if (placed < 0 || turned.has(`${housed}|${bolted}`)) 
+            if (turned.has(`${housed}|${bolted}`))
             {
                 continue;
             }
             turned.add(`${housed}|${bolted}`);
-            late.push({ at: Math.max(k, placed), row: { pbs: row.pbs, count, type: "Serrage",
-                                                         operation: `${phaseOf(out[Math.max(k, placed)]!)}Serrer les `
-                                                             + `boîtiers Minifix de ${housed}, ils tirent ${bolted}`,
-                                                         tool: tighten, direction: NA, comment: NA } });
+            // The board of the bolt built in another table : the turn is said here all the same, after its housing
+            // to be done once that board is in. Skipped, the cam was never turned and nothing said so
+            const placed = out.findIndex((r) => { return r.pbs.includes(literal(bolted)); });
+            const at = placed < 0 ? k : Math.max(k, placed);
+            late.push({ at, row: { pbs: row.pbs, count, type: "Serrage",
+                                   operation: `${phaseOf(out[at]!)}Serrer les boîtiers Minifix de ${housed}, ils tirent `
+                                       + bolted,
+                                   tool: tighten, direction: NA,
+                                   comment: placed < 0 ? `Goujon sur ${bolted}, monté dans une autre table : serrer une `
+                                       + "fois ce panneau en place" : NA } });
         }
     }
     for (const { at, row } of late.sort((a, b) => { return b.at - a.at; }))
@@ -772,9 +831,10 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     const boardKey = new Map(boards.map((q) => { return [`${q.item}|${q.code} ${q.label}`, `b|${q.id}`]; }));
     const boardName = new Map(boards.map((q) => { return [`b|${q.id}`, `${q.code} ${q.label}`]; }));
     const order = connectorOrder(boards, placed, models, (q) => { return boardStep(q).phase; });
-    // The ceiling ifller is set once the carcass stands, it wouldn't go under the ceiling with it (ceiling.ts)
+    // The ceiling filler and its cleat are set once the carcass stands (ceiling.ts) : screwed on the bench, the cleat
+    // went up with the carcass and left 6 mm under the ceiling
     // TODO the filler screws from the back edge of its cleat, against the wall : its fixing is still to choose
-    const up = new Map(boards.filter((q) => { return /\/filler$/.test(q.id); }).map((q) => 
+    const up = new Map(boards.filter((q) => { return /\/filler(-cleat)?$/.test(q.id); }).map((q) =>
     {
         return [`${q.code} ${q.label}`, q.item];
     }));
@@ -796,23 +856,31 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const scribed = ceiling === undefined && (q.role === "filler" || (q.role === "plinth" &&
             q.id.includes("/side-filler/")));
         // A filler is glued on its cleat once the carass stands, up to the ceiling or against a side wall (fillers.ts)
-        const glued = ceiling !== undefined || (scribed && q.role === "filler");
-        entries.push({ table, phase: ceiling !== undefined ? "ceiling" : scribed ? "scribe" : s.phase,
-                      rank: endBack(q) ? LOOSE : lined ? looseRank(table) + liningRank(q.label)
+        const upCleat = ceiling !== undefined && /\/filler-cleat$/.test(q.id);
+        const glued = (ceiling !== undefined && !upCleat) || (scribed && q.role === "filler");
+        // An adjustable shelf goes in once its carcass stands fixed : carried or stood up loose, it slid off its pins
+        const loose = q.role === "shelf" && !isBench(table);
+        entries.push({ table, phase: ceiling !== undefined ? "ceiling" : scribed ? "scribe" : loose ? "fronts" : s.phase,
+                      rank: ceiling !== undefined ? (upCleat ? CEILING_RANK.cleat : CEILING_RANK.filler)
+                          : loose ? FRONT_RANK.shelf : endBack(q) ? LOOSE : lined ? looseRank(table) + liningRank(q.label)
                           : o?.rank ?? (s.phase === PHASE.runners ? SPACER_RANK : looseRank(table)),
                       key: `b|${q.id}`,
                        pattern: literal(`${q.code} ${q.label}`), direction: o?.direction ?? s.direction,
-                       type: glued ? "Collage" : s.type,
-                       tool: ceiling === undefined && ON_DOWELS.test(s.type) ? TOOL.mallet : "Aucun",
-                       what: `${q.code} ${q.label}`, waits: ceiling ?? (scribed ? q.item : undefined),
+                       type: glued ? "Collage" : upCleat ? "Pose" : s.type,
+                       tool: glued ? TOOL.maskingTape : ON_DOWELS.test(s.type) ? TOOL.mallet : "Aucun",
+                       what: `${q.code} ${q.label}`, waits: ceiling ?? (scribed || loose ? q.item : undefined),
                        // Its edge bands, glued on in the workshop, come with it (freecad_build.py, "<board>, chant L1")
                        also: bandsOf(q) > 0 ? { pattern: `${literal(`${q.code} ${q.label}`)}, chant *`,
                                                count: bandsOf(q) }
                            : undefined,
                        // How it hold, said : the step only read "posé" (ceiling.ts glues it with the PU of the list)
-                       comment: ceiling !== undefined
+                       comment: upCleat ? "Posé à plat sur le dessus, le meuble en place : vissé par-dessous depuis la case haute"
+                           : ceiling !== undefined
                            ? "Encollé à la colle polyuréthane sur son tasseau et contre le dessus, maintenu le temps de la prise"
                            : glued ? "Encollé à la colle polyuréthane sur le chant avant de son tasseau, maintenu le temps de la prise"
+                           : s.type === "Pose sur cale" ? "Posée sur une cale de la hauteur qui la sépare du sol, jusqu'à "
+                               + "ce que ce qui s'y visse la tienne" + (q.toFloor === true ? `. ${FLOOR_NOTE}` : "")
+                           : q.toFloor === true ? FLOOR_NOTE
                            : o?.crossed === true ? "Goujons ou tourillons dans deux sens : ordre et mouvement à juger" : NA });
     }
     // A light in the way of a loose carcass goes in once the last of them stands (loose.ts)
@@ -830,6 +898,20 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const room = p.room.height;
         return room - Math.hypot(c.y + c.height, c.depth) < STAND_UP_MARGIN
             && room - Math.hypot(c.height, c.depth) >= STAND_UP_MARGIN;
+    };
+    const isCarcass = (item: string): boolean =>
+    {
+        return p.items.some((it) => { return it.id === item && it.kind === "carcass"; });
+    };
+    // The drill for the wall it's set in, the bit of the plug's diameter, the gun for the resin it goes into
+    const plugTools = (label: string, resin: boolean): string =>
+    {
+        // In resin the hole takes the sieve, wider and deeper than the plug : its sheet says how (data/hardware.ts)
+        const bit = resin ? String(SIEVE_BORE.diameter) : /(\d+) x \d+/.exec(label)?.[1];
+        const deep = resin ? String(SIEVE_BORE.depth) : undefined;
+        const drill = p.settings.wallType === "hollow" ? TOOL.drillHollow : TOOL.drillSolid;
+        const named = `${bit === undefined ? "" : `, foret Ø${bit}`}${deep === undefined ? "" : ` sur ${deep} mm au moins`}`;
+        return [`${drill}${named}`, ...(resin ? [TOOL.resinGun] : [])].join(", ");
     };
     // The plugs of a wall shelf in a hollow wall go into resin (hung_items.ts, RESIN_CHEM)
     const resined = (ref: string, item: string): boolean =>
@@ -919,25 +1001,40 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const strut = m.ref === "365.01.901" && /vérin/.test(m.label) ? 1 : 0;
         // The feet of a carcass too tall to be stood up with them clip into their bases once it stands
         const later = m.ref === AXILO_FOOT && feetAfterStanding(i.item);
+        // A connecting bolt ties 2 items as soon as the later of them stands levelled, before either goes to the wall
+        const bolted = liaison ? boltedItem(i, boards) : undefined;
+        const tiedTo = bolted === undefined ? undefined
+            : (rank.get(bolted) ?? -1) > (rank.get(i.item) ?? -1) ? bolted : i.item;
+        // The pins of a loose shelf and the halves of a stay riding on its flap come on site with them, the bracket
+        // on the side of the cell screwed in the workshop
+        const pin = m.ref === "282.24.727" && !isBench(table);
+        const onFlap = m.ref === "365.01.901" && /vérin|équerre d'abattant/.test(i.part);
+        const onSite = pin || onFlap;
         // The pins first : a shelf is laid on them, set before them it stood on nothing
-        entries.push({ table: later ? "#000" : table, phase: later ? "feet" : s.phase, waits: later ? i.item : undefined,
-                       rank: m.ref === "282.24.727" ? PIN_RANK
+        entries.push({ table: later ? "#000" : table, phase: later ? "feet" : onSite ? "fronts" : s.phase,
+                       waits: later || onSite ? i.item : tiedTo,
+                       rank: pin ? FRONT_RANK.pin : onFlap ? (strut > 0 ? FRONT_RANK.strut : FRONT_RANK.flapBracket)
+                           : m.ref === "282.24.727" ? PIN_RANK
                            : looseRank(table) + (clipped ? 2 : glued || housing ? 1 : 0) + underneath + strut,
                        key: `a|${i.model}|${i.item}|${i.part}${set ? `|${mate ?? ""}` : ""}`,
                        pattern: set ? literal(`${m.ref} ${m.label} ${index + 1}, ${i.part}`)
                            : `${literal(`${m.ref} ${m.label}`)} *, ${literal(i.part)}`, direction: s.direction,
                        // The sleeve of a connecting bolt pushed in by hand, its screw driven into it from the other side
                        type: away ? "Pose" : drilled || sleeve ? "Insertion" : housing ? "Clipsage" : s.type,
-                       tool: liaison && !sleeve ? TOOL.pozidriv2 : kind === "dowel" ? TOOL.mallet : "Aucun",
+                       tool: liaison && !sleeve ? TOOL.pozidriv2 : kind === "dowel" ? TOOL.mallet
+                           : m.ref.startsWith("PLUG") ? plugTools(m.label, resined(m.ref, i.item)) : "Aucun",
                        what: away ? `${m.label}, venue avec l'autre moitié, vissée sur ${i.part} à la pose` : `${m.label} sur ${i.part}`,
-                       comment: resined(m.ref, i.item) ? RESIN_NOTE : NA,
+                       comment: resined(m.ref, i.item) ? RESIN_NOTE
+                           : m.ref.startsWith("PLUG") && isCarcass(i.item) ? THROUGH_NOTE : NA,
                        host, mate, kind: host === undefined ? undefined : kind });
     }
     for (const s of screws)
     {
         // Those holding the filler on its cleat go with the filler
         const into = /dans le fileur/.test(s.label);
-        const ceiling = up.get(s.tag) ?? (into && closed.has(s.item) ? s.item : undefined);
+        // Up through the top into the cleat of the ceiling filler, once the carcass stands (ceiling.ts)
+        const cleatUp = /^Tasseau du fileur de plafond/.test(s.label);
+        const ceiling = up.get(s.tag) ?? (cleatUp || (into && closed.has(s.item)) ? s.item : undefined);
         // Through the cleat into a side filler : once the filler is cut and offered up
         const scribed = ceiling === undefined && into;
         // Those of the back of a rounded end follow it, after the shaped boards they go into
@@ -952,7 +1049,8 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         const waits = ceiling ?? (scribed ? s.item : later);
         const direction = axis([-s.out[0], -s.out[1], -s.out[2]]);
         const table = tableOf(s);
-        const spot = onEndBack ? LOOSE : LINING_SCREW.test(s.label) ? looseRank(table) + liningRank(s.tag, true)
+        const spot = ceiling !== undefined ? (cleatUp ? CEILING_RANK.cleatScrew : CEILING_RANK.intoFiller)
+            : onEndBack ? LOOSE : LINING_SCREW.test(s.label) ? looseRank(table) + liningRank(s.tag, true)
             : SPACER.test(s.label) ? SPACER_RANK : looseRank(table);
         // The washer goes on before its scerw
         if (s.washer === true)
@@ -1015,14 +1113,19 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                 type: "Vissage", direction: SPECIAL }
             : { phase: PHASE.doors, type: "Clipsage", direction: SPECIAL };
         const drawer = pullOut || front?.role === "drawerFront";
-        // Its feet clipped in once the carcass stands in the room : the plinth waits for them, levelled. Left in the
-        // table of the carcass it clipped onto feet not there yet (bth columns of the dresser)
-        const onSite = own.some((q) => { return q.role === "plinth"; }) && feetAfterStanding(sub.item);
+        // The plinth clips onto feet levelled in the room : clipped in the workshop, it hid feet set later and was
+        // on before they were levelled
+        const onSite = own.some((q) => { return q.role === "plinth"; });
+        // A front hangs on a carcass standing fixed : carried on it, it was in the way of every hand and weighed on
+        // feet levelled under load only up to 80 kg
+        const hung = !drawer && !onSite && front !== undefined && pose.phase === PHASE.doors;
+        const flapFirst = front?.role === "flap" && /^Abattant tombant/.test(front.label);
         // A wall stopping the door short of its hinges is a choice, said to the fitter : no stop bought
         const stop = front === undefined ? undefined : stops.get(front.id);
-        entries.push({ table: drawer || onSite ? "#000" : sub.parent!.slice(0, 4),
-                       phase: drawer ? "drawers" : onSite ? "plinth" : pose.phase, waits: onSite ? sub.item : undefined,
-                       rank: Number.MAX_SAFE_INTEGER,
+        entries.push({ table: drawer || onSite || hung ? "#000" : sub.parent!.slice(0, 4),
+                       phase: drawer ? "drawers" : onSite ? "plinth" : hung ? "fronts" : pose.phase,
+                       waits: onSite || hung ? sub.item : undefined,
+                       rank: hung ? (flapFirst ? FRONT_RANK.flap : FRONT_RANK.door) : Number.MAX_SAFE_INTEGER,
                        key: `u|${code}`, pattern: `${code}-000`, direction: pose.direction, type: pose.type, tool: "Aucun",
                        what: `${code}-000 ${sub.name}, monté à l'établi`,
                        comment: stop === undefined ? NA
@@ -1229,7 +1332,10 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                          comment: "Avant de percer le mur : platines percées à cette cote, au centre de leurs oblongs de "
                              + "réglage en hauteur" });
         }
-        whole.push(...room(code, "plug"), ...room(code, "before"));
+        // A carcass is drilled through its back once it stands levelled (wall_fixing.ts) : only what hangs on plates
+        // has its plugs set first, the plates marked off the measured top
+        const throughBack = it.kind === "carcass";
+        whole.push(...(throughBack ? [] : room(code, "plug")), ...room(code, "before"));
         // A loose carcass slides in towards the wall, the others go down onto what stands under them. Too near the
         // ceiling to be stood up there, set on the front of the one under it and slid back : the column of the TV wall
         // has 6 mm over the cleat of its fliler, screwed on its top before it goes up
@@ -1241,10 +1347,8 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
                 && q.x < it.x + it.width && q.x + q.width > it.x;
         });
         const gap = it.kind === "carcass" ? p.room.height - (it.y + it.height) : Infinity;
-        // Less room than its width left, the cleat lies flat on the top and goes up with the carcass : its thickness is
-        // what the carcass has to clear under the ceiling (ceiling.ts)
-        const flat = it.kind === "carcass" && it.ceilingFiller === true && gap >= it.thickness && gap < CLEAT_WIDTH;
-        const over = flat ? gap - it.thickness : gap;
+        // The cleat of a ceiling filler is screwed on once the carcass stands (ceiling.ts) : the whole gap to clear
+        const over = gap;
         const stand = it.kind === "carcass" ? Math.hypot(it.height, it.depth) - it.height : 0;
         const slid = onAnother && over < stand + STAND_UP_MARGIN;
         const shelfRows = onPlates.get(code);
@@ -1257,30 +1361,33 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
         }
         else
         {
+            // Too tall to be stood up with its feet : stood up in front of its place, its feet clipped in there, then
+            // slid in. Against the wall it could not tip back to free its front feet
+            whole.push(...rowsOf(entries.filter((e) => { return e.phase === "feet" && e.waits === it.id; }))
+                .map((r) => { return { ...r, comment: "Relevé devant son emplacement, sans ses pieds, trop haut pour le "
+                    + "plafond avec eux : clipser chaque pied dans son embase, puis glisser le meuble en place" }; }));
             whole.push({ pbs: [`${code}-000`], count: 1, type: "Mise en place",
                          operation: `Mettre en place ${code}-000 ${it.name}`,
                          tool: "Aucun", direction: slid ? "-z puis +y" : onAnother ? "-z" : "+y",
                          comment: loose ? "Glissée à la main, sans fixation"
                              : slid ? `Posée sur l'avant du meuble du dessous puis glissée vers le mur : `
-                                 + `${Math.round(over)} mm sous le plafond${flat ? ", tasseau du fileur compris" : ""}`
+                                 + `${Math.round(over)} mm sous le plafond`
                              : NA });
-            // Stood up without its feet when they left too little under the ceiling : clipped in once it stands, then
-            // levelled
-            whole.push(...rowsOf(entries.filter((e) => { return e.phase === "feet" && e.waits === it.id; }))
-                .map((r) => { return { ...r, comment: "Relevé sans ses pieds, trop haut pour le plafond avec eux : "
-                    + "basculer légèrement le meuble pour clipser chaque pied dans son embase" }; }));
             // Its feet set level before anything is measured off it or set on it : adjustable under load only up to
-            // an 80 kg cabinet (Häfele p. 11.43A), the bare carcass under it, its drawers and doors over it
+            // an 80 kg cabinet (Häfele p. 11.43A), the bare carcass under it, its fronts and drawers over it
             if (placed.some((i) => { return i.item === it.id && models[i.model]?.ref === AXILO_FOOT; }))
             {
                 whole.push({ pbs: [`${code}-000`], count: 1, type: "Réglage", tool: TOOL.level, direction: NA,
                              operation: `Régler à niveau les pieds AXILO de ${code}-000 ${it.name}`,
-                             comment: "Avant de poser ce qui va dessus : réglage sous charge limité à 80 kg de meuble "
-                                 + "(Häfele), tiroirs et portes déposés le temps du réglage" });
+                             comment: "Caisson vide, avant de poser ce qui va dessus : réglage sous charge limité à 80 kg "
+                                 + "de meuble (Häfele), étagères, façades et tiroirs posés une fois le meuble fixé" });
             }
             // Before the filler is measured : the plinth of a side filler is dowelled onto this one
             whole.push(...rowsOf(entries.filter((e) => { return e.phase === "plinth" && e.waits === it.id; })));
         }
+        // Tied to what stands already as soon as it stands levelled : bolted once both are on the wall, the holes
+        // drilled in the workshop no longer met
+        whole.push(...rowsOf(entries.filter((e) => { return e.phase === "link" && e.waits === it.id; })));
         // Presented and not yet fixed : a filler is measured against the wall or the ceiling it closes on and cut, the
         // carcass screwed to the wall, then only the filler glued, its glue left to set on a carcass that moves no more
         const fillers = rowsOf(entries.filter((e) =>
@@ -1292,17 +1399,20 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
             whole.push({ pbs: [`${code}-000`], count: 1, type: "Mesure sur place", tool: TOOL.tape, direction: NA,
                          operation: `Mesurer l'écart entre ${code}-000 ${it.name} présenté et le mur ou le plafond`,
                          comment: "Meuble présenté, pas encore fixé : le fileur se découpe à cette cote" },
-                       { pbs: [`${code}-000`], count: 1, type: "Découpe", tool: "Aucun", direction: NA,
+                       { pbs: [`${code}-000`], count: 1, type: "Découpe", tool: TOOL.saw, direction: NA,
                          operation: `Découper le fileur de ${code}-000 ${it.name} à la cote relevée`,
                          comment: "Chant tracé contre le mur, scie hors du meuble" });
         }
+        whole.push(...(throughBack ? room(code, "plug") : []));
         whole.push(...room(code, "wall"));
         whole.push(...fillers);
         whole.push(...rowsOf(entries.filter((e) => { return e.phase === "loose" && e.waits === it.id; })));
-        // Tied to what stands aready as soon as it stands
-        whole.push(...rowsOf(entries.filter((e) => { return e.phase === "link" && e.waits === it.id; })));
     }
     whole.push(...rowsOf(entries.filter((e) => { return e.phase === "link" && e.waits === undefined; })));
+    for (const it of items)
+    {
+        whole.push(...rowsOf(entries.filter((e) => { return e.phase === "fronts" && e.waits === it.id; })));
+    }
     whole.push(...rowsOf(entries.filter((e) => { return e.phase === "drawers"; })));
     whole.push(...rowsOf(entries.filter((e) => { return e.phase === "finish"; })));
     // Anything of an item left out of the PBS : still one step of the whole

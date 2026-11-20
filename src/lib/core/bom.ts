@@ -437,7 +437,8 @@ function cutRows(a: Analysis, codeOfPart: Map<string, string>): { cut: CutRow[];
         {
             curved = curved || s.kind === "arc";
         }
-        const shaped = curved || first.cutouts.length > 0
+        // Its outer contour alone : a cable hole is machined inside a blank still sawn to size (fabrication.ts)
+        const shaped = curved
             || polygonArea(tessellate(first.outline)) < (bb.maxX - bb.minX) * (bb.maxY - bb.minY) - 1;
         const row: CutRow = {
             code: [...codes].join(", "),

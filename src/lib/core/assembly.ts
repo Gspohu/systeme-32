@@ -270,6 +270,7 @@ function carcassSteps(project: Project, analysis: Analysis, bom: Bom, id: string
         return part.role === "hdivider";
     });
     const grooved = carcass.back.type === "groove";
+    const bearing = carcass.back.type === "panel";
     const build: string[] = [];
     if (shellDowels > 0)
     {
@@ -277,7 +278,8 @@ function carcassSteps(project: Project, analysis: Analysis, bom: Bom, id: string
     }
     build.push(`Dessous sur la joue gauche, ${uprights.length > 0 ? `montants (${codes(bom, uprights)}), ` : ""}`
         + `${fixed.length > 0 ? `tablettes fixes (${codes(bom, fixed)}), ` : ""}joue droite`
-        + `${grooved ? ", fond glissé dans ses rainures" : ""}, dessus en dernier`);
+        + `${grooved ? ", fond glissé dans ses rainures" : ""}${bearing ? ", fond porteur entre les joues" : ""}, `
+        + "dessus en dernier");
     if (housings > 0)
     {
         build.push("Serrer les boîtiers Minifix d'un quart de tour, sans forcer");

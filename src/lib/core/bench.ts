@@ -41,7 +41,8 @@ export function benchOfPart(p: Part): string | null
         return `${lining[1]}/lining/${lining[2]}`;
     }
     // The front plinth gets its clips screwed on in hand, then clips onto the feet : a return is screwed to the carcass
-    if (p.role === "plinth" && !/retour/.test(p.label))
+    // the plinth of a side filler dowelled onto the front plinth on site
+    if (p.role === "plinth" && !/retour/.test(p.label) && !p.id.includes("/side-filler/"))
     {
         return `${p.item}/plinth`;
     }
