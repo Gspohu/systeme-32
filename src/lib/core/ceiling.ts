@@ -90,18 +90,24 @@ export function buildCeilingFiller(c: Carcass, room: Room, b: Build): void
     b.parts.push(part);
     const spots = spread(l, CEILING_CLEAT_SCREW_END, CEILING_CLEAT_SCREW_PITCH);
     // TODO a cleat standing behind a strip higher than 40 takes no screw yet : the fixing check names it
-    if (flat)
+    const top = b.parts.find((q) => { return q.id === `${c.id}/top`; });
+    if (flat && top !== undefined && top.frame !== null)
     {
-        // Down through the cleat into the top, nothing of it seen from the room, before the carcass is set. The strip
-        // glued on the front edge of the cleat once it stands : on it before, the carcass wouldn't pass under the
-        // ceiling, and the back edge of the cleat is against the wall then
+        // Up through the top into the cleat from the cell under it, once the carcass stands : screwed down on the bench
+        // the cleat went up with it and left 6 mm under the ceiling (T6 of the external review). The strip glued on
+        // the front edge of the cleat after it
+        const f = top.frame;
         for (const s of spots)
         {
-            part.holes.push({ u: s, v: CLEAT_WIDTH / 2, diameter: 0, depth: 0, face: "A",
-                              label: "Tasseau du fileur dans le dessus : vis 4 x 30", purpose: "cleat-screw" });
+            const world = [c.x + t + s, c.y + c.height, c.z + c.depth + FRONT_GAP - CLEAT_WIDTH / 2];
+            const rel = [world[0]! - f.o[0], world[1]! - f.o[1], world[2]! - f.o[2]];
+            const [u, v] = [f.u, f.v].map((a) => { return rel[0]! * a[0] + rel[1]! * a[1] + rel[2]! * a[2]; });
+            top.holes.push({ u: u!, v: v!, diameter: 0, depth: 0, face: "A",
+                             label: "Tasseau du fileur de plafond depuis le dessus : vis 4 x 30", purpose: "cleat-screw" });
         }
         b.hardware.push({ ref: "SCREW_4x30", qty: spots.length, item: c.id, itemName: c.name, target: null,
-                          note: "tasseau du fileur de plafond dans le dessus, avant de poser la colonne", purpose: "cleat-screw" });
+                          note: "tasseau du fileur de plafond, vissé par-dessous une fois la colonne posée",
+                          purpose: "cleat-screw" });
         b.hardware.push({ ref: "GLUE_PU", qty: 1, item: c.id, itemName: c.name, target: strip.id,
                           note: "fileur de plafond collé sur le chant avant de son tasseau, une fois la colonne posée",
                           purpose: "cleat-screw" });
@@ -125,10 +131,12 @@ export function ceilingChecks(p: Project): Check[]
         const swing = Math.hypot(c.height, c.depth);
         if (swing > h - STAND_UP_MARGIN)
         {
+            // Past the ceiling it doesn't stand up at all, short of it only too close to stand up safely
+            const how = swing > h ? `plus que les ${h} mm sous plafond`
+                : `à moins de ${STAND_UP_MARGIN} mm des ${h} mm sous plafond`;
             checks.push({ level: "warning", item: c.id, target: null,
-                          message: `${c.name} : couché sur le dos, il se relève en balayant ${Math.round(swing)} mm, à moins `
-                              + `de ${STAND_UP_MARGIN} mm des ${h} mm sous plafond. L'assembler debout sur place ou le `
-                              + "scinder en deux caissons." });
+                          message: `${c.name} : couché sur le dos, il se relève en balayant ${Math.round(swing)} mm, ${how}. `
+                              + "L'assembler debout sur place ou le scinder en deux caissons." });
         }
     }
     return checks;

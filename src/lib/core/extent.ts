@@ -16,7 +16,7 @@ export interface Extent
 // Depth from the front face to the applied back, the room a rounded end can curve in
 export function usableDepth(c: Carcass): number
 {
-    return c.depth - (c.back.type === "applied" ? c.back.thickness : 0);
+    return c.depth - (c.back.type === "applied" || c.back.type === "panel" ? c.back.thickness : 0);
 }
 
 

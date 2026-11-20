@@ -65,7 +65,7 @@ export const MIN_CELL = 32;
 
 export function innerDepthStart(back: BackMount): number
 {
-    if (back.type === "applied")
+    if (back.type === "applied" || back.type === "panel")
     {
         return back.thickness;
     }

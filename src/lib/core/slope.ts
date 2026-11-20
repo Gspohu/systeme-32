@@ -81,9 +81,10 @@ export function slopeErrors(c: Carcass, lay: ResolvedLayout, panels: FrontPanel[
             + "(sous la joue haute).");
         return errors;
     }
-    if (c.back.type === "groove")
+    if (c.back.type === "groove" || c.back.type === "panel")
     {
-        errors.push(`${c.name} : fond en rainure impossible sous un rampant. Choisir un fond rapporté.`);
+        errors.push(`${c.name} : fond ${c.back.type === "groove" ? "en rainure" : "porteur"} impossible sous un rampant. `
+            + "Choisir un fond rapporté.");
     }
     if (c.seat !== null)
     {

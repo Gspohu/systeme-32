@@ -19,7 +19,7 @@ import { holeLine, nearestHole } from "./grid";
 import { at, neg, Y, type Frame, type Vec3 } from "./geometry";
 
 
-// Workshop conventions, stated in the drawings as such
+// Workshop conventions, stated in the drawings as sutch
 const PLATE_CLEARANCE = 25;
 const TIPON_FROM_EDGE = 100;
 // Height off the floor a hand pushes at : a workshop choice to try on a door, no Blum rule was found
@@ -429,7 +429,11 @@ export function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: Node
         mount(face.part, face.face, y - face.uOrigin, `TIP-ON ${tipRef} ${DIAM}10 x ${TIPON_DEPTH[tipRef] ?? 50} mini`);
         return;
     }
-    // Double doors meet in the middle : the unit fit into the front edge of the panel above
+    // A drop-down flap is pushed in the middle of its top edge, a door near its opening edge
+    const xLocal = centred ? fp.rect.x + fp.rect.w / 2
+        : openSide === "left" ? fp.rect.x + TIPON_FROM_EDGE : fp.rect.x + fp.rect.w - TIPON_FROM_EDGE;
+    // Double doors meet in the middle : the unit fit into the front edge of the panel above, the one over that very
+    // spot. The first at that height was another bay's shelf, its holes 782 along a board of 505.5
     let above: Part | undefined;
     for (const p of b.parts)
     {
@@ -438,16 +442,15 @@ export function fitTipOnHole(c: Carcass, lay: ResolvedLayout, b: Build, nb: Node
             continue;
         }
         const level = p.role === "top" ? nb.y + nb.h : nb.y + nb.h + p.thickness;
-        if ((p.role === "top" || p.role === "hdivider") && Math.abs(p.frame.o[1] - c.y - level) < 0.01)
+        const along = xLocal - (p.frame.o[0] - c.x);
+        if ((p.role === "top" || p.role === "hdivider") && Math.abs(p.frame.o[1] - c.y - level) < 0.01 && along > 0
+            && along < p.length)
         {
             above = p;
         }
     }
     if (above !== undefined && above.frame !== null)
     {
-        // A drop-down flap is pushed in the middle of its top edge, a door near its opening edge
-        const xLocal = centred ? fp.rect.x + fp.rect.w / 2
-            : openSide === "left" ? fp.rect.x + TIPON_FROM_EDGE : fp.rect.x + fp.rect.w - TIPON_FROM_EDGE;
         const u = xLocal - (above.frame.o[0] - c.x);
         // The face of the top looks down into the cell, a shelf turns its face B down
         mount(above, above.role === "top" ? "A" : "B", u,

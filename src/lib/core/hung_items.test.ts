@@ -34,8 +34,7 @@ describe("wall shelves on hollow brick", () =>
 {
     it("tells the cabinet maker the pull on each plug, 31 to 60 daN on the 1600 shelf of the TV wall", () =>
     {
-        // Review of Vibe (2026-11-09) : the plug against its load was never worked out, only the Häfele table
-        // of the support
+        // The plug against its load, not only the Häfele table of the support
         const p = tvWall();
         const b = analyse(p).build;
         const shelf = p.items.find((it) => { return it.kind === "wallShelf" && it.width === 1600; })!;

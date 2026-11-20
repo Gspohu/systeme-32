@@ -110,6 +110,7 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
     if (s.wallType === "hollow")
     {
         line("RESIN_CHEM", 1, "chevilles des platines noyées dans la résine", "wall-fixing");
+        line("RESIN_SIEVE", n * H.wallScrews, "un par cheville scellée", "wall-fixing");
     }
     // The load read on the table row of the same depth or the next deeper one, a deeper shelf carrying less
     const row = H.loads.find((r) =>
@@ -148,9 +149,8 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
 }
 
 
-// Pull on one plug of a concealed support in daN, worst first : the share of one support at half the
-// depth off the wall, its
-// moment taken on half the plate height, or on half the shelf thickness when the back edge bears (review of Vibe)
+// Pull on one plug of a concealed support in daN, worst first : the share of one support at half the depth off the
+// wall, its moment taken on half the plate height, or on half the shelf thickness when the back edge bears
 export function plugPull(w: WallShelf, kgPerM2: number, supports: number): [number, number]
 {
     const H = CONCEALED_SHELF_SUPPORT;

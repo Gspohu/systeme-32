@@ -103,8 +103,10 @@ describe("up to the ceiling", () =>
             .not.toContain("se relève");
         expect(said(wardrobe({ height: 2400, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
             .toContain("se relève en balayant 2474 mm, à moins de 50 mm");
-        expect(said(wardrobe({ height: 2450, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning"))
-            .toContain("se relève en balayant 2522 mm");
+        // Past the ceiling, it was said to clear it by less than 50 mm
+        const past = said(wardrobe({ height: 2450, y: 0, base: { type: "floor" }, ceilingFiller: false }), "warning");
+        expect(past).toContain("se relève en balayant 2522 mm, plus que les 2500 mm sous plafond");
+        expect(past).not.toContain("à moins de");
     });
 });
 
