@@ -18,8 +18,9 @@ def stay_joints(assembly, joints, cabinet, rod, body, flap, ground=True):
     def joint(kind, name, first, second):
         made = joints.newObject("App::FeaturePython", name)
         Joint(made, kind)
-        made.Reference1 = (assembly, [f"{first.Name}.Face1", f"{first.Name}.Vertex1"])
-        made.Reference2 = (assembly, [f"{second.Name}.Face1", f"{second.Name}.Vertex1"])
+        # Rooted at the component : rooted at the assembly, a visible link back to it made a cycle in the graph
+        made.Reference1 = (first, ["Face1", "Vertex1"])
+        made.Reference2 = (second, ["Face1", "Vertex1"])
         made.Detach1 = True
         made.Detach2 = True
         made.Placement1 = App.Placement()

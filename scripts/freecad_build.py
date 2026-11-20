@@ -552,8 +552,10 @@ def make_assembly(doc, built, model):
         for link, placement in links[1:]:
             j = joints.newObject("App::FeaturePython", "Liaison")
             Joint(j, 0)
-            j.Reference1 = (sub, [f"{leader.Name}.Face1", f"{leader.Name}.Vertex1"])
-            j.Reference2 = (sub, [f"{link.Name}.Face1", f"{link.Name}.Vertex1"])
+            # Rooted at the component, as FreeCAD 1.1 stores a reference : rooted at the assembly holding the joint
+            # it was a visible link back to it, a cycle in the graph
+            j.Reference1 = (leader, ["Face1", "Vertex1"])
+            j.Reference2 = (link, ["Face1", "Vertex1"])
             j.Detach1 = True
             j.Detach2 = True
             # Both coordinate systems on the same point of the room : the joint holds the part where it stands
