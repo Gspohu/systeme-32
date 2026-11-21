@@ -674,12 +674,22 @@ def sink_tab_holes(body, section):
         feature.Visibility = feature.Name == body.Tip.Name
 
 
+def library_card(name):
+    """A card of FreeCAD's own library by its name, the one cad_models.ts gives : no copy of its figures"""
+    found = [m for m in Materials.MaterialManager().Materials.values() if m.Name == name and m.LibraryName == "System"]
+    if not found:
+        raise RuntimeError(f"fiche '{name}' absente de la bibliothèque de matériaux de FreeCAD : "
+                           "corriger le nom dans cad_models.ts ou cad_hardware.ts")
+    return found[0]
+
+
 def make_models(doc, model, sources):
     """One object for each article, the links place it : a maker's file read as it comes, less the empty solid Häfele adds"""
     group = doc.addObject("App::DocumentObjectGroup", "Modeles_quincaillerie")
     group.Label = "Modèles de quincaillerie"
     out = {}
     missing = []
+    cards = {}
     for key, m in model["models"].items():
         # The reference first : what the check of the hardware bought reads it by
         named = f"{m['ref']} {m['label']}"
@@ -743,6 +753,12 @@ def make_models(doc, model, sources):
         else:
             missing.append(key)
             continue
+        if ("card" in m and o.TypeId == "PartDesign::Body"):
+            name = m["card"]["name"]
+            cards.setdefault(name, library_card(name))
+            o.ShapeMaterial = cards[name]
+            o.addProperty("App::PropertyString", "SourceMatiere", "Fabrication", "Why this card of the library")
+            o.SourceMatiere = m["card"]["why"]
         group.addObject(o)
         out[key] = o
     return out, missing

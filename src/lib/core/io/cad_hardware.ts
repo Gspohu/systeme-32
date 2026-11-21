@@ -10,7 +10,7 @@ import { decorById } from "../../data/materials";
 import { FRONT_GAP, MINIFIX, MOVENTO, TIPON_ADAPTER } from "../../data/rules";
 import { screwOf, type ScrewSpec } from "../../data/screws";
 import { AXILO_FEET, EDGE_PULL } from "../../data/hardware";
-import { CAD_MODELS, STEEL, ZINC, type CadModel } from "../../data/cad_models";
+import { CAD_MODELS, STEEL, ZINC, type CadModel, type LibraryCard } from "../../data/cad_models";
 
 export interface CadScrew extends ScrewSpec
 {
@@ -639,9 +639,12 @@ function cupScrews(out: CadInstance[], screws: CadScrew[]): void
 
 // The parts of a lit cell no maker gives a file for, drawn from the volume the light set : the strip profile an
 // aluminium U open towards the cell, the strip in it, the driver and the controller as their housings
-const LIGHT_LOOK: Record<string, { label: string; rgb: [number, number, number]; open: boolean }> = {
-    LED_PROFILE_SURFACE: { label: "Profilé LED en applique", rgb: [190, 192, 196], open: true },
-    LED_PROFILE_RECESS: { label: "Profilé LED encastré", rgb: [190, 192, 196], open: true },
+// The strip, the driver and the controller are devices, no one material : no card, declared so in the project's yml
+const PROFILE_CARD: LibraryCard = { name: "Aluminum-Generic", why: "profilé en aluminium de la liste de quincaillerie, "
+                                    + "alliage non publié" };
+const LIGHT_LOOK: Record<string, { label: string; rgb: [number, number, number]; open: boolean; card?: LibraryCard }> = {
+    LED_PROFILE_SURFACE: { label: "Profilé LED en applique", rgb: [190, 192, 196], open: true, card: PROFILE_CARD },
+    LED_PROFILE_RECESS: { label: "Profilé LED encastré", rgb: [190, 192, 196], open: true, card: PROFILE_CARD },
     LED_STRIP_24V: { label: "Ruban LED 24 V", rgb: [250, 232, 170], open: false },
     LED_DRIVER_24V: { label: "Alimentation LED 24 V", rgb: [41, 41, 41], open: false },
     SHELLY_PLUS_RGBW_PM: { label: "Contrôleur Wi-Fi Shelly Plus RGBW PM", rgb: [240, 240, 240], open: false },
@@ -666,7 +669,8 @@ function lightModels(p: Project, b: Build, out: CadInstance[], drawn: Record<str
             ? [[0, 0], [w, 0], [w, h], [w - t, h], [w - t, t], [t, t], [t, h], [0, h]]
             : [[0, 0], [w, 0], [w, h], [0, h]];
         const key = `${f.ref}@${Math.round(l)}x${Math.round(w)}x${Math.round(h * 10) / 10}`;
-        drawn[key] = { ref: f.ref, label: look.label, rgb: look.rgb, draw: { section, length: l } };
+        drawn[key] = { ref: f.ref, label: look.label, rgb: look.rgb, draw: { section, length: l },
+                       ...(look.card === undefined ? {} : { card: look.card }) };
         const x = f.axes[1];
         const y = f.axes[2];
         const z = cross(x, y);
@@ -699,7 +703,8 @@ function capModels(b: Build, out: CadInstance[], drawn: Record<string, CadModel>
         // A disc over a Minifix housing named apart : of one name with the caps of the screws, one pattern took both
         const what = f.key.includes("/cap/minifix-housing/") ? "Cache-boîtier" : "Cache-vis";
         drawn[key] = { ref: "EDGE_CAP", label: `${what} ${decor.ref} ${decor.label}`.trim(), rgb: decor.rgb,
-                       draw: { cylinder: [r, h] } };
+                       draw: { cylinder: [r, h] },
+                       card: { name: "ABS-Generic", why: "taillé dans les chutes du chant ABS du décor" } };
         const z = f.axes[2];
         const o: Vec3 = [0, 1, 2].map((k) => { return f.centre[k]! - z[k]! * h / 2; }) as Vec3;
         // The purpose of the screw it covers, read off its key (screw_caps.ts)

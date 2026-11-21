@@ -18,6 +18,14 @@ export interface CadModel
     fixing?: Fixing;
     // Set under what it goes on, the coupling under a drawer : the drawer is turned over for it and its screws
     fromBelow?: boolean;
+    // The card of FreeCAD's own material library the build gives a body it draws, by its name, and why that one
+    card?: LibraryCard;
+}
+
+export interface LibraryCard
+{
+    name: string;
+    why: string;
 }
 
 // The screws it's held by, by the start of their label, placed by the export in the frame of the file when it gives
@@ -182,16 +190,26 @@ export const CAD_MODELS: Record<string, CadModel> = {
                    rgb: [235, 235, 230],
                    fixing: { screws: { label: "Clip de plinthe : vis" },
                             source: "Häfele AXILO, clip vissé sur la plinthe" } },
-    "ANTI_TIP_BRACKET": { ref: "ANTI_TIP_BRACKET", label: "Équerre 40 x 40 x 40", rgb: ZINC },
-    "DOWEL_8x35": { ref: "DOWEL_8x35", label: "Tourillon 8 x 35", rgb: BEECH },
+    "ANTI_TIP_BRACKET": { ref: "ANTI_TIP_BRACKET", label: "Équerre 40 x 40 x 40", rgb: ZINC,
+                          card: { name: "Steel-Generic", why: "équerre en acier galvanisé de la liste de quincaillerie, "
+                                  + "nuance non donnée" } },
+    "DOWEL_8x35": { ref: "DOWEL_8x35", label: "Tourillon 8 x 35", rgb: BEECH,
+                    card: { name: "Wood-Generic", why: "tourillon en hêtre de la liste de quincaillerie, "
+                            + "fiche bois générique de FreeCAD" } },
     // The DuoPower of the hardware list, Ø8 x 40 : the cabinet maker may choose another fixing from the load on the
     // plans
     "PLUG_DUOPOWER_8x40": { ref: "PLUG_DUOPOWER_8x40", label: "Cheville fischer DuoPower 8 x 40", rgb: [120, 120, 120],
-                            draw: { cylinder: [4, 40] } },
+                            draw: { cylinder: [4, 40] },
+                            card: { name: "PA6-Generic",
+                                   why: "fischer : corps porteur gris en nylon, ailettes rouges en "
+                                    + "polypropylène, la fiche est celle du nylon" } },
     // The nylon plug of a solid wall, Ø8 x 40 as listed
     "PLUG_NYLON_8x40": { ref: "PLUG_NYLON_8x40", label: "Cheville nylon 8 x 40", rgb: [235, 235, 230],
-                        draw: { cylinder: [4, 40] } },
+                        draw: { cylinder: [4, 40] },
+                        card: { name: "PA6-Generic", why: "cheville en nylon de la liste de quincaillerie" } },
     "84335807": { ref: "84335807", label: "Poignée Oslo", rgb: ALUMINIUM_BRASS,
                  fixing: { screws: { label: "Vis Ø4 x 16 fraisée de la poignée Oslo" },
-                          source: "vis fournies avec la poignée" } },
+                          source: "vis fournies avec la poignée" },
+                 card: { name: "Aluminum-Generic", why: "poignée en aluminium d'après la fiche Leroy Merlin, alliage "
+                         + "non publié" } },
 };
