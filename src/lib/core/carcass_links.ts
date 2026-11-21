@@ -360,7 +360,8 @@ function link(panelA: Part, panelC: Part, b: Build, out: { item: string; message
                 }
                 else
                 {
-                    out.push({ item: panelA.item, message: `${panelA.itemName} et ${panelC.itemName} : pas de place pour `
+                    out.push({ item: panelA.item,
+                              message: `${panelA.itemName} et ${panelC.itemName} : pas de place pour `
                         + `3 vis en triangle près de ${Math.round(station)} mm, une seule posée. Déplacer la quincaillerie.` });
                 }
             }

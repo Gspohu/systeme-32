@@ -128,7 +128,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:637.76.333": entry(Math.round(0.67 / 1.21 * 1000) / 1000, "u",
                            "Monastil (Espagne), 0,67 EUR TTC l'embase avec 21 % de TVA, en stock", READ_ON_2),
 
-    "hw:262.26.535": entry(fromUsd(0.35), "u", "Prix du 262.25.035 avec bord, Home Decor Hardware (US), 0,35 USD HT le boîtier"),
+    "hw:262.26.535": entry(fromUsd(0.35), "u",
+                           "Prix du 262.25.035 avec bord, Home Decor Hardware (US), 0,35 USD HT le boîtier"),
     "hw:267.07.902": entry(fromUsd(0.76), "u", "Home Decor Hardware (US), 0,76 USD HT la vis de liaison", "2026-10-03"),
     "hw:267.07.903": entry(fromUsd(0.87), "u", "Home Decor Hardware (US), 0,87 USD HT la vis de liaison", "2026-10-03"),
     "hw:262.28.020": entry(fromUsd(0.44), "u", "Home Decor Hardware (US), 0,44 USD HT le 262.28.026, "
