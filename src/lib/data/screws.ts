@@ -121,11 +121,12 @@ export interface ScrewArticle
 }
 
 export const SCREW_ARTICLES: ScrewArticle[] = [
-    // Häfele's chipboard screw of the hinges, the runners and the TIP-ON plates
-    { kind: "countersunk", diameter: 3.5, length: 15, ref: "609.1500", designation: CHIPBOARD },
-    // The #6 wood screw of the Blum runners in their file, sold by Würth : its sheet not read
+    // Blum's chipboard screw of the hinges, the runners and the TIP-ON plates
+    { kind: "countersunk", diameter: 3.5, length: 15, ref: "609.1500",
+      designation: { card: "Steel-Generic", coating: "nickelé", why: "acier nickelé, fiche SFS de la Blum 609.1500" } },
+    // The #6 wood screw of the Blum runners in their file, sold by Würth
     { kind: "countersunk", diameter: 3.5, length: 16, standard: "ASMEB18.6.1.3", ref: "606N",
-      designation: { card: "Steel-Generic", coating: "selon le fabricant", why: "Würth B606N, fiche non lue" } },
+      designation: { card: "Steel-Generic", coating: "nickelé", why: "acier nickelé, fiche Würth B606N-100" } },
     { kind: "countersunk", diameter: 4, length: 30, ref: "SCREW_4x30", designation: CHIPBOARD },
     { kind: "countersunk", diameter: 4, length: 35, ref: "SCREW_4x35", designation: CHIPBOARD },
     // Supplied with the pull

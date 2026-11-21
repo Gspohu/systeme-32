@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { computeOutputs } from "../outputs";
 import { TEMPLATES } from "../templates";
-import { cadModel } from "./cad_model";
+import { cadModel, NO_SUPPLIER } from "./cad_model";
+import { SUPPLIERS } from "../../data/suppliers";
 import { HARDWARE } from "../../data/hardware";
 import { DEFAULT_PRICES } from "../../data/prices";
 import { SCREW_ADVICE, SCREW_ARTICLES, screwArticle, WASHER_REF } from "../../data/screws";
@@ -31,7 +32,8 @@ describe("article acheté de chaque vis du modèle", () =>
             {
                 expect(f.card).not.toBe("");
                 expect(f.coating).not.toBe("");
-                expect(f.supplier, f.ref).not.toBeNull();
+                // A merchant's name, never the sentence of a price
+                expect([...SUPPLIERS.map((s) => { return s.name; }), NO_SUPPLIER], f.ref).toContain(f.supplier);
                 expect(f.advice).toBe(SCREW_ADVICE);
             }
             expect(m.washer.propertyClass).toBe("100 HV");

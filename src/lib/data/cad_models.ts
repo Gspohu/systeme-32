@@ -210,6 +210,6 @@ export const CAD_MODELS: Record<string, CadModel> = {
     "84335807": { ref: "84335807", label: "Poignée Oslo", rgb: ALUMINIUM_BRASS,
                  fixing: { screws: { label: "Vis Ø4 x 16 fraisée de la poignée Oslo" },
                           source: "vis fournies avec la poignée" },
-                 card: { name: "Aluminum-Generic", why: "poignée en aluminium d'après la fiche Leroy Merlin, alliage "
+                 card: { name: "Aluminum-Generic", why: "poignée en aluminium d'après la fiche ADS Bricolage, alliage "
                          + "non publié" } },
 };

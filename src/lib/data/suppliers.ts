@@ -29,7 +29,7 @@ export const SUPPLIERS: Supplier[] = [
 ];
 
 
-// douane.gouv.fr, "Acheter en ligne au Royaume-Uni après le Brexit", page du 19/08/2026 lue par le fabricant
+// douane.gouv.fr, "Acheter en ligne au Royaume-Uni après le Brexit"
 export const IMPORT_NOTE = "TVA à l'import, le plus souvent 20 %, et frais de dossier du transporteur (douane.gouv.fr), "
     + "non comptés";
 

@@ -196,7 +196,8 @@ def designate(obj, article):
         raise RuntimeError(f"fiche '{article['card']}' absente de la bibliothèque de FreeCAD : corriger "
                            "SCREW_ARTICLES dans data/screws.ts")
     obj.ShapeMaterial = cards[0]
-    said = [("Revetement", article["coating"]), ("Fournisseur", article["supplier"] or ""),
+    said = [("Revetement", article["coating"]), ("Fournisseur", article["supplier"]),
+            ("SourcePrix", article["priceSource"] or ""),
             ("SourceDesignation", article["why"]), ("Recommandation", article["advice"])]
     if article["propertyClass"]:
         said.append(("ClasseQualite", article["propertyClass"]))
