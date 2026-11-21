@@ -482,6 +482,8 @@ def check_calc_notes(doc, model):
         return ([f"feuille absente, {len(notes)} notes exportées"] if notes else []), 0
     sheet.recompute()
     off, compared = [], 0
+    index = {p["id"]: k for k, p in enumerate(model["parts"])}
+    bodies = {o.Label2: o.Name for o in doc.Objects if o.TypeId == "PartDesign::Body" and o.Label2}
     for note in notes:
         prefix = note["number"]
         for step in note["steps"]:
@@ -500,12 +502,29 @@ def check_calc_notes(doc, model):
         if (str(sheet.get(f"{prefix}_phrase")) != note["verdict"] or not sheet.getContents(phrase_cell).startswith("=")):
             off.append(f"{prefix} phrase : '{sheet.get(prefix + '_phrase')}' pour '{note['verdict']}', ou figée")
         for value in note["inputs"]:
-            cell = sheet.getCellFromAlias(f"{prefix}_{value['name']}")
-            if (value.get("link") and not sheet.getContents(cell).startswith("=")):
-                off.append(f"{prefix} {value['name']} : saisi, pas lu dans sa cote ou sa fiche")
+            link = value.get("link")
+            if not link:
+                continue
+            # The very size or card of its own part : a formula on the size of another part of the same figure
+            # passes every comparison of values
+            contents = sheet.getContents(sheet.getCellFromAlias(f"{prefix}_{value['name']}"))
+            want = linked_source(link, index, bodies)
+            right = want is not None and (contents == want if "size" in link else want in contents)
+            if not right:
+                off.append(f"{prefix} {value['name']} : lit '{contents[:60]}' au lieu de {want}")
         if (any(value.get("result") for value in note["inputs"]) and float(sheet.get(f"{prefix}_valide")) != 1.0):
             off.append(f"{prefix} : résultat déjà périmé à la construction")
     return off, compared
+
+
+def linked_source(link, index, bodies):
+    """What the cell of a linked input must read : its own size in Cotes, or the card of the body of its own part"""
+    if "size" in link:
+        k = index.get(link["part"])
+        return None if k is None else f"=Cotes.p{k}_{dict(length='L', width='W', thickness='T')[link['size']]}"
+    body = bodies.get(link["part"])
+    key = dict(modulus="YoungsModulus", density="Density")[link["property"]]
+    return None if body is None else f"hiddenref({body}.ShapeMaterial.PhysicalProperties[<<{key}>>])"
 
 
 def prove_calc_notes_live(doc, model):
