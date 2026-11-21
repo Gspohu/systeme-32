@@ -10,7 +10,8 @@ import { DIAM, round1 } from "../text";
 export const ROW = 3.6;
 export const TABLE_COL_W = 198;
 export const TABLE_COLS = [16, 16, 10, 11, 24, 111];
-export const TABLE_HEAD = ["u", "v", DIAM, "prof.", "face", "usage"];
+// u and v name the axes of the part, as its dimensions do : the words take their capital
+export const TABLE_HEAD = ["u", "v", DIAM, "Prof.", "Face", "Usage"];
 
 // One column of the table as laid on the sheet, its top left corner and its lines : FreeCAD prints the same
 export interface PlacedColumn

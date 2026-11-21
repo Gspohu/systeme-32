@@ -187,7 +187,7 @@ add({ id: "WALL_SCREW_5x50_PAN", family: "D60", label: "Vis 5 x 50 tête cylindr
 // through fixing of the DuoPower asks
 add({ id: "WALL_SCREW_5x60_PAN", family: "D60", label: "Vis fischer PowerFast 5 x 60 tête demi-ronde TX, inox A2, au "
          + "mur à travers le fond sur rondelle large",
-     brand: "fischer", ref: "657385", source: "Alternate, fiche produit EAN 4048962050783 lue le 2026-11-18" });
+     brand: "fischer", ref: "657385", source: "Alternate, fiche produit EAN 4048962050783" });
 // Slat walls : a 20 mm cleat before the 40 mm plug asks for a 70 mm screw, the slats are glued and pinned
 const SLATS = ("Convention d'atelier, pas une donnée fabricant, référence au choix du distributeur");
 add({ id: "WALL_SCREW_5x70", family: "D60", label: "Vis 5 x 70, liteau ou lisse dans le mur, le sol ou le plafond",
@@ -315,11 +315,11 @@ add({ id: "GLUE_CYANO", family: "D60", label: "Colle cyanoacrylate, tube, pour l
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
 add({ id: "RESIN_CHEM", family: "D60", label: "Résine polyester de scellement chimique pour maçonnerie, cartouche 300 ml, "
          + "au pistolet à silicone : chevilles des platines noyées dans la résine en mur creux",
-     brand: "fischer", ref: "4048962519471", source: "Brico Dépôt, fiche produit lue le 2026-11-17",
+     brand: "fischer", ref: "4048962519471", source: "Brico Dépôt, fiche produit",
      perProject: true });
 // Made for threaded rods M6 to M8 : the plug of 8 goes into it, no figure of fischer for a plug so set
 add({ id: "RESIN_SIEVE", family: "D60", label: "Tamis d'injection fischer FIS H 12 x 50 K",
-     brand: "fischer", ref: "41900", source: "Domomat, fiche produit EAN 8001132419007 lue le 2026-11-18" });
+     brand: "fischer", ref: "41900", source: "Domomat, fiche produit EAN 8001132419007" });
 // The hole it takes, from the same sheet : drilled 12, 60 deep at least
 export const SIEVE_BORE = { diameter: 12, depth: 60 };
 add({ id: "TAPE_DOUBLE", family: "D60", label: "Adhésif double face mince, rouleau, pour les cache-vis des vis à démonter",
@@ -411,7 +411,7 @@ for (const h of BAR_HANDLES)
 {
     add({ id: h.ref, family: "D51", label: `Poignée barre inox brossé ${DIAM}12, entraxe ${h.centres}, longueur `
          + `${h.length}, vis M4 x 25 fournies`, brand: "Häfele", ref: h.ref,
-         source: "Häfele, désignation reprise par Home Decor Hardware (US), fiche de la référence lue le 2 octobre 2026" });
+         source: "Häfele, désignation reprise par Home Decor Hardware (US), fiche de la référence" });
 }
 
 
@@ -422,8 +422,8 @@ export const EDGE_PULL = { ref: "84335807", length: 180, centres: 128, depth: 44
                            wall: 1, tip: { length: 5, thickness: 3 }, flat: 145, headOver: 1.2 };
 add({ id: EDGE_PULL.ref, family: "D51", label: `Poignée Oslo aluminium laiton brossé, entraxe ${EDGE_PULL.centres}, `
      + `longueur ${EDGE_PULL.length}, posée sur le chant, vis de ${EDGE_PULL.screw} fournies`, brand: "INSPIRE",
-     ref: EDGE_PULL.ref, source: "Leroy Merlin, cotes de la fiche ADS Bricolage de l'EAN 3276007446920 lue le "
-         + "17 octobre 2026, vendue par lot de 2 (EAN 3276007458664) avec 4 vis à tête fraisée" });
+     ref: EDGE_PULL.ref, source: "Leroy Merlin, cotes de la fiche ADS Bricolage de l'EAN 3276007446920, "
+         + "vendue par lot de 2 (EAN 3276007458664) avec 4 vis à tête fraisée" });
 
 
 // The drop-down flap of the dresser : flap hinge and braking stays of the 2023 catalogue of Häfele Thailand, the

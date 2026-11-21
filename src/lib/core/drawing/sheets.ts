@@ -273,7 +273,7 @@ function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
         canvas.text(MARGIN + 18, cursorY, label, BODY);
         cursorY += 5;
     }
-    section("Conventions d'atelier (non issues d'une notice fabricant, modifiables dans les réglages)");
+    section("Conventions d'atelier");
     const settings = p.settings; 
     const conventions = [
         `Connecteurs à ${settings.connectorInset} mm des chants avant et arrière, intermédiaires tous les 256 mm maxi`,

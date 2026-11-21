@@ -185,7 +185,7 @@ export function tvWall(): Project
             model: "One For All WM 2251", maxKg: 30, vesa: [[75, 75], [100, 100], [200, 100], [200, 200]],
             reachMin: 49, reachMax: 393, plateW: 240, plateH: 249, x: 1076, y: 896,
             out: { cx: 940, z: 250 },
-            source: "fiche oneforall.com relevée le 2026-10-08 : 13 à 43 pouces, VESA 75 x 75 à 200 x 200, 30 kg, "
+            source: "fiche oneforall.com : 13 à 43 pouces, VESA 75 x 75 à 200 x 200, 30 kg, "
                 + "49 à 393 mm du mur, 180° ; platine prise à son encombrement de 24 x 24,9 cm",
         },
     };

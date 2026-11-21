@@ -19,7 +19,7 @@ export const SUPPLIERS: Supplier[] = [
     { name: "Monastil", country: "Espagne", eu: true, why: "'Monastil (Espagne)' dans la source du prix" },
     { name: "Intar", country: "Pologne", eu: true, why: "'Intar (Pologne)' dans la source du prix" },
     { name: "Alternate", country: "Allemagne", eu: true,
-      why: "ALTERNATE GmbH, Linden, mentions légales d'alternate.de lues le 8 octobre 2026" },
+      why: "ALTERNATE GmbH, Linden, mentions légales d'alternate.de" },
     { name: "Houdard", country: "France", eu: true, why: "site français, prix TTC en France" },
     { name: "Jean Hue & Socoda", country: "France", eu: true, why: "site français, prix TTC en France" },
     { name: "Barillet", country: "France", eu: true, why: "barillet-distribution.fr, agences en France" },

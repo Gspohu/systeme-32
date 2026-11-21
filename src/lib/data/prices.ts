@@ -81,7 +81,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "board:SNOW_WHITE_8685:8": entry(ht(22.98), "m2", `${JHS}, réf. 1001137234, 22,98 EUR TTC/m2 (133,22 le panneau `
                                      + "2800 x 2070), en stock", READ_ON_2),
     "board:SNOW_WHITE_8685:16": entry(ht(26.12), "m2", `${JHS}, réf. 1001137235, 26,12 EUR TTC/m2, panneau 2800 x 2070, `
-                                      + "en stock, lu le 9 novembre 2026"),
+                                      + "en stock", "2026-11-09"),
     "board:U604_ST9:19": entry(perSheet(101.3), "m2", "Houdard, 101,30 EUR HT le panneau 2800 x 2070, en stock"),
     // By the whole board, its format in SOLID_STOCK
     "board:CHENE_MASSIF:20": entry(ht(29.9), "u", "Brico Dépôt, planche rabotée chêne massif 2000 x 140 x 20, "
@@ -99,10 +99,10 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     "hw:173H7100": entry(fromGbp(0.42), "u", "Interfit (UK), 0,42 GBP HT l'embase"),
     "hw:174H7100E": entry(fromGbp(0.57), "u", "Interfit (UK), 0,57 GBP HT l'embase nickelée", "2026-10-03"),
     "hw:760H4800S": entry(fromGbp(25.92), "u", "Interfit (UK), 25,92 GBP HT la paire"),
-    "hw:760H4500S": entry(fromGbp(28.79), "u", "Blum UK (blum.org.uk), 28,79 GBP la paire, lu le 8 novembre 2026"),
-    "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière, lu le 2 octobre"),
-    "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire, lu le 2 octobre"),
-    "hw:760H4200S": entry(fromGbp(25.65), "u", "Interfit (UK), 25,65 GBP HT la paire, lu le 11 novembre", "2026-11-11"),
+    "hw:760H4500S": entry(fromGbp(28.79), "u", "Blum UK (blum.org.uk), 28,79 GBP la paire", "2026-11-08"),
+    "hw:71B3650": entry(fromGbp(2.70), "u", "Interfit (UK), 2,70 GBP HT la charnière", READ_ON_2),
+    "hw:760H3800S": entry(fromGbp(25.36), "u", "Interfit (UK), 25,36 GBP HT la paire", READ_ON_2),
+    "hw:760H4200S": entry(fromGbp(25.65), "u", "Interfit (UK), 25,65 GBP HT la paire", "2026-11-11"),
     "hw:70T3550.TL": entry(fromGbp(1.33), "u", "Interfit (UK), 1,33 GBP HT la charnière sans ressort", READ_ON_2),
     "hw:70T3650.TL": entry(fromGbp(1.61), "u", "Interfit (UK), 1,61 GBP HT la charnière sans ressort", READ_ON_2),
     // Sold as a set with its strike plaet, black or white at the same price
@@ -141,7 +141,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                      ["100.45.128", 3.15]]),
     // Receipt, Leroy Merlin Mundolsheim : the lot of 2 at 10.90 and 0.07 of eco-contribution
     "hw:84335807": entry(ht((10.9 + 0.07) / 2), "u", "Leroy Merlin, lot de 2 poignées Oslo laiton brossé mat 180 mm, "
-                         + "EAN 3276007458664, 10,90 EUR TTC et 0,07 d'éco-participation (ticket du 9 novembre 2026), "
+                         + "EAN 3276007458664, 10,90 EUR TTC et 0,07 d'éco-participation, "
                          + "4 vis fournies", "2026-11-09", 2),
     "hw:365.01.901": entry(24.14, "u", "Häfele France, compte client, prix net 24,14 EUR la pièce, disponibilité sur "
                            + "demande", "2026-11-11"),
