@@ -13,6 +13,9 @@ mkdir -p "$OUT/json"
 for piece in ${2:-tv dresser}
 do
     json="$OUT/json/$piece.json"
+    # Every report of this run is newer than this mark : one a crash left from an earlier run never counts
+    started="$OUT/$piece.run.start"
+    : > "$started"
     flatpak run --env=S32_JSON="$json" --env=S32_OUT="$OUT" --env=S32_SOURCES="$SOURCES" --env=S32_SCRIPTS="$HERE" \
         --env=S32_DRAWINGS="${S32_DRAWINGS:-}" --command=FreeCADCmd "$APP" \
         -c "exec(open('$HERE/freecad_build.py').read())" 2>&1 | grep -E '^pieces|^\{|Traceback|Error:' || true
@@ -37,11 +40,9 @@ do
     fi
     flatpak run --env=S32_JSON="$json" --env=S32_DOC="$OUT/$piece.FCStd" --command=FreeCADCmd "$APP" \
         -c "exec(open('$HERE/freecad_check.py').read())" 2>&1 | grep -E '^\{|^VERDICT|Traceback|Error:' || true
-    # The check says whether the piece is right : a failed one stops the chain, no check written stops it as well
-    report="$OUT/${piece}_controle.json"
-    if ! python3 -c "import json, sys; sys.exit(0 if json.load(open('$report'))['verdict']['ok'] else 1)"
+    # The build, the screws and the check say whether the piece is right, each report of this run
+    if ! python3 "$HERE/freecad_verdict.py" "$OUT" "$piece" "$started"
     then
-        echo "ECHEC du contrôle de $piece, voir $OUT/${piece}_controle.json"
         failed=1
     fi
 done

@@ -42,18 +42,31 @@ def axes(frame, su, sv):
 
 
 def overall_dimensions(doc, page, view, box, upright):
-    """The two overall dimensions of the sheet, each between the outermost vertices the projection has, never by index"""
-    pts = [(k, round(p.x, 4), round(p.y, 4)) for k, p in enumerate(view.getVisibleVertexes())]
+    """The 2 overall dimensions of the sheet, each between the outermost vertices the projection has, never by index.
+    Each made with the length it must read, the box of the sheet over the scale, and what could not be made"""
+    edges = [e.BoundBox for e in view.getVisibleEdges()]
+    if not edges:
+        return [], [f"{view.Label} : aucune arête visible, pas de cote hors tout"]
+    x0, x1 = min(b.XMin for b in edges), max(b.XMax for b in edges)
+    y0, y1 = min(b.YMin for b in edges), max(b.YMax for b in edges)
+    # TechDraw also gives the centre of each arc as a vertex : the one of a large arc lies off the part (#100-012)
+    pts = [(k, round(p.x, 4), round(p.y, 4)) for k, p in enumerate(view.getVisibleVertexes())
+           if x0 - 1e-3 <= p.x <= x1 + 1e-3 and y0 - 1e-3 <= p.y <= y1 + 1e-3]
     if (len(pts) < 2):
-        return []
+        return [], [f"{view.Label} : moins de 2 sommets sur son contour, pas de cote hors tout"]
     low = min(p[2] for p in pts)
     bottom = [p for p in pts if abs(p[2] - low) < 1e-3]
     left = min(p[1] for p in pts)
     side = [p for p in pts if abs(p[1] - left) < 1e-3]
     made = []
-    for kind, ends in (("DistanceX", (min(bottom, key=lambda p: p[1]), max(bottom, key=lambda p: p[1]))),
-                       ("DistanceY", (min(side, key=lambda p: p[2]), max(side, key=lambda p: p[2])))):
+    lost = []
+    for kind, ends, length in (("DistanceX", (min(bottom, key=lambda p: p[1]), max(bottom, key=lambda p: p[1])),
+                                box["w"] / view.Scale),
+                               ("DistanceY", (min(side, key=lambda p: p[2]), max(side, key=lambda p: p[2])),
+                                box["h"] / view.Scale)):
         if (ends[0][0] == ends[1][0]):
+            lost.append(f"{view.Label} : cote {'horizontale' if kind == 'DistanceX' else 'verticale'} hors tout "
+                        f"de {length:.1f} non posée, un seul sommet sur ce bord")
             continue
         dim = doc.addObject("TechDraw::DrawViewDimension", "Cote")
         dim.Type = kind
@@ -69,8 +82,14 @@ def overall_dimensions(doc, page, view, box, upright):
             dim.X, dim.Y = box["w"] / 2 + UPRIGHT_DIM_OFF, 0
         else:
             dim.X, dim.Y = -(box["w"] / 2 + DIM_OFF), 0
-        made.append(dim)
-    return made
+        made.append((dim, length))
+    return made, lost
+
+
+def wrong_dimensions(made):
+    """A dimension that reads otherwise than the part it measures, once the page is computed"""
+    return [f"{dim.Label} : {dim.getRawValue():.1f} au lieu de {length:.1f}" for dim, length in made
+            if abs(dim.getRawValue() - length) > 0.05]
 
 
 # Each view of an item, first angle, in the axes of the document (x along the wall, y towards it, z up) : the
@@ -362,6 +381,8 @@ def make_drawings(doc, model, bodies):
             texts[field] = spec["fields"].get(field, texts[field])
         template.EditableTexts = texts
         group.addObject(page)
+        dims = []
+        lost = []
         for v in spec["views"]:
             p = parts[v["part"]]
             view = doc.addObject("TechDraw::DrawViewPart", "Vue")
@@ -376,7 +397,9 @@ def make_drawings(doc, model, bodies):
             view.Y = A3_H - (box["y"] + box["h"] / 2)
             doc.recompute()
             # u up the sheet : a front drawn standing
-            overall_dimensions(doc, page, view, box, v["su"][1] != 0)
+            placed, missed = overall_dimensions(doc, page, view, box, v["su"][1] != 0)
+            dims += placed
+            lost += missed
         missing = []
         for v in spec.get("items", []):
             if (v["item"] in assemblies):
@@ -391,7 +414,7 @@ def make_drawings(doc, model, bodies):
             overlay(doc, page, spec["overlay"])
         doc.recompute()
         made.append({"page": page.Label, "faults": title_block_faults(template, spec["fields"])
-                     + [f"{item} : aucun assemblage à projeter" for item in missing],
+                     + [f"{item} : aucun assemblage à projeter" for item in missing] + lost + wrong_dimensions(dims),
                      "invalid": [o.Label for o in page.Views if "Invalid" in o.State or "Error" in o.State]})
     # Its own sections beside the sheets, unless a filter asks for other pages only
     if (only is None or only.search("Coupes FreeCAD")):
