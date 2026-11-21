@@ -271,11 +271,14 @@ def table(doc, page, column, k):
     sheet = doc.addObject("Spreadsheet::Sheet", "Usinages")
     sheet.Label = f"{page.Label}, usinages {k + 1}"
     lines = [column["head"]] + column["lines"]
+    last = chr(64 + len(column["widths"]))
     for r, cells in enumerate(lines):
-        # A line of one cell is a note running across the columns
         for c, text in enumerate(cells):
             # A leading quote keeps 37 and 9,5 as text, the way the sheet prints them
             sheet.set(f"{chr(65 + c)}{r + 1}", "'" + text)
+        # A line of one cell runs across the table, a groove : merged, no column border crosses its text
+        if (len(cells) == 1):
+            sheet.mergeCells(f"A{r + 1}:{last}{r + 1}")
         sheet.setRowHeight(str(r + 1), round(column["row"] / MM_PER_PX))
     # The row as FreeCAD draws it, a whole number of pixels : 3.70 for 3.6, 2 mm off over 40 lines
     row = round(column["row"] / MM_PER_PX) * MM_PER_PX

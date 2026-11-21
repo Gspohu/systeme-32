@@ -3,13 +3,18 @@
 import type { CutRow } from "../bom";
 import type { Part } from "../parts";
 import { bounds, tessellate } from "../geometry";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, wrap } from "./display";
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, textWidth, wrap, type Prim } from "./display";
 import { DIAM, round1 } from "../text";   
 
 
 export const ROW = 3.6;
 export const TABLE_COL_W = 198;
+// The narrowest each column is, Usage taking what the others leave of the table
 export const TABLE_COLS = [16, 16, 10, 11, 24, 111];
+export const TABLE_W = TABLE_COLS.reduce((a, b) => { return a + b; }, 0);
+export const TABLE_TEXT = 2.4;
+// What a cell keeps clear of its borders : TechDraw writes its text half a text size in from the left one
+export const CELL_PAD = 2;
 // u and v name the axes of the part, as its dimensions do : the words take their capital
 export const TABLE_HEAD = ["u", "v", DIAM, "Prof.", "Face", "Usage"];
 
@@ -19,6 +24,23 @@ export interface PlacedColumn
     x: number;
     top: number;
     lines: string[][];
+    widths: number[];
+}
+
+// The lines of a table and the widths of its columns, each wide enough for what it holds, then the notes printed
+// under it as text : a note is no machining and has no column to stand in
+export interface MachiningTable
+{
+    lines: string[][];
+    widths: number[];
+    notes: string[];
+}
+
+
+// Printed rows of a table and its notes, its header row included when it has any line
+export function printedRows(t: MachiningTable): number
+{
+    return t.lines.length + t.notes.length + (t.lines.length > 0 ? 1 : 0);
 }
 
 
@@ -49,20 +71,23 @@ export function outlineArcs(part: Part): { cu: number; cv: number; r: number; mi
 }
 
 
-// Every machining of the part as table lines, one line a printed row : holes, cutouts, arcs, pockets, grooves
-// then the notes. A long text carry on below its column, never cut
 export function tableLines(row: CutRow, part: Part): string[][]
 {
-    const usageW = TABLE_COLS[5]! - 1;
-    const lines: string[][] = [];
+    return machiningTable(row, part).lines;
+}
+
+
+// Every machining of the part as table lines, one line a printed row : holes, cutouts, arcs, pockets, grooves
+// then the notes. Each column is as wide as its longest value, Usage gets the rest and a long text carry on below
+// it, never cut
+export function machiningTable(row: CutRow, part: Part): MachiningTable
+{
+    const rows: string[][] = [];
+    const across: string[] = [];
+    const notes = row.notes.map((note) => { return `Note : ${note}`; });
     const add = (cells: string[]): void =>
     {
-        const [first, ...more] = wrap(cells[5]!, 2.4, usageW);
-        lines.push([...cells.slice(0, 5), first!]);
-        for (const m of more)
-        {
-            lines.push(["", "", "", "", "", m]);
-        }
+        rows.push(cells);
     };
     const holes = [...part.holes].sort((a, b) =>
     {
@@ -107,33 +132,61 @@ export function tableLines(row: CutRow, part: Part): string[][]
     for (const g of part.grooves)
     {
         const where = `le long de ${g.along} à ${round1(g.at)}, de ${round1(g.from)} à ${round1(g.to)}`;
-        lines.push(...wrap(`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`, 2.4,
-                           TABLE_COL_W - 5).map((t) =>
-        {
-            return [t];
-        }));
+        across.push(`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`);
     }
-    for (const note of row.notes)
+    const widths = TABLE_COLS.slice(0, 5).map((least, c) =>
     {
-        lines.push(...wrap(`Note : ${note}`, 2.4, TABLE_COL_W - 5).map((t) =>
+        return Math.max(least, ...[TABLE_HEAD[c]!, ...rows.map((cells) => { return cells[c]!; })].map((t) =>
+        {
+            return textWidth(t, TABLE_TEXT) + CELL_PAD;
+        }));
+    });
+    widths.push(TABLE_W - widths.reduce((a, b) => { return a + b; }, 0));
+    const lines: string[][] = [];
+    for (const cells of rows)
+    {
+        const [first, ...more] = wrap(cells[5]!, TABLE_TEXT, widths[5]! - CELL_PAD);
+        lines.push([...cells.slice(0, 5), first!]);
+        for (const m of more)
+        {
+            lines.push(["", "", "", "", "", m]);
+        }
+    }
+    for (const text of across)
+    {
+        lines.push(...wrap(text, TABLE_TEXT, TABLE_W - CELL_PAD).map((t) =>
         {
             return [t];
         }));
     }
-    return lines;
+    return { lines, widths, notes: notes.flatMap((t) => { return wrap(t, TABLE_TEXT, TABLE_W); }) };
 }
 
 
 // The table down as many columns as it's given from `top`, under its heading : what doesn't fit is returned
-export function drawTable(canvas: Canvas, lines: string[][], x0: number, top: number, tableCols: number,
-                          heading: string, placed: PlacedColumn[] = []): string[][]
+// The notes follow as text, never a column of their own. Returns what's left over and what was drawn outside the
+// TechDraw table : the heading and the notes
+export function drawTable(canvas: Canvas, table: MachiningTable, x0: number, top: number, tableCols: number,
+                          heading: string, placed: PlacedColumn[] = []): { rest: MachiningTable; marks: Prim[] }
 {
     const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 6;
-    canvas.text(x0, top - 5, heading, 2.8, "start", true);
-    let col = -1;
-    let ty = bottom + 1;
+    const marks: Prim[] = [];
+    const mark = (x: number, y: number, t: string, size: number, bold = false): void =>
+    {
+        canvas.text(x, y, t, size, "start", bold);
+        marks.push(canvas.prims.at(-1)!);
+    };
+    if (table.lines.length > 0)
+    {
+        mark(x0, top - 5, heading, 2.8, true);
+    }
+    const items = [...table.lines.map((cells) => { return { cells, note: false }; }),
+                   ...table.notes.map((t) => { return { cells: [t], note: true }; })];
+    let col = 0;
+    let ty = top;
+    let open = false;
     let n = 0;
-    for (const cells of lines)
+    for (const item of items)
     {
         if (ty > bottom)
         {
@@ -143,36 +196,41 @@ export function drawTable(canvas: Canvas, lines: string[][], x0: number, top: nu
                 break;
             }
             ty = top;
-            let cx = x0 + col * TABLE_COL_W;
-            placed.push({ x: cx, top, lines: [] });
-            let c = 0;
-            for (const title of TABLE_HEAD)
-            {
-                canvas.text(cx, ty, title, 2.4, "start", true);
-                cx += TABLE_COLS[c]!;
-                c++;
-            }
-            ty += 3.6;
+            open = false;
         }
         const x = x0 + col * TABLE_COL_W;
-        if (cells.length === 1)
+        if (item.note)
         {
-            canvas.text(x, ty, cells[0]!, 2.4);
+            // A little air between the last row of the table and the first note
+            ty += open && n === table.lines.length ? 1.5 : 0;
+            mark(x, ty, item.cells[0]!, TABLE_TEXT);
         }
         else
         {
-            let cx = x;
-            let c = 0;
-            for (const text of cells)
+            if (!open)
             {
-                canvas.text(cx, ty, text, 2.4);
-                cx += TABLE_COLS[c]!;
-                c++;
+                placed.push({ x, top: ty, lines: [], widths: table.widths });
+                let cx = x;
+                TABLE_HEAD.forEach((title, c) =>
+                {
+                    canvas.text(cx, ty, title, TABLE_TEXT, "start", true);
+                    cx += table.widths[c]!;
+                });
+                ty += ROW;
+                open = true;
             }
+            let cx = x;
+            item.cells.forEach((text, c) =>
+            {
+                canvas.text(cx, ty, text, TABLE_TEXT);
+                cx += table.widths[c]!;
+            });
+            placed.at(-1)!.lines.push(item.cells);
         }
-        placed.at(-1)!.lines.push(cells);
         ty += ROW;
         n++;
     }
-    return lines.slice(n);
+    const doneLines = Math.min(n, table.lines.length);
+    return { rest: { lines: table.lines.slice(doneLines), widths: table.widths,
+                     notes: table.notes.slice(n - doneLines) }, marks };
 }

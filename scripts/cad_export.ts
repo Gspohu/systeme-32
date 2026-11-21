@@ -5,7 +5,7 @@ import { computeOutputs } from "../src/lib/core/outputs";
 import { TEMPLATES } from "../src/lib/core/templates";
 import { cadModel } from "../src/lib/core/io/cad_model";
 import { drawingSet } from "../src/lib/core/io/workshop";
-import { ROW, TABLE_COLS, TABLE_HEAD } from "../src/lib/core/drawing/machining_table";
+import { ROW, TABLE_HEAD } from "../src/lib/core/drawing/machining_table";
 import { sheetTemplate } from "../src/lib/core/drawing/sheets";
 import { overlaySvg, WIDTH } from "../src/lib/core/drawing/svg";
 import { sectionRoom, sectionSpecs } from "../src/lib/core/drawing/sections";
@@ -28,7 +28,7 @@ for (const t of TEMPLATES)
                      overlay: page.marks === undefined ? "" : overlaySvg(page.marks, page.w, page.h),
                      tables: (page.tables ?? []).map((c) =>
                      {
-                         return { ...c, head: TABLE_HEAD, widths: TABLE_COLS, row: ROW };
+                         return { ...c, head: TABLE_HEAD, row: ROW };
                      }) };
         });
         // Each piece with its assembly sequence : the film of the gamme is made from it
