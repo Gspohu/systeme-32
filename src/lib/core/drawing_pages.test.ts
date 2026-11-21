@@ -5,7 +5,7 @@ import { drawingSet } from "./io/workshop";
 import { sheetTemplate } from "./drawing/sheets";
 import { pageToSvg } from "./drawing/svg";
 import { paperAxes } from "./drawing/workpiece";
-import { tableLines } from "./drawing/machining_table";
+import { machiningTable } from "./drawing/machining_table";
 import { A3 } from "./drawing/display";
 import { sectionPlanes, sectionSpecs } from "./drawing/sections";
 
@@ -158,8 +158,11 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                         && pg.views?.some((v) => { return v.part === row.parts[0]!.id; }) === true);
                 });
                 // A sheet holding 2 boards gives each its columns, the first board's first
-                const lines = own.flatMap((pg) => { return (pg.tables ?? []).flatMap((c) => { return c.lines; }); });
-                const wanted = tableLines(row, row.parts[0]!);
+                const columns = own.flatMap((pg) => { return pg.tables ?? []; });
+                const lines = columns.flatMap((c) => { return c.lines; });
+                // A board alone with its table in a side column has it narrower : its lines run on otherwise
+                const total = columns[0]?.widths.reduce((a, b) => { return a + b; }, 0);
+                const wanted = machiningTable(row, row.parts[0]!, total).lines;
                 expect(wanted.every((l) => { return lines.some((x) => { return x.join("|") === l.join("|"); }); }),
                        code).toBe(true);
             }

@@ -65,11 +65,55 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             {
                 return m.k === "text" ? [m.t] : [];
             }); });
+            // Whatever width the lines were broken at, a note reads whole once its lines are put back together
+            const text = printed.join(" ");
             for (const row of rows)
             {
-                for (const note of machiningTable(row, row.parts[0]!).notes)
+                for (const note of row.notes)
                 {
-                    expect(printed, `${row.code} : ${note}`).toContain(note);
+                    expect(text, `${row.code} : ${note}`).toContain(`Note : ${note}`);
+                }
+            }
+        });
+
+        it("mark every machining, a letter a setting of the machine then a number, and write it by its hole", () =>
+        {
+            const pages = drawingSet(p, o);
+            for (const row of rows)
+            {
+                const t = machiningTable(row, row.parts[0]!);
+                const placed = t.lines.filter((cells) => { return cells.length > 1 && cells[1] !== ""; });
+                const tags = placed.map((cells) => { return cells[0]!; });
+                expect(tags.every((tag) => { return /^[A-Z]+\d+$/.test(tag); }), row.code).toBe(true);
+                expect(new Set(tags).size, row.code).toBe(tags.length);
+                // One letter, one setting : Ø, depth, face and use alike
+                const byLetter = new Map<string, string>();
+                const numbers = new Map<string, number[]>();
+                for (const cells of placed)
+                {
+                    const letter = cells[0]!.replace(/\d+$/, "");
+                    const setting = cells.slice(3).join("|");
+                    expect(byLetter.get(letter) ?? setting, `${row.code} ${cells[0]}`).toBe(setting);
+                    byLetter.set(letter, setting);
+                    numbers.set(letter, [...numbers.get(letter) ?? [], Number(cells[0]!.slice(letter.length))]);
+                }
+                expect(new Set(byLetter.values()).size, row.code).toBe(byLetter.size);
+                for (const [letter, run] of numbers)
+                {
+                    expect(run, `${row.code} ${letter}`).toEqual(run.map((_, k) => { return k + 1; }));
+                }
+                // Each written on the sheet of its part, by its hole
+                const own = pages.filter((pg) =>
+                {
+                    return pg.views?.some((v) => { return v.part === row.parts[0]!.id; }) === true;
+                });
+                const written = own.flatMap((pg) => { return (pg.marks ?? []).flatMap((m) =>
+                {
+                    return m.k === "text" ? [m.t] : [];
+                }); });
+                for (const s of t.spots)
+                {
+                    expect(written, `${row.code} ${s.tag}`).toContain(s.tag);
                 }
             }
         });

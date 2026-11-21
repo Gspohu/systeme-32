@@ -9,14 +9,19 @@ import { DIAM, round1 } from "../text";
 
 export const ROW = 3.6;
 export const TABLE_COL_W = 198;
-// The narrowest each column is, Usage taking what the others leave of the table
-export const TABLE_COLS = [16, 16, 10, 11, 24, 111];
+// The narrowest each column is, Usage taking what the others leave of the table : 2 tables side by side still
+// keep clear of each other
+export const TABLE_COLS = [10, 16, 16, 10, 11, 24, 103];
 export const TABLE_W = TABLE_COLS.reduce((a, b) => { return a + b; }, 0);
 export const TABLE_TEXT = 2.4;
+// The lowest a table runs on a sheet, over the title block
+export const TABLE_BOTTOM = A3.h - MARGIN - TITLE_BLOCK_H - 6;
 // What a cell keeps clear of its borders : TechDraw writes its text half a text size in from the left one
 export const CELL_PAD = 2;
-// u and v name the axes of the part, as its dimensions do : the words take their capital
-export const TABLE_HEAD = ["u", "v", DIAM, "Prof.", "Face", "Usage"];
+// u and v name the axes of the part, as its dimensions do : the words take their capital. Rep. is the mark written
+// by each machining on the view, a letter for one setting of the machine then a number
+export const TABLE_HEAD = ["Rep.", "u", "v", DIAM, "Prof.", "Face", "Usage"];
+const USAGE = TABLE_HEAD.length - 1;
 
 // One column of the table as laid on the sheet, its top left corner and its lines : FreeCAD prints the same
 export interface PlacedColumn
@@ -34,6 +39,24 @@ export interface MachiningTable
     lines: string[][];
     widths: number[];
     notes: string[];
+    spots: MarkSpot[];
+}
+
+// Where the mark of a machining goes on the part, around a point of face A and clear of its radius
+export interface MarkSpot
+{
+    tag: string;
+    u: number;
+    v: number;
+    r: number;
+}
+
+
+// A, B ... Z, then AA : one letter for each setting of the machine
+function letterOf(k: number): string
+{
+    const head = k >= 26 ? letterOf(Math.floor(k / 26) - 1) : "";
+    return head + String.fromCharCode(65 + (k % 26));
 }
 
 
@@ -80,14 +103,15 @@ export function tableLines(row: CutRow, part: Part): string[][]
 // Every machining of the part as table lines, one line a printed row : holes, cutouts, arcs, pockets, grooves
 // then the notes. Each column is as wide as its longest value, Usage gets the rest and a long text carry on below
 // it, never cut
-export function machiningTable(row: CutRow, part: Part): MachiningTable
+export function machiningTable(row: CutRow, part: Part, total = TABLE_W): MachiningTable
 {
-    const rows: string[][] = [];
+    const rows: { cells: string[]; u: number; v: number; r: number }[] = [];
     const across: string[] = [];
     const notes = row.notes.map((note) => { return `Note : ${note}`; });
-    const add = (cells: string[]): void =>
+    // Its cells from u on, its point on face A and how far its mark keeps from it
+    const add = (cells: string[], at: [number, number], r = 0): void =>
     {
-        rows.push(cells);
+        rows.push({ cells, u: at[0], v: at[1], r });
     };
     const holes = [...part.holes].sort((a, b) =>
     {
@@ -101,7 +125,7 @@ export function machiningTable(row: CutRow, part: Part): MachiningTable
             face = h.w === undefined ? `chant ${h.face}` : `chant ${h.face} w${round1(h.w)}`;
         }
         add([round1(h.u), round1(h.v), h.diameter === 0 ? "-" : `${h.diameter}`, h.depth === 0 ? "-" : `${h.depth}`,
-             face, h.label]);
+             face, h.label], [h.u, h.v], h.face === "A" || h.face === "B" ? h.diameter / 2 : 0);
     }
     for (const c of part.cutouts)
     {
@@ -116,50 +140,70 @@ export function machiningTable(row: CutRow, part: Part): MachiningTable
         const b = bounds(tessellate(c));
         const [cu, cv] = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
         const size = round ? `${DIAM}${round1(b.maxX - b.minX)}` : `${round1(b.maxX - b.minX)}x${round1(b.maxY - b.minY)}`;
-        add([round1(cu), round1(cv), size, "trav.", "-", "Découpe traversante, cotes au centre"]);
+        add([round1(cu), round1(cv), size, "trav.", "-", "Découpe traversante, cotes au centre"], [cu, cv],
+            Math.max(b.maxX - b.minX, b.maxY - b.minY) / 2);
     }
     for (const a of outlineArcs(part))
     {
-        add([round1(a.cu), round1(a.cv), `R${round1(a.r)}`, "-", "-", "Arc du contour, cotes au centre"]);
+        add([round1(a.cu), round1(a.cv), `R${round1(a.r)}`, "-", "-", "Arc du contour, cotes au centre"],
+            [a.cu, a.cv]);
     }
     for (const k of part.pockets ?? [])
     {
         const u = k.edge === "u0" ? 0 : k.edge === "u1" ? part.length : k.at;
         const v = k.edge === "v0" ? 0 : k.edge === "v1" ? part.width : k.at;
         add([round1(u), round1(v), `${k.length}x${k.across}`, `${k.depth}`, `chant ${k.edge} w${round1(k.w)}`,
-             `${k.label}, centrée sur ces cotes`]);
+             `${k.label}, centrée sur ces cotes`], [u, v]);
     }
     for (const g of part.grooves)
     {
         const where = `le long de ${g.along} à ${round1(g.at)}, de ${round1(g.from)} à ${round1(g.to)}`;
         across.push(`Rainure ${g.width} x ${g.depth} face ${g.face}, ${where} : ${g.label}`);
     }
-    const widths = TABLE_COLS.slice(0, 5).map((least, c) =>
+    // One letter for each setting of the machine, in the order of the table, then a number within it
+    const settings: string[] = [];
+    const counts: number[] = [];
+    const spots: MarkSpot[] = [];
+    const tagged = rows.map((r) =>
     {
-        return Math.max(least, ...[TABLE_HEAD[c]!, ...rows.map((cells) => { return cells[c]!; })].map((t) =>
+        const setting = r.cells.slice(2).join("|");
+        let k = settings.indexOf(setting);
+        if (k < 0)
+        {
+            k = settings.push(setting) - 1;
+            counts.push(0);
+        }
+        counts[k]!++;
+        const tag = `${letterOf(k)}${counts[k]}`;
+        spots.push({ tag, u: r.u, v: r.v, r: r.r });
+        return [tag, ...r.cells];
+    });
+    const widths = TABLE_COLS.slice(0, USAGE).map((least, c) =>
+    {
+        return Math.max(least, ...[TABLE_HEAD[c]!, ...tagged.map((cells) => { return cells[c]!; })].map((t) =>
         {
             return textWidth(t, TABLE_TEXT) + CELL_PAD;
         }));
     });
-    widths.push(TABLE_W - widths.reduce((a, b) => { return a + b; }, 0));
+    widths.push(total - widths.reduce((a, b) => { return a + b; }, 0));
     const lines: string[][] = [];
-    for (const cells of rows)
+    for (const cells of tagged)
     {
-        const [first, ...more] = wrap(cells[5]!, TABLE_TEXT, widths[5]! - CELL_PAD);
-        lines.push([...cells.slice(0, 5), first!]);
+        const [first, ...more] = wrap(cells[USAGE]!, TABLE_TEXT, widths[USAGE]! - CELL_PAD);
+        lines.push([...cells.slice(0, USAGE), first!]);
         for (const m of more)
         {
-            lines.push(["", "", "", "", "", m]);
+            lines.push([...cells.slice(0, USAGE).map(() => { return ""; }), m]);
         }
     }
     for (const text of across)
     {
-        lines.push(...wrap(text, TABLE_TEXT, TABLE_W - CELL_PAD).map((t) =>
+        lines.push(...wrap(text, TABLE_TEXT, total - CELL_PAD).map((t) =>
         {
             return [t];
         }));
     }
-    return { lines, widths, notes: notes.flatMap((t) => { return wrap(t, TABLE_TEXT, TABLE_W); }) };
+    return { lines, widths, notes: notes.flatMap((t) => { return wrap(t, TABLE_TEXT, total); }), spots };
 }
 
 
@@ -167,9 +211,9 @@ export function machiningTable(row: CutRow, part: Part): MachiningTable
 // The notes follow as text, never a column of their own. Returns what's left over and what was drawn outside the
 // TechDraw table : the heading and the notes
 export function drawTable(canvas: Canvas, table: MachiningTable, x0: number, top: number, tableCols: number,
-                          heading: string, placed: PlacedColumn[] = []): { rest: MachiningTable; marks: Prim[] }
+                          heading: string, placed: PlacedColumn[] = [], bottom = TABLE_BOTTOM):
+    { rest: MachiningTable; marks: Prim[] }
 {
-    const bottom = A3.h - MARGIN - TITLE_BLOCK_H - 6;
     const marks: Prim[] = [];
     const mark = (x: number, y: number, t: string, size: number, bold = false): void =>
     {
@@ -231,6 +275,7 @@ export function drawTable(canvas: Canvas, table: MachiningTable, x0: number, top
         n++;
     }
     const doneLines = Math.min(n, table.lines.length);
+    // The marks are written by their holes on the part's own sheet, never on a sheet carrying the table on
     return { rest: { lines: table.lines.slice(doneLines), widths: table.widths,
-                     notes: table.notes.slice(n - doneLines) }, marks };
+                     notes: table.notes.slice(n - doneLines), spots: [] }, marks };
 }

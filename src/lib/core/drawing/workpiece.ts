@@ -5,11 +5,12 @@ import { edgeNotation } from "../bom";
 import type { Fitted, Part } from "../parts";
 import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
-import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, fit, pickScale, textWidth, type Prim, type Stroke }
+import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, fit, inkBox, pickScale, scaleText, textWidth, wrap,
+    type Prim, type Stroke }
     from "./display";
 import type { Draft, PartView } from "./draft";
-import { ROW, TABLE_COL_W, drawTable, machiningTable, outlineArcs, printedRows, type MachiningTable,
-    type PlacedColumn } from "./machining_table";
+import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_W, drawTable, machiningTable, outlineArcs, printedRows,
+    type MachiningTable, type PlacedColumn } from "./machining_table";
 import { round1 } from "../text";
 
 
@@ -28,6 +29,8 @@ const DEFAULT_ORIGIN = "u selon la longueur, v selon la largeur, origine au coin
 const BOX_W = 185;
 // The u and v of the origin, read at a glance : twice the 2 mm floor, a whole millimetre TechDraw keeps
 const AXIS_TEXT = 4;
+// A part sheet may enlarge a very small board to 2:1 : the views of a carcass never do
+const PART_SCALES = [0.5, ...SCALES];
 const BOX_H = 120;
 // A part alone on its sheet
 const WIDE_W = 390;
@@ -38,12 +41,27 @@ const WIDE_H = 150;
 const UPRIGHT = new Set(["door", "leaf", "panel"]);
 
 
+// A narrow board laid a quarter turn round, its long side along the sheet, when that alone reads at a larger
+// scale than any other way of drawing it : a 80 x 420 cleat at 1:2 rather than 1:5
+export function isTurned(part: Part): boolean
+{
+    if (UPRIGHT.has(part.role))
+    {
+        return false;
+    }
+    const [u, v] = [part.length, part.width];
+    const best = Math.min(pickScale(u, v, BOX_W - 20, BOX_H - 20), pickScale(u, v, WIDE_W - 20, WIDE_H - 20));
+    return pickScale(v, u, WIDE_W - 20, WIDE_H - 20) < best;
+}
+
+
 // Which way +u and +v run on the paper (y down the sheet) seen from face A for real : lying u to the right
-// and standing u up, v the way the frame makes it (geometry.ts, vDown)
-export function paperAxes(part: Part): { su: [number, number]; sv: [number, number] }
+// and standing u up, v the way the frame makes it (geometry.ts, vDown). Standing is a quarter turn of lying
+// never a mirror
+export function paperAxes(part: Part, turned = isTurned(part)): { su: [number, number]; sv: [number, number] }
 {
     const down = vDown(part.frame);
-    if (UPRIGHT.has(part.role))
+    if (UPRIGHT.has(part.role) || turned)
     {
         return { su: [0, -1], sv: [down ? 1 : -1, 0] };
     }
@@ -54,7 +72,7 @@ export function paperAxes(part: Part): { su: [number, number]; sv: [number, numb
 // Width and height the part takes on the sheet before scaling
 function spans(part: Part): [number, number]
 {
-    return UPRIGHT.has(part.role) ? [part.width, part.length] : [part.length, part.width];
+    return UPRIGHT.has(part.role) || isTurned(part) ? [part.width, part.length] : [part.length, part.width];
 }
 
 
@@ -66,8 +84,13 @@ function originText(part: Part): string
         return "u depuis le bas, v depuis la gauche vue de face, dessin vu de l'intérieur (face A) : v de "
             + (vDown(part.frame) ? "gauche à droite" : "droite à gauche");
     }
-    const text = ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN;
-    return vDown(part.frame) ? text.replace("coin bas gauche", "coin haut gauche") : text;
+    // The corner the origin lands on : both axes run into the board from it
+    const { su, sv } = paperAxes(part);
+    const across = su[0] !== 0 ? su[0] : sv[0];
+    const up = su[1] !== 0 ? su[1] : sv[1];
+    const corner = `coin ${up < 0 ? "bas" : "haut"} ${across > 0 ? "gauche" : "droit"}`;
+    const text = (ROLE_ORIGIN[part.role] ?? DEFAULT_ORIGIN).replace("coin bas gauche", corner);
+    return isTurned(part) ? `${text}, pièce tournée d'un quart de tour : u vers le haut` : text;
 }
 
 
@@ -81,17 +104,58 @@ function tableRoom(part: Part, boxH: number, boxW: number, cols: number): number
 }
 
 
+// A part alone on its sheet : its table under it, or its header and table in a column on the right and the drawing
+// the whole height on the left
+function drawAlone(canvas: Canvas, row: CutRow, fitted: Fitted[], beside: boolean): ReturnType<typeof drawWorkpiece>
+{
+    return beside ? drawWorkpiece(canvas, row, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 1, TABLE_BOTTOM,
+                                  { x: A3.w - MARGIN - 5 - SIDE_W, w: SIDE_W })
+        : drawWorkpiece(canvas, row, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 2);
+}
+
+
+// Whichever of the two draws it the larger, both tried for real : the column only when its table holds in it
+function aloneBeside(row: CutRow, fitted: Fitted[]): boolean
+{
+    const trial = drawAlone(new Canvas(), row, fitted, true);
+    return trial.scale < drawAlone(new Canvas(), row, fitted, false).scale && printedRows(trial.rest) === 0;
+}
+
+
 // A long or much drilled part reads better alone on its sheet than in half of it, and a table that wouldn't fit
-// half a sheet takes the whole of it
-function wantsWholeSheet(row: CutRow): boolean
+// half a sheet takes the whole of it. Half a sheet and the whole are both drawn to compare
+function wantsWholeSheet(row: CutRow, fitted: Fitted[]): boolean
 {
     const part = row.parts[0]!;
     if (part.holes.length > 36 || printedRows(machiningTable(row, part)) > tableRoom(part, BOX_H, BOX_W, 1))
     {
         return true;
     }
+    const alone = drawAlone(new Canvas(), row, fitted, aloneBeside(row, fitted)).scale;
+    const half = drawWorkpiece(new Canvas(), row, MARGIN + 5, MARGIN + 5, BOX_W, BOX_H, fitted, 1,
+                               A3.h - MARGIN - 4).scale;
+    return alone < half;
+}
+
+
+// The column a large board alone on its sheet may put its header and table in, the drawing on its left
+const SIDE_W = 125;
+
+// Half the height a sheet gives its parts : 2 long and narrow ones drawn across its whole width share it
+const HALF = (TABLE_BOTTOM - (MARGIN + 5)) / 2;
+
+
+// Whether a part, drawn across the whole width at the scale that width gives it, holds in half the height with
+// its table under it in 2 columns
+function fitsHalfSheet(row: CutRow): boolean
+{
+    const part = row.parts[0]!;
     const [sx, sy] = spans(part);
-    return pickScale(sx, sy, WIDE_W - 20, WIDE_H - 20) < pickScale(sx, sy, BOX_W - 20, BOX_H - 20);
+    const scale = pickScale(sx, sy, WIDE_W - 20, WIDE_H - 20);
+    const table = machiningTable(row, part);
+    // Lines and notes share the 2 columns, each column under its own head
+    const lines = Math.ceil((table.lines.length + table.notes.length) / 2) + 1;
+    return part.holes.length <= 36 && 24 + sy / scale + 18 + lines * ROW + 4 <= HALF;
 }
 
 
@@ -110,13 +174,31 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         const views: PartView[] = [];
         const tables: PlacedColumn[] = [];
         const marks: Prim[] = [];
-        const wide = wantsWholeSheet(rows[i]!);
+        const wide = wantsWholeSheet(rows[i]!, fitted);
+        // 2 parts that both want the whole width and each hold in half the height : one above the other
+        const stacked = wide && i + 1 < rows.length && wantsWholeSheet(rows[i + 1]!, fitted)
+            && fitsHalfSheet(rows[i]!) && fitsHalfSheet(rows[i + 1]!);
         let k = 0;
-        while (k < (wide ? 1 : 2) && i + k < rows.length && (wide || !wantsWholeSheet(rows[i + k]!)))
+        while (k < (wide && !stacked ? 1 : 2) && i + k < rows.length
+            && (wide || !wantsWholeSheet(rows[i + k]!, fitted)))
         {
             const row = rows[i + k]!;
-            const drawn = wide ? drawWorkpiece(canvas, row, MARGIN + 5, MARGIN + 5, WIDE_W, WIDE_H, fitted, 2)
-                : drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1);
+            const top = MARGIN + 5 + k * HALF;
+            let drawn;
+            if (stacked)
+            {
+                drawn = drawWorkpiece(canvas, row, MARGIN + 5, top, WIDE_W, HALF, fitted, 2, top + HALF - 4);
+            }
+            else if (wide)
+            {
+                drawn = drawAlone(canvas, row, fitted, aloneBeside(row, fitted));
+            }
+            else
+            {
+                // The left half is clear of the title block : its table may run down to the frame
+                drawn = drawWorkpiece(canvas, row, MARGIN + 5 + k * 200, MARGIN + 5, BOX_W, BOX_H, fitted, 1,
+                                      k === 0 ? A3.h - MARGIN - 4 : TABLE_BOTTOM);
+            }
             scales.add(drawn.scale);
             views.push(drawn.view);
             tables.push(...drawn.columns);
@@ -131,7 +213,7 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
         }
         const scale = [...scales].map((s) =>
         {
-            return `1:${s}`;
+            return scaleText(s);
         }).join(", ");
         sheets.push({ title: `Pièces ${codes.join(" et ")}`, supplement: [...stuff].join(" / "), scale, canvas, views,
                       tables, marks });
@@ -160,8 +242,9 @@ export function partSheets(bom: Bom, fitted: Fitted[]): Draft[]
 
 
 // A workpiece in a 195 x 255 box : header, drawing at a drafting scale, then the table of holes
+// With a side column the header and the table go there, the drawing taking the whole height on its left
 function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW: number, boxH: number,
-                       fitted: Fitted[], tableCols: number):
+                       fitted: Fitted[], tableCols: number, bottom = TABLE_BOTTOM, side?: { x: number; w: number }):
     { scale: number; rest: MachiningTable; view: PartView; columns: PlacedColumn[]; marks: Prim[] }
 {
     // What is drawn from here on goes on the TechDraw page as it is : all but the board, its dimensions and the table
@@ -174,9 +257,28 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     };
     const part = row.parts[0]!;
     const details = `${row.items.join(", ")} : quantité ${row.quantity}, ${row.decorLabel}, ép. ${row.thickness} mm`;
-    canvas.text(x0, y0 + 5, fit(`${row.code}  ${row.label}`, 3.5, boxW + 5), 3.5, "start", true);
-    canvas.text(x0, y0 + 10, fit(`${details}, chants ${edgeNotation(row.edges)}`, 2.5, boxW + 5), 2.5);
-    canvas.text(x0, y0 + 14, fit(`Origine : ${originText(part)}`, 2.5, boxW + 5), 2.5);
+    const heads: [string, number, boolean][] = [[`${row.code}  ${row.label}`, 3.5, true],
+        [`${details}, chants ${edgeNotation(row.edges)}`, 2.5, false], [`Origine : ${originText(part)}`, 2.5, false]];
+    // How far down the side column its header runs, the table starting under it
+    let headBottom = y0;
+    if (side === undefined)
+    {
+        heads.forEach(([t, size, bold], k) =>
+        {
+            canvas.text(x0, y0 + [5, 10, 14][k]!, fit(t, size, boxW + 5), size, "start", bold);
+        });
+    }
+    else
+    {
+        for (const [t, size, bold] of heads)
+        {
+            for (const line of wrap(t, size, side.w))
+            {
+                headBottom += size + 1.5;
+                canvas.text(side.x, headBottom, line, size, "start", bold);
+            }
+        }
+    }
     keep();
     const outline = tessellate(part.outline);
     let maxU = 0;
@@ -186,17 +288,26 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         maxU = Math.max(maxU, u);
         maxV = Math.max(maxV, v);
     }
-    const upright = UPRIGHT.has(part.role);
+    // A turned board stands like a front : its spans, its dimensions and its origin follow
+    const upright = UPRIGHT.has(part.role) || isTurned(part);
     const [spanX, spanY] = upright ? [maxV, maxU] : [maxU, maxV];
     // As large as the box is wide and the whole table still fits under the drawing, never smaller than the box allows
-    const tableRows = Math.ceil(printedRows(machiningTable(row, part)) / tableCols) + 1;
-    const tallest = A3.h - MARGIN - TITLE_BLOCK_H - 6 - (y0 + 24 + 18) - tableRows * ROW;
-    const scale = SCALES.find((s) =>
+    const own = machiningTable(row, part);
+    // Lines and notes share the columns, each column under its own head
+    const tableRows = Math.ceil((own.lines.length + own.notes.length) / tableCols) + 1;
+    const tallest = bottom - (y0 + 24 + 18) - tableRows * ROW;
+    // Beside its column the drawing runs from the top of the sheet to just over the title block, its dimensions
+    // under it included
+    const drawTop = side === undefined ? y0 + 24 : y0 + 4;
+    const scale = (side === undefined ? PART_SCALES.find((s) =>
     {
         return spanX / s <= boxW - 20 && spanY / s <= Math.max(boxH - 20, tallest);
-    }) ?? pickScale(spanX, spanY, boxW - 20, boxH - 20);
+    }) : PART_SCALES.find((s) =>
+    {
+        return x0 + 12 + spanX / s <= side.x - 8 && drawTop + spanY / s <= A3.h - MARGIN - TITLE_BLOCK_H - 9;
+    })) ?? pickScale(spanX, spanY, boxW - 20, boxH - 20);
     const ox = x0 + 12;
-    const oy = y0 + 24 + spanY / scale;
+    const oy = drawTop + spanY / scale;
     const down = vDown(part.frame);
     const { su, sv } = paperAxes(part);
     // The board's box set left on ox and down on oy, whichever corner its origin lands on
@@ -354,6 +465,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         }
     }
     // The origin, then which way u and v run from it
+    const originFrom = canvas.prims.length;
     const [zx, zy] = P(0, 0);
     canvas.circle(zx, zy, 1, "thin");
     // Its 0 outside the part, whichever corner it took
@@ -370,6 +482,38 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.text(zx + 6 * dx + 3.5 * awayX, zy + 6 * dy + 3.5 * awayY + AXIS_TEXT * 0.35, name, AXIS_TEXT,
                     "middle", true);
     }
+    // Each machining named by the mark of its line in the table, on the first corner around it that covers no
+    // hole, no other mark and nothing of the origin
+    const table = machiningTable(row, part, side === undefined ? TABLE_W : side.w);
+    const busy = part.holes.filter((h) => { return h.face === "A" || h.face === "B"; }).map((h) =>
+    {
+        const [hx, hy] = P(h.u, h.v);
+        const r = Math.max(0.5, h.diameter / 2 / scale);
+        return { x: hx - r, y: hy - r, w: 2 * r, h: 2 * r };
+    });
+    busy.push(...canvas.prims.slice(originFrom).flatMap((q) =>
+    {
+        const b = inkBox([q]);
+        return b === null ? [] : [b];
+    }));
+    const overlaps = (a: typeof busy[number], b: typeof busy[number]): boolean =>
+    {
+        return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    };
+    for (const s of table.spots)
+    {
+        const [sx, sy] = P(s.u, s.v);
+        const gap = s.r / scale + 0.6;
+        const w = textWidth(s.tag, SMALL_TEXT);
+        const corners = ([[1, -1], [1, 1], [-1, -1], [-1, 1]] as const).map(([dx, dy]) =>
+        {
+            return { x: dx > 0 ? sx + gap : sx - gap - w, y: dy < 0 ? sy - gap - SMALL_TEXT : sy + gap, w,
+                     h: SMALL_TEXT };
+        });
+        const spot = corners.find((c) => { return !busy.some((o) => { return overlaps(c, o); }); }) ?? corners[0]!;
+        canvas.text(spot.x, spot.y + SMALL_TEXT, s.tag, SMALL_TEXT, "start");
+        busy.push(spot);
+    }
     keep();
     const left = ox;
     const right = ox + spanX / scale;
@@ -382,9 +526,16 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     // The dimensions are TechDraw's own, measured on the solid
     from = canvas.prims.length;
     drawFootprints(canvas, part, fitted, P);
-    canvas.text(x0 + boxW, y0 + 18, `1:${scale}`, 2.5, "end");
+    if (side === undefined)
+    {
+        canvas.text(x0 + boxW, y0 + 18, scaleText(scale), 2.5, "end");
+    }
+    else
+    {
+        headBottom += 4;
+        canvas.text(side.x + side.w, headBottom, scaleText(scale), 2.5, "end");
+    }
     keep();
-    const table = machiningTable(row, part);
     const counts = [`Perçages (${part.holes.length})`];
     for (const [n, what] of [[part.cutouts.length, "découpes"], [outlineArcs(part).length, "arcs"],
                              [(part.pockets ?? []).length, "entailles"], [part.grooves.length, "rainures"]] as const)
@@ -395,7 +546,9 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         }
     }
     const columns: PlacedColumn[] = [];
-    const drawnTable = drawTable(canvas, table, x0, oy + 18, tableCols, counts.join(", "), columns);
+    const drawnTable = side === undefined
+        ? drawTable(canvas, table, x0, oy + 18, tableCols, counts.join(", "), columns, bottom)
+        : drawTable(canvas, table, side.x, headBottom + 12, 1, counts.join(", "), columns, bottom);
     const rest = drawnTable.rest;
     // Its heading and its notes, the cells left to the TechDraw table
     marks.push(...drawnTable.marks);

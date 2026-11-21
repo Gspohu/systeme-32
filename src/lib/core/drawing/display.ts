@@ -388,6 +388,13 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
 export const SCALES = [1, 2, 5, 10, 20, 25, 50, 100];
 
 
+// A scale as a drawing writes it, s being how many times smaller the paper is : 1:5, and 2:1 for an enlargement
+export function scaleText(s: number): string
+{
+    return s < 1 ? `${Math.round(1 / s)}:1` : `1:${s}`;
+}
+
+
 export function pickScale(realW: number, realH: number, boxW: number, boxH: number): number
 {
     for (const s of SCALES)
