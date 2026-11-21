@@ -47,9 +47,26 @@ const AVG_CHAR = 0.52;
 export const OVERLAY_EM = 0.66;
 
 
+// Advance of each capital and figure in DejaVu Sans, in em, read from DejaVuSans.ttf : I is 0.295, W 0.989, an
+// average let G4 and H1 run into each other. C11 at 2 mm comes to 3.94 mm, 3.93 measured on the PDF
+const DEJAVU: Record<string, number> = {
+    A: 0.684, B: 0.686, C: 0.698, D: 0.77, E: 0.632, F: 0.575, G: 0.775, H: 0.752, I: 0.295, J: 0.295, K: 0.656,
+    L: 0.557, M: 0.863, N: 0.748, O: 0.787, P: 0.603, Q: 0.787, R: 0.695, S: 0.635, T: 0.611, U: 0.732, V: 0.684,
+    W: 0.989, X: 0.685, Y: 0.611, Z: 0.685, 0: 0.636, 1: 0.636, 2: 0.636, 3: 0.636, 4: 0.636, 5: 0.636, 6: 0.636,
+    7: 0.636, 8: 0.636, 9: 0.636,
+};
+
+
 export function textWidth(t: string, size: number, em = AVG_CHAR): number
 {
     return t.length * size * em;
+}
+
+
+// How wide the overlay prints a text, letter by letter where the font is known
+export function overlayWidth(t: string, size: number): number
+{
+    return [...t].reduce((w, c) => { return w + (DEJAVU[c] ?? OVERLAY_EM); }, 0) * size;
 }
 
 
@@ -100,7 +117,7 @@ export function inkBox(prims: Prim[]): { x: number; y: number; w: number; h: num
             const b = boxOf([q]);
             return b === null ? [] : [b];
         }
-        const w = textWidth(q.t, q.size, OVERLAY_EM);
+        const w = overlayWidth(q.t, q.size);
         const lead = q.anchor === "start" ? 0 : q.anchor === "middle" ? w / 2 : w;
         // Turned a quarter anticlockwise its glyphs stand left of the point, its lenght running up the page
         return q.rot === 90 ? [{ x: q.x - q.size, y: q.y - w + lead, w: q.size * 1.25, h: w }]

@@ -3,7 +3,8 @@ import { computeOutputs } from "./outputs";
 import { dresser, tvWall } from "./templates";
 import { drawingSet } from "./io/workshop";
 import { OVERLAY_EM, SMALL_TEXT, inkBox, inkedBoxes, scaleText, textWidth, type Prim } from "./drawing/display";
-import { CELL_PAD, ROW, TABLE_COLS, TABLE_HEAD, TABLE_TEXT, TABLE_W, machiningTable } from "./drawing/machining_table";
+import { CELL_PAD, ROW, TABLE_COLS, TABLE_HEAD, TABLE_TEXT, TABLE_W, machiningTable, outlineArcs } from
+    "./drawing/machining_table";
 import type { PartView } from "./drawing/draft";
 import type { Part } from "./parts";
 import { tessellate } from "./geometry";
@@ -54,6 +55,82 @@ function faceOf(h: Part["holes"][number]): string
         return h.face;
     }
     return h.w === undefined ? `chant ${h.face}` : `chant ${h.face} w${round1(h.w)}`;
+}
+
+
+// The advance of each capital and figure in DejaVu Sans, read again from DejaVuSans.ttf for this test : a mark
+// measured with the widths the code places it with would agree with any mistake in them
+const DEJAVU_EM: Record<string, number> = {
+    A: 0.684, B: 0.686, C: 0.698, D: 0.77, E: 0.632, F: 0.575, G: 0.775, H: 0.752, I: 0.295, J: 0.295, K: 0.656,
+    L: 0.557, M: 0.863, N: 0.748, O: 0.787, P: 0.603, Q: 0.787, R: 0.695, S: 0.635, T: 0.611, U: 0.732, V: 0.684,
+    W: 0.989, X: 0.685, Y: 0.611, Z: 0.685, 0: 0.636, 1: 0.636, 2: 0.636, 3: 0.636, 4: 0.636, 5: 0.636, 6: 0.636,
+    7: 0.636, 8: 0.636, 9: 0.636,
+};
+
+type Text = Extract<Prim, { k: "text" }>;
+
+
+// A text as the PDF prints it, its box from its own letters, its descenders under the baseline
+function printed(m: Text): Box
+{
+    const w = [...m.t].reduce((s, c) => { return s + (DEJAVU_EM[c] ?? 0.66); }, 0) * m.size;
+    const lead = m.anchor === "start" ? 0 : m.anchor === "middle" ? w / 2 : w;
+    // Turned a quarter anticlockwise, its letters stand left of the point and run up the page
+    return m.rot === 90 ? { x: m.x - m.size, y: m.y - w + lead, w: m.size * 1.25, h: w }
+        : { x: m.x - lead, y: m.y - m.size, w, h: m.size * 1.25 };
+}
+
+
+// Where each line of a table says its machining is, read off its own cells and not off the code that places the
+// marks : an arc by the middle of its curve, a hole of a face with its radius
+function tableSpots(row: Parameters<typeof machiningTable>[0], part: Part, P: (u: number, v: number) => [number,
+    number]):
+    { tag: string; at: [number, number]; r: number }[]
+{
+    const arcs = outlineArcs(part);
+    const num = (t: string): number => { return Number(t.replace(",", ".")); };
+    return machiningTable(row, part).lines.filter((c) => { return c.length > 1 && c[1] !== ""; }).map((c) =>
+    {
+        const [u, v] = [num(c[1]!), num(c[2]!)];
+        if (c[3]!.startsWith("R"))
+        {
+            const a = arcs.find((x) => { return Math.abs(x.cu - u) < 0.06 && Math.abs(x.cv - v) < 0.06; })!;
+            return { tag: c[0]!, at: P(a.cu + a.r * Math.cos(a.mid), a.cv + a.r * Math.sin(a.mid)), r: 0 };
+        }
+        const onFace = c[5] === "A" || c[5] === "B";
+        return { tag: c[0]!, at: P(u, v), r: onFace && !Number.isNaN(num(c[3]!)) ? num(c[3]!) / 2 : 0 };
+    });
+}
+
+
+// The cut edges of a part on the sheet, its outline and its cutouts, as segments
+function outlineOf(part: Part, P: (u: number, v: number) => [number, number]): [number, number, number, number][]
+{
+    return [part.outline, ...part.cutouts].flatMap((o) =>
+    {
+        const pts = tessellate(o).map(([u, v]) => { return P(u, v); });
+        return pts.map((p, i) =>
+        {
+            const q = pts[(i + 1) % pts.length]!;
+            return [p[0], p[1], q[0], q[1]] as [number, number, number, number];
+        });
+    });
+}
+
+
+// Whether a segment runs through a box, sampled every tenth of a millimetre
+function crosses(s: [number, number, number, number], b: Box): boolean
+{
+    const steps = Math.max(1, Math.ceil(Math.hypot(s[2] - s[0], s[3] - s[1]) / 0.1));
+    for (let i = 0; i <= steps; i++)
+    {
+        const [x, y] = [s[0] + (s[2] - s[0]) * i / steps, s[1] + (s[3] - s[1]) * i / steps];
+        if (x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -196,64 +273,113 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             }
         });
 
+        // Each machining of a sheet where its line of the table puts it, with the mark it's given
+        const sheetSpots = (pg: (typeof partPages)[number]) =>
+        {
+            return pg.views!.flatMap((v) =>
+            {
+                const row = byPart.get(v.part)!;
+                const P = paperOf(row.parts[0]!, v);
+                return tableSpots(row, row.parts[0]!, P).map((s) =>
+                {
+                    // The table rounds to a tenth : a point read off it is that close to the one the code drew from
+                    return { ...s, code: row.code, reach: s.r / v.scale, slack: 0.051 / v.scale };
+                });
+            });
+        };
+        const dist = (a: [number, number], b: [number, number]): number =>
+        {
+            return Math.hypot(a[0] - b[0], a[1] - b[1]);
+        };
+
         it("write each mark at 2 mm by its own machining, nearer to it than to any other or tied to it", () =>
         {
             for (const pg of partPages)
             {
-                const texts = (pg.marks ?? []).filter((m): m is Extract<Prim, { k: "text" }> =>
-                {
-                    return m.k === "text";
-                });
+                const texts = (pg.marks ?? []).filter((m): m is Text => { return m.k === "text"; });
+                // A leader is a thin line : a hole in an edge is drawn in a centre line from the same point
                 const leaders = (pg.marks ?? []).filter((m): m is Extract<Prim, { k: "line" }> =>
                 {
-                    return m.k === "line";
+                    return m.k === "line" && m.s === "thin";
                 });
-                const spots = pg.views!.flatMap((v) =>
-                {
-                    const row = byPart.get(v.part)!;
-                    const P = paperOf(row.parts[0]!, v);
-                    return machiningTable(row, row.parts[0]!).spots.map((s) =>
-                    {
-                        return { code: row.code, tag: s.tag, at: P(s.u, s.v) };
-                    });
-                });
+                const spots = sheetSpots(pg);
                 for (const s of spots)
                 {
-                    const centre = (m: Prim): [number, number] =>
+                    const centre = (m: Text): [number, number] =>
                     {
-                        const b = inkBox([m])!;
+                        const b = printed(m);
                         return [b.x + b.w / 2, b.y + b.h / 2];
                     };
-                    const dist = (a: [number, number], b: [number, number]): number =>
-                    {
-                        return Math.hypot(a[0] - b[0], a[1] - b[1]);
-                    };
                     // Two parts on a sheet both have an A1 : the one by this spot
-                    const own = texts.filter((m) => { return m.t === s.tag; }).reduce<typeof texts[number] | undefined>(
-                        (best, m) =>
-                        {
-                            return best === undefined || dist(centre(m), s.at) < dist(centre(best), s.at) ? m : best;
-                        }, undefined);
+                    const own = texts.filter((m) => { return m.t === s.tag; }).reduce<Text | undefined>((best, m) =>
+                    {
+                        return best === undefined || dist(centre(m), s.at) < dist(centre(best), s.at) ? m : best;
+                    }, undefined);
                     expect(own, `${pg.title} : ${s.code} ${s.tag} absent`).toBeDefined();
                     expect(own!.size, `${s.code} ${s.tag}`).toBe(SMALL_TEXT);
                     const c = centre(own!);
-                    const nearest = spots.every((x) => { return x === s || dist(c, x.at) > dist(c, s.at); });
-                    const tied = leaders.some((l) =>
+                    // A pocket centred on its hole shares its point : no position tells the 2 apart
+                    const nearest = spots.every((x) =>
                     {
-                        return Math.hypot(l.x1 - s.at[0], l.y1 - s.at[1]) < 1e-6;
+                        return dist(x.at, s.at) < 1e-6 || dist(c, x.at) > dist(c, s.at);
                     });
-                    expect(nearest || tied, `${pg.title} : ${s.code} ${s.tag} plus près d'un autre usinage`).toBe(true);
+                    const tied = leaders.some((l) => { return Math.hypot(l.x1 - s.at[0], l.y1 - s.at[1]) < s.slack; });
+                    const other = spots.filter((x) => { return dist(x.at, s.at) > 1e-6; }).reduce((a, b) =>
+                    {
+                        return dist(c, a.at) < dist(c, b.at) ? a : b;
+                    });
+                    expect(nearest || tied, `${pg.title} : ${s.code} ${s.tag} à ${dist(c, s.at).toFixed(2)} mm de son `
+                        + `usinage, ${other.tag} à ${dist(c, other.at).toFixed(2)}`).toBe(true);
                     expect(dist(c, s.at), `${s.code} ${s.tag}`).toBeLessThan(35);
                 }
             }
         });
 
-        it("lay no mark over another text or line of the overlay, measured in the font TechDraw draws it in", () =>
+        it("run no leader through another machining, which it would seem to name", () =>
+        {
+            const through: string[] = [];
+            for (const pg of partPages)
+            {
+                const spots = sheetSpots(pg);
+                for (const l of (pg.marks ?? []).filter((m): m is Extract<Prim, { k: "line" }> =>
+                {
+                    return m.k === "line" && m.s === "thin";
+                }))
+                {
+                    const from = spots.find((s) => { return Math.hypot(l.x1 - s.at[0], l.y1 - s.at[1]) < s.slack; });
+                    if (from === undefined)
+                    {
+                        continue;
+                    }
+                    const [lx, ly] = [l.x2 - l.x1, l.y2 - l.y1];
+                    const length2 = lx * lx + ly * ly;
+                    for (const x of spots)
+                    {
+                        const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, ((x.at[0] - l.x1) * lx + (x.at[1] -
+                            l.y1) * ly)
+                            / length2));
+                        const off = Math.hypot(l.x1 + t * lx - x.at[0], l.y1 + t * ly - x.at[1]);
+                        if (dist(x.at, from.at) > 1e-6 && off < Math.max(0.5, x.reach))
+                        {
+                            through.push(`${pg.title} : le trait de ${from.tag} passe sur ${x.tag}`);
+                        }
+                    }
+                }
+            }
+            expect(through).toEqual([]);
+        });
+
+        it("lay no mark over a text, a line or the cut edge of the part, measured in the font TechDraw prints", () =>
         {
             const over: string[] = [];
             for (const pg of partPages)
             {
                 const prims = pg.marks ?? [];
+                const edges = pg.views!.flatMap((v) =>
+                {
+                    const part = byPart.get(v.part)!.parts[0]!;
+                    return outlineOf(part, paperOf(part, v));
+                });
                 for (const m of prims)
                 {
                     // A mark, not the R50 of a radius written at 2.5 mm
@@ -261,22 +387,25 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                     {
                         continue;
                     }
-                    const b = inkBox([m])!;
+                    const b = printed(m);
+                    for (const e of edges.filter((s) => { return crosses(s, b); }))
+                    {
+                        over.push(`${pg.title} : ${m.t} barré par le contour en ${e[0].toFixed(1)} ${e[1].toFixed(1)}`);
+                    }
                     for (const q of prims)
                     {
                         // Its own leader ends on its edge
                         if (q === m || (q.k === "line" && Math.abs(q.x2 - Math.min(Math.max(q.x1, b.x), b.x +
-                            b.w)) < 1e-6
-                            && Math.abs(q.y2 - Math.min(Math.max(q.y1, b.y), b.y + b.h)) < 1e-6))
+                            b.w)) < 0.05
+                            && Math.abs(q.y2 - Math.min(Math.max(q.y1, b.y), b.y + b.h)) < 0.05))
                         {
                             continue;
                         }
-                        // An outline inks its sides, not its inside
-                        if (inkedBoxes(q).some((ob) => { return overlaps(b, ob); }))
+                        // A text by its own letters, an outline by its sides, not its inside
+                        const inked = q.k === "text" ? [printed(q)] : inkedBoxes(q);
+                        if (inked.some((ob) => { return overlaps(b, ob); }))
                         {
-                            const ends = q.k === "line" ? [q.x1, q.y1, q.x2, q.y2].map((n) => { return n.toFixed(1); })
-                                : [];
-                            const what = q.k === "text" ? q.t : q.k === "line" ? `trait ${ends.join(" ")} ${q.s}` : q.k;
+                            const what = q.k === "text" ? q.t : q.k;
                             over.push(`${pg.title} : ${m.t} en ${b.x.toFixed(1)} ${b.y.toFixed(1)} sur ${what}`);
                         }
                     }
@@ -285,10 +414,36 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             expect(over).toEqual([]);
         });
 
-        it("say the scale each part is drawn at, its drawing as large as that scale makes it", () =>
+        it("draw a hole of face A in full line and one of face B dashed, where the part has it", () =>
         {
             for (const pg of partPages)
             {
+                const circles = (pg.marks ?? []).filter((m): m is Extract<Prim, { k: "circle" }> =>
+                {
+                    return m.k === "circle";
+                });
+                for (const v of pg.views!)
+                {
+                    const part = byPart.get(v.part)!.parts[0]!;
+                    const P = paperOf(part, v);
+                    for (const h of part.holes.filter((x) => { return (x.face === "A" || x.face === "B") &&
+                                                              x.diameter > 0; }))
+                    {
+                        const [x, y] = P(h.u, h.v);
+                        const drawn = circles.filter((c) => { return Math.hypot(c.x - x, c.y - y) < 1e-6; });
+                        expect(drawn.length, `${pg.title} : trou en ${h.u} ${h.v}`).toBeGreaterThan(0);
+                        expect(drawn.every((c) => { return c.s === (h.face === "A" ? "normal" : "dashed"); }),
+                               `${pg.title} : trou face ${h.face} en ${h.u} ${h.v}`).toBe(true);
+                    }
+                }
+            }
+        });
+
+        it("say the scale each part is drawn at, by it and in the title block, its drawing that large", () =>
+        {
+            for (const pg of partPages)
+            {
+                const written = (pg.marks ?? []).flatMap((m) => { return m.k === "text" ? [m.t] : []; });
                 for (const v of pg.views!)
                 {
                     const part = byPart.get(v.part)!.parts[0]!;
@@ -303,6 +458,7 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                     expect(drawn[0]!, pg.title).toBeCloseTo(real[0]!, 6);
                     expect(drawn[1]!, pg.title).toBeCloseTo(real[1]!, 6);
                     expect(pg.fields?.scale, pg.title).toContain(scaleText(v.scale));
+                    expect(written, pg.title).toContain(scaleText(v.scale));
                 }
             }
         });

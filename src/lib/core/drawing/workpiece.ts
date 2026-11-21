@@ -6,7 +6,7 @@ import type { Fitted, Part } from "../parts";
 import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
 import { A3, Canvas, MARGIN, OVERLAY_EM, SCALES, SMALL_TEXT, TITLE_BLOCK_H, TITLE_BLOCK_W, fit, inkBox, inkedBoxes,
-    pickScale, scaleText, textWidth, wrap, type Prim, type Stroke } from "./display";
+    overlayWidth, pickScale, scaleText, textWidth, wrap, type Prim, type Stroke } from "./display";
 import type { Draft, PartView } from "./draft";
 import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_W, drawTable, machiningTable, outlineArcs, printedRows,
     type MachiningTable, type MarkSpot, type PlacedColumn } from "./machining_table";
@@ -350,8 +350,6 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), s);
     };
 
-    // The board's own outline, which every mark lies on or by : left out of what a mark must keep clear of
-    const shapeFrom = canvas.prims.length;
     if (part.curve !== null && (part.role === "skin" || part.role === "batten"))
     {
         // Laid flat here, bent in the solid : no projection draw it this way
@@ -371,7 +369,6 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         // The outline is the projection's own
         from = canvas.prims.length;
     }
-    const shapeTo = canvas.prims.length;
     for (const e of part.edges)
     {
         const vAt = e === "v1" ? part.width : 0;
@@ -525,10 +522,8 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     from = canvas.prims.length;
     drawFootprints(canvas, part, fitted, P);
     const table = machiningTable(row, part, side === undefined ? TABLE_W : side.w);
-    placeMarks(canvas, table.spots, P, scale, canvas.prims.filter((_, i) =>
-    {
-        return i >= partFrom && !(i >= shapeFrom && i < shapeTo);
-    }), row.code);
+    // Everything of the part, its own outline included : a mark on a cut edge would be struck through by it
+    placeMarks(canvas, table.spots, P, scale, canvas.prims.slice(partFrom), P(maxU / 2, maxV / 2), row.code);
     if (side === undefined)
     {
         canvas.text(x0 + boxW, y0 + 18, scaleText(scale), 2.5, "end");
@@ -570,7 +565,7 @@ const AROUND = [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1
 
 // Each machining named by its mark : clear of all drawn, on the sheet, nearest its own hole, else led to it
 function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number) => [number, number],
-                    scale: number, drawn: Prim[], code: string): void
+                    scale: number, drawn: Prim[], middle: [number, number], code: string): void
 {
     // Everything already on the part, and its texts alone : a mark keeps clear of the first, a leader of the second
     const boxes = (prims: Prim[]): Box[] =>
@@ -595,25 +590,49 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
     spots.forEach((s, k) =>
     {
         const [sx, sy] = points[k]!;
-        const w = textWidth(s.tag, h, OVERLAY_EM);
+        const w = overlayWidth(s.tag, h);
+        // A pocket centred on its hole shares its point : no position tells them apart, both are left to the table
+        const elsewhere = points.map(([px, py], j) =>
+        {
+            return j !== k && Math.hypot(px - sx, py - sy) > 1e-6;
+        });
         const nearestIsOwn = (b: Box): boolean =>
         {
             const [cx, cy] = [b.x + b.w / 2, b.y + b.h / 2];
             const own = Math.hypot(cx - sx, cy - sy);
-            return points.every(([px, py], j) => { return j === k || Math.hypot(cx - px, cy - py) > own; });
+            return points.every(([px, py], j) => { return !elsewhere[j] || Math.hypot(cx - px, cy - py) > own; });
         };
         // Off the first ring a leader ties the mark to its hole : the nearest machining no longer says which, and
-        // the leader may cross a line but strikes no text, save one written over the hole it starts from
+        // the leader may cross a line but strikes no text, save one written over the hole it starts from, and never
+        // runs through another machining, which it would seem to name
         const leaderClear = (b: Box): boolean =>
         {
             const ex = Math.min(Math.max(sx, b.x), b.x + b.w);
             const ey = Math.min(Math.max(sy, b.y), b.y + b.h);
             const line = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
-            return words.every((o) =>
+            const struck = words.some((o) =>
             {
                 const overHole = sx >= o.x && sx <= o.x + o.w && sy >= o.y && sy <= o.y + o.h;
-                return overHole || !overlaps(line, o);
+                return !overHole && overlaps(line, o);
             });
+            const [lx, ly] = [ex - sx, ey - sy];
+            const length2 = lx * lx + ly * ly;
+            const through = points.some(([px, py], j) =>
+            {
+                const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - sx) * lx + (py - sy) * ly) / length2));
+                const reach = Math.max(0.8, spots[j]!.r / scale + 0.4);
+                return elsewhere[j] && Math.hypot(sx + t * lx - px, sy + t * ly - py) < reach;
+            });
+            return !struck && !through;
+        };
+        // A point on the outline, a hole in an edge or the middle of an arc, looks for room inside the board first
+        const inwardFirst = (tries: Box[]): Box[] =>
+        {
+            const away = (b: Box): number =>
+            {
+                return Math.hypot(b.x + b.w / 2 - middle[0], b.y + b.h / 2 - middle[1]);
+            };
+            return s.r === 0 ? [...tries].sort((a, b) => { return away(a) - away(b); }) : tries;
         };
         let chosen: Box | null = null;
         let ring = 0;
@@ -627,7 +646,7 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
                 const top = dy < 0 ? sy - gap - 1.25 * h : dy > 0 ? sy + gap : sy - 0.625 * h;
                 return inkBox([{ k: "text", x, y: top + h, t: s.tag, size: h, anchor: "start" }])!;
             });
-            chosen = tries.find((b) =>
+            chosen = inwardFirst(tries).find((b) =>
             {
                 return onSheet(b) && !busy.some((o) => { return overlaps(b, o); })
                     && (ring > 0 ? leaderClear(b) : nearestIsOwn(b));
