@@ -4,9 +4,10 @@ import type { Analysis } from "../analysis";
 import type { Bom, PbsNode } from "../bom";
 import { edgeNotation, sawSize, shapeWord } from "../bom";
 import type { NestResult } from "../nesting";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, textWidth, wrap } from "./display";
+import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, fit, textWidth, wrap } from "./display";
 import { heading, pageSuffix, paginateTable, table, type Draft } from "./draft";
 import { FAMILY_LABELS } from "../../data/hardware";
+import { SCREW_ADVICE } from "../../data/screws";
 import { round1 } from "../text";
 
 
@@ -70,6 +71,11 @@ export function hardwareSheets(bom: Bom): Draft[]
     {
         const canvas = new Canvas();
         heading(canvas, `Quincaillerie${pageSuffix(i, pages.length)}`);
+        // Once, over the first page : the screws listed are what the costing counts, not an order
+        if (i === 0)
+        {
+            canvas.text(MARGIN + 5, TABLE_TOP - 2, `Vis : ${SCREW_ADVICE}.`, 2.3);
+        }
         const y = table(canvas, MARGIN + 5, TABLE_TOP, cols, header, chunk, 2.1, 4.2);
         // The edge metres close the last hardware page, or take one of their own when it's full
         if (i === pages.length - 1)
@@ -123,16 +129,17 @@ export function nestingSheets(nesting: NestResult): Draft[]
                 canvas.rect(x0 + pl.x / scale, y0 + pl.y / scale, pl.w / scale, pl.h / scale, "thin",
                             pl.shaped ? "#e6e6e6" : "#f4f4f4");
                 let label = `${pl.code.split(",")[0]}${pl.rotated ? " (piv.)" : ""}`;
-                if (pl.w / scale <= textWidth(label, 1.8) || pl.h / scale <= 2.5)
+                if (pl.w / scale <= textWidth(label, SMALL_TEXT) || pl.h / scale <= 2.5)
                 {
                     legend.push(`${legend.length + 1} = ${label}`);
                     label = `${legend.length}`;
                 }
-                canvas.text(x0 + (pl.x + pl.w / 2) / scale, y0 + (pl.y + pl.h / 2) / scale + 0.7, label, 1.8, "middle");
+                canvas.text(x0 + (pl.x + pl.w / 2) / scale, y0 + (pl.y + pl.h / 2) / scale + 0.7, label, SMALL_TEXT,
+                            "middle");
             }
-            (legend.length > 0 ? wrap(`Repères : ${legend.join(", ")}`, 1.8, 190) : []).forEach((line, j) =>
+            (legend.length > 0 ? wrap(`Repères : ${legend.join(", ")}`, SMALL_TEXT, 190) : []).forEach((line, j) =>
             {
-                canvas.text(x0, y0 + sheet.width / scale + 4 + j * 2.6, line, 1.8);
+                canvas.text(x0, y0 + sheet.width / scale + 4 + j * 2.8, line, SMALL_TEXT);
             });
             k++;
         }

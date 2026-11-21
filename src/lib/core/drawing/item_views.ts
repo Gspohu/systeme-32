@@ -9,7 +9,7 @@ import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";
 import { endPost, endToe, floorOutline, openEndLevels, plinthFootGap } from "../curves";
 import { tessellate } from "../geometry";
-import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H, boxOf } from "./display";
+import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, boxOf, clearOfFrame } from "./display";
 import { heading, paginateTable, table, type Draft, type ItemView } from "./draft";
 import { drawFront } from "./views";
 import { round1 } from "../text";
@@ -26,25 +26,11 @@ const VIEW_GAP = 28;
 
 export function itemViews(k: Carcass, a: Analysis): Draft
 {
-    const canvas = new Canvas();
-    heading(canvas, `${k.name} : vues`);
-    // What a TechDraw view projects of the solids is left out of the marks laid over it
-    const drawn: [number, number][] = [];
-    const geometry = (draw: () => void): [number, number] =>
-    {
-        const start = canvas.prims.length;
-        draw();
-        drawn.push([start, canvas.prims.length]);
-        return drawn[drawn.length - 1]!;
-    };
-    // What the plinth or the feet add under the box
     const standHeight = baseHeight(k);
-    const reachLeft = endReach(k, "left");
-    const reachRight = endReach(k, "right");
     const fullHeight = k.height + standHeight;
     // A tall item lines front, cut and side up on one row with the plan under the front, a wide and low one stacks
     // the cut under the front with the side beside it : whichever reads at the larger scale
-    const fullWidth = k.width + reachLeft + reachRight;
+    const fullWidth = k.width + endReach(k, "left") + endReach(k, "right");
     const availW = A3.w - 2 * MARGIN - 20;
     const availH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 20;
     const fits = (s: number, asStack: boolean): boolean =>
@@ -67,7 +53,44 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         return fits(s, true);
     }) ?? last;
     const stacked = inStack < inRow;
-    const scale = stacked ? inStack : inRow;
+    const reckoned = stacked ? inStack : inRow;
+    // That reckoning takes the whole page for the views : laid out for real a larger scale often still stays
+    // inside the frame and off the title block, the plan under the front clear of it
+    for (const s of SCALES.filter((x) => { return x < reckoned; }))
+    {
+        for (const asStack of [false, true])
+        {
+            const sheet = itemSheetAt(k, a, s, asStack);
+            if (clearOfFrame(sheet.canvas.prims))
+            {
+                return sheet;
+            }
+        }
+    }
+    return itemSheetAt(k, a, reckoned, stacked);
+}
+
+
+// The sheet of an item drawn at 1:scale, its cut beside the front or under it
+function itemSheetAt(k: Carcass, a: Analysis, scale: number, stacked: boolean): Draft
+{
+    const canvas = new Canvas();
+    heading(canvas, `${k.name} : vues`);
+    // What a TechDraw view projects of the solids is left out of the marks laid over it
+    const drawn: [number, number][] = [];
+    const geometry = (draw: () => void): [number, number] =>
+    {
+        const start = canvas.prims.length;
+        draw();
+        drawn.push([start, canvas.prims.length]);
+        return drawn[drawn.length - 1]!;
+    };
+    // What the plinth or the feet add under the box
+    const standHeight = baseHeight(k);
+    const reachLeft = endReach(k, "left");
+    const reachRight = endReach(k, "right");
+    const fullHeight = k.height + standHeight;
+    const fullWidth = k.width + reachLeft + reachRight;
     // Page point of the left face of the box and of the floor under it, the item kept in its own coordinates
     const boxLeftX = MARGIN + 20 + reachLeft / scale;
     const floorY = MARGIN + 38 + fullHeight / scale;
@@ -110,7 +133,8 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         {
             const clear = levels[i + 1]! - levels[i]! - k.thickness;
             canvas.dimV(floorY - (standHeight + levels[i + 1]!) / scale,
-                        floorY - (standHeight + levels[i]! + k.thickness) / scale, endMidX, endMidX, round1(clear), 1.8);
+                        floorY - (standHeight + levels[i]! +
+                                  k.thickness) / scale, endMidX, endMidX, round1(clear), SMALL_TEXT);
         }
     }
     const lay = a.build.layouts.get(k.id);
@@ -130,7 +154,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         while (i + 1 < edges.length)
         {
             canvas.dimH(boxLeftX + edges[i]! / scale, boxLeftX + edges[i + 1]! / scale, topY - 1, topY - 6,
-                        round1(edges[i + 1]! - edges[i]!), 1.8);
+                        round1(edges[i + 1]! - edges[i]!), SMALL_TEXT);
             i += 2;
         }
     }
@@ -150,7 +174,7 @@ export function itemViews(k: Carcass, a: Analysis): Draft
         {
             const cellMidX = cutX + (cell.x + cell.w / 2) / scale;
             canvas.dimV(cutY - (standHeight + cell.y + cell.h) / scale, cutY - (standHeight + cell.y) / scale,
-                        cellMidX, cellMidX, round1(cell.h), 1.8);
+                        cellMidX, cellMidX, round1(cell.h), SMALL_TEXT);
         }
     }
 
@@ -190,11 +214,12 @@ export function itemViews(k: Carcass, a: Analysis): Draft
     const sideFront = sideX + k.depth / scale;
     if (standHeight > 0)
     {
-        canvas.dimV(floorY - standHeight / scale, floorY, sideFront + 1, sideFront + 6, `${standHeight}`, 1.8);
+        canvas.dimV(floorY - standHeight / scale, floorY, sideFront + 1, sideFront + 6, `${standHeight}`, SMALL_TEXT);
     }
     if (k.base.type === "plinth" && k.base.setback > 0)
     {
-        canvas.dimH(sideFront - k.base.setback / scale, sideFront, floorY + 1, floorY + 14, `${k.base.setback}`, 1.8);
+        canvas.dimH(sideFront - k.base.setback / scale, sideFront, floorY + 1, floorY + 14, `${k.base.setback}`,
+                    SMALL_TEXT);
     }
 
     // The tables take the free column on the right, else the space under the cut
@@ -380,7 +405,7 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
             }), false, "hidden");
             // Over the radius, towards the back : under it the two curves close in on the front
             canvas.text(planX(xFace + dir * r / 2), planY(k.depth / 2) - 6, end.sweep === 180
-                ? `R ${Math.round(r - endToe(k, end))} au sol` : "au sol", 1.8, "middle");
+                ? `R ${Math.round(r - endToe(k, end))} au sol` : "au sol", SMALL_TEXT, "middle");
         }
         // The upright of a seat end, its centre from the side face and from the front
         const post = endPost(k, side);
@@ -389,8 +414,8 @@ function drawPlan(canvas: Canvas, k: Carcass, scale: number, fx: number, planTop
             const px = planX(xFace + dir * post.u);
             const py = planY(k.depth - post.v);
             canvas.cross(px, py, 1.2);
-            canvas.dimH(planX(xFace), px, planY(k.depth) + 1, planY(k.depth) + 5, `${Math.round(post.u)}`, 1.8);
-            canvas.dimV(py, planY(k.depth), px + dir * 1.5, px + dir * 5, `${Math.round(post.v)}`, 1.8); 
+            canvas.dimH(planX(xFace), px, planY(k.depth) + 1, planY(k.depth) + 5, `${Math.round(post.u)}`, SMALL_TEXT);
+            canvas.dimV(py, planY(k.depth), px + dir * 1.5, px + dir * 5, `${Math.round(post.v)}`, SMALL_TEXT); 
         }
     }
     const dimX = planX(k.width) + reachRight / scale;

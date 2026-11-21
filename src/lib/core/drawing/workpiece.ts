@@ -5,7 +5,8 @@ import { edgeNotation } from "../bom";
 import type { Fitted, Part } from "../parts";
 import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, fit, pickScale, textWidth, type Prim, type Stroke } from "./display";
+import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, fit, pickScale, textWidth, type Prim, type Stroke }
+    from "./display";
 import type { Draft, PartView } from "./draft";
 import { ROW, TABLE_COL_W, drawTable, outlineArcs, tableLines, type PlacedColumn } from "./machining_table";
 import { round1 } from "../text";
@@ -182,7 +183,13 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     }
     const upright = UPRIGHT.has(part.role);
     const [spanX, spanY] = upright ? [maxV, maxU] : [maxU, maxV];
-    const scale = pickScale(spanX, spanY, boxW - 20, boxH - 20);
+    // As large as the box is wide and the whole table still fits under the drawing, never smaller than the box allows
+    const tableRows = Math.ceil(tableLines(row, part).length / tableCols) + 1;
+    const tallest = A3.h - MARGIN - TITLE_BLOCK_H - 6 - (y0 + 24 + 18) - tableRows * ROW;
+    const scale = SCALES.find((s) =>
+    {
+        return spanX / s <= boxW - 20 && spanY / s <= Math.max(boxH - 20, tallest);
+    }) ?? pickScale(spanX, spanY, boxW - 20, boxH - 20);
     const ox = x0 + 12;
     const oy = y0 + 24 + spanY / scale;
     const down = vDown(part.frame);
@@ -316,6 +323,30 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.arrowHead(...P(tipU, tipV), ...D(-Math.cos(a.mid), -Math.sin(a.mid)));
         const [tx, ty] = P(a.cu + a.r * 0.55 * Math.cos(a.mid), a.cv + a.r * 0.55 * Math.sin(a.mid));
         canvas.text(tx, ty - 1, `R${round1(a.r)}`, 2.5, "middle");
+        // Its centre crossed and set from the two nearest edges of the board, where the compass goes in
+        const [cx, cy] = P(a.cu, a.cv);
+        canvas.cross(cx, cy, 1.5);
+        const edgeU = a.cu > maxU / 2 ? maxU : 0;
+        const edgeV = a.cv > maxV / 2 ? maxV : 0;
+        const toEdges: { at: [number, number]; gap: number }[] = [
+            { at: P(edgeU, a.cv), gap: Math.abs(edgeU - a.cu) },
+            { at: P(a.cu, edgeV), gap: Math.abs(edgeV - a.cv) },
+        ];
+        for (const { at: [ex, ey], gap } of toEdges)
+        {
+            if (gap < 0.05)
+            {
+                continue;
+            }
+            if (Math.abs(ey - cy) < 1e-6)
+            {
+                canvas.dimH(Math.min(cx, ex), Math.max(cx, ex), cy, cy, round1(gap), SMALL_TEXT);
+            }
+            else
+            {
+                canvas.dimV(Math.min(cy, ey), Math.max(cy, ey), cx, cx, round1(gap), SMALL_TEXT);
+            }
+        }
     }
     // The origin, then which way u and v run from it
     const [zx, zy] = P(0, 0);
@@ -426,13 +457,14 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
         canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), "dashed");
         // The reference reads along the long side of the footprint, or above it when even that's too short
         const tall = Math.abs(d - b) > Math.abs(c - a);
-        if (textWidth(f.ref, 1.8) > Math.max(Math.abs(d - b), Math.abs(c - a)) - 1)
+        if (textWidth(f.ref, SMALL_TEXT) > Math.max(Math.abs(d - b), Math.abs(c - a)) - 1)
         {
-            canvas.text((a + c) / 2, Math.min(b, d) - 0.8, f.ref, 1.8, "middle");
+            canvas.text((a + c) / 2, Math.min(b, d) - 0.8, f.ref, SMALL_TEXT, "middle");
         }
         else
         {
-            canvas.text((a + c) / 2 + (tall ? 0.7 : 0), (b + d) / 2 + (tall ? 0 : 0.7), f.ref, 1.8, "middle", false,
+            canvas.text((a + c) / 2 + (tall ? 0.7 : 0), (b + d) / 2 + (tall ? 0 : 0.7), f.ref, SMALL_TEXT, "middle",
+                        false,
                         tall ? 90 : 0);
         }
     }

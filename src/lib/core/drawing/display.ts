@@ -36,6 +36,9 @@ export const MARGIN = 10;
 export const TITLE_BLOCK_H = 28;
 // ISO 7200:2004 § 6 : 180 mm wide whatever the sheet, the width of an A4 between margins of 20 and 10
 export const TITLE_BLOCK_W = 180;
+// The smallest text of a sheet. TechDraw cuts a font size down to whole millimetres in a French locale : 1.8 came
+// out at 1 mm on the PDF
+export const SMALL_TEXT = 2;
 
 // Helvetica averages about half an em per character : used to centre and truncate, not exatc metics
 const AVG_CHAR = 0.52;
@@ -81,6 +84,52 @@ export function boxOf(prims: Prim[]): { x: number; y: number; w: number; h: numb
     }
     const [x, y] = [Math.min(...xs), Math.min(...ys)];
     return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+
+// What some primitives cover on the page, each text as wide as textWidth reckons it
+export function inkBox(prims: Prim[]): { x: number; y: number; w: number; h: number } | null
+{
+    const boxes = prims.flatMap((q) =>
+    {
+        if (q.k !== "text")
+        {
+            const b = boxOf([q]);
+            return b === null ? [] : [b];
+        }
+        const w = textWidth(q.t, q.size);
+        const lead = q.anchor === "start" ? 0 : q.anchor === "middle" ? w / 2 : w;
+        // Turned a quarter anticlockwise its glyphs stand left of the point, its lenght running up the page
+        return q.rot === 90 ? [{ x: q.x - q.size, y: q.y - w + lead, w: q.size * 1.25, h: w }]
+            : [{ x: q.x - lead, y: q.y - q.size, w, h: q.size * 1.25 }];
+    });
+    if (boxes.length === 0)
+    {
+        return null;
+    }
+    const x = Math.min(...boxes.map((b) => { return b.x; }));
+    const y = Math.min(...boxes.map((b) => { return b.y; }));
+    const w = Math.max(...boxes.map((b) => { return b.x + b.w; })) - x;
+    const h = Math.max(...boxes.map((b) => { return b.y + b.h; })) - y;
+    return { x, y, w, h };
+}
+
+
+// Whether nothing drawn runs off the frame of an A3 sheet or into its title block
+export function clearOfFrame(prims: Prim[]): boolean
+{
+    const blockX = A3.w - MARGIN - TITLE_BLOCK_W;
+    const blockY = A3.h - MARGIN - TITLE_BLOCK_H;
+    return prims.every((q) =>
+    {
+        const b = inkBox([q]);
+        if (b === null)
+        {
+            return true;
+        }
+        const inside = b.x >= MARGIN && b.y >= MARGIN && b.x + b.w <= A3.w - MARGIN && b.y + b.h <= A3.h - MARGIN;
+        return inside && !(b.x + b.w > blockX && b.y + b.h > blockY);
+    });
 }
 
 
@@ -215,7 +264,7 @@ export interface TitleInfo
 }
 
 // Where the columns of the block start, from its left edge
-const TB_COLS = { people: 40, title: 85, number: 137, date: 145, lang: 163, sheet: 169 };
+const TB_COLS = { people: 40, title: 85, number: 137, date: 145, lang: 162, sheet: 169 };
 // The general tolerances named in or near the block (ISO 2768-1:1989 via the Zeiss quality forum chart)
 const GENERAL_TOLERANCES = "ISO 2768-1:1989 classe m";
 
@@ -284,7 +333,7 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     // A small name over each field as in the figure, its value under it
     const label = (col: number, k: number, text: string): void =>
     {
-        c.text(x + col + 1, y + k * row + 2.2, text, 1.6, "start");
+        c.text(x + col + 1, y + k * row + 2.5, text, SMALL_TEXT, "start");
     };
     // Each value already cut to its cell, tagged with its field : a FreeCAD template is drawn from the same list
     const value = (col: number, k: number, field: string): void =>

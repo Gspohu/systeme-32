@@ -3,7 +3,7 @@
 import type { Project } from "../model";
 import { boxToRoom, roomBox, sideWallDepth } from "../room";
 import { OBSTACLE_LABELS, obstacleBox } from "../obstacles";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, pickScale, textWidth } from "./display";
+import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, pickScale, textWidth } from "./display";
 import { heading, table, type Draft } from "./draft";
 import { round1 } from "../text";
 
@@ -73,7 +73,8 @@ export function roomPlan(p: Project): Draft
         const b = boxToRoom(o.wall, room, obstacleBox(o));
         canvas.rect(pageX(b.min[0]), pageZ(b.min[2]), (b.max[0] - b.min[0]) / scale, (b.max[2] - b.min[2]) /
                     scale, "dashed");
-        canvas.text(pageX((b.min[0] + b.max[0]) / 2), pageZ(b.max[2]) + 3, `${OBSTACLE_LABELS[o.kind]} ${o.name}`, 1.6,
+        canvas.text(pageX((b.min[0] + b.max[0]) / 2), pageZ(b.max[2]) + 3, `${OBSTACLE_LABELS[o.kind]} ${o.name}`,
+                    SMALL_TEXT,
                     "middle");
     }
     // Footprints overlap once items stand on or hang over others : open outlines, a mark at the front left corner
@@ -139,7 +140,8 @@ export function roomPlan(p: Project): Draft
 
 
 // Consecutive dimensions between sorted page positions, the duplicates and slivers under 1 mm dropped
-export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, line: number, dir: "h" | "v"): void
+export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, line: number, dir: "h" | "v",
+    size = SMALL_TEXT): void
 {
     const xs = [...new Set(at.map((v) =>
     {
@@ -148,7 +150,6 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
     {
         return p - q;
     });
-    const size = 1.8;
     const out = Math.sign(line - ref);
     const segs = xs.slice(1).map((x, i) =>
     {

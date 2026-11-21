@@ -11,7 +11,7 @@ import { slatLayout } from "../slats";
 import { ceilingAt, frontOutline } from "../slope";
 import { FIT_PLAY, RAIL_D, railPlan } from "../wardrobe";
 import { SPOT_RIM, lightLevel, spotCentres } from "../lights";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, boxOf, pickScale, textWidth, wrap } from "./display";
+import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, boxOf, inkBox, textWidth, wrap } from "./display";
 import { BODY, heading, type Draft } from "./draft";
 import { fittedExtent } from "../fitted";
 import { topDoubling } from "../layout";
@@ -412,9 +412,20 @@ function drawOutlets(v: CarcassView): void
 // What the FreeCAD file builds an assembly for, projected there : the rest has no solid to project
 const PROJECTED = new Set<Item["kind"]>(["carcass", "wallShelf"]);
 
+// Room of a composition on the sheet, under its heading
+const FREE = { left: MARGIN + 3, right: A3.w - MARGIN - 3, top: MARGIN + 14 };
+const MAX_REDUCTION = 100;
+
+
+// Baseline of line i of a legend of n lines, the last one just over the title block
+function legendBaseline(n: number, i: number): number
+{
+    return A3.h - MARGIN - TITLE_BLOCK_H - 2 - (n - 1 - i) * 4;
+}
+
+
 export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
 {
-    const canvas = new Canvas();
     const items: Item[] = [];
     for (const it of p.items)
     {
@@ -424,11 +435,10 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
         }
     }
     const where = wall === "back" ? "vue de face" : WALL_LABELS[wall].toLowerCase();
-    heading(canvas, `Composition, ${where}`);
     const all = projectExtent(items);
     // In an alcove the back wall shows its returns and its ceiling raound the items
-    const room = p.room; 
-    const niche = wall === "back" && room.returns !== undefined; 
+    const room = p.room;
+    const niche = wall === "back" && room.returns !== undefined;
     // The radiators, boxes and skirtings of this wall widen the view to show them
     const obstacles = room.obstacles.filter((obstacle) =>
     {
@@ -436,142 +446,166 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     });
     const frame = obstacles.reduce((extent, obstacle) =>
     {
-        return { x0: Math.min(extent.x0, obstacle.x), x1: Math.max(extent.x1, obstacle.x + obstacle.width),  
+        return { x0: Math.min(extent.x0, obstacle.x), x1: Math.max(extent.x1, obstacle.x + obstacle.width),
                  y0: Math.min(extent.y0, obstacle.y), y1: Math.max(extent.y1, obstacle.y + obstacle.height) };
     }, niche ? { x0: Math.min(all.x0, 0), x1: Math.max(all.x1, room.width), y0: Math.min(all.y0, 0),
                  y1: Math.max(all.y1, room.height) } : all);
-    const boxW = A3.w - 2 * MARGIN - 60;
-    const boxH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 40;
-    const scale = pickScale(frame.x1 - frame.x0, frame.y1 - frame.y0, boxW, boxH);
-    // Where the origin of the wall, its left end at floor lvel, lands on the page
-    const originX = MARGIN + 25 - frame.x0 / scale + (boxW - (frame.x1 - frame.x0) / scale) / 2;
-    const originY = MARGIN + 25 + boxH - (boxH - (frame.y1 - frame.y0) / scale) / 2 + frame.y0 / scale;   
-    // On the back wall what has an assembly is TechDraw's to project : left out of the marks laid over it. A device
-    // has no solid, still drawn by the sheet
-    const drawn: [number, number][] = [];
-    const projected: string[] = [];
-    for (const it of items)
+
+    // The whole wall at 1:scale, the top left corner of its frame at (left, top) on the page. Heading and legend
+    // stay where the sheet puts them, everything else moves with the corner
+    const lay = (scale: number, left: number, top: number) =>
     {
-        const start = canvas.prims.length;
-        drawFront(canvas, it, scale, originX, originY, a);
-        if (wall === "back" && PROJECTED.has(it.kind))
+        const canvas = new Canvas();
+        heading(canvas, `Composition, ${where}`);
+        const from = canvas.prims.length;
+        const originX = left - frame.x0 / scale;
+        const originY = top + frame.y1 / scale;
+        // On the back wall what has an assembly is TechDraw's to project : left out of the marks laid over it. A
+        // device has no solid, still drawn by the sheet
+        const drawn: [number, number][] = [];
+        const projected: string[] = [];
+        for (const it of items)
         {
-            drawn.push([start, canvas.prims.length]);
-            projected.push(it.id);
-        }
-    }
-    for (const obstacle of obstacles)
-    {
-        canvas.rect(originX + obstacle.x / scale, originY - (obstacle.y + obstacle.height) / scale,
-                    obstacle.width / scale, obstacle.height / scale, "dashed");
-        canvas.text(originX + (obstacle.x + obstacle.width / 2) / scale,
-                    originY - (obstacle.y + obstacle.height / 2) / scale,
-                    `${OBSTACLE_LABELS[obstacle.kind]} ${obstacle.name}`, 1.8, "middle"); 
-    }
-    if (niche)
-    {
-        const [x0, x1, top] = [originX, originX + room.width / scale, originY - room.height / scale];
-        canvas.poly([[x0, originY], [x0, top], [x1, top], [x1, originY]], false, "thick");
-        canvas.dimH(x0, x1, top - 2, top - 10, `${room.width}`);
-    }
-    const floorY = originY - all.y0 / scale;
-    canvas.line(originX + frame.x0 / scale - 5, floorY, originX + frame.x1 / scale + 5, floorY, "thin");
-    canvas.dimH(originX + all.x0 / scale, originX + all.x1 / scale, floorY + 2, floorY + 16, round1(all.x1 - all.x0));
-    canvas.dimV(originY - all.y1 / scale, floorY, originX + (frame.x0 / scale) - 2, originX + (frame.x0 / scale) - 10,
-                round1(all.y1 - all.y0));
-    // What each item takes along the wall, a filler apart from the side it closes
-    chain(canvas, items.filter((it) =>
-    {
-        return it.kind !== "device" && !(it.kind === "carcass" && it.freeStanding === true);
-    }).flatMap((it) =>
-    {
-        const box = itemExtent(it);
-        return it.kind === "carcass" ? [box.x0, box.x1, it.x, it.x + it.width] : [box.x0, box.x1];
-    }), (along) =>
-    {
-        return originX + along / scale;
-    }, floorY + 2, floorY + 8, "h");
-    // Where the sections of this set are cut, a long line with its letter at each end
-    const planes = sectionPlanes(p, a, wall);
-    for (const plane of planes)
-    {
-        if (plane.axis === "x")
-        {
-            const x = originX + plane.at / scale;
-            canvas.line(x, originY - (all.y1 / scale) - 4, x, floorY + 1, "centre");
-            canvas.text(x, originY - all.y1 / scale - 5, plane.letter, 3, "middle", true);
-        }
-        else
-        {
-            const y = originY - plane.at / scale;
-            canvas.line(originX + all.x0 / scale - 4, y, originX + (all.x1 / scale) + 1, y, "centre");
-            canvas.text(originX + all.x0 / scale - 6, y + 1, plane.letter, 3, "middle", true);
-        }
-    }
-    // The levels on the right : floor, underside and top of each item, and the ceiling of an alcove
-    const right = originX + frame.x1 / scale;
-    chain(canvas, [0, ...items.flatMap((it) =>
-    {
-        const box = itemExtent(it);
-        return [box.y0, box.y1];
-    }), ...niche ? [room.height] : []], (level) =>
-    {
-        return originY - level / scale;
-    }, right + 2, right + 9, "v");
-    if (p.screen !== null && wall === "back")
-    {
-        const screen = p.screen;
-        const { w, h } = screenSize(screen);
-        if (screen.arm !== null && screen.arm.plateW > 0 && screen.arm.plateH > 0)
-        {
-            const arm = screen.arm;
-            canvas.rect(originX + (arm.x - arm.plateW / 2) / scale, originY - (arm.y + arm.plateH / 2) / scale,
-                        arm.plateW / scale, arm.plateH / scale, "thin");
-        }
-        // Put away in dashes, swung out on its arm in hidden line, named so the two are never mistaken
-        for (const spot of screenSpots(screen))
-        {
-            const out = spot.label === "sorti";
-            // A turned set covers its own width and part of its thickness along the wall
-            const [x0, x1] = spotSpan(screen, spot);
-            canvas.rect(originX + x0 / scale, originY - (spot.bottom + h) / scale, (x1 - x0) / scale, h / scale,  
-                        out ? "hidden" : "dashed");
-            // On an arm the two outlines and the plate overlap : short names over the outlines, the swung one a line
-            // higher, both centred on their own outline
-            if (spot.label === "")
+            const start = canvas.prims.length;
+            drawFront(canvas, it, scale, originX, originY, a);
+            if (wall === "back" && PROJECTED.has(it.kind))
             {
-                canvas.text(originX + spot.cx / scale, originY - (spot.bottom + h / 2) / scale,
-                            `Écran ${screen.diagonalInch}" (${Math.round(w)} x ${Math.round(h)})`, BODY, "middle");
+                drawn.push([start, canvas.prims.length]);
+                projected.push(it.id);
+            }
+        }
+        for (const obstacle of obstacles)
+        {
+            canvas.rect(originX + obstacle.x / scale, originY - (obstacle.y + obstacle.height) / scale,
+                        obstacle.width / scale, obstacle.height / scale, "dashed");
+            canvas.text(originX + (obstacle.x + obstacle.width / 2) / scale,
+                        originY - (obstacle.y + obstacle.height / 2) / scale,
+                        `${OBSTACLE_LABELS[obstacle.kind]} ${obstacle.name}`, SMALL_TEXT, "middle");
+        }
+        if (niche)
+        {
+            const [x0, x1, ceiling] = [originX, originX + room.width / scale, originY - room.height / scale];
+            canvas.poly([[x0, originY], [x0, ceiling], [x1, ceiling], [x1, originY]], false, "thick");
+            canvas.dimH(x0, x1, ceiling - 2, ceiling - 10, `${room.width}`);
+        }
+        const floorY = originY - all.y0 / scale;
+        canvas.line(originX + frame.x0 / scale - 5, floorY, originX + frame.x1 / scale + 5, floorY, "thin");
+        canvas.dimH(originX + all.x0 / scale, originX + all.x1 / scale, floorY + 2, floorY + 16,
+                    round1(all.x1 - all.x0));
+        canvas.dimV(originY - all.y1 / scale, floorY, originX + (frame.x0 / scale) - 2,
+                    originX + (frame.x0 / scale) - 10, round1(all.y1 - all.y0));
+        // What each item takes along the wall, a filler apart from the side it closes
+        chain(canvas, items.filter((it) =>
+        {
+            return it.kind !== "device" && !(it.kind === "carcass" && it.freeStanding === true);
+        }).flatMap((it) =>
+        {
+            const box = itemExtent(it);
+            return it.kind === "carcass" ? [box.x0, box.x1, it.x, it.x + it.width] : [box.x0, box.x1];
+        }), (along) =>
+        {
+            return originX + along / scale;
+        }, floorY + 2, floorY + 8, "h");
+        // Where the sections of this set are cut, a long line with its letter at each end
+        for (const plane of sectionPlanes(p, a, wall))
+        {
+            if (plane.axis === "x")
+            {
+                const x = originX + plane.at / scale;
+                canvas.line(x, originY - (all.y1 / scale) - 4, x, floorY + 1, "centre");
+                canvas.text(x, originY - all.y1 / scale - 5, plane.letter, 3, "middle", true);
             }
             else
             {
-                canvas.text(originX + spot.cx / scale, originY - (spot.bottom + h) / scale - (out ? 5.5 : 1.5),
-                            out ? "sorti" : `Écran ${screen.diagonalInch}" rangé`, BODY, "middle");
+                const y = originY - plane.at / scale;
+                canvas.line(originX + all.x0 / scale - 4, y, originX + (all.x1 / scale) + 1, y, "centre");
+                canvas.text(originX + all.x0 / scale - 6, y + 1, plane.letter, 3, "middle", true);
             }
         }
-    }
-    // A name wider htan its item becomes a numbered mark, read in the legend over the title block
-    const marks: string[] = [];
-    for (const it of items)
-    {
-        const box = itemExtent(it);
-        const labelX = (box.x0 + box.x1) / 2;
-        const labelY = it.kind === "wallShelf" ? box.y1 + 40 : (box.y0 + box.y1) / 2; 
-        const name = textWidth(it.name, 2.2) <= (box.x1 - box.x0) / scale ? it.name : `${marks.push(it.name)}`;
-        canvas.text(originX + labelX / scale, originY - labelY / scale, name, 2.2, "middle", true);
-    }
-    if (marks.length > 0)
-    {
-        const numbered = marks.map((m, i) =>
+        // The levels on the right : floor, underside and top of each item, and the ceiling of an alcove
+        const right = originX + frame.x1 / scale;
+        chain(canvas, [0, ...items.flatMap((it) =>
+        {
+            const box = itemExtent(it);
+            return [box.y0, box.y1];
+        }), ...niche ? [room.height] : []], (level) =>
+        {
+            return originY - level / scale;
+        }, right + 2, right + 9, "v");
+        if (p.screen !== null && wall === "back")
+        {
+            const screen = p.screen;
+            const { w, h } = screenSize(screen);
+            if (screen.arm !== null && screen.arm.plateW > 0 && screen.arm.plateH > 0)
+            {
+                const arm = screen.arm;
+                canvas.rect(originX + (arm.x - arm.plateW / 2) / scale, originY - (arm.y + arm.plateH / 2) / scale,
+                            arm.plateW / scale, arm.plateH / scale, "thin");
+            }
+            // Put away in dashes, swung out on its arm in hidden line, named so the 2 are never mistaken
+            for (const spot of screenSpots(screen))
+            {
+                const out = spot.label === "sorti";
+                // A turned set covers its own width and part of its thickness along the wall
+                const [x0, x1] = spotSpan(screen, spot);
+                canvas.rect(originX + x0 / scale, originY - (spot.bottom + h) / scale, (x1 - x0) / scale, h / scale,
+                            out ? "hidden" : "dashed");
+                // On an arm the two outlines and the plate overlap : short names over the outlines, the swung one a
+                // line higher, both centred on their own outline
+                if (spot.label === "")
+                {
+                    canvas.text(originX + spot.cx / scale, originY - (spot.bottom + h / 2) / scale,
+                                `Écran ${screen.diagonalInch}" (${Math.round(w)} x ${Math.round(h)})`, BODY, "middle");
+                }
+                else
+                {
+                    canvas.text(originX + spot.cx / scale, originY - (spot.bottom + h) / scale - (out ? 5.5 : 1.5),
+                                out ? "sorti" : `Écran ${screen.diagonalInch}" rangé`, BODY, "middle");
+                }
+            }
+        }
+        // A name wider htan its item becomes a numbered mark, read in the legend over the title block
+        const marks: string[] = [];
+        for (const it of items)
+        {
+            const box = itemExtent(it);
+            const labelX = (box.x0 + box.x1) / 2;
+            const labelY = it.kind === "wallShelf" ? box.y1 + 40 : (box.y0 + box.y1) / 2;
+            const name = textWidth(it.name, 2.2) <= (box.x1 - box.x0) / scale ? it.name : `${marks.push(it.name)}`;
+            canvas.text(originX + labelX / scale, originY - labelY / scale, name, 2.2, "middle", true);
+        }
+        const legend = marks.length === 0 ? [] : wrap(`Repères : ${marks.map((m, i) =>
         {
             return `${i + 1} ${m}`;
-        });
-        const lines = wrap(`Repères : ${numbered.join(", ")}`, BODY, 390); 
-        lines.forEach((l, i) =>
+        }).join(", ")}`, BODY, 390);
+        return { canvas, from, drawn, projected, legend };
+    };
+
+    // The smallest reduction whose drawing, its figures and letters included, fills the room between the heading
+    // and the legend : tried from 1:1 up, the first that fits is centred there
+    const roomBelow = (lines: number) =>
+    {
+        return lines === 0 ? A3.h - MARGIN - TITLE_BLOCK_H - 3 : legendBaseline(lines, 0) - BODY - 3;
+    };
+    const freeW = FREE.right - FREE.left;
+    let chosen = { scale: MAX_REDUCTION, ink: { x: 0, y: 0, w: 0, h: 0 }, freeH: 0 };
+    for (let s = 1; s <= MAX_REDUCTION; s++)
+    {
+        const trial = lay(s, 0, 0);
+        const ink = inkBox(trial.canvas.prims.slice(trial.from)) ?? { x: 0, y: 0, w: 0, h: 0 };
+        chosen = { scale: s, ink, freeH: roomBelow(trial.legend.length) - FREE.top };
+        if (ink.w <= freeW && ink.h <= chosen.freeH)
         {
-            canvas.text(MARGIN + 8, A3.h - MARGIN - TITLE_BLOCK_H - 2 - (lines.length - 1 - i) * 4, l, BODY);   
-        }); 
+            break;
+        }
     }
+    const { scale, ink, freeH } = chosen;
+    const { canvas, drawn, projected, legend } = lay(scale, FREE.left - ink.x + (freeW - ink.w) / 2,
+                                                     FREE.top - ink.y + Math.max(0, freeH - ink.h) / 2);
+    legend.forEach((l, i) =>
+    {
+        canvas.text(MARGIN + 8, legendBaseline(legend.length, i), l, BODY);
+    });
     const title = wall === "back" ? "Composition" : `Composition, ${where}`;
     const box = boxOf(drawn.flatMap(([s, e]) => { return canvas.prims.slice(s, e); }));
     if (box === null)

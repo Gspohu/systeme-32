@@ -11,14 +11,24 @@ import FreeCAD as App
 
 A3_W = 420
 A3_H = 297
-# A spreadsheet cell is sized in pixels at 96 dpi, its text in points
+# A spreadsheet cell is sized in pixels at 96 dpi, and so is its text on a TechDraw page (DrawViewSpreadsheet.cpp
+# writes TextSize as the font-size of the cell's own svg)
 MM_PER_PX = 25.4 / 96
-PT_PER_MM = 72 / 25.4
 # How far off the outline the sheet sets its overall dimensions, mm of paper
 DIM_OFF = 6
 UPRIGHT_DIM_OFF = 12
 # The lines a long owner or title runs on, left empty when it fits on the one before
 CONTINUATION = {"legal_owner_2", "legal_owner_3", "supplementary_title_2"}
+SCALE_TEXT = re.compile(r"^\s*1\s*:\s*(\d+(?:[.,]\d+)?)\s*$")
+
+
+def page_scale(page, fields):
+    # Page.Scale is what a reader of the document takes for the scale of the sheet : the one its title block writes
+    # every view keeping its own Custom scale
+    found = SCALE_TEXT.match(fields.get("scale", ""))
+    if found:
+        page.Scale = 1 / float(found.group(1).replace(",", "."))
+    return page
 
 
 def axes(frame, su, sv):
@@ -124,12 +134,14 @@ def wall_view(doc, page, spec, assemblies, missing):
 # FreeCAD's own sections, the sheets drawing them as the parts cut : vertical ones seen from the left with the front
 # on the right, horizontal ones from above with the wall at the top, as the sheets read them
 SECTION_AXES = {"x": ((-1, 0, 0), (0, -1, 0)), "y": ((0, 0, 1), (1, 0, 0))}
-BASE_SCALE = 50
+BASE_SCALE = 25
 SECTION_SCALE = 20
 SECTION_GAP = 6
 SECTION_LINE_RUN = 14
 # Width of a bold Helvetica letter for its size, on average over a french title
 TITLE_EM = 0.6
+# A whole number of millimetres : TechDraw cuts a font size down to one in a French locale
+SUBTITLE_SIZE = 2
 
 
 def make_sections(doc, model, assemblies, group, template_path):
@@ -151,6 +163,7 @@ def make_sections(doc, model, assemblies, group, template_path):
         page = doc.addObject("TechDraw::DrawPage", "Plan")
         page.Label = f"Planche {coupes[0]['index']} {suffix}, coupes FreeCAD {fields['supplementary_title_2']}"
         page.Template = template
+        page_scale(page, fields)
         texts = dict(template.EditableTexts)
         for field in texts:
             texts[field] = fields.get(field, texts[field])
@@ -187,7 +200,7 @@ def make_sections(doc, model, assemblies, group, template_path):
             sec.Scale = 1 / SECTION_SCALE
             views.append((sec, s["title"]))
         doc.recompute()
-        captions, lost = lay_out(views, model["sectionRoom"])
+        captions, lost = lay_out(views, model["sectionRoom"], cuts_low=axis == "y")
         overlay(doc, page, model["sectionRoom"]["heading"])
         overlay(doc, page, captions).Label = f"{page.Label}, titres des vues"
         doc.recompute()
@@ -206,8 +219,9 @@ def extent(view):
     return x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2
 
 
-def lay_out(views, room):
-    """Each view in the first place free from the top left, its title over it, as sections.ts lays its sheets out"""
+def lay_out(views, room, cuts_low=False):
+    """Each view in the first place free from the top left, its title over it, as sections.ts lays its sheets out.
+    With cuts_low the sections fill the sheet up from the top of the title block, the lowest cut nearest to it"""
     taken = []
     texts = []
     lost = []
@@ -216,11 +230,16 @@ def lay_out(views, room):
         w, h, cx, cy = extent(view)
         # The lines of the cuts run past the base view, their letters on their ends
         pad = SECTION_LINE_RUN if k == 0 else 0
-        slot_w = max(w + 2 * pad, TITLE_EM * size * len(title)) + SECTION_GAP
-        slot_h = h + 2 * pad + size + 2 + SECTION_GAP
+        # Its name bold, what follows the first comma on a smaller line : a cut 20 mm wide no longer takes 80
+        name, _, rest = title.partition(", ")
+        head = size + (SUBTITLE_SIZE + 1 if rest else 0)
+        slot_w = max(w + 2 * pad, TITLE_EM * size * len(name), TITLE_EM * SUBTITLE_SIZE * len(rest)) + SECTION_GAP
+        slot_h = h + 2 * pad + head + 2 + SECTION_GAP
+        rising = cuts_low and k > 0
+        step = -2 if rising else 2
         spot = None
-        y = room["top"]
-        while (spot is None and y + slot_h <= room["bottom"]):
+        y = room["blockTop"] - slot_h if rising else room["top"]
+        while (spot is None and room["top"] <= y and y + slot_h <= room["bottom"]):
             x = room["left"]
             while (spot is None and x + slot_w <= room["right"]):
                 over_block = x + slot_w > room["blockLeft"] and y + slot_h > room["blockTop"]
@@ -228,18 +247,20 @@ def lay_out(views, room):
                                                for tx, ty, tw, th in taken)):
                     spot = (x, y)
                 x += 2
-            y += 2
+            y += step
         if (spot is None):
             lost.append(title)
             continue
         x, y = spot
         taken.append((x, y, slot_w, slot_h))
-        texts.append((x, y + size, title))
+        texts.append((x, y + size, name, size, ' font-weight="bold"'))
+        if rest:
+            texts.append((x, y + head, rest, SUBTITLE_SIZE, ""))
         # The page counts up from its foot, the edges of a view up from its own middle
         view.X = x + pad + w / 2 - cx
-        view.Y = A3_H - (y + size + 2 + pad + h / 2) - cy
-    body = "\n".join(f'<text x="{x:.2f}" y="{y:.2f}" font-family="Helvetica, Arial, sans-serif" font-size="{size}" '
-                     f'font-weight="bold">{escape(t)}</text>' for x, y, t in texts)
+        view.Y = A3_H - (y + head + 2 + pad + h / 2) - cy
+    body = "\n".join(f'<text x="{x:.2f}" y="{y:.2f}" font-family="Helvetica, Arial, sans-serif" font-size="{s}"'
+                     f'{weight}>{escape(t)}</text>' for x, y, t, s, weight in texts)
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {A3_W} {A3_H}" width="{A3_W}mm" '
            f'height="{A3_H}mm">\n{body}\n</svg>\n')
     return svg, lost
@@ -263,11 +284,13 @@ def table(doc, page, column, k):
     view = doc.addObject("TechDraw::DrawViewSpreadsheet", "Tableau")
     view.Source = sheet
     view.CellEnd = f"{chr(64 + len(column['widths']))}{len(lines)}"
-    # TechDraw reads its text size in points : the 2.4 mm of the sheet
-    view.TextSize = 2.4 * PT_PER_MM
+    # The 2.4 mm of the sheet in pixels, a whole number : TechDraw cuts 6.8 down to 6 in a French locale
+    view.TextSize = round(2.4 / MM_PER_PX)
     # The sheet draws no grid, only the thinnest one TechDraw allows
     view.LineWidth = 0.05
     page.addView(view)
+    view.ScaleType = "Custom"
+    view.Scale = 1
     # Its centre where the sheet has the middle of the column
     view.X = column["x"] + sum(column["widths"]) / 2
     view.Y = A3_H - (column["top"] - column["row"] + len(lines) * row / 2)
@@ -281,6 +304,8 @@ def overlay(doc, page, svg):
     s.Label = f"{page.Label}, annotations"
     s.Symbol = svg
     page.addView(s)
+    # Its own scale, never the page's : the page carries the scale of its title block, 1:20
+    s.ScaleType = "Custom"
     s.Scale = 1
     s.X, s.Y = A3_W / 2, A3_H / 2
     return s
@@ -328,6 +353,7 @@ def make_drawings(doc, model, bodies):
         page = doc.addObject("TechDraw::DrawPage", "Plan")
         page.Label = f"Planche {spec['index']}, {spec['title']}"
         page.Template = template
+        page_scale(page, spec["fields"])
         texts = dict(template.EditableTexts)
         for field in texts:
             texts[field] = spec["fields"].get(field, texts[field])
