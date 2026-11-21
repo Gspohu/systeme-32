@@ -639,9 +639,9 @@ function cupScrews(out: CadInstance[], screws: CadScrew[]): void
 
 // The parts of a lit cell no maker gives a file for, drawn from the volume the light set : the strip profile an
 // aluminium U open towards the cell, the strip in it, the driver and the controller as their housings
-// The strip, the driver and the controller are devices, no one material : no card, declared so in the project's yml
 const PROFILE_CARD: LibraryCard = { name: "Aluminum-Generic", why: "profilé en aluminium de la liste de quincaillerie, "
                                     + "alliage non publié" };
+// Strip, driver and controller have no card : devices of no one material, listed so in the yml
 const LIGHT_LOOK: Record<string, { label: string; rgb: [number, number, number]; open: boolean; card?: LibraryCard }> = {
     LED_PROFILE_SURFACE: { label: "Profilé LED en applique", rgb: [190, 192, 196], open: true, card: PROFILE_CARD },
     LED_PROFILE_RECESS: { label: "Profilé LED encastré", rgb: [190, 192, 196], open: true, card: PROFILE_CARD },

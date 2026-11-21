@@ -11,7 +11,7 @@ import traceback
 import FreeCAD as App
 import FreeCADGui as Gui
 import Import
-from PySide import QtCore
+from PySide import QtCore, QtGui
 
 SOURCE = os.environ["S32_JSON"]
 DOC = os.environ["S32_DOC"]
@@ -28,6 +28,57 @@ SCREW_TYPES = {"countersunk": "DIN7505", "pan": "DIN7996", "metric": "ISO7380-1"
 SMALL_COUNTERSUNK = ("DIN7997", 3.0)
 # The text of the dimensions of the sheets, mm (display.ts, dimH)
 DIM_TEXT = 2.2
+# Room round the text of a cell, pixels : its margins and the grid line
+CELL_PAD = 12
+ROW_PAD = 6
+CELL = re.compile(r"^([A-Z]+)(\d+)$")
+
+
+def shown_text(sheet, address):
+    """What a cell shows : a text as written, a formula by its value"""
+    content = sheet.getContents(address)
+    if not content.startswith("="):
+        return content[1:] if content.startswith("'") else content
+    value = sheet.get(address)
+    if hasattr(value, "UserString"):
+        return value.UserString
+    decimals = App.ParamGet("User parameter:BaseApp/Preferences/Units").GetInt("Decimals", 2)
+    return f"{value:.{decimals}f}" if isinstance(value, float) else str(value)
+
+
+def fit_sheets(doc):
+    """Each column as wide as its longest text, measured in the font FreeCAD draws it with, each row as high as its
+    lines : a sentence alone on its row is merged across the table instead of widening its column"""
+    plain = QtGui.QFontMetrics(QtGui.QApplication.font())
+    font = QtGui.QApplication.font()
+    font.setBold(True)
+    bold = QtGui.QFontMetrics(font)
+    for sheet in doc.Objects:
+        # The tables of the drawings print at the widths of the paper sheet, their columns stay as laid out
+        if (sheet.TypeId != "Spreadsheet::Sheet" or sheet.Name.startswith("Usinages")):
+            continue
+        rows = {}
+        for address in sheet.getUsedCells():
+            col, row = CELL.match(address).groups()
+            rows.setdefault(int(row), []).append(col)
+        last = max((c for cols in rows.values() for c in cols), key=lambda c: (len(c), c))
+        widths = {}
+        for row, cols in rows.items():
+            # A cell never styled has no style set, None
+            metrics = [bold if "bold" in (sheet.getStyle(f"{c}{row}") or ()) else plain for c in cols]
+            if (len(cols) == 1 and cols[0] == "A" and last != "A"):
+                sheet.mergeCells(f"A{row}:{last}{row}")
+                continue
+            lines = 1
+            for col, fm in zip(cols, metrics):
+                text = shown_text(sheet, f"{col}{row}").split("\n")
+                lines = max(lines, len(text))
+                widths[col] = max(widths.get(col, 0), max(fm.horizontalAdvance(t) for t in text) + CELL_PAD)
+            if (lines > 1):
+                sheet.setRowHeight(str(row), lines * plain.lineSpacing() + ROW_PAD)
+        for col, width in widths.items():
+            sheet.setColumnWidth(col, width)
+        sheet.recompute()
 
 
 def settled(page, limit=120.0):
@@ -136,6 +187,33 @@ def place(parent, base, label, note, origin, out):
     return link
 
 
+def designate(obj, article):
+    """What the hardware list buys for it, on the object of the workbench : a recommendation, said so on it"""
+    import Materials
+    cards = [m for m in Materials.MaterialManager().Materials.values()
+             if m.Name == article["card"] and m.LibraryName == "System"]
+    if not cards:
+        raise RuntimeError(f"fiche '{article['card']}' absente de la bibliothèque de FreeCAD : corriger "
+                           "SCREW_ARTICLES dans data/screws.ts")
+    obj.ShapeMaterial = cards[0]
+    said = [("Revetement", article["coating"]), ("Fournisseur", article["supplier"] or ""),
+            ("SourceDesignation", article["why"]), ("Recommandation", article["advice"])]
+    if article["propertyClass"]:
+        said.append(("ClasseQualite", article["propertyClass"]))
+    for prop, value in said:
+        obj.addProperty("App::PropertyString", prop, "Achat", "From the hardware list of systeme-32")
+        setattr(obj, prop, value)
+    return obj
+
+
+def article_of(model, s):
+    for a in model["fasteners"]:
+        if (a["kind"], a["diameter"], a["length"], a["standard"]) == (s["kind"], s["diameter"], s["length"],
+                                                                      s.get("standard")):
+            return a
+    raise RuntimeError(f"vis {s['kind']} {s['diameter']} x {s['length']} absente des articles exportés")
+
+
 def make_screws(doc, model, hardware):
     """One object of the workbench for each size, a link at each place, in the assembly of its item"""
     models = doc.addObject("App::DocumentObjectGroup", "Modeles_visserie")
@@ -150,6 +228,7 @@ def make_screws(doc, model, hardware):
         key = (s["kind"], s["diameter"], s["length"], screw_type(s))
         if key not in bases:
             bases[key] = make_screw(doc, models, s)
+            designate(bases[key][1], article_of(model, s))
         name, base = bases[key]
         # In the hardware of its own assembly : a cup screw goes with the door it hold the hinge in
         parent = hardware.get(s.get("assembly") or s["item"])
@@ -162,6 +241,7 @@ def make_screws(doc, model, hardware):
         if s.get("washer"):
             if washer is None:
                 washer = make_washer(doc, models)
+                designate(washer[0], model["washer"])
             # By the PBS code of the board it sits on : a step of the assembly sequence names it by that
             tag = s.get("tag", s["part"])
             # A Fasteners washer is read by its note : the board alone there made it a board, out of every step
@@ -204,11 +284,16 @@ def export_steps(doc, model, root, subs, drawn):
 
 def frame(view):
     # The view clipped the piece when captured at once : near and far planes settle over a redraw
-    view.viewIsometric()
-    for _ in range(3):
-        view.fitAll()
-        Gui.updateGui()
-        QtCore.QCoreApplication.processEvents()
+    # A capture of the TV wall once looked up from under the piece, never reproduced : the camera must look down
+    for _ in range(2):
+        view.viewIsometric()
+        for _ in range(3):
+            view.fitAll()
+            Gui.updateGui()
+            QtCore.QCoreApplication.processEvents()
+        if (view.getViewDirection().z < 0):
+            return
+    raise RuntimeError(f"vue iso ne regardant pas vers le bas : direction {view.getViewDirection()}")
 
 
 def run():
@@ -275,6 +360,7 @@ def run():
     view = Gui.getDocument(doc.Name).ActiveView 
     frame(view)
     view.saveImage(IMAGE, 1600, 1000, "White")
+    fit_sheets(doc)
     doc.save()
     report["pages"] = export_pages(doc)
     report["steps_written"] = export_steps(doc, model, root, subs, drawn)

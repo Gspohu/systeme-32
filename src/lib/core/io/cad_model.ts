@@ -6,7 +6,9 @@ import type { Build, Part } from "../part_types";
 import { at, neg, type Vec3 } from "../geometry";
 import { innerOutline, plainRectangle } from "../edge_bands";
 import { decorById, materialOfDecor } from "../../data/materials";
-import { SCREW_HOLDS, SCREW_SEAT, screwOf, type ScrewSpec } from "../../data/screws";
+import { SCREW_ADVICE, SCREW_HOLDS, SCREW_SEAT, screwArticle, screwOf, WASHER_DESIGNATION, WASHER_REF,
+         type ScrewDesignation, type ScrewSpec } from "../../data/screws";
+import { DEFAULT_PRICES } from "../../data/prices";
 import { HEAD_SINK } from "../screw_heads";
 import { CAD_MODELS, type CadModel } from "../../data/cad_models";
 import { cadHardware, DOWEL_LENGTH, handleSection, sameBolt, type CadInstance } from "./cad_hardware";
@@ -360,8 +362,33 @@ export function cadModel(p: Project, o: Pick<Outputs, "analysis" | "bom">, withG
     {
         return motion.parts.map((id) => { return [id, { amount: motion.amount, by: motion.stoppedBy! }] as const; });
     }));
+    // The article bought for each shape of screw, its designation and its supplier as the costing prices it
+    const supplier = (ref: string): string | null =>
+    {
+        const key = `hw:${ref}`;
+        return (p.prices[key] ?? DEFAULT_PRICES[key])?.source ?? null;
+    };
+    const advised = (ref: string, d: ScrewDesignation): object =>
+    {
+        return { ref, card: d.card, coating: d.coating, propertyClass: d.propertyClass ?? null, why: d.why,
+                 supplier: supplier(ref), advice: SCREW_ADVICE };
+    };
+    const fasteners = new Map<string, object>();
+    for (const s of every.filter((e) => { return e.kind !== "bolt"; }))
+    {
+        const article = screwArticle(s);
+        if (article === undefined)
+        {
+            throw new Error(`Vis ${s.kind} ${s.diameter} x ${s.length}${s.standard ? " " + s.standard : ""} sans article `
+                + "dans SCREW_ARTICLES (data/screws.ts) : l'y ajouter avec sa référence achetée.");
+        }
+        const key = `${s.kind}:${s.diameter}:${s.length}:${s.standard ?? ""}`;
+        fasteners.set(key, { kind: s.kind, diameter: s.diameter, length: s.length, standard: s.standard ?? null,
+                             ...advised(article.ref, article.designation) });
+    }
     return { schema: CAD_SCHEMA, name: p.name, parts, left, fitted, screws: every, listed, instances, standing, models,
              assemblies: pbs, gamme: withGamme ? gamme(p, parts, instances, every, models, pbs, stops) : null,
+             fasteners: [...fasteners.values()], washer: advised(WASHER_REF, WASHER_DESIGNATION),
              sections: handleSection(build.fitted), dowelLength: DOWEL_LENGTH, materials: [...materials.values()],
              // Each calculation of the checks, its inputs and its formulas : the FreeCAD sheet works them out again
              calcNotes: o.analysis.calcNotes };

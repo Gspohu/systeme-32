@@ -82,3 +82,67 @@ export function screwOf(purpose: string, label: string): ScrewSpec | null
     // A countersunk head would ride on the rim of the flat washer under a wall screw
     return purpose === "wall-screw" ? { kind: "pan", ...size, washer: true } : { kind: "countersunk", ...size };
 }
+
+
+// What the model says of each screw, written once on its FreeCAD object and once in the hardware list
+export const SCREW_ADVICE = "Recommandation, surtout utile pour le chiffrage : l'atelier peut employer ses propres vis";
+
+// The designation of a screw : a card of FreeCAD's library for its material, its coating, its property class for a
+// metric thread, and where these come from. Suppliers' sheets, the standards themselves not read
+export interface ScrewDesignation
+{
+    card: string;
+    coating: string;
+    propertyClass?: string;
+    why: string;
+}
+
+const CHIPBOARD: ScrewDesignation = { card: "Steel-Generic", coating: "zingué",
+                                      why: "acier trempé zingué, fiches PGB Europe et RS PRO des vis d'aggloméré DIN 7505" };
+const WOOD: ScrewDesignation = { card: "Steel-Generic", coating: "zingué 5 µm",
+                                 why: "acier ST zingué 5 µm, fiche Keller & Kalmbach des vis à bois DIN 7997 et 7996" };
+// A2 is the austenitic 18-8 family, 1.4301 its usual grade
+const STAINLESS: ScrewDesignation = { card: "Steel-X5CrNi18-10", coating: "aucun, inox A2",
+                                      why: "fischer PowerFast inox A2, fiche produit Alternate" };
+export const WASHER_DESIGNATION: ScrewDesignation = { card: "Steel-Generic", coating: "zingué", propertyClass: "100 HV",
+                                                      why: "acier de classe 100 HV, ISO 7094:2000 tableau 3, zingué "
+                                                           + "d'après la liste de quincaillerie" };
+export const WASHER_REF = "WASHER_5x20";
+
+// The article bought for each screw the CAD draws, by its shape : the export finds the supplier in its price
+export interface ScrewArticle
+{
+    kind: ScrewSpec["kind"];
+    diameter: number;
+    length: number;
+    standard?: string;
+    ref: string;
+    designation: ScrewDesignation;
+}
+
+export const SCREW_ARTICLES: ScrewArticle[] = [
+    // Häfele's chipboard screw of the hinges, the runners and the TIP-ON plates
+    { kind: "countersunk", diameter: 3.5, length: 15, ref: "609.1500", designation: CHIPBOARD },
+    // The #6 wood screw of the Blum runners in their file, sold by Würth : its sheet not read
+    { kind: "countersunk", diameter: 3.5, length: 16, standard: "ASMEB18.6.1.3", ref: "606N",
+      designation: { card: "Steel-Generic", coating: "selon le fabricant", why: "Würth B606N, fiche non lue" } },
+    { kind: "countersunk", diameter: 4, length: 30, ref: "SCREW_4x30", designation: CHIPBOARD },
+    { kind: "countersunk", diameter: 4, length: 35, ref: "SCREW_4x35", designation: CHIPBOARD },
+    // Supplied with the pull
+    { kind: "countersunk", diameter: 4, length: 16, standard: "DIN7997", ref: "84335807", designation: WOOD },
+    { kind: "countersunk", diameter: 2.5, length: 16, ref: "SCREW_2.5x16", designation: WOOD },
+    { kind: "countersunk", diameter: 5, length: 50, ref: "WALL_SCREW_5x50", designation: CHIPBOARD },
+    { kind: "pan", diameter: 5, length: 50, ref: "WALL_SCREW_5x50_PAN", designation: WOOD },
+    { kind: "pan", diameter: 5, length: 60, ref: "WALL_SCREW_5x60_PAN", designation: STAINLESS },
+    { kind: "pan", diameter: 4, length: 16, ref: "SCREW_4x16", designation: WOOD },
+];
+
+export function screwArticle(s: { kind: string; diameter: number; length: number; standard?: string }):
+    ScrewArticle | undefined
+{
+    return SCREW_ARTICLES.find((a) =>
+    {
+        return a.kind === s.kind && a.diameter === s.diameter && a.length === s.length
+            && (a.standard ?? "") === (s.standard ?? "");
+    });
+}
