@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { computeOutputs } from "./outputs";
 import { dresser, tvWall } from "./templates";
 import { drawingSet } from "./io/workshop";
-import { OVERLAY_EM, SMALL_TEXT, inkBox, inkedBoxes, scaleText, textWidth, type Prim } from "./drawing/display";
+import { Canvas, OVERLAY_EM, SMALL_TEXT, inkBox, inkedBoxes, scaleText, textWidth, type Prim } from "./drawing/display";
 import { CELL_PAD, ROW, TABLE_COLS, TABLE_HEAD, TABLE_TEXT, TABLE_W, machiningTable, outlineArcs } from
     "./drawing/machining_table";
-import { segmentHits } from "./drawing/workpiece";
+import { placeMarks, segmentHits } from "./drawing/workpiece";
 import type { PartView } from "./drawing/draft";
 import type { Part } from "./parts";
 import { tessellate } from "./geometry";
-import { round1 } from "./text";
+import { DIAM, round1 } from "./text";
 
 // What the workshop read is what FreeCAD print : each table and mark measured here where it land
 
@@ -74,7 +74,7 @@ type Text = Extract<Prim, { k: "text" }>;
 
 
 // A text as the PDF prints it, its box from its own letters, its descenders under the baseline
-function printed(m: Text): Box
+function printed(m: Text): Box   
 {
     const w = [...m.t].reduce((s, c) => { return s + (DEJAVU_EM[c] ?? 0.66); }, 0) * m.size;
     const lead = m.anchor === "start" ? 0 : m.anchor === "middle" ? w / 2 : w;
@@ -99,6 +99,12 @@ function tableSpots(row: Parameters<typeof machiningTable>[0], part: Part, P: (u
         {
             const a = arcs.find((x) => { return Math.abs(x.cu - u) < 0.06 && Math.abs(x.cv - v) < 0.06; })!;
             return { tag: c[0]!, at: P(a.cu + a.r * Math.cos(a.mid), a.cv + a.r * Math.sin(a.mid)), r: 0 };
+        }
+        // A cutout runs through, Ø8 or 30x20 : its edge half its largest size from the point given
+        if (c[4] === "trav.")
+        {
+            const sizes = c[3]!.replace(DIAM, "").split("x").map(num);
+            return { tag: c[0]!, at: P(u, v), r: Math.max(...sizes) / 2 };
         }
         const onFace = c[5] === "A" || c[5] === "B";
         return { tag: c[0]!, at: P(u, v), r: onFace && !Number.isNaN(num(c[3]!)) ? num(c[3]!) / 2 : 0 };
@@ -153,7 +159,7 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             const over: string[] = [];
             for (const row of rows)
             {
-                const t = machiningTable(row, row.parts[0]!);
+                const t = machiningTable(row, row.parts[0]!); 
                 expect(t.widths.reduce((a, b) => { return a + b; }, 0)).toBeCloseTo(TABLE_W, 9);
                 for (const cells of [TABLE_HEAD, ...t.lines])
                 {
@@ -212,7 +218,7 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             }
         });
 
-        it("keep the notes out of the columns, under the table as FreeCAD draws it", () =>
+        it("keep the notes out of the columns, under the table as FreeCAD draws it", () => 
         {
             // FreeCAD draws a row a whole number of pixels high at 96 dpi : the sheet counts the same
             const px = ROW / (25.4 / 96);
@@ -241,9 +247,9 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
             }); }).join(" ");
             for (const row of rows)
             {
-                for (const note of row.notes)
+                for (const note of row.notes)   
                 {
-                    expect(text, `${row.code} : ${note}`).toContain(`Note : ${note}`);
+                    expect(text, `${row.code} : ${note}`).toContain(`Note : ${note}`);   
                 }
             }
         });
@@ -336,6 +342,49 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                     expect(dist(c, s.at), `${s.code} ${s.tag}`).toBeLessThan(35);
                 }
             }
+        });
+
+        it("give each hole with no leader the mark nearest it, its own, within 2 mm of its edge", () =>
+        {
+            const gap = (p: [number, number], b: Box): number =>
+            {
+                return Math.hypot(Math.max(b.x - p[0], 0, p[0] - b.x - b.w), Math.max(b.y - p[1], 0, p[1] - b.y - b.h));
+            };
+            const wrong: string[] = [];
+            for (const pg of partPages)
+            {
+                const spots = sheetSpots(pg);
+                const marks = (pg.marks ?? []).filter((m): m is Text => { return m.k === "text" && MARK.test(m.t); });
+                const leaders = (pg.marks ?? []).filter((m): m is Extract<Prim, { k: "line" }> =>
+                {
+                    return m.k === "line" && m.s === "thin";
+                });
+                for (const s of spots)
+                {
+                    if (leaders.some((l) => { return Math.hypot(l.x1 - s.at[0], l.y1 - s.at[1]) < s.slack; }))
+                    {
+                        continue;
+                    }
+                    // Marks of a machining on this very point tell nothing apart : left out, as the code does
+                    const same = new Set(spots.filter((x) => { return dist(x.at, s.at) < 1e-6; }).map((x) =>
+                    {
+                        return x.tag;
+                    }));
+                    const byGap = marks.map((m) => { return { m, d: gap(s.at, printed(m)) }; }).sort((a, b) =>
+                    {
+                        return a.d - b.d;
+                    });
+                    const own = byGap.find((x) => { return x.m.t === s.tag; });
+                    const nearer = byGap.find((x) => { return !same.has(x.m.t) && x.d < (own?.d ?? Infinity); });
+                    if (own === undefined || nearer !== undefined || own.d > s.reach + 2 + s.slack + 0.05)
+                    {
+                        wrong.push(`${pg.title} : ${s.code} ${s.tag} (${s.at.map((x) => { return x.toFixed(1); })}) à `
+                            + `${own?.d.toFixed(2)} mm sans trait`
+                            + (nearer === undefined ? "" : `, ${nearer.m.t} à ${nearer.d.toFixed(2)}`));
+                    }
+                }
+            }
+            expect(wrong).toEqual([]);
         });
 
         it("run no leader through another machining, which it would seem to name", () =>
@@ -456,10 +505,10 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                     for (const [u, w] of tessellate(part.outline))
                     {
                         maxU = Math.max(maxU, u);
-                        maxV = Math.max(maxV, w);
+                        maxV = Math.max(maxV, w);   
                     }
                     const drawn = [v.box.w * v.scale, v.box.h * v.scale].sort((a, b) => { return a - b; });
-                    const real = [maxU, maxV].sort((a, b) => { return a - b; });
+                    const real = [maxU, maxV].sort((a, b) => { return a - b; }); 
                     expect(drawn[0]!, pg.title).toBeCloseTo(real[0]!, 6);
                     expect(drawn[1]!, pg.title).toBeCloseTo(real[1]!, 6);
                     expect(pg.fields?.scale, pg.title).toContain(scaleText(v.scale));
@@ -542,6 +591,52 @@ describe("a leader crossing a word", () =>
 });
 
 
+// 24 holes thrown round a block on 24 mm square : far tighter than any delivered part, where many marks need a
+// leader and the next ones look for room round them
+describe("marks crowded round a block", () =>
+{
+    it("are never written over the leader of another mark", () =>
+    {
+        const struck: string[] = [];
+        for (let seed = 1; seed <= 40; seed++)
+        {
+            let x = seed;
+            const rnd = (): number =>
+            {
+                x = (x * 16807) % 2147483647;
+                return x / 2147483647;
+            };
+            const c = new Canvas();
+            c.rect(100, 100, 12, 12);
+            const spots = Array.from({ length: 24 }, (_, k) =>
+            {
+                return { tag: `A${k + 1}`, u: 94 + rnd() * 24, v: 94 + rnd() * 24, r: 0.5 };
+            });
+            for (const s of spots)
+            {
+                c.circle(s.u, s.v, s.r);
+            }
+            const from = c.prims.length;
+            placeMarks(c, spots, (u, v) => { return [u, v]; }, 1, [...c.prims], [106, 106]);
+            const out = c.prims.slice(from);
+            const leaders = out.filter((m): m is Extract<Prim, { k: "line" }> => { return m.k === "line"; });
+            for (const m of out.filter((q): q is Text => { return q.k === "text"; }))
+            {
+                const own = spots.find((s) => { return s.tag === m.t; })!;
+                for (const l of leaders)
+                {
+                    if (Math.hypot(l.x1 - own.u, l.y1 - own.v) > 1e-9 && crosses([l.x1, l.y1, l.x2, l.y2], printed(m)))
+                    {
+                        struck.push(`tirage ${seed} : ${m.t}`);
+                    }
+                }
+            }
+        }
+        expect(struck).toEqual([]);
+    });
+});
+
+
 // 2 cotes of a delivered set moved by a few millimetres, the way a customer's room moves them : a sheet of marks
 // with no room for one of them came out as no sheet at all
 describe("the drawings of a set whose sizes moved", () =>
@@ -581,7 +676,7 @@ describe("the drawings of a set whose sizes moved", () =>
             }); }).join(" ");
             for (const row of [...o.bom.cut, ...o.bom.offSheet])
             {
-                const pg = pages.find((x) =>
+                const pg = pages.find((x) =>   
                 {
                     return x.views?.some((v) => { return v.part === row.parts[0]!.id; }) === true;
                 });
@@ -597,4 +692,59 @@ describe("the drawings of a set whose sizes moved", () =>
             }
         });
     }
+});
+
+
+// A low TV unit of 452 leaves #100-006 no room round F7 : the one real case of a mark sent to the table
+describe("a mark with no room on its view", () =>
+{
+    const p = tvWall();
+    (p.items.find((it) => { return it.name === "Meuble bas"; })! as unknown as { height: number }).height = 452;
+    const o = computeOutputs(p);
+    const pages = drawingSet(p, o);
+    const row = o.bom.cut.find((r) => { return r.code === "#100-006"; })!;
+    const pg = pages.find((x) => { return x.views?.some((v) => { return v.part === row.parts[0]!.id; }) === true; })!;
+    const texts = (pg.marks ?? []).filter((m): m is Text => { return m.k === "text"; });
+
+    it("is named in a note under the table, the others all written on the view", () => 
+    {
+        const note = texts.filter((m) => { return m.t.startsWith("Note : repères") ||
+                                          /^[A-Z]+\d+, |^ ?[A-Z]+\d+ /.test(m.t); })
+            .map((m) => { return m.t; }).join(" ");
+        expect(note).toContain("non écrits sur la vue");
+        const left = machiningTable(row, row.parts[0]!).spots.map((s) => { return s.tag; }).filter((tag) =>
+        {
+            return !texts.some((m) => { return m.t === tag; }); 
+        });
+        expect(left).toContain("F7");
+        for (const tag of left)
+        {
+            expect(note, tag).toMatch(new RegExp(`\\b${tag}\\b`));
+        }
+    });
+
+    it("is never written over a leader of another mark", () =>
+    {
+        const v = pg.views!.find((x) => { return x.part === row.parts[0]!.id; })!;
+        const spots = tableSpots(row, row.parts[0]!, paperOf(row.parts[0]!, v));
+        const leaders = (pg.marks ?? []).filter((m): m is Extract<Prim, { k: "line" }> =>
+        {
+            return m.k === "line" && m.s === "thin";
+        });
+        const struck: string[] = [];
+        for (const m of texts.filter((x) => { return MARK.test(x.t); }))
+        {
+            const own = spots.find((s) => { return s.tag === m.t; });
+            for (const l of leaders)
+            {
+                const mine = own !== undefined && Math.hypot(l.x1 - own.at[0], l.y1 - own.at[1]) < 0.051 / v.scale;
+                if (!mine && crosses([l.x1, l.y1, l.x2, l.y2], printed(m)))
+                {
+                    struck.push(m.t);
+                }
+            }
+        }
+        expect(leaders.length).toBeGreaterThan(0);
+        expect(struck).toEqual([]);
+    });
 });

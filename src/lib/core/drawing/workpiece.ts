@@ -569,11 +569,23 @@ type Box = { x: number; y: number; w: number; h: number };
 const AROUND = [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1, 1]] as const;
 // Clear paper kept round a mark, mm
 const MARK_AIR = 0.4;
+// Past this much paper between a hole's edge and its mark, mm, the mark takes a leader : D3 at 5 mm from its hole
+// with C11 at 2.5 named C11's
+const NEAR = 2;
+
+
+// Paper between a point and the nearest ink of a box, mm
+export function paperGap(p: [number, number], b: Box): number
+{
+    const dx = Math.max(b.x - p[0], 0, p[0] - b.x - b.w);
+    const dy = Math.max(b.y - p[1], 0, p[1] - b.y - b.h);
+    return Math.hypot(dx, dy);
+}
 
 
 // Each machining named by its mark : clear of all drawn, on the sheet, nearest its own hole, else led to it
 // Returns the marks it found no room for
-function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number) => [number, number],
+export function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number) => [number, number],
                     scale: number, drawn: Prim[], middle: [number, number]): string[]
 {
     // Everything already on the part, and its texts alone : a mark keeps clear of the first, a leader of the second
@@ -606,20 +618,36 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
     };
     const points = spots.map((s) => { return P(s.u, s.v); });
     const h = SMALL_TEXT;
+    // The marks written so far, those standing with no leader kept : a later one may not come nearer their hole
+    const written: { k: number; box: Box; alone: boolean }[] = [];
     spots.forEach((s, k) =>
     {
         const [sx, sy] = points[k]!;
         const w = overlayWidth(s.tag, h);
         // A pocket centred on its hole shares its point : no position tells them apart, both are left to the table
-        const elsewhere = points.map(([px, py], j) =>
+        const apart = (j: number, i: number): boolean =>
         {
-            return j !== k && Math.hypot(px - sx, py - sy) > 1e-6;
-        });
-        const nearestIsOwn = (b: Box): boolean =>
+            return j !== i && Math.hypot(points[j]![0] - points[i]![0], points[j]![1] - points[i]![1]) > 1e-6;
+        };
+        const elsewhere = points.map((_, j) => { return apart(j, k); });
+        // Read alone, a mark sits by its hole, the machining nearest it's its own and no other mark is nearer
+        // the hole : anywhere else it takes a leader
+        const standsAlone = (b: Box): boolean =>
         {
             const [cx, cy] = [b.x + b.w / 2, b.y + b.h / 2];
             const own = Math.hypot(cx - sx, cy - sy);
-            return points.every(([px, py], j) => { return !elsewhere[j] || Math.hypot(cx - px, cy - py) > own; });
+            const near = paperGap([sx, sy], b);
+            return near <= s.r / scale + NEAR
+                && points.every(([px, py], j) => { return !elsewhere[j] || Math.hypot(cx - px, cy - py) > own; })
+                && written.every((m) => { return !elsewhere[m.k] || paperGap([sx, sy], m.box) > near; });
+        };
+        // Nearer the hole of a mark standing alone than that mark : the reader would take one for the other
+        const steals = (b: Box): boolean =>
+        {
+            return written.some((m) =>
+            {
+                return m.alone && apart(m.k, k) && paperGap(points[m.k]!, b) <= paperGap(points[m.k]!, m.box);
+            });
         };
         // Off the first ring a leader ties the mark to its hole : the nearest machining no longer says which, and
         // the leader may cross a line but strikes no text, save one written over the hole it starts from, and never
@@ -653,10 +681,9 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
             };
             return s.r === 0 ? [...tries].sort((a, b) => { return away(a) - away(b); }) : tries;
         };
-        // A place reads on its own when the mark is nearer its hole than any other, else it takes a leader
         const usable = (b: Box): boolean =>
         {
-            return onSheet(b) && !crowded(b) && (nearestIsOwn(b) || leaderClear(b));
+            return onSheet(b) && !crowded(b) && !steals(b) && (standsAlone(b) || leaderClear(b));
         };
         let chosen: Box | null = null;
         for (let ring = 0; chosen === null && ring < 20; ring++)
@@ -694,7 +721,9 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
             unplaced.push(s.tag);
             return;
         }
-        if (!nearestIsOwn(chosen))
+        const alone = standsAlone(chosen);
+        written.push({ k, box: chosen, alone });
+        if (!alone)
         {
             const ex = Math.min(Math.max(sx, chosen.x), chosen.x + chosen.w);
             const ey = Math.min(Math.max(sy, chosen.y), chosen.y + chosen.h);
