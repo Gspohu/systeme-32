@@ -921,7 +921,13 @@ export function gamme(p: Project, boards: Board[], placed: Placed[], screws: Scr
     };
     for (const [index, i] of placed.entries())
     {
-        const m = models[i.model]!;
+        // An article with no model in the catalogue, a runner of a length never drawn : left out here, the checks of
+        // the analysis name it, rather than the whole set of drawings falling on it
+        const m = models[i.model];
+        if (m === undefined)
+        {
+            continue;
+        }
         const liaison = m.ref.startsWith("267.07");
         const sleeve = liaison && i.model.endsWith(".sleeve");
         if (i.after !== undefined && i.after.length > 0)

@@ -58,6 +58,7 @@ import { lightsInTheWay, lowest } from "./loose";
 import { MATERIALS, SHEET_LENGTH, SHEET_WIDTH } from "../data/materials";
 import { GRAVITY, SHELF_DEFLECTION_LIMIT } from "../data/rules";
 import { MAX_RUN_CELL, SIMULATED_TOPS, type SimulatedTop } from "../data/fem_results";
+import { CAD_MODELS } from "../data/cad_models";
 import { femFingerprint, femInput } from "./fem_input";
 
 
@@ -291,8 +292,8 @@ export function analyse(p: Project): Analysis
     }
     const partReport = partChecks(p, b);
     checks.push(...partReport.checks, ...frontChecks(p), ...itemChecks(p, masses, loads, b), ...deviceChecks(p, b),
-                ...footLoadChecks(p, b, own), ...cutoutChecks(b), ...stockChecks(b, p.settings), ...obstacleChecks(p, b),  
-                ...titleBlockChecks(p));
+                ...footLoadChecks(p, b, own), ...cutoutChecks(b), ...stockChecks(b, p.settings), ...obstacleChecks(p, b),
+                ...titleBlockChecks(p), ...modelChecks(b));
     const tippings: Tipping[] = [];
     for (const it of p.items)
     {
@@ -455,6 +456,30 @@ function simulatedTop(fingerprint: string, item: string, over: string[]): Simula
         // A coarser cell reads the sag low : such a run is never cited
         return run.item === item && [...run.over].sort().join("|") === names && run.input === fingerprint
             && run.mesh <= MAX_RUN_CELL;
+    });
+}
+
+
+// A runner sized to its carcass, a Blum length the CAD catalogue holds no model of : the CAD file and the work
+// sequence go without it, said once for each reference
+function modelChecks(b: Build): Check[]
+{
+    const missing = new Map<string, string>();
+    for (const q of b.parts)
+    {
+        for (const h of q.holes)
+        {
+            if (h.purpose === "runner-screw" && h.fixes !== undefined && CAD_MODELS[`${h.fixes}.left`] === undefined)
+            {
+                missing.set(h.fixes, q.item);
+            }
+        }
+    }
+    return [...missing].map(([ref, item]) =>
+    {
+        return { level: "warning" as const, item, target: null,
+                 message: `Coulisse ${ref} : aucun modèle 3D au catalogue (data/cad_models.ts), elle manque au fichier `
+                     + "CAO et à la gamme de montage. Ajouter ses deux fichiers STEP Blum, gauche et droite." };
     });
 }
 
