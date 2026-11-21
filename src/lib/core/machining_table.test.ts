@@ -387,17 +387,19 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                     {
                         continue;
                     }
-                    const b = printed(m);
+                    // With a little air round it : 2 marks touching read as one word, B2D11
+                    const ink = printed(m);
+                    const b = { x: ink.x - 0.2, y: ink.y - 0.2, w: ink.w + 0.4, h: ink.h + 0.4 };
                     for (const e of edges.filter((s) => { return crosses(s, b); }))
                     {
                         over.push(`${pg.title} : ${m.t} barré par le contour en ${e[0].toFixed(1)} ${e[1].toFixed(1)}`);
                     }
                     for (const q of prims)
                     {
-                        // Its own leader ends on its edge
-                        if (q === m || (q.k === "line" && Math.abs(q.x2 - Math.min(Math.max(q.x1, b.x), b.x +
-                            b.w)) < 0.05
-                            && Math.abs(q.y2 - Math.min(Math.max(q.y1, b.y), b.y + b.h)) < 0.05))
+                        // Its own leader ends on the edge of its letters
+                        if (q === m || (q.k === "line" && Math.abs(q.x2 - Math.min(Math.max(q.x1, ink.x), ink.x +
+                            ink.w)) < 0.05
+                            && Math.abs(q.y2 - Math.min(Math.max(q.y1, ink.y), ink.y + ink.h)) < 0.05))
                         {
                             continue;
                         }

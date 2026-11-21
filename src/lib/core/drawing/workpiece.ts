@@ -561,6 +561,8 @@ type Box = { x: number; y: number; w: number; h: number };
 // Centred over the hole, under it, beside it, then on its corners : a row of holes closer than a mark is wide
 // alternates over and under by itself
 const AROUND = [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1, 1]] as const;
+// Clear paper kept round a mark, mm
+const MARK_AIR = 0.4;
 
 
 // Each machining named by its mark : clear of all drawn, on the sheet, nearest its own hole, else led to it
@@ -577,6 +579,12 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
     const overlaps = (a: Box, b: Box): boolean =>
     {
         return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    };
+    // Some air round a mark : B2 touching D11 read B2D11
+    const crowded = (b: Box): boolean =>
+    {
+        const room = { x: b.x - MARK_AIR, y: b.y - MARK_AIR, w: b.w + 2 * MARK_AIR, h: b.h + 2 * MARK_AIR };
+        return busy.some((o) => { return overlaps(room, o); });
     };
     const blockX = A3.w - MARGIN - TITLE_BLOCK_W;
     const blockY = A3.h - MARGIN - TITLE_BLOCK_H;
@@ -612,8 +620,9 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
             const line = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
             const struck = words.some((o) =>
             {
-                const overHole = sx >= o.x && sx <= o.x + o.w && sy >= o.y && sy <= o.y + o.h;
-                return !overHole && overlaps(line, o);
+                const aired = { x: o.x - MARK_AIR, y: o.y - MARK_AIR, w: o.w + 2 * MARK_AIR, h: o.h + 2 * MARK_AIR };
+                const overHole = sx >= aired.x && sx <= aired.x + aired.w && sy >= aired.y && sy <= aired.y + aired.h;
+                return !overHole && overlaps(line, aired);
             });
             const [lx, ly] = [ex - sx, ey - sy];
             const length2 = lx * lx + ly * ly;
@@ -648,7 +657,7 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
             });
             chosen = inwardFirst(tries).find((b) =>
             {
-                return onSheet(b) && !busy.some((o) => { return overlaps(b, o); })
+                return onSheet(b) && !crowded(b)
                     && (ring > 0 ? leaderClear(b) : nearestIsOwn(b));
             }) ?? null;
             ring++;
@@ -662,7 +671,7 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
                 {
                     const b = inkBox([{ k: "text", x: sx + ax - w / 2, y: sy + ay + h / 2, t: s.tag, size: h,
                                         anchor: "start" }])!;
-                    if (onSheet(b) && !busy.some((o) => { return overlaps(b, o); }) && leaderClear(b))
+                    if (onSheet(b) && !crowded(b) && leaderClear(b))
                     {
                         chosen = b;
                         ring = 2;
