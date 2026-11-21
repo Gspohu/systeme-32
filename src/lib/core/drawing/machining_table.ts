@@ -3,11 +3,13 @@
 import type { CutRow } from "../bom";
 import type { Part } from "../parts";
 import { bounds, tessellate } from "../geometry";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, textWidth, wrap, type Prim } from "./display";
+import { A3, Canvas, MARGIN, OVERLAY_EM, TITLE_BLOCK_H, textWidth, wrap, type Prim } from "./display";
 import { DIAM, round1 } from "../text";   
 
 
-export const ROW = 3.6;
+// A row as FreeCAD draws it : a spreadsheet row is a whole number of pixels at 96 dpi, and 3.6 mm came out at
+// 14 px, 3.704 mm. Counted at 3.6 the notes under a table of 32 lines sat on its last one
+export const ROW = 14 * 25.4 / 96;
 export const TABLE_COL_W = 198;
 // The narrowest each column is, Usage taking what the others leave of the table : 2 tables side by side still
 // keep clear of each other
@@ -145,8 +147,9 @@ export function machiningTable(row: CutRow, part: Part, total = TABLE_W): Machin
     }
     for (const a of outlineArcs(part))
     {
+        // Its mark on the middle of the arc, the contour it names : a centre may lie off the board, off the sheet
         add([round1(a.cu), round1(a.cv), `R${round1(a.r)}`, "-", "-", "Arc du contour, cotes au centre"],
-            [a.cu, a.cv]);
+            [a.cu + a.r * Math.cos(a.mid), a.cv + a.r * Math.sin(a.mid)]);
     }
     for (const k of part.pockets ?? [])
     {
@@ -176,7 +179,14 @@ export function machiningTable(row: CutRow, part: Part, total = TABLE_W): Machin
         counts[k]!++;
         const tag = `${letterOf(k)}${counts[k]}`;
         spots.push({ tag, u: r.u, v: r.v, r: r.r });
-        return [tag, ...r.cells];
+        return { cells: [tag, ...r.cells], k, n: counts[k]! };
+    }).sort((a, b) =>
+    {
+        return a.k - b.k || a.n - b.n;
+    }).map((t) =>
+    {
+        // Read in the order of the marks, A1, A2 then B1, never interleaved
+        return t.cells;
     });
     const widths = TABLE_COLS.slice(0, USAGE).map((least, c) =>
     {
@@ -203,7 +213,9 @@ export function machiningTable(row: CutRow, part: Part, total = TABLE_W): Machin
             return [t];
         }));
     }
-    return { lines, widths, notes: notes.flatMap((t) => { return wrap(t, TABLE_TEXT, total); }), spots };
+    // Notes are overlay text, drawn in its wider font
+    return { lines, widths, notes: notes.flatMap((t) => { return wrap(t, TABLE_TEXT, total, OVERLAY_EM); }),
+             spots };
 }
 
 

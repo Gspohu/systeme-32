@@ -19,7 +19,8 @@ DIM_OFF = 6
 UPRIGHT_DIM_OFF = 12
 # The lines a long owner or title runs on, left empty when it fits on the one before
 CONTINUATION = {"legal_owner_2", "legal_owner_3", "supplementary_title_2"}
-SCALE_TEXT = re.compile(r"^\s*1\s*:\s*(\d+(?:[.,]\d+)?)\s*$")
+# 1:5, 2:1 for an enlargement, or the first of a sheet of two parts drawn at 2 scales, 1:2, 1:5
+SCALE_TEXT = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)")
 
 
 def page_scale(page, fields):
@@ -27,7 +28,7 @@ def page_scale(page, fields):
     # every view keeping its own Custom scale
     found = SCALE_TEXT.match(fields.get("scale", ""))
     if found:
-        page.Scale = 1 / float(found.group(1).replace(",", "."))
+        page.Scale = float(found.group(1).replace(",", ".")) / float(found.group(2).replace(",", "."))
     return page
 
 

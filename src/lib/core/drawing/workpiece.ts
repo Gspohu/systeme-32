@@ -5,12 +5,11 @@ import { edgeNotation } from "../bom";
 import type { Fitted, Part } from "../parts";
 import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
-import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, fit, inkBox, pickScale, scaleText, textWidth, wrap,
-    type Prim, type Stroke }
-    from "./display";
+import { A3, Canvas, MARGIN, OVERLAY_EM, SCALES, SMALL_TEXT, TITLE_BLOCK_H, TITLE_BLOCK_W, fit, inkBox, inkedBoxes,
+    pickScale, scaleText, textWidth, wrap, type Prim, type Stroke } from "./display";
 import type { Draft, PartView } from "./draft";
 import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_W, drawTable, machiningTable, outlineArcs, printedRows,
-    type MachiningTable, type PlacedColumn } from "./machining_table";
+    type MachiningTable, type MarkSpot, type PlacedColumn } from "./machining_table";
 import { round1 } from "../text";
 
 
@@ -100,7 +99,7 @@ function tableRoom(part: Part, boxH: number, boxW: number, cols: number): number
     const [sx, sy] = spans(part);
     const scale = pickScale(sx, sy, boxW - 20, boxH - 20);
     const top = MARGIN + 5 + 24 + sy / scale + 18;
-    return cols * Math.max(4, Math.floor((A3.h - MARGIN - TITLE_BLOCK_H - 6 - top - 3.6) / ROW));
+    return cols * Math.max(4, Math.floor((A3.h - MARGIN - TITLE_BLOCK_H - 6 - top - ROW) / ROW));
 }
 
 
@@ -114,11 +113,27 @@ function drawAlone(canvas: Canvas, row: CutRow, fitted: Fitted[], beside: boolea
 }
 
 
+// The scale a layout draws a part at, tried on a sheet of its own, and none when that layout can't hold its marks
+// or its table : a trial that fails rules its layout out, only the layout kept may stop the sheets
+function trialScale(draw: () => ReturnType<typeof drawWorkpiece>): number
+{
+    try
+    {
+        const t = draw();
+        return printedRows(t.rest) === 0 ? t.scale : Infinity;
+    }
+    catch
+    {
+        return Infinity;
+    }
+}
+
+
 // Whichever of the two draws it the larger, both tried for real : the column only when its table holds in it
 function aloneBeside(row: CutRow, fitted: Fitted[]): boolean
 {
-    const trial = drawAlone(new Canvas(), row, fitted, true);
-    return trial.scale < drawAlone(new Canvas(), row, fitted, false).scale && printedRows(trial.rest) === 0;
+    const beside = trialScale(() => { return drawAlone(new Canvas(), row, fitted, true); });
+    return beside < trialScale(() => { return drawAlone(new Canvas(), row, fitted, false); });
 }
 
 
@@ -131,9 +146,11 @@ function wantsWholeSheet(row: CutRow, fitted: Fitted[]): boolean
     {
         return true;
     }
-    const alone = drawAlone(new Canvas(), row, fitted, aloneBeside(row, fitted)).scale;
-    const half = drawWorkpiece(new Canvas(), row, MARGIN + 5, MARGIN + 5, BOX_W, BOX_H, fitted, 1,
-                               A3.h - MARGIN - 4).scale;
+    const alone = trialScale(() => { return drawAlone(new Canvas(), row, fitted, aloneBeside(row, fitted)); });
+    const half = trialScale(() =>
+    {
+        return drawWorkpiece(new Canvas(), row, MARGIN + 5, MARGIN + 5, BOX_W, BOX_H, fitted, 1, A3.h - MARGIN - 4);
+    });
     return alone < half;
 }
 
@@ -249,6 +266,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
 {
     // What is drawn from here on goes on the TechDraw page as it is : all but the board, its dimensions and the table
     const marks: Prim[] = [];
+    const partFrom = canvas.prims.length;
     let from = canvas.prims.length;
     const keep = (): void =>
     {
@@ -272,7 +290,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     {
         for (const [t, size, bold] of heads)
         {
-            for (const line of wrap(t, size, side.w))
+            for (const line of wrap(t, size, side.w, OVERLAY_EM))
             {
                 headBottom += size + 1.5;
                 canvas.text(side.x, headBottom, line, size, "start", bold);
@@ -332,6 +350,8 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), s);
     };
 
+    // The board's own outline, which every mark lies on or by : left out of what a mark must keep clear of
+    const shapeFrom = canvas.prims.length;
     if (part.curve !== null && (part.role === "skin" || part.role === "batten"))
     {
         // Laid flat here, bent in the solid : no projection draw it this way
@@ -351,6 +371,7 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         // The outline is the projection's own
         from = canvas.prims.length;
     }
+    const shapeTo = canvas.prims.length;
     for (const e of part.edges)
     {
         const vAt = e === "v1" ? part.width : 0;
@@ -435,6 +456,16 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     {
         const tipU = a.cu + a.r * Math.cos(a.mid);
         const tipV = a.cv + a.r * Math.sin(a.mid);
+        if (a.cu < 0 || a.cu > maxU || a.cv < 0 || a.cv > maxV)
+        {
+            // A centre off the board may lie off the sheet : a short leader on the arc, its centre in the table
+            const [tipX, tipY] = P(tipU, tipV);
+            const [dx, dy] = D(-Math.cos(a.mid), -Math.sin(a.mid));
+            canvas.line(tipX, tipY, tipX + 10 * dx, tipY + 10 * dy, "thin");
+            canvas.arrowHead(tipX, tipY, dx, dy);
+            canvas.text(tipX + 12 * dx, tipY + 12 * dy - 1, `R${round1(a.r)}`, 2.5, "middle");
+            continue;
+        }
         seg(a.cu, a.cv, tipU, tipV, "thin");
         canvas.arrowHead(...P(tipU, tipV), ...D(-Math.cos(a.mid), -Math.sin(a.mid)));
         const [tx, ty] = P(a.cu + a.r * 0.55 * Math.cos(a.mid), a.cv + a.r * 0.55 * Math.sin(a.mid));
@@ -465,7 +496,6 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         }
     }
     // The origin, then which way u and v run from it
-    const originFrom = canvas.prims.length;
     const [zx, zy] = P(0, 0);
     canvas.circle(zx, zy, 1, "thin");
     // Its 0 outside the part, whichever corner it took
@@ -482,38 +512,6 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
         canvas.text(zx + 6 * dx + 3.5 * awayX, zy + 6 * dy + 3.5 * awayY + AXIS_TEXT * 0.35, name, AXIS_TEXT,
                     "middle", true);
     }
-    // Each machining named by the mark of its line in the table, on the first corner around it that covers no
-    // hole, no other mark and nothing of the origin
-    const table = machiningTable(row, part, side === undefined ? TABLE_W : side.w);
-    const busy = part.holes.filter((h) => { return h.face === "A" || h.face === "B"; }).map((h) =>
-    {
-        const [hx, hy] = P(h.u, h.v);
-        const r = Math.max(0.5, h.diameter / 2 / scale);
-        return { x: hx - r, y: hy - r, w: 2 * r, h: 2 * r };
-    });
-    busy.push(...canvas.prims.slice(originFrom).flatMap((q) =>
-    {
-        const b = inkBox([q]);
-        return b === null ? [] : [b];
-    }));
-    const overlaps = (a: typeof busy[number], b: typeof busy[number]): boolean =>
-    {
-        return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-    };
-    for (const s of table.spots)
-    {
-        const [sx, sy] = P(s.u, s.v);
-        const gap = s.r / scale + 0.6;
-        const w = textWidth(s.tag, SMALL_TEXT);
-        const corners = ([[1, -1], [1, 1], [-1, -1], [-1, 1]] as const).map(([dx, dy]) =>
-        {
-            return { x: dx > 0 ? sx + gap : sx - gap - w, y: dy < 0 ? sy - gap - SMALL_TEXT : sy + gap, w,
-                     h: SMALL_TEXT };
-        });
-        const spot = corners.find((c) => { return !busy.some((o) => { return overlaps(c, o); }); }) ?? corners[0]!;
-        canvas.text(spot.x, spot.y + SMALL_TEXT, s.tag, SMALL_TEXT, "start");
-        busy.push(spot);
-    }
     keep();
     const left = ox;
     const right = ox + spanX / scale;
@@ -526,6 +524,11 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     // The dimensions are TechDraw's own, measured on the solid
     from = canvas.prims.length;
     drawFootprints(canvas, part, fitted, P);
+    const table = machiningTable(row, part, side === undefined ? TABLE_W : side.w);
+    placeMarks(canvas, table.spots, P, scale, canvas.prims.filter((_, i) =>
+    {
+        return i >= partFrom && !(i >= shapeFrom && i < shapeTo);
+    }), row.code);
     if (side === undefined)
     {
         canvas.text(x0 + boxW, y0 + 18, scaleText(scale), 2.5, "end");
@@ -555,6 +558,122 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     const view: PartView = { part: part.id, scale, su, sv,
                              box: { x: ox, y: oy - spanY / scale, w: spanX / scale, h: spanY / scale } };
     return { scale, rest, view, columns, marks };
+}
+
+
+type Box = { x: number; y: number; w: number; h: number };
+
+// Centred over the hole, under it, beside it, then on its corners : a row of holes closer than a mark is wide
+// alternates over and under by itself
+const AROUND = [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1, 1]] as const;
+
+
+// Each machining named by its mark : clear of all drawn, on the sheet, nearest its own hole, else led to it
+function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number) => [number, number],
+                    scale: number, drawn: Prim[], code: string): void
+{
+    // Everything already on the part, and its texts alone : a mark keeps clear of the first, a leader of the second
+    const boxes = (prims: Prim[]): Box[] =>
+    {
+        return prims.flatMap((q) => { return inkedBoxes(q); });
+    };
+    const busy = boxes(drawn);
+    const words = boxes(drawn.filter((q) => { return q.k === "text"; }));
+    const overlaps = (a: Box, b: Box): boolean =>
+    {
+        return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    };
+    const blockX = A3.w - MARGIN - TITLE_BLOCK_W;
+    const blockY = A3.h - MARGIN - TITLE_BLOCK_H;
+    const onSheet = (b: Box): boolean =>
+    {
+        return b.x >= MARGIN && b.y >= MARGIN && b.x + b.w <= A3.w - MARGIN && b.y + b.h <= A3.h - MARGIN
+            && !(b.x + b.w > blockX && b.y + b.h > blockY);
+    };
+    const points = spots.map((s) => { return P(s.u, s.v); });
+    const h = SMALL_TEXT;
+    spots.forEach((s, k) =>
+    {
+        const [sx, sy] = points[k]!;
+        const w = textWidth(s.tag, h, OVERLAY_EM);
+        const nearestIsOwn = (b: Box): boolean =>
+        {
+            const [cx, cy] = [b.x + b.w / 2, b.y + b.h / 2];
+            const own = Math.hypot(cx - sx, cy - sy);
+            return points.every(([px, py], j) => { return j === k || Math.hypot(cx - px, cy - py) > own; });
+        };
+        // Off the first ring a leader ties the mark to its hole : the nearest machining no longer says which, and
+        // the leader may cross a line but strikes no text, save one written over the hole it starts from
+        const leaderClear = (b: Box): boolean =>
+        {
+            const ex = Math.min(Math.max(sx, b.x), b.x + b.w);
+            const ey = Math.min(Math.max(sy, b.y), b.y + b.h);
+            const line = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
+            return words.every((o) =>
+            {
+                const overHole = sx >= o.x && sx <= o.x + o.w && sy >= o.y && sy <= o.y + o.h;
+                return overHole || !overlaps(line, o);
+            });
+        };
+        let chosen: Box | null = null;
+        let ring = 0;
+        while (chosen === null && ring < 12)
+        {
+            const gap = s.r / scale + 0.6 + ring * 2.5;
+            // Each try measured as the text it would write, descenders included : what keeps clear is what prints
+            const tries = AROUND.map(([dx, dy]) =>
+            {
+                const x = dx > 0 ? sx + gap : dx < 0 ? sx - gap - w : sx - w / 2;
+                const top = dy < 0 ? sy - gap - 1.25 * h : dy > 0 ? sy + gap : sy - 0.625 * h;
+                return inkBox([{ k: "text", x, y: top + h, t: s.tag, size: h, anchor: "start" }])!;
+            });
+            chosen = tries.find((b) =>
+            {
+                return onSheet(b) && !busy.some((o) => { return overlaps(b, o); })
+                    && (ring > 0 ? leaderClear(b) : nearestIsOwn(b));
+            }) ?? null;
+            ring++;
+        }
+        // A crowded corner : any free place within 40 mm, square by square outwards, a leader always drawn
+        for (let d = 1; chosen === null && d <= 40; d++)
+        {
+            for (let i = -d; chosen === null && i <= d; i++)
+            {
+                for (const [ax, ay] of [[i, -d], [i, d], [-d, i], [d, i]] as const)
+                {
+                    const b = inkBox([{ k: "text", x: sx + ax - w / 2, y: sy + ay + h / 2, t: s.tag, size: h,
+                                        anchor: "start" }])!;
+                    if (onSheet(b) && !busy.some((o) => { return overlaps(b, o); }) && leaderClear(b))
+                    {
+                        chosen = b;
+                        ring = 2;
+                        break;
+                    }
+                }
+            }
+        }
+        if (chosen === null)
+        {
+            const first = AROUND.map(([dx, dy]) =>
+            {
+                const b = { x: sx + dx * 3 - w / 2, y: sy + dy * 3 - h / 2, w, h };
+                return !onSheet(b) ? "hors feuille" : busy.some((o) => { return overlaps(b, o); }) ? "recouvre"
+                    : "plus près d'un autre";
+            });
+            throw new Error(`${code} : aucune place pour le repère ${s.tag} autour de son usinage, en `
+                + `${sx.toFixed(1)} ${sy.toFixed(1)} mm sur la feuille (${first.join(", ")})`);
+        }
+        if (ring > 1)
+        {
+            const ex = Math.min(Math.max(sx, chosen.x), chosen.x + chosen.w);
+            const ey = Math.min(Math.max(sy, chosen.y), chosen.y + chosen.h);
+            canvas.line(sx, sy, ex, ey, "thin");
+            busy.push({ x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) });
+        }
+        canvas.text(chosen.x, chosen.y + h, s.tag, h, "start");
+        busy.push(chosen);
+        words.push(chosen);
+    });
 }
 
 

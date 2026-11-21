@@ -42,11 +42,14 @@ export const SMALL_TEXT = 2;
 
 // Helvetica averages about half an em per character : used to centre and truncate, not exatc metics
 const AVG_CHAR = 0.52;
+// What TechDraw draws the overlay of a page in, DejaVu Sans whatever the svg asks for : C11 at 2 mm came out
+// 3.93 mm wide on the PDF, 0.655 em a character. Marks, notes and headings are placed with it
+export const OVERLAY_EM = 0.66;
 
 
-export function textWidth(t: string, size: number): number
+export function textWidth(t: string, size: number, em = AVG_CHAR): number
 {
-    return t.length * size * AVG_CHAR;
+    return t.length * size * em;
 }
 
 
@@ -87,7 +90,7 @@ export function boxOf(prims: Prim[]): { x: number; y: number; w: number; h: numb
 }
 
 
-// What some primitives cover on the page, each text as wide as textWidth reckons it
+// What some primitives cover on the page, each text as wide as the DejaVu of the overlay draws it
 export function inkBox(prims: Prim[]): { x: number; y: number; w: number; h: number } | null
 {
     const boxes = prims.flatMap((q) =>
@@ -97,7 +100,7 @@ export function inkBox(prims: Prim[]): { x: number; y: number; w: number; h: num
             const b = boxOf([q]);
             return b === null ? [] : [b];
         }
-        const w = textWidth(q.t, q.size);
+        const w = textWidth(q.t, q.size, OVERLAY_EM);
         const lead = q.anchor === "start" ? 0 : q.anchor === "middle" ? w / 2 : w;
         // Turned a quarter anticlockwise its glyphs stand left of the point, its lenght running up the page
         return q.rot === 90 ? [{ x: q.x - q.size, y: q.y - w + lead, w: q.size * 1.25, h: w }]
@@ -112,6 +115,29 @@ export function inkBox(prims: Prim[]): { x: number; y: number; w: number; h: num
     const w = Math.max(...boxes.map((b) => { return b.x + b.w; })) - x;
     const h = Math.max(...boxes.map((b) => { return b.y + b.h; })) - y;
     return { x, y, w, h };
+}
+
+
+// What a primitive inks, as boxes : a text its own box, a rectangle or a polygon its sides only, the inside of an
+// outline being empty paper a mark may sit on
+export function inkedBoxes(q: Prim): { x: number; y: number; w: number; h: number }[]
+{
+    const side = (x1: number, y1: number, x2: number, y2: number) =>
+    {
+        return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+    };
+    if (q.k === "rect")
+    {
+        return [side(q.x, q.y, q.x + q.w, q.y), side(q.x + q.w, q.y, q.x + q.w, q.y + q.h),
+                side(q.x, q.y + q.h, q.x + q.w, q.y + q.h), side(q.x, q.y, q.x, q.y + q.h)];
+    }
+    if (q.k === "poly")
+    {
+        const pts = q.closed ? [...q.pts, q.pts[0]!] : q.pts;
+        return pts.slice(1).map((p, i) => { return side(pts[i]![0], pts[i]![1], p[0], p[1]); });
+    }
+    const b = inkBox([q]);
+    return b === null ? [] : [b];
 }
 
 
@@ -145,14 +171,14 @@ export function fit(t: string, size: number, width: number): string
 
 
 // Lines of at most `width`, broken between words : nothing cut off, a word too long for a line stands alone
-export function wrap(t: string, size: number, width: number): string[]
+export function wrap(t: string, size: number, width: number, em = AVG_CHAR): string[]
 {
     const lines: string[] = [];
     let line = "";
     for (const word of t.split(" "))
     {
         const next = line === "" ? word : `${line} ${word}`;
-        if (line !== "" && textWidth(next, size) > width)
+        if (line !== "" && textWidth(next, size, em) > width)
         {
             lines.push(line);
             line = word;
