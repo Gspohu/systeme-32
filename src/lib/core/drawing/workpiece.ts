@@ -8,7 +8,7 @@ import { fittedExtent } from "../fitted";
 import { A3, Canvas, MARGIN, OVERLAY_EM, SCALES, SMALL_TEXT, TITLE_BLOCK_H, TITLE_BLOCK_W, fit, inkBox, inkedBoxes,
     overlayWidth, pickScale, scaleText, textWidth, wrap, type Prim, type Stroke } from "./display";
 import type { Draft, PartView } from "./draft";
-import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_W, drawTable, machiningTable, outlineArcs, printedRows,
+import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_TEXT, TABLE_W, drawTable, machiningTable, outlineArcs, printedRows,
     type MachiningTable, type MarkSpot, type PlacedColumn } from "./machining_table";
 import { round1 } from "../text";
 
@@ -523,7 +523,13 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     drawFootprints(canvas, part, fitted, P);
     const table = machiningTable(row, part, side === undefined ? TABLE_W : side.w);
     // Everything of the part, its own outline included : a mark on a cut edge would be struck through by it
-    placeMarks(canvas, table.spots, P, scale, canvas.prims.slice(partFrom), P(maxU / 2, maxV / 2), row.code);
+    const unplaced = placeMarks(canvas, table.spots, P, scale, canvas.prims.slice(partFrom), P(maxU / 2, maxV / 2));
+    if (unplaced.length > 0)
+    {
+        // Said on the sheet, never dropped : the maker finds those holes by their line of the table
+        table.notes.push(...wrap(`Note : repères ${unplaced.join(", ")} non écrits sur la vue faute de place, `
+            + "positions au tableau", TABLE_TEXT, side === undefined ? TABLE_W : side.w, OVERLAY_EM));
+    }
     if (side === undefined)
     {
         canvas.text(x0 + boxW, y0 + 18, scaleText(scale), 2.5, "end");
@@ -566,8 +572,9 @@ const MARK_AIR = 0.4;
 
 
 // Each machining named by its mark : clear of all drawn, on the sheet, nearest its own hole, else led to it
+// Returns the marks it found no room for
 function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number) => [number, number],
-                    scale: number, drawn: Prim[], middle: [number, number], code: string): void
+                    scale: number, drawn: Prim[], middle: [number, number]): string[]
 {
     // Everything already on the part, and its texts alone : a mark keeps clear of the first, a leader of the second
     const boxes = (prims: Prim[]): Box[] =>
@@ -580,11 +587,15 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
     {
         return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
     };
+    // Leaders already drawn, as the segments they are : their box would close a whole corner of empty paper
+    const leaders: [number, number, number, number][] = [];
+    const unplaced: string[] = [];
     // Some air round a mark : B2 touching D11 read B2D11
     const crowded = (b: Box): boolean =>
     {
         const room = { x: b.x - MARK_AIR, y: b.y - MARK_AIR, w: b.w + 2 * MARK_AIR, h: b.h + 2 * MARK_AIR };
-        return busy.some((o) => { return overlaps(room, o); });
+        return busy.some((o) => { return overlaps(room, o); })
+            || leaders.some(([x1, y1, x2, y2]) => { return segmentHits([x1, y1], [x2, y2], room); });
     };
     const blockX = A3.w - MARGIN - TITLE_BLOCK_W;
     const blockY = A3.h - MARGIN - TITLE_BLOCK_H;
@@ -617,12 +628,11 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
         {
             const ex = Math.min(Math.max(sx, b.x), b.x + b.w);
             const ey = Math.min(Math.max(sy, b.y), b.y + b.h);
-            const line = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
             const struck = words.some((o) =>
             {
                 const aired = { x: o.x - MARK_AIR, y: o.y - MARK_AIR, w: o.w + 2 * MARK_AIR, h: o.h + 2 * MARK_AIR };
                 const overHole = sx >= aired.x && sx <= aired.x + aired.w && sy >= aired.y && sy <= aired.y + aired.h;
-                return !overHole && overlaps(line, aired);
+                return !overHole && segmentHits([sx, sy], [ex, ey], aired);
             });
             const [lx, ly] = [ex - sx, ey - sy];
             const length2 = lx * lx + ly * ly;
@@ -643,11 +653,15 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
             };
             return s.r === 0 ? [...tries].sort((a, b) => { return away(a) - away(b); }) : tries;
         };
-        let chosen: Box | null = null;
-        let ring = 0;
-        while (chosen === null && ring < 12)
+        // A place reads on its own when the mark is nearer its hole than any other, else it takes a leader
+        const usable = (b: Box): boolean =>
         {
-            const gap = s.r / scale + 0.6 + ring * 2.5;
+            return onSheet(b) && !crowded(b) && (nearestIsOwn(b) || leaderClear(b));
+        };
+        let chosen: Box | null = null;
+        for (let ring = 0; chosen === null && ring < 20; ring++)
+        {
+            const gap = s.r / scale + 0.6 + ring * 1.25;
             // Each try measured as the text it would write, descenders included : what keeps clear is what prints
             const tries = AROUND.map(([dx, dy]) =>
             {
@@ -655,14 +669,9 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
                 const top = dy < 0 ? sy - gap - 1.25 * h : dy > 0 ? sy + gap : sy - 0.625 * h;
                 return inkBox([{ k: "text", x, y: top + h, t: s.tag, size: h, anchor: "start" }])!;
             });
-            chosen = inwardFirst(tries).find((b) =>
-            {
-                return onSheet(b) && !crowded(b)
-                    && (ring > 0 ? leaderClear(b) : nearestIsOwn(b));
-            }) ?? null;
-            ring++;
+            chosen = inwardFirst(tries).find(usable) ?? null;
         }
-        // A crowded corner : any free place within 40 mm, square by square outwards, a leader always drawn
+        // A crowded corner : any free place within 40 mm, square by square outwards
         for (let d = 1; chosen === null && d <= 40; d++)
         {
             for (let i = -d; chosen === null && i <= d; i++)
@@ -671,37 +680,66 @@ function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: number)
                 {
                     const b = inkBox([{ k: "text", x: sx + ax - w / 2, y: sy + ay + h / 2, t: s.tag, size: h,
                                         anchor: "start" }])!;
-                    if (onSheet(b) && !crowded(b) && leaderClear(b))
+                    if (usable(b))
                     {
                         chosen = b;
-                        ring = 2;
                         break;
                     }
                 }
             }
         }
+        // No room at all : the sheet still comes out, the mark sent to the table by a note the maker reads
         if (chosen === null)
         {
-            const first = AROUND.map(([dx, dy]) =>
-            {
-                const b = { x: sx + dx * 3 - w / 2, y: sy + dy * 3 - h / 2, w, h };
-                return !onSheet(b) ? "hors feuille" : busy.some((o) => { return overlaps(b, o); }) ? "recouvre"
-                    : "plus près d'un autre";
-            });
-            throw new Error(`${code} : aucune place pour le repère ${s.tag} autour de son usinage, en `
-                + `${sx.toFixed(1)} ${sy.toFixed(1)} mm sur la feuille (${first.join(", ")})`);
+            unplaced.push(s.tag);
+            return;
         }
-        if (ring > 1)
+        if (!nearestIsOwn(chosen))
         {
             const ex = Math.min(Math.max(sx, chosen.x), chosen.x + chosen.w);
             const ey = Math.min(Math.max(sy, chosen.y), chosen.y + chosen.h);
             canvas.line(sx, sy, ex, ey, "thin");
-            busy.push({ x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) });
+            leaders.push([sx, sy, ex, ey]);
         }
         canvas.text(chosen.x, chosen.y + h, s.tag, h, "start");
         busy.push(chosen);
         words.push(chosen);
     });
+    return unplaced;
+}
+
+
+// Whether the segment from a to b runs through a box : clipped against its 4 sides in turn (Liang and Barsky)
+export function segmentHits(a: [number, number], b: [number, number], box: Box): boolean
+{
+    let [t0, t1] = [0, 1];
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    for (const [p, q] of [[-dx, a[0] - box.x], [dx, box.x + box.w - a[0]], [-dy, a[1] - box.y],
+                          [dy, box.y + box.h - a[1]]] as const)
+    {
+        if (p === 0)
+        {
+            if (q < 0)
+            {
+                return false;
+            }
+            continue;
+        }
+        const r = q / p;
+        if (p < 0)
+        {
+            t0 = Math.max(t0, r);
+        }
+        else
+        {
+            t1 = Math.min(t1, r);
+        }
+        if (t0 > t1)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 

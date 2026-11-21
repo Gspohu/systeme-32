@@ -5,6 +5,7 @@ import { drawingSet } from "./io/workshop";
 import { OVERLAY_EM, SMALL_TEXT, inkBox, inkedBoxes, scaleText, textWidth, type Prim } from "./drawing/display";
 import { CELL_PAD, ROW, TABLE_COLS, TABLE_HEAD, TABLE_TEXT, TABLE_W, machiningTable, outlineArcs } from
     "./drawing/machining_table";
+import { segmentHits } from "./drawing/workpiece";
 import type { PartView } from "./drawing/draft";
 import type { Part } from "./parts";
 import { tessellate } from "./geometry";
@@ -25,6 +26,8 @@ const overlaps = (a: Box, b: Box): boolean =>
 };
 
 const MARK = /^[A-Z]+\d+$/;
+// Share of the marks of a point on the outline written inside the board : measured, then kept under it
+const INWARD_SHARE = 0.5;
 
 
 // Where a point of face A lands on the sheet, the way the sheet lays its view out from its box
@@ -464,5 +467,134 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                 }
             }
         });
+
+        it("write every mark of the delivered sets on its view, none sent to the table", () =>
+        {
+            const sent = pages.flatMap((pg) => { return (pg.marks ?? []).flatMap((m) =>
+            {
+                return m.k === "text" && m.t.includes("non écrits sur la vue") ? [`${pg.title} : ${m.t}`] : [];
+            }); });
+            expect(sent).toEqual([]);
+        });
+
+        it("write most marks of a hole in an edge inside the board, where the paper is free", () =>
+        {
+            let [inside, all] = [0, 0];
+            for (const pg of partPages)
+            {
+                for (const v of pg.views!)
+                {
+                    const row = byPart.get(v.part)!;
+                    const part = row.parts[0]!;
+                    const P = paperOf(part, v);
+                    const shape = tessellate(part.outline).map(([u, w]) => { return P(u, w); });
+                    const holds = ([x, y]: [number, number]): boolean =>
+                    {
+                        let odd = false;
+                        shape.forEach(([ax, ay], i) =>
+                        {
+                            const [bx, by] = shape[(i + 1) % shape.length]!;
+                            if ((ay > y) !== (by > y) && x < ax + (y - ay) * (bx - ax) / (by - ay))
+                            {
+                                odd = !odd;
+                            }
+                        });
+                        return odd;
+                    };
+                    for (const s of tableSpots(row, part, P).filter((x) => { return x.r === 0; }))
+                    {
+                        const mark = (pg.marks ?? []).filter((m): m is Text => { return m.k === "text" &&
+                            m.t === s.tag; })
+                            .reduce<Text | undefined>((best, m) =>
+                            {
+                                const b = printed(m);
+                                const near = Math.hypot(b.x + b.w / 2 - s.at[0], b.y + b.h / 2 - s.at[1]);
+                                const was = best === undefined ? Infinity : Math.hypot(printed(best).x
+                                    + printed(best).w / 2 - s.at[0], printed(best).y + printed(best).h / 2 - s.at[1]);
+                                return near < was ? m : best;
+                            }, undefined);
+                        if (mark !== undefined)
+                        {
+                            const b = printed(mark);
+                            all++;
+                            inside += holds([b.x + b.w / 2, b.y + b.h / 2]) ? 1 : 0;
+                        }
+                    }
+                }
+            }
+            expect(inside / all, `${inside} sur ${all}`).toBeGreaterThan(INWARD_SHARE);
+        });
     });
 }
+
+
+// A leader drawn corner to corner : the box it spans takes in a word the line itself keeps well clear of
+describe("a leader crossing a word", () =>
+{
+    it("is the line, never the box round it", () =>
+    {
+        const word = { x: 7, y: 0, w: 2, h: 2 };
+        expect(segmentHits([0, 0], [10, 10], word)).toBe(false);
+        expect(segmentHits([0, 1], [10, 1], word)).toBe(true);
+        expect(segmentHits([8, -5], [8, 5], word)).toBe(true);
+        expect(segmentHits([0, 0], [6.9, 6.9], { x: 7, y: 7, w: 1, h: 1 })).toBe(false);
+    });
+});
+
+
+// 2 cotes of a delivered set moved by a few millimetres, the way a customer's room moves them : a sheet of marks
+// with no room for one of them came out as no sheet at all
+describe("the drawings of a set whose sizes moved", () =>
+{
+    const variants: [string, () => ReturnType<typeof tvWall>][] = [
+        ...[2520, 2528, 2536, 2540].map((w) =>
+        {
+            return [`meuble bas TV de ${w}`, () =>
+            {
+                const p = tvWall();
+                const k = p.items.find((it) => { return it.name === "Meuble bas"; })! as { width: number };
+                k.width = w;
+                return p;
+            }] as [string, () => ReturnType<typeof tvWall>];
+        }),
+        ...[510, 520, 530, 545].map((d) =>
+        {
+            return [`placards hauts de ${d} de profondeur`, () =>
+            {
+                const p = dresser();
+                const k = p.items.find((it) => { return it.name === "Placards hauts"; })! as { depth: number };
+                k.depth = d;
+                return p;
+            }] as [string, () => ReturnType<typeof tvWall>];
+        }),
+    ];
+    for (const [name, make] of variants)
+    {
+        it(`still draws every sheet, each mark on its view or sent to the table : ${name}`, () =>
+        {
+            const p = make();
+            const o = computeOutputs(p);
+            const pages = drawingSet(p, o);
+            const text = pages.flatMap((pg) => { return (pg.marks ?? []).flatMap((m) =>
+            {
+                return m.k === "text" ? [m.t] : [];
+            }); }).join(" ");
+            for (const row of [...o.bom.cut, ...o.bom.offSheet])
+            {
+                const pg = pages.find((x) =>
+                {
+                    return x.views?.some((v) => { return v.part === row.parts[0]!.id; }) === true;
+                });
+                if (pg === undefined)
+                {
+                    continue;
+                }
+                const own = (pg.marks ?? []).flatMap((m) => { return m.k === "text" ? [m.t] : []; });
+                for (const s of machiningTable(row, row.parts[0]!).spots)
+                {
+                    expect(own.includes(s.tag) || text.includes(` ${s.tag}`), `${row.code} ${s.tag}`).toBe(true);
+                }
+            }
+        });
+    }
+});
