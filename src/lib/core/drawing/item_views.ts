@@ -9,7 +9,9 @@ import { sideHeights, topAngle } from "../slope";
 import { fittedExtent } from "../fitted";
 import { endPost, endToe, floorOutline, openEndLevels, plinthFootGap } from "../curves";
 import { tessellate } from "../geometry";
-import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, boxOf, clearOfFrame } from "./display";
+import { A3, Canvas, MARGIN, SCALES, SMALL_TEXT, TITLE_BLOCK_H, boxOf, clearOfFrame, labelGap,
+    overlayWidth } from "./display";
+import { writeNear, type TextPrim } from "./clear";
 import { heading, paginateTable, table, type Draft, type ItemView } from "./draft";
 import { drawFront } from "./views";
 import { round1 } from "../text";
@@ -129,11 +131,11 @@ function itemSheetAt(k: Carcass, a: Analysis, scale: number, stacked: boolean): 
         {
             return lower - upper;
         });
-        for (let i = 0; i + 1 < levels.length; i++)
+        for (let step = 0; step + 1 < levels.length; step++)
         {
-            const clear = levels[i + 1]! - levels[i]! - k.thickness;
-            canvas.dimV(floorY - (standHeight + levels[i + 1]!) / scale,
-                        floorY - (standHeight + levels[i]! +
+            const clear = levels[step + 1]! - levels[step]! - k.thickness;
+            canvas.dimV(floorY - (standHeight + levels[step + 1]!) / scale,
+                        floorY - (standHeight + levels[step]! +
                                   k.thickness) / scale, endMidX, endMidX, round1(clear), SMALL_TEXT);
         }
     }
@@ -150,12 +152,12 @@ function itemSheetAt(k: Carcass, a: Analysis, scale: number, stacked: boolean): 
             }
         }
         edges.push(k.width - k.thickness);
-        let i = 0;
-        while (i + 1 < edges.length)
+        let edge = 0;
+        while (edge + 1 < edges.length)
         {
-            canvas.dimH(boxLeftX + edges[i]! / scale, boxLeftX + edges[i + 1]! / scale, topY - 1, topY - 6,
-                        round1(edges[i + 1]! - edges[i]!), SMALL_TEXT);
-            i += 2;
+            canvas.dimH(boxLeftX + edges[edge]! / scale, boxLeftX + edges[edge + 1]! / scale, topY - 1, topY - 6,
+                        round1(edges[edge + 1]! - edges[edge]!), SMALL_TEXT);
+            edge += 2;
         }
     }
     // The inside the fronts hide : panels, runner spaces and the height of every cell
@@ -168,13 +170,27 @@ function itemSheetAt(k: Carcass, a: Analysis, scale: number, stacked: boolean): 
     });
     canvas.text(cutX + k.width / scale / 2, topY - 12 + cutY - floorY, "Vue de face, façades déposées", 3, "middle",
                 true);
+    const heights: { figure: string; lineX: number; top: number; foot: number }[] = [];
     for (const cell of lay?.nodes.values() ?? [])
     {
         if (cell.kind === "cell" && cell.h / scale >= 6)
         {
-            const cellMidX = cutX + (cell.x + cell.w / 2) / scale;
-            canvas.dimV(cutY - (standHeight + cell.y + cell.h) / scale, cutY - (standHeight + cell.y) / scale,
-                        cellMidX, cellMidX, round1(cell.h), SMALL_TEXT);
+            const lineX = cutX + (cell.x + cell.w / 2) / scale;
+            const top = cutY - (standHeight + cell.y + cell.h) / scale;
+            const foot = cutY - (standHeight + cell.y) / scale;
+            canvas.dimV(top, foot, lineX, lineX, "", SMALL_TEXT);
+            heights.push({ figure: round1(cell.h), lineX, top, foot });
+        }
+    }
+    // Every line drawn before any figure : 152 slid off a socket hole onto the line of the cell above, drawn after
+    // The cut shows what the fronts hid, a rail on edge ran through 227
+    for (const { figure, lineX, top, foot } of heights)
+    {
+        const besideLine = alongLine(figure, SMALL_TEXT, lineX, top, foot);
+        if (!writeNear(canvas, figure, SMALL_TEXT, { x: lineX, y: top, w: 0, h: foot - top }, canvas.prims,
+                       besideLine))
+        {
+            canvas.prims.push(besideLine[0]!);
         }
     }
 
@@ -260,6 +276,30 @@ function itemSheetAt(k: Carcass, a: Analysis, scale: number, stacked: boolean): 
             w: k.depth / scale, h: high }) },
     ];
     return { title: `${k.name}, vues`, scale: `1:${scale}`, canvas, marks, items };
+}
+
+
+// Places for the figure of a vertical dimension at x from y1 to y2, turned along it : its middle on the left as
+// dimV writes it, then sliding up and down by 1.25, then the same on the right
+export function alongLine(t: string, size: number, x: number, y1: number, y2: number): TextPrim[]
+{
+    const half = overlayWidth(t, size) / 2;
+    const reach = Math.max(0, (y2 - y1) / 2 - half);
+    // Glyphs turned a quarter stand from size left of their point to a quarter of it right (inkBox)
+    const sides = [x - labelGap(size), x + labelGap(size) + 0.75 * size];
+    const out: TextPrim[] = [];
+    for (const bx of sides)
+    {
+        for (let k = 0; k * 1.25 <= reach; k++)
+        {
+            for (const sign of k === 0 ? [1] : [-1, 1])
+            {
+                out.push({ k: "text", x: bx, y: (y1 + y2) / 2 + sign * k * 1.25, t, size, anchor: "middle",
+                           bold: false, rot: 90 });
+            }
+        }
+    }
+    return out;
 }
 
 

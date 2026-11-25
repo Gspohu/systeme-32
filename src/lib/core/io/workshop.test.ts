@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { drawingSet, workshopArchive } from "./workshop";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W, frameAndTitle, textWidth,
+import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W, frameAndTitle, inkBox, textWidth,
         type Prim } from "../drawing/display";
+import { segmentHits } from "../drawing/workpiece";
 import { computeOutputs } from "../outputs";
 import { dresser, tvWall } from "../templates";
 import { newDevice } from "../factory";
@@ -110,8 +111,70 @@ describe("workshop archive", () =>
             }
             expect(inside).toEqual([]);
         });
+
+
+        it(`strikes no text of any sheet of ${make.name} with a line, and inks nothing past its frame`, () =>
+        {
+            // The rule of scripts/plans_check.py, on the overlay of every sheet
+            // TechDraw draws the tables and projected views itself, the export check reads those
+            const p = make();
+            const pages = drawingSet(p, computeOutputs(p));
+            const struck: string[] = [];
+            const out: string[] = [];
+            for (const page of pages)
+            {
+                const overlay = page.marks ?? [];
+                const lines = overlay.flatMap(strokes);
+                for (const q of overlay)
+                {
+                    const [x0, y0, x1, y1] = extent(q);
+                    if (x0 < MARGIN - 0.2 || y0 < MARGIN - 0.2 || x1 > A3.w - MARGIN + 0.2 || y1 > A3.h - MARGIN + 0.2)
+                    {
+                        out.push(`hors cadre, ${page.title} : ${q.k}${q.k === "text" ? ` ${q.t}` : ""}`);
+                    }
+                    if (q.k !== "text")
+                    {
+                        continue;
+                    }
+                    const core = glyphs(q);
+                    if (lines.some((s) => { return segmentHits([s[0], s[1]], [s[2], s[3]], core); }))
+                    {
+                        struck.push(`barré, ${page.title} : ${q.t}`);
+                    }
+                }
+            }
+            expect(struck).toEqual([]);
+            expect(out).toEqual([]);
+        });
     }
 });
+
+
+// The ink of a text's own glyphs, not the line box inkBox keeps round it : capitals and figures 0.72 of the size
+// high, a descender only for the letters that have one, as Qt's tight box measures them on the export
+function glyphs(q: Extract<Prim, { k: "text" }>): { x: number; y: number; w: number; h: number }
+{
+    const line = inkBox([q])!;
+    const down = /[gjpqy(),;]/.test(q.t) ? 0.22 * q.size : 0;
+    const up = 0.72 * q.size;
+    // Turned a quarter, its height runs across the page from the baseline leftwards
+    return q.rot === 90 ? { x: q.x - up + 0.05, y: line.y + 0.05, w: up + down - 0.1, h: line.h - 0.1 }
+        : { x: line.x + 0.05, y: q.y - up + 0.05, w: line.w - 0.1, h: up + down - 0.1 };
+}
+
+
+// The segments a primitive strokes : a rectangle and a polygon by their sides, never their inside
+function strokes(q: Prim): [number, number, number, number][]
+{
+    if (q.k === "line")
+    {
+        return [[q.x1, q.y1, q.x2, q.y2]];
+    }
+    const pts: [number, number][] = q.k === "rect"
+        ? [[q.x, q.y], [q.x + q.w, q.y], [q.x + q.w, q.y + q.h], [q.x, q.y + q.h], [q.x, q.y]]
+        : q.k === "poly" ? (q.closed ? [...q.pts, q.pts[0]!] : q.pts) : [];
+    return pts.slice(1).map((r, i) => { return [pts[i]![0], pts[i]![1], r[0], r[1]]; });
+}
 
 
 // Page box of a primitive, a text taken at its average glyph width

@@ -1,12 +1,26 @@
 // SVG rendering of a display list page, in millimetres
 
-import type { Page, Prim, Stroke } from "./display";
+import { overlayWidth, type Page, type Prim, type Stroke } from "./display";
 
 
 // The widths of the lines on paper : TechDraw draws its views with them as well
 export const WIDTH: Record<Stroke, number> = { thin: 0.13, normal: 0.25, thick: 0.6, dashed: 0.18,
                                               hidden: 0.18, centre: 0.13 };
-const DASH: Partial<Record<Stroke, string>> = { dashed: "1.5 1", hidden: "0.8 0.8", centre: "4 1 0.6 1" };
+export const DASH: Partial<Record<Stroke, string>> = { dashed: "1.5 1", hidden: "0.8 0.8", centre: "4 1 0.6 1" };
+
+// The overall dimensions of a part sheet as TechDraw draws them, each setting pinned on every one by
+// scripts/freecad_view.py, mm of paper : the label sits offset off the outline (uprightOffset for a standing front
+// on its right) and the line runs past it, ISO oriented style
+export const DIMENSION = { offset: 6, uprightOffset: 12, font: "osifont", text: 2.2, arrow: 3.5, lineWidth: 0.35,
+                           spacingFactor: 2, gapFactor: 0, labelHalf: 1.78 } as const;
+
+// Paper between the label centre and the line, +y on a horizontal dimension and +x on a vertical one : half
+// frame plus line width times spacing factor (QGIViewDimension.cpp, ISO oriented), labelHalf measured on TV sheet 14
+// of f0aedac, label at 21 and line at 23.48
+export function dimensionShift(): number
+{
+    return DIMENSION.labelHalf + DIMENSION.lineWidth * DIMENSION.spacingFactor;
+}
 
 function esc(t: string): string
 {
@@ -77,7 +91,23 @@ export function pageToSvg(page: Page): string
 export function overlaySvg(prims: Prim[], w: number, h: number): string
 {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}mm" height="${h}mm">\n`
-        + `${prims.map(prim).join("\n")}\n</svg>\n`;
+        + `${prims.map(startAnchored).map(prim).join("\n")}\n</svg>\n`;
+}
+
+
+// A text centred or set right as one written from its start, at the width the sheet reckoned its ink with : the
+// symbol renderer of TechDraw takes a 2 mm 65 for 3.54 wide when it anchors it, the figure ran 0.63 mm into its
+// extension line on the TV setting out, 84.63 asked and 82.86 printed
+export function startAnchored(p: Prim): Prim
+{
+    if (p.k !== "text" || p.anchor === "start")
+    {
+        return p;
+    }
+    const w = overlayWidth(p.t, p.size);
+    const lead = p.anchor === "middle" ? w / 2 : w;
+    // Turned a quarter its start lies down the page, the point it turns round going with it
+    return p.rot === 90 ? { ...p, y: p.y + lead, anchor: "start" } : { ...p, x: p.x - lead, anchor: "start" };
 }
 
 

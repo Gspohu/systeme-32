@@ -3,8 +3,10 @@
 import type { Project } from "../model";
 import { boxToRoom, roomBox, sideWallDepth } from "../room";
 import { OBSTACLE_LABELS, obstacleBox } from "../obstacles";
-import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, pickScale, textWidth } from "./display";
+import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, inkBox, inkedBoxes, labelGap, pickScale,
+    textWidth } from "./display";
 import { heading, table, type Draft } from "./draft";
+import { writeNear, type Box, type TextPrim } from "./clear";
 import { round1 } from "../text";
 
 type ToPage = (value: number) => number;
@@ -14,14 +16,14 @@ const LEGEND_W = 150;
 
 // Setting out, seen from above : the walls as far as they stand, every footprint, and a chain of dimensions along
 // each wall that carry items, from its corner
-export function roomPlan(p: Project): Draft
+export function roomPlan(project: Project): Draft
 {
     const canvas = new Canvas();
     heading(canvas, "Implantation, vue de dessus");
-    const room = p.room;
-    const boxes = p.items.map((it) =>
+    const room = project.room;
+    const boxes = project.items.map((it) =>
     {
-        return { it, b: roomBox(it, room) };
+        return { it, area: roomBox(it, room) };
     });
     const left = sideWallDepth(room, "left");
     const right = sideWallDepth(room, "right");
@@ -31,7 +33,7 @@ export function roomPlan(p: Project): Draft
     {
         shown = Math.max(left, right, ...boxes.map((x) =>
         {
-            return x.b.max[2];
+            return x.area.max[2];
         }));
         shown = Math.min(room.depth, shown + 400);
     }
@@ -39,15 +41,15 @@ export function roomPlan(p: Project): Draft
     const boxW = A3.w - 2 * MARGIN - 60 - LEGEND_W;
     const boxH = A3.h - 2 * MARGIN - TITLE_BLOCK_H - 60;
     const scale = pickScale(room.width, shown, boxW, boxH);
-    const ox = MARGIN + 35 + (boxW - room.width / scale) / 2;
-    const oy = MARGIN + 35;
+    const originX = MARGIN + 35 + (boxW - room.width / scale) / 2;
+    const originY = MARGIN + 35;
     const pageX: ToPage = (x) =>
     {
-        return ox + x / scale;
+        return originX + x / scale;
     };
     const pageZ: ToPage = (z) =>
     {
-        return oy + z / scale;
+        return originY + z / scale;
     };
     // room x to the right, depth downwards : the back wall at the top of the sheet
     canvas.line(pageX(0), pageZ(0), pageX(room.width), pageZ(0), "thick");
@@ -68,31 +70,39 @@ export function roomPlan(p: Project): Draft
     }
     canvas.dimH(pageX(0), pageX(room.width), pageZ(0) - 2, pageZ(0) - 10, `${room.width}`);
     // What stands on the walls, seen from above against its wall
-    for (const o of room.obstacles)
+    // Its words wait for the chains : written as it went, a chain ran through a 30 and a mark 2
+    const pending: { t: string; size: number; bold: boolean; around: Box; first: TextPrim[] }[] = [];
+    for (const obstacle of room.obstacles)
     {
-        const b = boxToRoom(o.wall, room, obstacleBox(o));
-        canvas.rect(pageX(b.min[0]), pageZ(b.min[2]), (b.max[0] - b.min[0]) / scale, (b.max[2] - b.min[2]) /
-                    scale, "dashed");
-        canvas.text(pageX((b.min[0] + b.max[0]) / 2), pageZ(b.max[2]) + 3, `${OBSTACLE_LABELS[o.kind]} ${o.name}`,
-                    SMALL_TEXT,
-                    "middle");
+        const walled = boxToRoom(obstacle.wall, room, obstacleBox(obstacle));
+        const box = { x: pageX(walled.min[0]), y: pageZ(walled.min[2]), w: (walled.max[0] - walled.min[0]) / scale,
+                      h: (walled.max[2] - walled.min[2]) / scale };
+        canvas.rect(box.x, box.y, box.w, box.h, "dashed");
+        const t = `${OBSTACLE_LABELS[obstacle.kind]} ${obstacle.name}`;
+        pending.push({ t, size: SMALL_TEXT, bold: false, around: box,
+                       first: [{ k: "text", x: box.x + box.w / 2, y: pageZ(walled.max[2]) + 3, t, size: SMALL_TEXT,
+                                 anchor: "middle", bold: false, rot: 0 }] });
     }
     // Footprints overlap once items stand on or hang over others : open outlines, a mark at the front left corner
     // of each, the items sharing a corner sharing its mark, and the names in the legend
     const corners = new Map<string, { x: number; z: number; marks: number[] }>();
     const legend: string[][] = [];
-    boxes.forEach(({ it, b }, i) =>
+    boxes.forEach(({ it, area }, i) =>
     {
-        canvas.rect(pageX(b.min[0]), pageZ(b.min[2]), (b.max[0] - b.min[0]) / scale, (b.max[2] - b.min[2]) / scale,
-                    "normal");
-        const key = `${Math.round(b.min[0])},${Math.round(b.max[2])}`;
-        corners.set(key, { x: b.min[0], z: b.max[2], marks: [...corners.get(key)?.marks ?? [], i + 1] });
-        legend.push([`${i + 1}`, it.name, `${Math.round(b.max[0] - b.min[0])} x ${Math.round(b.max[2] - b.min[2])}`,
-                     `${Math.round(b.min[1])}`]);
+        canvas.rect(pageX(area.min[0]), pageZ(area.min[2]), (area.max[0] - area.min[0]) / scale,
+                    (area.max[2] - area.min[2]) / scale, "normal");
+        const key = `${Math.round(area.min[0])},${Math.round(area.max[2])}`;
+        corners.set(key, { x: area.min[0], z: area.max[2], marks: [...corners.get(key)?.marks ?? [], i + 1] });
+        legend.push([`${i + 1}`, it.name,
+                     `${Math.round(area.max[0] - area.min[0])} x ${Math.round(area.max[2] - area.min[2])}`,
+                     `${Math.round(area.min[1])}`]);
     });
     for (const { x, z, marks } of corners.values())
     {
-        canvas.text(pageX(x) + 1.5, pageZ(z) - 1.5, marks.join(", "), 2.4, "start", true);
+        const t = marks.join(", ");
+        pending.push({ t, size: 2.4, bold: true, around: { x: pageX(x), y: pageZ(z), w: 0, h: 0 },
+                       first: [{ k: "text", x: pageX(x) + 1.5, y: pageZ(z) - 1.5, t, size: 2.4, anchor: "start",
+                                 bold: true, rot: 0 }] });
     }
     table(canvas, A3.w - MARGIN - LEGEND_W, MARGIN + 30, [12, 70, 34, 34],
           ["Repère", "Meuble", "Emprise", "Dessous à"], legend, 2.4, 4.5);
@@ -105,43 +115,49 @@ export function roomPlan(p: Project): Draft
     {
         const deep = Math.max(...back.map((x) =>
         {
-            return x.b.max[2];
+            return x.area.max[2];
         }));
         chain(canvas, [0, room.width, ...back.flatMap((x) =>
         {
-            return [x.b.min[0], x.b.max[0]];
+            return [x.area.min[0], x.area.max[0]];
         })], pageX, pageZ(deep) + 2, pageZ(deep) + 9, "h");
     }
     for (const side of ["left", "right"] as const)
     {
-        const on = boxes.filter((x) =>
+        const against = boxes.filter((x) =>
         {
             return x.it.wall === side;
         });
-        if (on.length === 0)
+        if (against.length === 0)
         {
             continue;
         }
-        const reach = side === "left" ? Math.max(...on.map((x) =>
+        const reach = side === "left" ? Math.max(...against.map((x) =>
         {
-            return x.b.max[0];
-        })) : Math.min(...on.map((x) =>
+            return x.area.max[0];
+        })) : Math.min(...against.map((x) =>
         {
-            return x.b.min[0];
+            return x.area.min[0];
         }));
         const dir = side === "left" ? 1 : -1;
-        chain(canvas, [0, ...on.flatMap((x) =>
+        chain(canvas, [0, ...against.flatMap((x) =>
         {
-            return [x.b.min[2], x.b.max[2]];
+            return [x.area.min[2], x.area.max[2]];
         })], pageZ, pageX(reach) + dir * 2, pageX(reach) + dir * 9, "v");
+    }
+    // A mark with no free paper by its corner is still in the table, its line read by its number
+    for (const word of pending)
+    {
+        writeNear(canvas, word.t, word.size, word.around, canvas.prims, word.first, word.bold);
     }
     return { title: "Implantation", scale: `1:${scale}`, canvas };
 }
 
 
 // Consecutive dimensions between sorted page positions, the duplicates and slivers under 1 mm dropped
+// Returns the outermost level a figure took, 0 when all sit between their arrows
 export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, line: number, dir: "h" | "v",
-    size = SMALL_TEXT): void
+    size = SMALL_TEXT): number
 {
     const xs = [...new Set(at.map((v) =>
     {
@@ -157,25 +173,56 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
         const label = round1(x - xs[i]!);
         return { p: Math.min(p, q), q: Math.max(p, q), label, fits: textWidth(label, size) + 1 <= Math.abs(q - p) };
     });
+    // Where a figure prints at a level : between its arrows over the line at 0, past the line beyond, its ink
+    // starting past the 1 mm the extension lines overrun it by with some air (a text inks from size above its
+    // baseline to a quarter under it, inkBox)
+    const figureAt = (s: (typeof segs)[number], level: number, slide = 0): TextPrim =>
+    {
+        const mid = (s.p + s.q) / 2 + slide;
+        const edge = line + out * (CHAIN_CLEAR + (level - 1) * (size + 0.8));
+        const baseline = level === 0 ? line - labelGap(size) : out > 0 ? edge + size : edge - 0.25 * size;
+        return dir === "h" ? { k: "text", x: mid, y: baseline, t: s.label, size, anchor: "middle", bold: false, rot: 0 }
+            : { k: "text", x: baseline, y: mid, t: s.label, size, anchor: "middle", bold: false, rot: 90 };
+    };
+    // What the sheet holds before the chain : a figure pushed out never lands on a wall drawn there
+    const busy = canvas.prims.flatMap((q) => { return inkedBoxes(q); });
+    const inked = (q: TextPrim): boolean =>
+    {
+        const b = inkBox([q])!;
+        return busy.some((o) => { return b.x < o.x + o.w && o.x < b.x + b.w && b.y < o.y + o.h && o.y < b.y + b.h; });
+    };
     // A figure longer than its segment steps away frm the line, outwards, to the first level where it overlaps
-    // no other figure : still facing its own segment
+    // no other figure and nothing drawn : still facing its own segment
     const taken: [number, number][][] = [];
-    const place = (s: (typeof segs)[number]): number =>
+    // Past a level, a figure may slide along the line by these steps : a wall standing across the chain blocks
+    // every level at the middle of its segment, a 30 beside the wall stayed on it
+    const slides = [0, ...[1, 2, 3, 4].flatMap((k) => { return [k * 1.25, -k * 1.25]; })];
+    const place = (s: (typeof segs)[number]): { level: number; slide: number } =>
     {
         const half = textWidth(s.label, size) / 2 + 0.5;
-        const [a, b] = [(s.p + s.q) / 2 - half, (s.p + s.q) / 2 + half]; 
-        let level = 0;
-        while ((taken[level] ?? []).some(([c, d]) =>
+        const free = (level: number, slide: number): boolean =>
         {
-            return a < d && c < b;
-        })) 
+            const [a, b] = [(s.p + s.q) / 2 + slide - half, (s.p + s.q) / 2 + slide + half];
+            return !(taken[level] ?? []).some(([c, d]) => { return a < d && c < b; }) && !inked(figureAt(s,
+                level, slide));
+        };
+        // One that doesn't fit never stays between its arrows, even with nothing beside it : the extension lines of
+        // a 19 mm board ran through its figure on the sections. Between its arrows it never slides
+        let chosen = { level: MAX_CHAIN_LEVEL, slide: 0 };
+        for (let level = s.fits ? 0 : 1; level < MAX_CHAIN_LEVEL; level++)
         {
-            level++;
+            const slide = (level === 0 ? [0] : slides).find((d) => { return free(level, d); });
+            if (slide !== undefined)
+            {
+                chosen = { level, slide };
+                break;
+            }
         }
-        taken[level] = [...(taken[level] ?? []), [a, b]];
-        return level;
+        const mid = (s.p + s.q) / 2 + chosen.slide;
+        taken[chosen.level] = [...(taken[chosen.level] ?? []), [mid - half, mid + half]];
+        return chosen;
     };
-    const levels = new Map<(typeof segs)[number], number>();
+    const levels = new Map<(typeof segs)[number], { level: number; slide: number }>();
     // The figures that fit between their arrows first, the ones pushed outside take the levels left
     const fitting = segs.filter((x) =>
     {
@@ -191,23 +238,24 @@ export function chain(canvas: Canvas, at: number[], page: ToPage, ref: number, l
     }
     for (const s of segs)
     {
-        const level = levels.get(s)!;
-        const shift = out * level * (size + 1.2);
+        const { level, slide } = levels.get(s)!;
         if (dir === "h")
         {
-            canvas.dimH(s.p, s.q, ref, line, level === 0 ? s.label : "", size);
-            if (level > 0)
-            {
-                canvas.text((s.p + s.q) / 2, line - 0.8 + shift, s.label, size, "middle");
-            }
+            canvas.dimH(s.p, s.q, ref, line, "", size);
         }
         else
         {
-            canvas.dimV(s.p, s.q, ref, line, level === 0 ? s.label : "", size);
-            if (level > 0)
-            {
-                canvas.text(line - 0.8 + shift, (s.p + s.q) / 2, s.label, size, "middle", false, 90);
-            }
+            canvas.dimV(s.p, s.q, ref, line, "", size);
         }
+        const f = figureAt(s, level, slide);
+        canvas.text(f.x, f.y, f.t, f.size, f.anchor, false, f.rot ?? 0);
     }
+    return levels.size === 0 ? 0 : Math.max(...[...levels.values()].map((v) => { return v.level; }));
 }
+
+
+// Paper between a chain's line and the ink of a figure pushed out of it : the 1 mm its extension lines run past it
+// and some air
+const CHAIN_CLEAR = 1.4;
+// Levels a figure may step out to before it stays where it is
+const MAX_CHAIN_LEVEL = 12;

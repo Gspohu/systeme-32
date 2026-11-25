@@ -4,7 +4,7 @@ import type { Carcass, Project, Wall } from "../model";
 import type { Analysis } from "../analysis";
 import type { Part } from "../part_types";
 import { at as onFrame } from "../geometry";
-import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W, type Prim } from "./display";
+import { A3, Canvas, MARGIN, SCALES, TITLE_BLOCK_H, TITLE_BLOCK_W, inkBox, type Prim } from "./display";
 import { heading, type Draft } from "./draft";
 import { chain } from "./plan";
 import { round1 } from "../text";
@@ -16,11 +16,10 @@ const CUT_FILL = "#dddddd";
 const FRONT_FILL = "#bcbcbc";
 const SCALE = 10;
 const TITLE_SIZE = 3;
-// Room around a drawing for its title and its 2 chains of dimensions
-const ROOM_LEFT = 24;
-const ROOM_RIGHT = 12;
-const ROOM_TOP = 11;
-const ROOM_BOTTOM = 14;
+// Paper left between 2 sections, mm
+const SECTION_GAP = 8;
+// The reductions a section too large for a sheet steps down through : the usual scales of every drawing, from 1:10
+const SECTION_SCALES = SCALES.filter((k) => { return k >= SCALE; });
 const MAX_LEVELS = 6;
 
 export interface SectionPlane
@@ -210,23 +209,25 @@ export function sectionSpecs(p: Project, a: Analysis): { letter: string; axis: "
 
 // One section, its lower left at (x0, y0) on the page, with a chain of dimensions along each side
 // Each peice cut spans a0 to a1 across the plane and b0 to b1 up it, in mm
-function drawSection(canvas: Canvas, plane: SectionPlane, x0: number, y0: number): void
+function drawSection(canvas: Canvas, plane: SectionPlane, x0: number, y0: number, scale = SCALE): void
 {
-    const minA = Math.min(...plane.cut.map((piece) => { return piece.a0; })); 
+    const minA = Math.min(...plane.cut.map((piece) => { return piece.a0; }));
     const minB = Math.min(...plane.cut.map((piece) => { return piece.b0; }));
     const maxB = Math.max(...plane.cut.map((piece) => { return piece.b1; }));
     const pageX = (along: number): number =>
     {
-        return x0 + (along - minA) / SCALE;
+        return x0 + (along - minA) / scale;
     };
-    const pageY = (up: number): number =>   
+    const pageY = (up: number): number =>
     {
-        return y0 - (up - minB) / SCALE;
+        return y0 - (up - minB) / scale;
     };
-    canvas.text(pageX(minA), pageY(maxB) - 8, plane.title, TITLE_SIZE, "start", true);
+    // A section drawn smaller than the sheet says its own scale
+    const title = scale === SCALE ? plane.title : `${plane.title}, 1:${scale}`;
+    canvas.text(pageX(minA), pageY(maxB) - 8, title, TITLE_SIZE, "start", true);
     for (const piece of plane.cut)
     {
-        canvas.rect(pageX(piece.a0), pageY(piece.b1), (piece.a1 - piece.a0) / SCALE, (piece.b1 - piece.b0) / SCALE,
+        canvas.rect(pageX(piece.a0), pageY(piece.b1), (piece.a1 - piece.a0) / scale, (piece.b1 - piece.b0) / scale,
                     "normal", piece.front ? FRONT_FILL : CUT_FILL);
     }
     chain(canvas, plane.cut.flatMap((piece) => { return [piece.a0, piece.a1]; }), pageX, y0 + 1, y0 + 7, "h");
@@ -235,14 +236,14 @@ function drawSection(canvas: Canvas, plane: SectionPlane, x0: number, y0: number
 }
 
 
-// Page size a section takes with its titles and dimensions
-function sizeOf(s: SectionPlane): { w: number; h: number }
+// Page size a section takes with its title and dimensions, measured on the section drawn aside : a chain whose
+// figures step out takes more than a fixed room, and ran under the frame. dx, dy bring its ink to the place given
+function sizeOf(s: SectionPlane, scale: number): { w: number; h: number; dx: number; dy: number }
 {
-    const a0 = Math.min(...s.cut.map((c) => { return c.a0; }));
-    const a1 = Math.max(...s.cut.map((c) => { return c.a1; }));
-    const b0 = Math.min(...s.cut.map((c) => { return c.b0; }));
-    const b1 = Math.max(...s.cut.map((c) => { return c.b1; }));
-    return { w: (a1 - a0) / SCALE + ROOM_LEFT + ROOM_RIGHT, h: (b1 - b0) / SCALE + ROOM_TOP + ROOM_BOTTOM };
+    const aside = new Canvas();
+    drawSection(aside, s, 0, 0, scale);
+    const ink = inkBox(aside.prims)!;
+    return { w: ink.w + SECTION_GAP, h: ink.h + SECTION_GAP, dx: -ink.x, dy: -ink.y };
 }
 
 
@@ -265,46 +266,61 @@ export function sectionSheets(p: Project, a: Analysis, wall: Wall): Draft[]
     const out: Draft[] = [];
     const { left, right, top, bottom, blockTop, blockLeft } = sectionRoom("Coupes");
     let canvas: Canvas | null = null;
-    let x = left;
-    let y = top;
+    let cursorX = left;
+    let cursorY = top;
     let rowH = 0;
     let empty = true;
+    // The scales each sheet draws at, its title block listing them all
+    const scalesOf: Set<number>[] = [];
     const open = (): Canvas =>
     {
         const c = new Canvas();
         heading(c, "Coupes");
+        scalesOf.push(new Set<number>());
         out.push({ title: "Coupes", scale: `1:${SCALE}`, canvas: c });
-        x = left;
-        y = top;
+        cursorX = left;
+        cursorY = top;
         rowH = 0;
         empty = true;
         return c;
     };
-    // A place is free when it stays in the frame and off the title block
+    // A place is free when the ink stays in the frame and off the title block, the gap past it needing no room
     const fits = (px: number, py: number, w: number, h: number): boolean =>
     {
-        const overBlock = px + w > blockLeft && py + h > blockTop;
-        return px + w <= right && py + h <= bottom && !overBlock;
+        const [iw, ih] = [w - SECTION_GAP, h - SECTION_GAP];
+        const overBlock = px + iw > blockLeft && py + ih > blockTop;
+        return px + iw <= right && py + ih <= bottom && !overBlock;
     };
     for (const s of sectionPlanes(p, a, wall))
     {
-        const { w, h } = sizeOf(s);
-        canvas ??= open();
-        if (!fits(x, y, w, h) && !empty)
+        // 1:10 when it fits on a sheet of its own, else the first standard scale that does : drawn at 1:10 whatever
+        // its size, the TV's section A-A ran its dimensions under the frame
+        const scale = SECTION_SCALES.find((k) =>
         {
-            x = left;
-            y += rowH;
+            const size = sizeOf(s, k);
+            return fits(left, top, size.w, size.h);
+        }) ?? SECTION_SCALES[SECTION_SCALES.length - 1]!;
+        const { w, h, dx, dy } = sizeOf(s, scale);
+        canvas ??= open();
+        if (!fits(cursorX, cursorY, w, h) && !empty)
+        {
+            cursorX = left;
+            cursorY += rowH;
             rowH = 0;
-            // Never a blank sheet : a section too tall for any still goes on the one it opened
-            if (!fits(x, y, w, h))
+            if (!fits(cursorX, cursorY, w, h))
             {
                 canvas = open();
             }
         }
-        drawSection(canvas, s, x + ROOM_LEFT, y + h - ROOM_BOTTOM);
+        drawSection(canvas, s, cursorX + dx, cursorY + dy, scale);
+        scalesOf[scalesOf.length - 1]!.add(scale);
         empty = false;
-        x += w;
+        cursorX += w;
         rowH = Math.max(rowH, h);
     }
+    out.forEach((sheet, k) =>
+    {
+        sheet.scale = [...scalesOf[k]!].sort((m, n) => { return m - n; }).map((s) => { return `1:${s}`; }).join(", ");
+    });
     return out;
 }

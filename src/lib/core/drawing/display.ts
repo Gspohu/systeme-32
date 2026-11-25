@@ -108,10 +108,14 @@ export function boxOf(prims: Prim[]): { x: number; y: number; w: number; h: numb
 
 
 // What some primitives cover on the page, each text as wide as the DejaVu of the overlay draws it
-export function inkBox(prims: Prim[]): { x: number; y: number; w: number; h: number } | null
+export function inkBox(prims: Prim[], from = 0): { x: number; y: number; w: number; h: number } | null
 {
-    const boxes = prims.flatMap((q) =>
+    const boxes = prims.flatMap((q, index) =>
     {
+        if (index < from)
+        {
+            return [];
+        }
         if (q.k !== "text")
         {
             const b = boxOf([q]);
@@ -210,6 +214,20 @@ export function wrap(t: string, size: number, width: number, em = AVG_CHAR): str
 }
 
 
+// An arrowhead of a dimension : its length along the line and half its width across it, mm
+const ARROW_LENGTH = 1.8;
+const ARROW_HALF = 0.6;
+
+
+// Paper between a dimension's line and the baseline of its figure : the half width of the arrowheads, the
+// descenders of the figure under its baseline and some air. At 0.8 the foot of a 46 sat on the arrows of its own
+// short segment
+export function labelGap(size: number): number
+{
+    return ARROW_HALF + 0.22 * size + 0.2;
+}
+
+
 export class Canvas
 {
     prims: Prim[] = [];
@@ -259,7 +277,7 @@ export class Canvas
         this.arrowHead(x2, y, -1, 0);
         if (label !== "")
         {
-            this.text((x1 + x2) / 2, y - 0.8, label, size, "middle");
+            this.text((x1 + x2) / 2, y - labelGap(size), label, size, "middle");
         }
     }
 
@@ -272,14 +290,14 @@ export class Canvas
         this.arrowHead(x, y2, 0, -1);
         if (label !== "")
         {
-            this.text(x - 0.8, (y1 + y2) / 2, label, size, "middle", false, 90);
+            this.text(x - labelGap(size), (y1 + y2) / 2, label, size, "middle", false, 90);
         }
     }
 
     arrowHead(x: number, y: number, dx: number, dy: number): void
     {
-        const l = 1.8;
-        const w = 0.6;
+        const l = ARROW_LENGTH;
+        const w = ARROW_HALF;
         this.poly([[x, y], [x + dx * l - dy * w, y + dy * l + dx * w], [x + dx * l + dy * w, y + dy * l -
                                                                         dx * w]], true, "thin", "#000000");
     }
@@ -356,43 +374,44 @@ function firstAngleSymbol(c: Canvas, x: number, cy: number, u = 1): void
 export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): void
 {
     c.rect(MARGIN, MARGIN, w - 2 * MARGIN, h - 2 * MARGIN, "thick");
-    const y = h - MARGIN - TITLE_BLOCK_H;
-    const x = w - MARGIN - TITLE_BLOCK_W;
+    const top = h - MARGIN - TITLE_BLOCK_H;
+    const left = w - MARGIN - TITLE_BLOCK_W;
     const row = TITLE_BLOCK_H / 4;
-    c.rect(x, y, TITLE_BLOCK_W, TITLE_BLOCK_H, "normal");
+    c.rect(left, top, TITLE_BLOCK_W, TITLE_BLOCK_H, "normal");
     const { people, title, number, date, lang, sheet } = TB_COLS;
-    const f = titleFields(info);
-    c.line(x + people, y, x + people, y + 3 * row, "thin");
-    c.line(x + title, y, x + title, y + TITLE_BLOCK_H, "thin");
-    c.line(x + number, y, x + number, y + TITLE_BLOCK_H, "thin");
+    const fields = titleFields(info);
+    c.line(left + people, top, left + people, top + 3 * row, "thin");
+    c.line(left + title, top, left + title, top + TITLE_BLOCK_H, "thin");
+    c.line(left + number, top, left + number, top + TITLE_BLOCK_H, "thin");
     for (const at of [date, lang, sheet])
     {
-        c.line(x + at, y + 2 * row, x + at, y + 3 * row, "thin");
+        c.line(left + at, top + 2 * row, left + at, top + 3 * row, "thin");
     }
-    c.line(x + people, y + row, x + TITLE_BLOCK_W, y + row, "thin");
-    c.line(x + people, y + 2 * row, x + title, y + 2 * row, "thin");
-    c.line(x + number, y + 2 * row, x + TITLE_BLOCK_W, y + 2 * row, "thin");
-    c.line(x, y + 3 * row, x + TITLE_BLOCK_W, y + 3 * row, "thin");
+    c.line(left + people, top + row, left + TITLE_BLOCK_W, top + row, "thin");
+    c.line(left + people, top + 2 * row, left + title, top + 2 * row, "thin");
+    c.line(left + number, top + 2 * row, left + TITLE_BLOCK_W, top + 2 * row, "thin");
+    c.line(left, top + 3 * row, left + TITLE_BLOCK_W, top + 3 * row, "thin");
     // A small name over each field as in the figure, its value under it
     const label = (col: number, k: number, text: string): void =>
     {
-        c.text(x + col + 1, y + k * row + 2.5, text, SMALL_TEXT, "start");
+        c.text(left + col + 1, top + k * row + 2.5, text, SMALL_TEXT, "start");
     };
     // Each value already cut to its cell, tagged with its field : a FreeCAD template is drawn from the same list
     const value = (col: number, k: number, field: string): void =>
     {
-        c.text(x + col + 1, y + (k * row) + 6, f[field]!, 2.4, "start", false, 0, field);
+        c.text(left + col + 1, top + (k * row) + 6, fields[field]!, 2.4, "start", false, 0, field);
     };
     label(0, 0, "Propriétaire");
     // A naem of any length (table 1), up to three lines centred in its tall cell
     const owned = ["legal_owner_1", "legal_owner_2", "legal_owner_3"];
     const used = owned.filter((k) =>
     {
-        return f[k] !== "";
+        return fields[k] !== "";
     }).length;
     owned.forEach((k, i) =>
     {
-        c.text(x + people / 2, y + 1.5 * row + 2 + (i - (used - 1) / 2) * 3.4, f[k]!, 2.6, "middle", true, 0, k);
+        c.text(left + people / 2, top + 1.5 * row + 2 + (i - (used - 1) / 2) * 3.4, fields[k]!, 2.6, "middle", true,
+               0, k);
     });
     label(people, 0, "Dessiné par");
     value(people, 0, "creator");
@@ -403,15 +422,16 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     label(title, 0, "Type de document");
     value(title, 0, "document_type");
     label(title, 1, "Titre, titre complémentaire");
-    c.text(x + title + 1, y + row + 5.6, f.title!, 2.6, "start", true, 0, "title");
+    c.text(left + title + 1, top + row + 5.6, fields.title!, 2.6, "start", true, 0, "title");
     // The supplemnetary title takes two lines of 25 characters or so (table 2), always two for a block of fixed size
     ["supplementary_title_1", "supplementary_title_2"].forEach((k, i) =>
     {
-        c.text(x + title + 1, y + row + 9.4 + i * 3.2, f[k]!, 2.2, "start", false, 0, k);
+        c.text(left + title + 1, top + row + 9.4 + i * 3.2, fields[k]!, 2.2, "start", false, 0, k);
     });
     label(number, 0, "Statut");
     value(number, 0, "document_status");
-    c.text(x + (number + TITLE_BLOCK_W) / 2, y + row + 5, f.drawing_number!, 2.8, "middle", true, 0, "drawing_number");
+    c.text(left + (number + TITLE_BLOCK_W) / 2, top + row + 5, fields.drawing_number!, 2.8, "middle", true, 0,
+           "drawing_number");
     label(number, 2, "Ind.");
     value(number, 2, "revision_index");
     label(date, 2, "Date d'émission");
@@ -420,10 +440,10 @@ export function frameAndTitle(c: Canvas, info: TitleInfo, w = A3.w, h = A3.h): v
     value(lang, 2, "language_code");
     label(sheet, 2, "Planche");
     value(sheet, 2, "sheet_number");
-    c.text(x + 1, y + 3 * row + 4.6, f.general_tolerances!, 2.2, "start", false, 0, "general_tolerances");
+    c.text(left + 1, top + 3 * row + 4.6, fields.general_tolerances!, 2.2, "start", false, 0, "general_tolerances");
     label(title, 3, "Échelle");
     value(title, 3, "scale");
-    firstAngleSymbol(c, x + number + 12, y + 3.5 * row, 0.75);  
+    firstAngleSymbol(c, left + number + 12, top + 3.5 * row, 0.75);
 }
 
 

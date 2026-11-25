@@ -18,6 +18,7 @@ import { topDoubling } from "../layout";
 import { endDrop, endPost, floorOutline, openEndLevels, plinthFootGap } from "../curves";
 import { bounds, tessellate } from "../geometry";
 import { chain } from "./plan";
+import { insideFirst, writeNear, type Box, type TextPrim } from "./clear";
 import { OBSTACLE_LABELS } from "../obstacles";
 import { sectionPlanes } from "./sections";
 import { round1 } from "../text";
@@ -279,7 +280,9 @@ function drawInside(v: CarcassView): void
         const nb = a.build.layouts.get(k.id)?.nodes.get(stiffener.cell);
         if (nb !== undefined)
         {
-            canvas.rect(pageX(k.x + nb.x), pageY(k.y + nb.y + nb.h), nb.w / scale, stiffener.height / scale, "dashed");
+            // Hidden by the fronts, in plain sight with them taken off as the projection shows it
+            canvas.rect(pageX(k.x + nb.x), pageY(k.y + nb.y + nb.h), nb.w / scale, stiffener.height / scale,
+                        v.withFronts ? "dashed" : "thin");
         }
     }
     for (const divider of a.build.layouts.get(k.id)?.dividers ?? [])
@@ -474,13 +477,17 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
                 projected.push(it.id);
             }
         }
+        // Every word of the view waits for the last line : written as it went, a later section line or chain ran
+        // through it
+        const pending: { t: string; size: number; bold: boolean; around: Box; first: TextPrim[] }[] = [];
         for (const obstacle of obstacles)
         {
-            canvas.rect(originX + obstacle.x / scale, originY - (obstacle.y + obstacle.height) / scale,
-                        obstacle.width / scale, obstacle.height / scale, "dashed");
-            canvas.text(originX + (obstacle.x + obstacle.width / 2) / scale,
-                        originY - (obstacle.y + obstacle.height / 2) / scale,
-                        `${OBSTACLE_LABELS[obstacle.kind]} ${obstacle.name}`, SMALL_TEXT, "middle");
+            const box = { x: originX + obstacle.x / scale, y: originY - (obstacle.y + obstacle.height) / scale,
+                          w: obstacle.width / scale, h: obstacle.height / scale };
+            canvas.rect(box.x, box.y, box.w, box.h, "dashed");
+            const named = `${OBSTACLE_LABELS[obstacle.kind]} ${obstacle.name}`;
+            pending.push({ t: named, size: SMALL_TEXT, bold: false, around: box,
+                           first: insideFirst(named, SMALL_TEXT, box) });
         }
         if (niche)
         {
@@ -511,15 +518,21 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
         {
             if (plane.axis === "x")
             {
-                const x = originX + plane.at / scale;
-                canvas.line(x, originY - (all.y1 / scale) - 4, x, floorY + 1, "centre");
-                canvas.text(x, originY - all.y1 / scale - 5, plane.letter, 3, "middle", true);
+                const cutX = originX + plane.at / scale;
+                const top = originY - (all.y1 / scale) - 4;
+                canvas.line(cutX, top, cutX, floorY + 1, "centre");
+                pending.push({ t: plane.letter, size: 3, bold: true, around: { x: cutX, y: top, w: 0, h: 0 },
+                               first: [{ k: "text", x: cutX, y: top - 1, t: plane.letter, size: 3, anchor: "middle",
+                                         bold: true, rot: 0 }] });
             }
             else
             {
-                const y = originY - plane.at / scale;
-                canvas.line(originX + all.x0 / scale - 4, y, originX + (all.x1 / scale) + 1, y, "centre");
-                canvas.text(originX + all.x0 / scale - 6, y + 1, plane.letter, 3, "middle", true);
+                const cutY = originY - plane.at / scale;
+                const start = originX + all.x0 / scale - 4;
+                canvas.line(start, cutY, originX + (all.x1 / scale) + 1, cutY, "centre");
+                pending.push({ t: plane.letter, size: 3, bold: true, around: { x: start, y: cutY, w: 0, h: 0 },
+                               first: [{ k: "text", x: start - 2, y: cutY + 1, t: plane.letter, size: 3,
+                                         anchor: "middle", bold: true, rot: 0 }] });
             }
         }
         // The levels on the right : floor, underside and top of each item, and the ceiling of an alcove
@@ -548,20 +561,20 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
                 const out = spot.label === "sorti";
                 // A turned set covers its own width and part of its thickness along the wall
                 const [x0, x1] = spotSpan(screen, spot);
-                canvas.rect(originX + x0 / scale, originY - (spot.bottom + h) / scale, (x1 - x0) / scale, h / scale,
-                            out ? "hidden" : "dashed");
+                const box = { x: originX + x0 / scale, y: originY - (spot.bottom + h) / scale, w: (x1 - x0) / scale,
+                              h: h / scale };
+                canvas.rect(box.x, box.y, box.w, box.h, out ? "hidden" : "dashed");
                 // On an arm the two outlines and the plate overlap : short names over the outlines, the swung one a
                 // line higher, both centred on their own outline
-                if (spot.label === "")
-                {
-                    canvas.text(originX + spot.cx / scale, originY - (spot.bottom + h / 2) / scale,
-                                `Écran ${screen.diagonalInch}" (${Math.round(w)} x ${Math.round(h)})`, BODY, "middle");
-                }
-                else
-                {
-                    canvas.text(originX + spot.cx / scale, originY - (spot.bottom + h) / scale - (out ? 5.5 : 1.5),
-                                out ? "sorti" : `Écran ${screen.diagonalInch}" rangé`, BODY, "middle");
-                }
+                const cx = originX + spot.cx / scale;
+                const caption = spot.label === ""
+                    ? `Écran ${screen.diagonalInch}" (${Math.round(w)} x ${Math.round(h)})`
+                    : out ? "sorti" : `Écran ${screen.diagonalInch}" rangé`;
+                const captionY = spot.label === "" ? originY - (spot.bottom + h / 2) / scale
+                    : originY - (spot.bottom + h) / scale - (out ? 5.5 : 1.5);
+                pending.push({ t: caption, size: BODY, bold: false, around: box,
+                               first: [{ k: "text", x: cx, y: captionY, t: caption, size: BODY, anchor: "middle",
+                                         bold: false, rot: 0 }] });
             }
         }
         // A name wider htan its item becomes a numbered mark, read in the legend over the title block
@@ -569,15 +582,30 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
         for (const it of items)
         {
             const box = itemExtent(it);
-            const labelX = (box.x0 + box.x1) / 2;
-            const labelY = it.kind === "wallShelf" ? box.y1 + 40 : (box.y0 + box.y1) / 2;
             const name = textWidth(it.name, 2.2) <= (box.x1 - box.x0) / scale ? it.name : `${marks.push(it.name)}`;
-            canvas.text(originX + labelX / scale, originY - labelY / scale, name, 2.2, "middle", true);
+            const paper = { x: originX + box.x0 / scale, y: originY - box.y1 / scale, w: (box.x1 - box.x0) / scale,
+                            h: (box.y1 - box.y0) / scale };
+            // A wall shelf is too thin to hold a name : above it, where it always went
+            const first = it.kind === "wallShelf"
+                ? [{ k: "text" as const, x: paper.x + paper.w / 2, y: originY - (box.y1 + 40) / scale, t: name,
+                     size: 2.2, anchor: "middle" as const, bold: true, rot: 0 as const }]
+                : insideFirst(name, 2.2, paper, true);
+            pending.push({ t: name, size: 2.2, bold: true, around: paper, first });
         }
-        const legend = marks.length === 0 ? [] : wrap(`Repères : ${marks.map((m, i) =>
+        // Then all at once, each on the first free paper by its own item, the last line drawn
+        const missing: string[] = [];
+        for (const word of pending)
+        {
+            if (!writeNear(canvas, word.t, word.size, word.around, canvas.prims, word.first, word.bold))
+            {
+                missing.push(word.t);
+            }
+        }
+        const legend = [...marks.length === 0 ? [] : wrap(`Repères : ${marks.map((m, i) =>
         {
             return `${i + 1} ${m}`;
-        }).join(", ")}`, BODY, 390);
+        }).join(", ")}`, BODY, 390), ...missing.length === 0 ? [] : wrap(`Non écrits sur la vue faute de place : `
+            + `${missing.join(", ")}`, BODY, 390)];
         return { canvas, from, drawn, projected, legend };
     };
 
@@ -592,7 +620,7 @@ export function composition(p: Project, a: Analysis, wall: Wall = "back"): Draft
     for (let s = 1; s <= MAX_REDUCTION; s++)
     {
         const trial = lay(s, 0, 0);
-        const ink = inkBox(trial.canvas.prims.slice(trial.from)) ?? { x: 0, y: 0, w: 0, h: 0 };
+        const ink = inkBox(trial.canvas.prims, trial.from) ?? { x: 0, y: 0, w: 0, h: 0 };
         chosen = { scale: s, ink, freeH: roomBelow(trial.legend.length) - FREE.top };
         if (ink.w <= freeW && ink.h <= chosen.freeH)
         {
