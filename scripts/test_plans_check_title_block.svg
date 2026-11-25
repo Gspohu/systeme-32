@@ -1,0 +1,127 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<svg baseProfile="tiny" height="297mm" version="1.2" viewBox="0 0 4200 2970" width="420mm" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:freecad="https://www.freecad.org/wiki/index.php?title=Svg_Namespace" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   sodipodi:docname="test_plans_check_title_block.svg">
+  <sodipodi:namedview
+     id="namedview5006"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="0.3684"
+     inkscape:cx="2100.0"
+     inkscape:cy="1485.0"
+     inkscape:current-layer="layer1"
+     inkscape:document-units="px"
+     inkscape:document-rotation="0"
+     inkscape:window-width="1440"
+     inkscape:window-height="1080"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false" />
+  <metadata id="metadata9273">
+    <rdf:RDF>
+      <cc:Work rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+
+ <title>FreeCAD SVG Export</title>
+ <desc>Drawing page: Plan013 exported from FreeCAD document: tv</desc>
+ <defs/>
+ <g id="Plan013" inkscape:groupmode="layer" inkscape:label="TechDraw">
+  <g id="tv_gabarit13.svg" style="stroke: none;" transform="scale(10.000000, 10.000000)"
+     inkscape:groupmode="layer"
+     inkscape:label="Layer 1">
+   <rect fill="none" height="277" stroke="#000" stroke-width="0.6" width="400" x="10" y="10"/>
+   <rect fill="none" height="28" stroke="#000" stroke-width="0.25" width="180" x="230" y="259"/>
+   <line stroke="#000" stroke-width="0.13" x1="270" x2="270" y1="259" y2="280"/>
+   <line stroke="#000" stroke-width="0.13" x1="315" x2="315" y1="259" y2="287"/>
+   <line stroke="#000" stroke-width="0.13" x1="367" x2="367" y1="259" y2="287"/>
+   <line stroke="#000" stroke-width="0.13" x1="375" x2="375" y1="273" y2="280"/>
+   <line stroke="#000" stroke-width="0.13" x1="392" x2="392" y1="273" y2="280"/>
+   <line stroke="#000" stroke-width="0.13" x1="399" x2="399" y1="273" y2="280"/>
+   <line stroke="#000" stroke-width="0.13" x1="270" x2="410" y1="266" y2="266"/>
+   <line stroke="#000" stroke-width="0.13" x1="270" x2="315" y1="273" y2="273"/>
+   <line stroke="#000" stroke-width="0.13" x1="367" x2="410" y1="273" y2="273"/>
+   <line stroke="#000" stroke-width="0.13" x1="230" x2="410" y1="280" y2="280"/>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="231" y="261.5">Propriétaire</text>
+   <text freecad:editable="legal_owner_1" style="font-family:Helvetica, Arial, sans-serif;font-size:2.6px;text-anchor:middle;font-weight:bold" x="250" y="271.5">
+    <tspan xml:space="preserve">Martin Dupont</tspan>
+   </text>
+   <text freecad:editable="legal_owner_2" style="font-family:Helvetica, Arial, sans-serif;font-size:2.6px;text-anchor:middle;font-weight:bold" x="250" y="274.9">
+    <tspan xml:space="preserve"/>
+   </text>
+   <text freecad:editable="legal_owner_3" style="font-family:Helvetica, Arial, sans-serif;font-size:2.6px;text-anchor:middle;font-weight:bold" x="250" y="278.3">
+    <tspan xml:space="preserve"/>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="271" y="261.5">Dessiné par</text>
+   <text freecad:editable="creator" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="271" y="265">
+    <tspan xml:space="preserve">Martin Dupont</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="271" y="268.5">Approuvé par</text>
+   <text freecad:editable="approval_person" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="271" y="272">
+    <tspan xml:space="preserve">Martin Dupont</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="271" y="275.5">Empreinte du contenu</text>
+   <text freecad:editable="content" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="271" y="279">
+    <tspan xml:space="preserve">EF86F3</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="316" y="261.5">Type de document</text>
+   <text freecad:editable="document_type" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="316" y="265">
+    <tspan xml:space="preserve">Dossier de fabrication</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="316" y="268.5">Titre, titre complémentaire</text>
+   <text freecad:editable="title" style="font-family:Helvetica, Arial, sans-serif;font-size:2.6px;text-anchor:start;font-weight:bold" x="316" y="271.6">
+    <tspan xml:space="preserve">Composition TV et bibliothèque</tspan>
+   </text>
+   <text freecad:editable="supplementary_title_1" style="font-family:Helvetica, Arial, sans-serif;font-size:2.2px;text-anchor:start" x="316" y="275.4">
+    <tspan xml:space="preserve">Pièces #170-001, H1180 ST37 Chêne Halifax</tspan>
+   </text>
+   <text freecad:editable="supplementary_title_2" style="font-family:Helvetica, Arial, sans-serif;font-size:2.2px;text-anchor:start" x="316" y="278.6">
+    <tspan xml:space="preserve">naturel 19 mm, chants l2</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="368" y="261.5">Statut</text>
+   <text freecad:editable="document_status" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="368" y="265">
+    <tspan xml:space="preserve">En préparation</tspan>
+   </text>
+   <text freecad:editable="drawing_number" style="font-family:Helvetica, Arial, sans-serif;font-size:2.8px;text-anchor:middle;font-weight:bold" x="388.5" y="271">
+    <tspan xml:space="preserve">S32-FD2D91701</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="368" y="275.5">Ind</text>
+   <text freecad:editable="revision_index" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="368" y="279">
+    <tspan xml:space="preserve">-</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="376" y="275.5">Date d'émission</text>
+   <text freecad:editable="date_of_issue" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="376" y="279">
+    <tspan xml:space="preserve">2026-11-25</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="393" y="275.5">Lang</text>
+   <text freecad:editable="language_code" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="393" y="279">
+    <tspan xml:space="preserve">fr</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="400" y="275.5">Planche</text>
+   <text freecad:editable="sheet_number" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="400" y="279">
+    <tspan xml:space="preserve">14/96</tspan>
+   </text>
+   <text freecad:editable="general_tolerances" style="font-family:Helvetica, Arial, sans-serif;font-size:2.2px;text-anchor:start" x="231" y="284.6">
+    <tspan xml:space="preserve">Cotes en mm, tolérances générales ISO 2768-1:1989 classe m</tspan>
+   </text>
+   <text font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="start" x="316" y="282.5">Échelle</text>
+   <text freecad:editable="scale" style="font-family:Helvetica, Arial, sans-serif;font-size:2.4px;text-anchor:start" x="316" y="286">
+    <tspan xml:space="preserve">1:10</tspan>
+   </text>
+   <polygon fill="none" points="379,282 386.5,280.5 386.5,286.5 379,285" stroke="#000" stroke-width="0.13"/>
+   <circle cx="392.5" cy="283.5" fill="none" r="3" stroke="#000" stroke-width="0.13"/>
+   <circle cx="392.5" cy="283.5" fill="none" r="1.5" stroke="#000" stroke-width="0.13"/>
+   <line stroke="#000" stroke-dasharray="4 1 0.6 1" stroke-width="0.13" x1="377.5" x2="397" y1="283.5" y2="283.5"/>
+  </g>
+ </g>
+</svg>

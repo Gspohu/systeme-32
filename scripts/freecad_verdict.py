@@ -4,7 +4,21 @@
 
 import json
 import os
+import re
 import sys
+
+
+def expected_pages(model, wanted):
+    """The pages make_drawings (freecad_drawings.py) builds from the JSON : each sheet carrying something, then a
+    page of FreeCAD sections for each axis cut, both under the filter of S32_DRAWINGS"""
+    only = re.compile(wanted) if wanted else None
+    sheets = [s for s in model.get("drawings", []) if (s["views"] or s["tables"] or s.get("items") or s.get("overlay"))
+              and (only is None or only.search(s["title"]))]
+    sections = 0
+    if (any(s["title"] == "Coupes" for s in model.get("drawings", [])) and (only is None or
+        only.search("Coupes FreeCAD"))):
+        sections = len({c["axis"] for c in model.get("sectionCuts", [])} & {"x", "y"})
+    return len(sheets) + sections
 
 
 def fresh(path, marker):
@@ -21,8 +35,11 @@ def reasons(out, piece, marker):
                              for name in ("rapport", "visserie", "controle")) if why]
     if stale:
         return stale
-    load = lambda name: json.load(open(os.path.join(out, f"{piece}_{name}.json"), encoding="utf-8"))
-    built, screws, check = load("rapport"), load("visserie"), load("controle")
+    found = {}
+    for name in ("rapport", "visserie", "controle"):
+        with open(os.path.join(out, f"{piece}_{name}.json"), encoding="utf-8") as f:
+            found[name] = json.load(f)
+    built, screws, check = found["rapport"], found["visserie"], found["controle"]
     why = [f"construction, {key} : {len(built[key])}" for key in ("failed", "invalid", "not_one_solid",
                                                                    "missing_models", "unrouted") if built.get(key)]
     if built.get("moved_by_solver"):
@@ -38,6 +55,15 @@ def reasons(out, piece, marker):
         why.append("plans : textes barrés non contrôlés, passe d'interface antérieure au contrôle")
     why += [f"{s['page']} : '{s['text']}' barré par un trait à ({s['x']}, {s['y']}) mm"
             for s in screws.get("struck_texts", [])]
+    # A view left blank strikes no text : its page would apss
+    if "blank_views" not in screws:
+        why.append("plans : projections non attendues, passe d'interface antérieure au contrôle")
+    why += [f"plans, {blank}" for blank in screws.get("blank_views", [])]
+    with open(os.path.join(out, "json", f"{piece}.json"), encoding="utf-8") as f:
+        wanted = expected_pages(json.load(f), os.environ.get("S32_DRAWINGS", ""))
+    for what, count in (("exportées", len(screws.get("pages", []))), ("construites", len(built.get("drawings", [])))):
+        if (count != wanted):
+            why.append(f"plans : {count} pages {what} pour {wanted} planches attendues du JSON")
     if (check.get("parts_json") != check.get("links")):
         why.append(f"contrôle : {check.get('links')} liens pour {check.get('parts_json')} pièces du JSON")
     if check.get("no_material"):

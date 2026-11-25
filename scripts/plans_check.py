@@ -57,7 +57,11 @@ def invert(m):
 
 def path_points(d):
     """The polylines of a path, its curves cut in straight pieces : M, L, H, V, C, Q and Z, absolute or relative"""
-    tokens = re.findall(r"[MmLlHhVvCcQqZz]|" + NUMBER.pattern, d)
+    tokens = re.findall(NUMBER.pattern + r"|[A-Za-z]", d)
+    unread = sorted({t for t in tokens if t.isalpha() and t not in "MmLlHhVvCcQqZz"})
+    # An arc or a smooth curve read as the command before it would draw a line that isn't there
+    if unread:
+        raise ValueError(f"commande de chemin SVG non lue : {''.join(unread)} dans {d[:40]}")
     runs = []
     run = []
     x = y = sx = sy = 0.0
@@ -78,7 +82,9 @@ def path_points(d):
             raise ValueError(f"chemin SVG sans commande : {d[:40]}")
         rel = cmd.islower()
         take = {"m": 2, "l": 2, "h": 1, "v": 1, "c": 6, "q": 4}[cmd.lower()]
-        v = [float(t) for t in tokens[k:k + take]]
+        v = [float(t) for t in tokens[k:k + take] if not t.isalpha()]
+        if (len(v) < take):
+            raise ValueError(f"chemin SVG tronqué après {cmd} : {d[:40]}")
         k += take
         if (cmd in "Mm"):
             if (len(run) > 1):
@@ -142,10 +148,80 @@ def stroked(style):
     colour = (style.get("stroke") or "none").strip().lower()
     if colour in ("none", "transparent", "#ffffff", "#fff", "white"):
         return False
-    return float(style.get("stroke-opacity", 1) or 1) > 0 and float(style.get("stroke-width", 1) or 1) > 0
+    return number(style.get("stroke-opacity"), 1.0) > 0 and number(style.get("stroke-width"), 1.0) > 0
 
 
-STYLE = ("stroke", "stroke-opacity", "stroke-width", "font-family", "font-size")
+def number(text, default):
+    found = NUMBER.findall(text or "")
+    return float(found[0]) if found else default
+
+
+STYLE = ("stroke", "stroke-opacity", "stroke-width", "font-family", "font-size", "font-weight", "text-anchor")
+# Where SVG puts the start of a text for each anchor, in its advance
+ANCHOR = {"start": 0.0, "middle": 0.5, "end": 1.0}
+# A size in user units, the px of SVG being the same unit
+SIZE = re.compile(r"^\s*(" + NUMBER.pattern + r")\s*(px)?\s*$")
+# What a tspan of the template may carry and still sit on the line of its text
+TSPAN = ("{http://www.w3.org/XML/1998/namespace}space",)
+
+
+def own_style(e, inherited):
+    """The style an element draws with : the inherited one, its attributes over it, its style= over both, as CSS says"""
+    style = dict(inherited)
+    for key in STYLE:
+        if e.get(key) is not None:
+            style[key] = e.get(key).strip()
+    for declaration in (e.get("style") or "").split(";"):
+        if not declaration.strip():
+            continue
+        key, _, value = declaration.partition(":")
+        key = key.strip().lower()
+        if key in STYLE:
+            style[key] = value.strip()
+        elif (key == "font"):
+            raise ValueError(f"raccourci CSS font non lu : {declaration.strip()}")
+    return style
+
+
+def bold_of(weight, content):
+    weight = (weight or "normal").strip().lower()
+    if weight in ("normal", "lighter"):
+        return False
+    if weight in ("bold", "bolder"):
+        return True
+    if weight.isdigit():
+        # CSS Fonts 4, 5.2 : with a normal and a bold face, 500 falls to the 400 one and 600 up to the 700 one
+        return int(weight) >= 600
+    raise ValueError(f"graisse '{weight}' non lue pour le texte '{content}'")
+
+
+def read_text(e, style, m):
+    """A text of the page with what its ink is measured from, or an error for whatever of it isn't read"""
+    content = "".join(e.itertext()).strip()
+    if not content:
+        return None
+    for child in e.iter():
+        if child is e:
+            continue
+        # Moved or restyled on its own, a piece of the text would be measured where it isn't
+        extra = [k for k in child.attrib if k not in TSPAN]
+        if (child.tag.split("}")[-1] != "tspan" or extra):
+            raise ValueError(f"texte '{content}' : élément {child.tag.split('}')[-1]} {extra} non lu")
+    for key in ("dx", "dy", "rotate", "textLength"):
+        if e.get(key) is not None:
+            raise ValueError(f"texte '{content}' : attribut {key} non lu")
+    size = SIZE.match(style.get("font-size", ""))
+    if (size is None or float(size.group(1)) <= 0):
+        raise ValueError(f"texte '{content}' sans taille de police lisible : '{style.get('font-size', '')}'")
+    anchor = style.get("text-anchor", "start").lower()
+    if anchor not in ANCHOR:
+        raise ValueError(f"texte '{content}' : ancrage '{anchor}' non lu")
+    place = [NUMBER.findall(e.get(key) or "0") for key in ("x", "y")]
+    if (len(place[0]) != 1 or len(place[1]) != 1):
+        raise ValueError(f"texte '{content}' : position glyphe par glyphe non lue")
+    return {"text": content, "family": style.get("font-family", ""), "size": float(size.group(1)),
+            "bold": bold_of(style.get("font-weight"), content), "anchor": ANCHOR[anchor],
+            "x": float(place[0][0]), "y": float(place[1][0]), "m": m}
 
 
 def walk(e, m, style, texts, segments):
@@ -153,17 +229,15 @@ def walk(e, m, style, texts, segments):
     tag = e.tag.split("}")[-1]
     if tag in ("defs", "title", "desc", "clipPath", "mask", "symbol", "marker"):
         return
+    # A style sheet would restyle by class what this reads by attribute
+    if (tag == "style"):
+        raise ValueError("feuille de style CSS non lue")
     m = compose(m, matrix_of(e.get("transform")))
-    style = dict(style)
-    for key in STYLE:
-        if e.get(key) is not None:
-            style[key] = e.get(key)
+    style = own_style(e, style)
     if (tag == "text"):
-        content = "".join(e.itertext()).strip()
-        if content:
-            texts.append({"text": content, "family": style.get("font-family", ""),
-                          "size": float(NUMBER.findall(style.get("font-size", "0"))[0]),
-                          "x": float(e.get("x", 0) or 0), "y": float(e.get("y", 0) or 0), "m": m})
+        found = read_text(e, style, m)
+        if found is not None:
+            texts.append(found)
         return
     if stroked(style):
         for run in shape_points(tag, e):
@@ -193,8 +267,8 @@ def clips(p, q, box):
 
 
 def crossed_texts(svg, ink):
-    """Each text a stroked segment runs through, with where it sits on the page in mm. ink(text, family, size) gives
-    the box of its glyphs from the start of its baseline (x0, y0, x1, y1), y down, in the units of size"""
+    """Each text a stroked segment runs through, with where it sits on the page in mm. ink(text, family, size, bold)
+    gives the box of its glyphs from the start of its baseline and its advance (x0, y0, x1, y1, advance), y down"""
     # The SVG itself, or the path of its file
     root = ET.fromstring(svg) if svg.lstrip().startswith("<") else ET.parse(svg).getroot()
     width = float(NUMBER.findall(root.get("width", "0"))[0])
@@ -209,9 +283,12 @@ def crossed_texts(svg, ink):
         inverse = invert(t["m"])
         if inverse is None:
             continue
-        x0, y0, x1, y1 = ink(t["text"], t["family"], t["size"])
+        x0, y0, x1, y1, advance = ink(t["text"], t["family"], t["size"], t["bold"])
         if (x1 <= x0 or y1 <= y0):
-            continue
+            raise ValueError(f"texte '{t['text']}' sans encre mesurée en {t['family']} {t['size']}")
+        # SVG moves the start of an anchored text back by its advance, the ink follows
+        shift = -t["anchor"] * advance
+        x0, x1 = x0 + shift, x1 + shift
         # The tolerence in the frame of the text : its matrix may scale it
         scale = math.sqrt(abs(t["m"][0] * t["m"][3] - t["m"][1] * t["m"][2])) or 1.0
         air = TOUCH * unit / scale

@@ -25,6 +25,8 @@ sys.path.insert(0, os.environ.get("S32_SCRIPTS", os.path.dirname(os.path.abspath
 INK_SCALE = 100.0
 # Started from the command line a macro runs before the event loop : it waits for it
 START_MS = 2000
+# Longest wait for the views of a page to project, s : past it a view without edges is a fault of the report
+SETTLE_S = 120.0
 # Zinc plated steel, what the data of the hardware list say the screws are
 SCREW_COLOUR = (0.78, 0.79, 0.80, 0.0)
 # DIN7505 was added to the workbench for this : chipboard screws, a head of twice their diameter like the Blum 609.1500
@@ -84,11 +86,12 @@ def fit_sheets(doc):
         sheet.recompute()
 
 
-def settled(page, limit=120.0):
+def settled(page, limit=SETTLE_S):
     """With a GUI the views of a page project in threads : exported before, the last ones came out blank (the top
-    and left of the low unit of the TV wall). Waits until each has its edges"""
+    and left of the low unit of the TV wall). Waits until each has its edges, sections too, and names those that
+    still have none"""
     import time
-    views = [v for v in page.Views if v.TypeId == "TechDraw::DrawViewPart"]
+    views = [v for v in page.Views if v.TypeId in ("TechDraw::DrawViewPart", "TechDraw::DrawViewSection")]
     end = time.monotonic() + limit
     while (time.monotonic() < end and not all(len(v.getVisibleEdges()) > 0 for v in views)):
         QtCore.QCoreApplication.processEvents()
@@ -96,16 +99,20 @@ def settled(page, limit=120.0):
         time.sleep(0.2)
     for _ in range(10):
         Gui.updateGui()
+    return [f"{page.Label} : vue {v.Label} sans arête après {limit:g} s" for v in views if not v.getVisibleEdges()]
 
 
-def text_ink(text, family, size):
-    """The box of a text's glyphs from the start of its baseline, in the units of its size, as Qt draws them"""
+def text_ink(text, family, size, bold):
+    """The box of a text's glyphs from the start of its baseline and its advance, in the units of its size, as Qt draws them"""
     font = QtGui.QFont()
     font.setFamilies([f.strip() for f in family.split(",") if f.strip()])
+    font.setBold(bold)
     # A pixel size is a whole number : measured 100 times larger
     font.setPixelSize(max(1, int(round(size * INK_SCALE))))
-    r = QtGui.QFontMetricsF(font).tightBoundingRect(text)
-    return (r.left() / INK_SCALE, r.top() / INK_SCALE, r.right() / INK_SCALE, r.bottom() / INK_SCALE)
+    metrics = QtGui.QFontMetricsF(font)
+    r = metrics.tightBoundingRect(text)
+    return (r.left() / INK_SCALE, r.top() / INK_SCALE, r.right() / INK_SCALE, r.bottom() / INK_SCALE,
+            metrics.horizontalAdvance(text) / INK_SCALE)
 
 
 def export_pages(doc):
@@ -117,17 +124,18 @@ def export_pages(doc):
     os.makedirs(folder, exist_ok=True)
     written = []
     struck = []
+    blank = []
     with tempfile.TemporaryDirectory() as scratch:
         for page in [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]:
             page.ViewObject.show()
-            settled(page)
+            blank += settled(page)
             path = os.path.join(folder, file_name(page.Label) + ".pdf")
             TechDrawGui.exportPageAsPdf(page, path)
             written.append(path)
             svg = os.path.join(scratch, "page.svg")
             TechDrawGui.exportPageAsSvg(page, svg)
             struck += [dict(found, page=page.Label) for found in crossed_texts(svg, text_ink)]
-    return written, struck
+    return written, struck, blank
 
 
 def screw_type(screw):
@@ -396,7 +404,7 @@ def run():
     view.saveImage(IMAGE, 1600, 1000, "White")
     fit_sheets(doc)
     doc.save()
-    report["pages"], report["struck_texts"] = export_pages(doc)
+    report["pages"], report["struck_texts"], report["blank_views"] = export_pages(doc)
     report["steps_written"] = export_steps(doc, model, root, subs, drawn)
     report["expected_step_solids"] = (len(model["parts"]) + sum(len(p.get("bands", [])) +
                                                                 (1 if p.get("bandInner") else 0)
