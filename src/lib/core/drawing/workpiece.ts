@@ -7,8 +7,11 @@ import { tessellate, vDown, type Vec3 } from "../geometry";
 import { fittedExtent } from "../fitted";
 import { A3, Canvas, MARGIN, OVERLAY_EM, SCALES, SMALL_TEXT, TITLE_BLOCK_H, TITLE_BLOCK_W, fit, inkBox, inkedBoxes,
     overlayWidth, pickScale, scaleText, textWidth, wrap, type Prim, type Stroke } from "./display";
+import { DIMENSION, dimensionShift } from "./svg";
+import { MARK_AIR, writeNear, type Box, type TextPrim } from "./clear";
 import type { Draft, PartView } from "./draft";
-import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_TEXT, TABLE_W, drawTable, machiningTable, outlineArcs, printedRows,
+import { ROW, TABLE_BOTTOM, TABLE_COL_W, TABLE_TEXT, TABLE_W, drawTable, faceRadius, machiningTable, outlineArcs,
+    printedRows,
     type MachiningTable, type MarkSpot, type PlacedColumn } from "./machining_table";
 import { round1 } from "../text";
 
@@ -41,7 +44,7 @@ const UPRIGHT = new Set(["door", "leaf", "panel"]);
 
 
 // A narrow board laid a quarter turn round, its long side along the sheet, when that alone reads at a larger
-// scale than any other way of drawing it : a 80 x 420 cleat at 1:2 rather than 1:5
+// scale than any other way of drawing it : a 80 x 420 cleat at 1:2, not 1:5
 export function isTurned(part: Part): boolean
 {
     if (UPRIGHT.has(part.role))
@@ -339,6 +342,28 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     {
         return [du * su[0] + dv * sv[0], du * su[1] + dv * sv[1]];
     };
+    // The overall dimensions where TechDraw draws them : the label on its offset, the line past it by the shift, the
+    // extension lines from the outline itself, its gap factor being 0
+    const overallDimensions = (c: Canvas): void =>
+    {
+        const [left, right] = [ox, ox + spanX / scale];
+        const shift = dimensionShift();
+        const labelY = oy + DIMENSION.offset;
+        c.dimH(left, right, oy, labelY + shift, "");
+        c.text((left + right) / 2, labelY + DIMENSION.text * 0.35, round1(spanX), DIMENSION.text, "middle");
+        // Standing, the height is dimensioned on the right, clear of the u arrow at the origin
+        const labelX = upright ? right + DIMENSION.uprightOffset : left - DIMENSION.offset;
+        c.dimV(oy - spanY / scale, oy, upright ? right : left, labelX + shift, "");
+        c.text(labelX + DIMENSION.text * 0.35, oy - spanY / scale / 2, round1(spanY), DIMENSION.text, "middle", false,
+               90);
+    };
+    // Drawn aside first : every text written before them keeps clear of what TechDraw will print there
+    const ahead = new Canvas();
+    overallDimensions(ahead);
+    const around = (): Prim[] =>
+    {
+        return [...canvas.prims.slice(partFrom), ...ahead.prims];
+    };
     const seg = (u1: number, v1: number, u2: number, v2: number, s: Stroke): void =>
     {
         canvas.line(...P(u1, v1), ...P(u2, v2), s);
@@ -409,6 +434,11 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
             else
             {
                 canvas.circle(x, y, Math.max(0.5, h.diameter / 2 / scale), h.face === "A" ? "normal" : "dashed");
+                // The rim of its countersink, the circle TechDraw prints round the hole
+                if (faceRadius(h) > h.diameter / 2)
+                {
+                    canvas.circle(x, y, faceRadius(h) / scale, h.face === "A" ? "normal" : "dashed");
+                }
             }
         }
         // An edge hole is a short stroke going into the part as deep as the hole
@@ -421,17 +451,25 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
             seg(h.u, h.v, h.u, h.v + (h.face === "v0" ? h.depth : -h.depth), "centre");
         }
     }
+    // The bought parts outlined before any word is written : the grain and the axes came out on their dashes
+    const footprints = drawFootprints(canvas, part, fitted, P);
+    let grainLeft = false;
     if (part.grain)
     {
-        // The arrow along u, set off 4 mm of paper towards v
+        // The arrow along u, set off towards v by 4 mm of paper, less on a narrow board : a plinth 9.5 mm wide on
+        // paper had it on its edge
+        const off = Math.min(4, part.width / scale / 4);
         const [nx, ny] = D(0, 1);
         const [g0x, g0y] = P(part.length * 0.35, part.width / 2);
         const [g1x, g1y] = P(part.length * 0.65, part.width / 2);
         const [ax, ay] = D(1, 0);
-        canvas.line(g0x + 4 * nx, g0y + 4 * ny, g1x + 4 * nx, g1y + 4 * ny, "thin");
-        canvas.arrowHead(g0x + 4 * nx, g0y + 4 * ny, ax, ay);
-        canvas.arrowHead(g1x + 4 * nx, g1y + 4 * ny, -ax, -ay);
-        canvas.text((g0x + g1x) / 2 + 5 * nx + 1, (g0y + g1y) / 2 + 5 * ny, "fil", 2, "middle");
+        const [x1, y1, x2, y2] = [g0x + off * nx, g0y + off * ny, g1x + off * nx, g1y + off * ny];
+        canvas.line(x1, y1, x2, y2, "thin");
+        canvas.arrowHead(x1, y1, ax, ay);
+        canvas.arrowHead(x2, y2, -ax, -ay);
+        // Its word beside it, never on it : which side v runs decided before whether the letters stood on the line
+        const arrow = { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+        grainLeft = !writeNear(canvas, "fil", 2, arrow, around());
     }
     // A pocket in an edge is hidden from the face : its outline dashed, as deep as it goes in
     for (const k of part.pockets ?? [])
@@ -460,13 +498,18 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
             const [dx, dy] = D(-Math.cos(a.mid), -Math.sin(a.mid));
             canvas.line(tipX, tipY, tipX + 10 * dx, tipY + 10 * dy, "thin");
             canvas.arrowHead(tipX, tipY, dx, dy);
-            canvas.text(tipX + 12 * dx, tipY + 12 * dy - 1, `R${round1(a.r)}`, 2.5, "middle");
+            const end = { x: tipX + 10 * dx, y: tipY + 10 * dy, w: 0, h: 0 };
+            writeNear(canvas, `R${round1(a.r)}`, 2.5, end, around(),
+                      [{ k: "text", x: tipX + 12 * dx, y: tipY + 12 * dy - 1, t: `R${round1(a.r)}`, size: 2.5,
+                         anchor: "middle" }]);
             continue;
         }
         seg(a.cu, a.cv, tipU, tipV, "thin");
         canvas.arrowHead(...P(tipU, tipV), ...D(-Math.cos(a.mid), -Math.sin(a.mid)));
         const [tx, ty] = P(a.cu + a.r * 0.55 * Math.cos(a.mid), a.cv + a.r * 0.55 * Math.sin(a.mid));
-        canvas.text(tx, ty - 1, `R${round1(a.r)}`, 2.5, "middle");
+        // By its leader, off the arc and every line : the table lists each arc, a radius with no room stays there
+        writeNear(canvas, `R${round1(a.r)}`, 2.5, { x: tx, y: ty, w: 0, h: 0 }, around(),
+                  [{ k: "text", x: tx, y: ty - 1, t: `R${round1(a.r)}`, size: 2.5, anchor: "middle" }]);
         // Its centre crossed and set from the two nearest edges of the board, where the compass goes in
         const [cx, cy] = P(a.cu, a.cv);
         canvas.cross(cx, cy, 1.5);
@@ -498,37 +541,48 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
     // Its 0 outside the part, whichever corner it took
     const zeroRight = upright && !down;
     canvas.text(zx + (zeroRight ? 1.5 : -1.5), zy + (down && !upright ? -1.5 : 3), "0", 2, zeroRight ? "start" : "end");
-    for (const [du, dv, name] of [[1, 0, "u"], [0, 1, "v"]] as const)
+    const axes = [[1, 0, "u"], [0, 1, "v"]] as const;
+    for (const [du, dv] of axes)
     {
         const [dx, dy] = D(du, dv);
         canvas.line(zx, zy, zx + 8 * dx, zy + 8 * dy, "thin");
         canvas.arrowHead(zx + 8 * dx, zy + 8 * dy, -dx, -dy);
+    }
+    // Both arrows drawn, then their letters : the arrow of v crossed a u moved off its place
+    for (const [du, dv, name] of axes)
+    {
+        const [dx, dy] = D(du, dv);
         // Clear of the edge and its arrow : u outside the part, v inside it, the overall dimension of the height
         // running down the outer side of v and hiding a letter there
         const [awayX, awayY] = name === "u" ? D(0, -1) : D(1, 0);
-        canvas.text(zx + 6 * dx + 3.5 * awayX, zy + 6 * dy + 3.5 * awayY + AXIS_TEXT * 0.35, name, AXIS_TEXT,
-                    "middle", true);
+        const [lx, ly] = [zx + 6 * dx + 3.5 * awayX, zy + 6 * dy + 3.5 * awayY];
+        // There when the paper is free, else the nearest free place : the origin line of the sheet says it too
+        writeNear(canvas, name, AXIS_TEXT, { x: lx, y: ly, w: 0, h: 0 }, around(),
+                  [{ k: "text", x: lx, y: ly + AXIS_TEXT * 0.35, t: name, size: AXIS_TEXT, anchor: "middle",
+                    bold: true }],
+                  true);
     }
     keep();
-    const left = ox;
-    const right = ox + spanX / scale;
-    canvas.dimH(left, right, oy + 1, oy + 7, round1(spanX));
-    // Standing, the height is dimensioned on the right, clear of the u arrow at the origin
-    const dimAt = upright ? right : left;
-    const away = upright ? 1 : -1;
-    canvas.dimV(oy - spanY / scale, oy, dimAt + away, dimAt + (upright ? 12 : 6) * away,
-                round1(spanY));
+    // A mark keeps clear of what TechDraw prints
+    overallDimensions(canvas);
     // The dimensions are TechDraw's own, measured on the solid
     from = canvas.prims.length;
-    drawFootprints(canvas, part, fitted, P);
     const table = machiningTable(row, part, side === undefined ? TABLE_W : side.w);
     // Everything of the part, its own outline included : a mark on a cut edge would be struck through by it
     const unplaced = placeMarks(canvas, table.spots, P, scale, canvas.prims.slice(partFrom), P(maxU / 2, maxV / 2));
+    // The marks first, they name the machining : the references of the bought parts take the paper left
+    placeReferences(canvas, footprints, canvas.prims.slice(partFrom));
     if (unplaced.length > 0)
     {
         // Said on the sheet, never dropped : the maker finds those holes by their line of the table
         table.notes.push(...wrap(`Note : repères ${unplaced.join(", ")} non écrits sur la vue faute de place, `
             + "positions au tableau", TABLE_TEXT, side === undefined ? TABLE_W : side.w, OVERLAY_EM));
+    }
+    if (grainLeft)
+    {
+        // The arrow alone could be read as a dimension : the grain is said in words
+        table.notes.push(...wrap("Note : fil le long de u, flèche sans légende faute de place", TABLE_TEXT,
+            side === undefined ? TABLE_W : side.w, OVERLAY_EM));
     }
     if (side === undefined)
     {
@@ -562,13 +616,10 @@ function drawWorkpiece(canvas: Canvas, row: CutRow, x0: number, y0: number, boxW
 }
 
 
-type Box = { x: number; y: number; w: number; h: number };
 
 // Centred over the hole, under it, beside it, then on its corners : a row of holes closer than a mark is wide
 // alternates over and under by itself
 const AROUND = [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1, 1]] as const;
-// Clear paper kept round a mark, mm
-const MARK_AIR = 0.4;
 // Past this much paper between a hole's edge and its mark, mm, the mark takes a leader : D3 at 5 mm from its hole
 // with C11 at 2.5 named C11's
 const NEAR = 2;
@@ -725,8 +776,10 @@ export function placeMarks(canvas: Canvas, spots: MarkSpot[], P: (u: number, v: 
         written.push({ k, box: chosen, alone });
         if (!alone)
         {
-            const ex = Math.min(Math.max(sx, chosen.x), chosen.x + chosen.w);
-            const ey = Math.min(Math.max(sy, chosen.y), chosen.y + chosen.h);
+            // Stopped short of the mark by the same air kept round it : the glyphs print a little wider than their
+            // estimate, and E1 came out with the leader in its 1
+            const ex = Math.min(Math.max(sx, chosen.x - MARK_AIR), chosen.x + chosen.w + MARK_AIR);
+            const ey = Math.min(Math.max(sy, chosen.y - MARK_AIR), chosen.y + chosen.h + MARK_AIR);
             canvas.line(sx, sy, ex, ey, "thin");
             leaders.push([sx, sy, ex, ey]);
         }
@@ -773,13 +826,15 @@ export function segmentHits(a: [number, number], b: [number, number], box: Box):
 
 
 // The outline of the hardware this part carries the screws of, dashed, with its reference
+// The dashed outline of each bought part on the board, and its reference left to place once the marks are written
 function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
-                        P: (u: number, v: number) => [number, number]): void
+                        P: (u: number, v: number) => [number, number]): Footprint[]
 {
     const fr = part.frame;
+    const pending: Footprint[] = [];
     if (fr === null)
     {
-        return;
+        return pending;
     }
     for (const f of fitted)
     {
@@ -831,20 +886,42 @@ function drawFootprints(canvas: Canvas, part: Part, fitted: Fitted[],
         }
         const [a, b] = P(u0, v0);
         const [c, d] = P(u1, v1);
-        canvas.rect(Math.min(a, c), Math.min(b, d), Math.abs(c - a), Math.abs(d - b), "dashed");
-        // The reference reads along the long side of the footprint, or above it when even that's too short
-        const tall = Math.abs(d - b) > Math.abs(c - a);
-        if (textWidth(f.ref, SMALL_TEXT) > Math.max(Math.abs(d - b), Math.abs(c - a)) - 1)
+        const box = { x: Math.min(a, c), y: Math.min(b, d), w: Math.abs(c - a), h: Math.abs(d - b) };
+        canvas.rect(box.x, box.y, box.w, box.h, "dashed");
+        pending.push({ ref: f.ref, box });
+    }
+    return pending;
+}
+
+
+type Footprint = { ref: string; box: Box };
+
+
+// Each reference of a footprint along its long side inside it, else round it. Its table names the part in full : a
+// reference with no room is left to it, never written over the outline, a dimension or a mark
+export function placeReferences(canvas: Canvas, footprints: Footprint[], drawn: Prim[]): string[]
+{
+    const left: string[] = [];
+    for (const { ref, box } of footprints)
+    {
+        const h = SMALL_TEXT;
+        const [cx, cy] = [box.x + box.w / 2, box.y + box.h / 2];
+        const tall = box.h > box.w;
+        const inside: TextPrim[] = textWidth(ref, h) < Math.max(box.w, box.h) - 1
+            ? [tall ? { k: "text", x: cx + 0.7, y: cy, t: ref, size: h, anchor: "middle", rot: 90 }
+                : { k: "text", x: cx, y: cy + 0.7, t: ref, size: h, anchor: "middle" }]
+            : [];
+        if (writeNear(canvas, ref, h, box, drawn, inside))
         {
-            canvas.text((a + c) / 2, Math.min(b, d) - 0.8, f.ref, SMALL_TEXT, "middle");
+            // What this one wrote, a later reference keeps clear of it
+            drawn = [...drawn, canvas.prims[canvas.prims.length - 1]!];
         }
         else
         {
-            canvas.text((a + c) / 2 + (tall ? 0.7 : 0), (b + d) / 2 + (tall ? 0 : 0.7), f.ref, SMALL_TEXT, "middle",
-                        false,
-                        tall ? 90 : 0);
+            left.push(ref);
         }
     }
+    return left;
 }
 
 

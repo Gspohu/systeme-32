@@ -6,6 +6,7 @@ import { Canvas, OVERLAY_EM, SMALL_TEXT, inkBox, inkedBoxes, scaleText, textWidt
 import { CELL_PAD, ROW, TABLE_COLS, TABLE_HEAD, TABLE_TEXT, TABLE_W, machiningTable, outlineArcs } from
     "./drawing/machining_table";
 import { placeMarks, segmentHits } from "./drawing/workpiece";
+import { DIMENSION } from "./drawing/svg";
 import type { PartView } from "./drawing/draft";
 import type { Part } from "./parts";
 import { tessellate } from "./geometry";
@@ -92,7 +93,18 @@ function tableSpots(row: Parameters<typeof machiningTable>[0], part: Part, P: (u
 {
     const arcs = outlineArcs(part);
     const num = (t: string): number => { return Number(t.replace(",", ".")); };
-    return machiningTable(row, part).lines.filter((c) => { return c.length > 1 && c[1] !== ""; }).map((c) =>
+    // Each line with the rest of its Usage, carried on under it
+    const lines = machiningTable(row, part).lines.filter((c) => { return c.length > 1; });
+    const usage = lines.map((c, i) =>
+    {
+        let text = c[6] ?? "";
+        for (let j = i + 1; j < lines.length && lines[j]![1] === ""; j++)
+        {
+            text += ` ${lines[j]![6] ?? ""}`;
+        }
+        return text;
+    });
+    return lines.flatMap((c, i) => { return c[1] !== "" ? [{ c, use: usage[i]! }] : []; }).map(({ c, use }) =>
     {
         const [u, v] = [num(c[1]!), num(c[2]!)];
         if (c[3]!.startsWith("R"))
@@ -107,7 +119,10 @@ function tableSpots(row: Parameters<typeof machiningTable>[0], part: Part, P: (u
             return { tag: c[0]!, at: P(u, v), r: Math.max(...sizes) / 2 };
         }
         const onFace = c[5] === "A" || c[5] === "B";
-        return { tag: c[0]!, at: P(u, v), r: onFace && !Number.isNaN(num(c[3]!)) ? num(c[3]!) / 2 : 0 };
+        // A screw hole shows the rim of its countersink on the sheet, its Usage says how wide
+        const sink = new RegExp(`fraisé ${DIAM}(\\d+(?:,\\d+)?)`).exec(use);
+        const bore = Number.isNaN(num(c[3]!)) ? 0 : num(c[3]!);
+        return { tag: c[0]!, at: P(u, v), r: onFace ? Math.max(bore, sink === null ? 0 : num(sink[1]!)) / 2 : 0 };
     });
 }
 
@@ -252,6 +267,52 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                     expect(text, `${row.code} : ${note}`).toContain(`Note : ${note}`);   
                 }
             }
+        });
+
+        // TechDraw prints the rim of a countersink round its screw hole, read here off the part and not off the
+        // code that places the marks : the A marks of #150-004 and B of #200-004 sat on it
+        it("write the mark of a countersunk hole off the rim of its countersink", () =>
+        {
+            const onRim: string[] = [];
+            let seen = 0;
+            for (const pg of partPages)
+            {
+                const texts = (pg.marks ?? []).filter((m): m is Text => { return m.k === "text"; });
+                for (const v of pg.views ?? [])
+                {
+                    const row = byPart.get(v.part);
+                    if (row === undefined)
+                    {
+                        continue;
+                    }
+                    const part = row.parts[0]!;
+                    const P = paperOf(part, v);
+                    for (const s of tableSpots(row, part, P))
+                    {
+                        const sunk = part.holes.find((h) =>
+                        {
+                            const [x, y] = P(h.u, h.v);
+                            return (h.face === "A" || h.face === "B") && h.countersink !== undefined
+                                && Math.hypot(x - s.at[0], y - s.at[1]) < 1e-6;
+                        });
+                        const m = texts.find((t) => { return t.t === s.tag; });
+                        if (sunk === undefined || m === undefined)
+                        {
+                            continue;
+                        }
+                        seen++;
+                        const b = printed(m);
+                        const gap = Math.hypot(Math.max(b.x - s.at[0], 0, s.at[0] - b.x - b.w),
+                                               Math.max(b.y - s.at[1], 0, s.at[1] - b.y - b.h));
+                        if (gap < sunk.countersink! / 2 / v.scale)
+                        {
+                            onRim.push(`${row.code} ${s.tag} à ${round1(gap)} du centre`);
+                        }
+                    }
+                }
+            }
+            expect(seen).toBeGreaterThan(0);
+            expect(onRim).toEqual([]);
         });
 
         it("mark every machining, a letter a setting of the machine then a number", () =>
@@ -466,6 +527,92 @@ for (const [name, make] of [["TV wall", tvWall], ["dresser", dresser]] as const)
                 }
             }
             expect(over).toEqual([]);
+        });
+
+        it("run no line of the overlay nor the outline of the part through any text it writes", () =>
+        {
+            // The twin of scripts/plans_check.py, which reads the exported page itself : marks, references of bought
+            // parts, the grain, the axes and the radii alike
+            const struck: string[] = [];
+            const segments = (q: Prim): [number, number, number, number][] =>
+            {
+                if (q.k === "line")
+                {
+                    return [[q.x1, q.y1, q.x2, q.y2]];
+                }
+                const pts: [number, number][] = q.k === "rect"
+                    ? [[q.x, q.y], [q.x + q.w, q.y], [q.x + q.w, q.y + q.h], [q.x, q.y + q.h], [q.x, q.y]]
+                    : q.k === "poly" ? (q.closed ? [...q.pts, q.pts[0]!] : q.pts) : [];
+                return pts.slice(1).map((p, i) => { return [pts[i]![0], pts[i]![1], p[0], p[1]]; });
+            };
+            for (const pg of partPages)
+            {
+                const prims = pg.marks ?? [];
+                const lines = [...prims.flatMap(segments), ...pg.views!.flatMap((v) =>
+                {
+                    const part = byPart.get(v.part)!.parts[0]!;
+                    return outlineOf(part, paperOf(part, v));
+                })];
+                for (const m of prims)
+                {
+                    if (m.k !== "text")
+                    {
+                        continue;
+                    }
+                    const ink = printed(m);
+                    const b = { x: ink.x + 0.05, y: ink.y + 0.05, w: ink.w - 0.1, h: ink.h - 0.1 };
+                    if (lines.some((s) => { return crosses(s, b); }))
+                    {
+                        struck.push(`${pg.title} : ${m.t}`);
+                    }
+                }
+            }
+            expect(struck).toEqual([]);
+        });
+
+        it("write no text of the overlay on the overall dimensions TechDraw draws, its line past the label", () =>
+        {
+            // Worked out here from the pinned settings, not by the code that draws : the line at the label plus half
+            // its frame plus the line width times the spacing factor, towards +y or +x, as TechDraw lays it
+            const shift = DIMENSION.labelHalf + DIMENSION.lineWidth * DIMENSION.spacingFactor;
+            const struck: string[] = [];
+            for (const pg of partPages)
+            {
+                const texts = (pg.marks ?? []).filter((m): m is Text => { return m.k === "text"; });
+                for (const v of pg.views!)
+                {
+                    const { x, y, w, h } = v.box;
+                    const upright = v.su[1] !== 0;
+                    const lineY = y + h + DIMENSION.offset + shift;
+                    const labelX = upright ? x + w + DIMENSION.uprightOffset : x - DIMENSION.offset;
+                    const edgeX = upright ? x + w : x;
+                    const lines: [number, number, number, number][] = [
+                        [x, lineY, x + w, lineY], [x, y + h, x, lineY], [x + w, y + h, x + w, lineY],
+                        [labelX + shift, y, labelX + shift, y + h], [edgeX, y, labelX + shift, y],
+                        [edgeX, y + h, labelX + shift, y + h]];
+                    // Each label as wide as its number prints, its frame as high as TechDraw's
+                    const half = DIMENSION.labelHalf;
+                    const long = (t: string): number =>
+                    {
+                        return printed({ k: "text", x: 0, y: 0, t, size: DIMENSION.text, anchor: "start" }).w;
+                    };
+                    const across = long(round1(w * v.scale));
+                    const up = long(round1(h * v.scale));
+                    const labels: Box[] = [
+                        { x: x + w / 2 - across / 2, y: y + h + DIMENSION.offset - half, w: across, h: 2 * half },
+                        { x: labelX - half, y: y + h / 2 - up / 2, w: 2 * half, h: up }];
+                    for (const m of texts)
+                    {
+                        const b = printed(m);
+                        if (lines.some((s) => { return crosses(s, b); }) ||
+                            labels.some((l) => { return overlaps(b, l); }))
+                        {
+                            struck.push(`${pg.title} : ${m.t} en ${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
+                        }
+                    }
+                }
+            }
+            expect(struck).toEqual([]);
         });
 
         it("draw a hole of face A in full line and one of face B dashed, where the part has it", () =>

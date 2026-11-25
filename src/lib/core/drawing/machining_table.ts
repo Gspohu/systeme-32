@@ -1,7 +1,7 @@
 // The table of what is machined on a workpiece : holes, cutouts, arcs, pockest, grooves and notes, column after column
 
 import type { CutRow } from "../bom";
-import type { Part } from "../parts";
+import type { Hole, Part } from "../parts";
 import { bounds, tessellate } from "../geometry";
 import { A3, Canvas, MARGIN, OVERLAY_EM, TITLE_BLOCK_H, textWidth, wrap, type Prim } from "./display";
 import { DIAM, round1 } from "../text";   
@@ -51,6 +51,14 @@ export interface MarkSpot
     u: number;
     v: number;
     r: number;
+}
+
+
+// The widest edge a hole shows on its face : the rim of its countersink when it has one, as the solid is cut
+// (freecad_build.py sketches the sink at that diameter on the face), the A marks of #150-004 sat on it
+export function faceRadius(h: Hole): number
+{
+    return Math.max(h.diameter, h.countersink ?? 0) / 2;
 }
 
 
@@ -127,29 +135,30 @@ export function machiningTable(row: CutRow, part: Part, total = TABLE_W): Machin
             face = h.w === undefined ? `chant ${h.face}` : `chant ${h.face} w${round1(h.w)}`;
         }
         add([round1(h.u), round1(h.v), h.diameter === 0 ? "-" : `${h.diameter}`, h.depth === 0 ? "-" : `${h.depth}`,
-             face, h.label], [h.u, h.v], h.face === "A" || h.face === "B" ? h.diameter / 2 : 0);
+             face, h.label], [h.u, h.v], h.face === "A" || h.face === "B" ? faceRadius(h) : 0);
     }
-    for (const c of part.cutouts)
+    for (const cutout of part.cutouts)
     {
-        const arcs = c.segments.filter((s) =>
+        const arcs = cutout.segments.filter((s) =>
         {
             return s.kind === "arc";
         });
-        const round = arcs.length === c.segments.length && arcs.every((s) =>
+        const round = arcs.length === cutout.segments.length && arcs.every((s) =>
         {
             return s.kind === "arc" && s.cx === arcs[0]!.cx && s.cy === arcs[0]!.cy;
         });
-        const b = bounds(tessellate(c));
-        const [cu, cv] = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
-        const size = round ? `${DIAM}${round1(b.maxX - b.minX)}` : `${round1(b.maxX - b.minX)}x${round1(b.maxY - b.minY)}`;
+        const extent = bounds(tessellate(cutout));
+        const [cu, cv] = [(extent.minX + extent.maxX) / 2, (extent.minY + extent.maxY) / 2];
+        const [wide, high] = [extent.maxX - extent.minX, extent.maxY - extent.minY];
+        const size = round ? `${DIAM}${round1(wide)}` : `${round1(wide)}x${round1(high)}`;
         add([round1(cu), round1(cv), size, "trav.", "-", "Découpe traversante, cotes au centre"], [cu, cv],
-            Math.max(b.maxX - b.minX, b.maxY - b.minY) / 2);
+            Math.max(wide, high) / 2);
     }
-    for (const a of outlineArcs(part))
+    for (const arc of outlineArcs(part))
     {
         // Its mark on the middle of the arc, the contour it names : a centre may lie off the board, off the sheet
-        add([round1(a.cu), round1(a.cv), `R${round1(a.r)}`, "-", "-", "Arc du contour, cotes au centre"],
-            [a.cu + a.r * Math.cos(a.mid), a.cv + a.r * Math.sin(a.mid)]);
+        add([round1(arc.cu), round1(arc.cv), `R${round1(arc.r)}`, "-", "-", "Arc du contour, cotes au centre"],
+            [arc.cu + arc.r * Math.cos(arc.mid), arc.cv + arc.r * Math.sin(arc.mid)]);
     }
     for (const k of part.pockets ?? [])
     {
