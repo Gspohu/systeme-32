@@ -3,6 +3,7 @@
 
 """The pieces of the finite element model a wrong figure would hide in : python3 -I -m unittest discover -s scripts"""
 
+import json
 import math
 import os
 import random
@@ -11,6 +12,7 @@ import unittest
 
 import fem_calculix
 import fem_meuble
+import fem_rapport
 from fem_meuble import checked_args, fingerprint, own_sag
 from fem_panneau import OUTSIDE_MM, Board
 
@@ -158,6 +160,99 @@ class Supports(unittest.TestCase):
             self.assertEqual(ends, set(fixed) | (set(upright) if dof == 2 else set()))
         self.assertIn("APPUIS,1,3,0.", deck)
         self.assertNotIn("FIXES", deck)
+
+
+class Fasteners(unittest.TestCase):
+
+    # A link screw is drilled through both joues : a weld from each hole, the same point, the pieces the other way
+    # round. The screw carries the sum, 2 x 138 N on the most loaded one of the dresser
+    def test_screw_through_both_boards_counted_once_with_the_sum(self):
+        one = {"type": "link-screw", "pieces": ["A", "B"], "position": [10.0, 20.0, 30.0],
+               "composantes_N": [3.0, -4.0, 0.0], "effort_N": 5.0}
+        back = {**one, "pieces": ["B", "A"], "position": [10.0, 20.0, 30.004], "composantes_N": [-3.0, 4.0, 0.0]}
+        apart = {**one, "position": [10.0, 52.0, 30.0], "composantes_N": [0.0, 1.0, 0.0], "effort_N": 1.0}
+        merged = fem_meuble.merged_fasteners([one, back, apart])
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0]["soudures"], 2)
+        self.assertAlmostEqual(merged[0]["effort_N"], 10.0)
+        self.assertEqual(merged[1]["soudures"], 1)
+        self.assertAlmostEqual(merged[1]["effort_N"], 1.0)
+
+
+class Deck(unittest.TestCase):
+
+    # FEM_POST reads node numbers off the .dat : the deck the code builds again must be told apart from another one
+    def test_digest_sees_a_support_moved(self):
+        fem_meuble.CELL = 60.0
+        model = {"parts": [{"item": "i0", "itemName": "Essai", "label": "Dessous", "role": "bottom", "length": 600,
+                            "width": 400, "thickness": 19, "outline": None, "material": "p2", "holes": [],
+                            "frame": {"o": [0, 100, 0], "u": [1, 0, 0], "v": [0, 0, 1], "n": [0, 1, 0]}}],
+                 "fitted": [], "loads": [], "shelfLoad": 1.0,
+                 "materials": {"poisson": 0.3, "poissonSource": "", "materials": {"p2": {"modulus": 3000,
+                                                                                    "density": 600}}}}
+        fem_meuble.MODEL, fem_meuble.TABLE = model, model["materials"]
+        boards = fem_meuble.build(model)[0]
+        nodes = sorted(boards[0].nodes)
+        digest = lambda upright: fem_meuble.deck_digest(boards, [], [], [], nodes[:3], upright, [], [], set(nodes), [])
+        self.assertEqual(digest(nodes[3:6]), digest(nodes[3:6]))
+        self.assertNotEqual(digest(nodes[3:6]), digest(nodes[3:5] + nodes[7:8]))
+
+
+class Report(unittest.TestCase):
+
+    # The .frd glues a negative value to the one before it : read by columns of 12, never split on blanks
+    def test_stress_read_by_columns(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "essai.frd")
+            with open(path, "w") as handle:
+                handle.write(" -4  STRESS      6    1\n -5  SXX         1    4    1    1\n"
+                             " -1         1-3.01902E-02 3.99358E-03 3.21025E-02-6.00173E-02 7.41549E-02-1.27243E-02\n"
+                             " -1        12 1.00000E+00 2.00000E+00 3.00000E+00 4.00000E+00 5.00000E+00 6.00000E+00\n"
+                             " -3\n -4  ERROR       1    1\n -1         1 9.00000E+00\n")
+            out = fem_rapport.stresses(path)
+        self.assertEqual(sorted(out), [1, 12])
+        self.assertEqual(out[1], [-3.01902e-02, 3.99358e-03, 3.21025e-02, -6.00173e-02, 7.41549e-02, -1.27243e-02])
+        self.assertEqual(out[12][5], 6.0)
+
+    def test_largest_principal_keeps_its_sign(self):
+        values = fem_rapport.largest_principal([[-5, 1, 0, 0, 0, 0], [0, 0, 0, 2, 0, 0]])
+        self.assertAlmostEqual(values[0], -5.0)
+        self.assertAlmostEqual(abs(values[1]), 2.0)
+
+    # A report on the run of an older model would be read as the piece of today
+    def test_stale_run_refused(self):
+        with tempfile.TemporaryDirectory() as root:
+            run = os.path.join(root, "tv")
+            os.makedirs(run)
+            raw = b'{"parts": []}'
+            with open(os.path.join(root, "tv_entree.json"), "wb") as handle:
+                handle.write(raw)
+            for name, body in (("tv.inp", b"deck"), ("tv.dat", b"results")):
+                with open(os.path.join(run, name), "wb") as handle:
+                    handle.write(body)
+            stamp = fingerprint(raw)
+            identity = {"empreinte": stamp, "sha256_inp": fem_rapport.sha256_of(os.path.join(run, "tv.inp")),
+                        "sha256_dat": fem_rapport.sha256_of(os.path.join(run, "tv.dat"))}
+            for name, body in (("tv_identite.json", identity), ("tv_fem.json", {"empreinte": stamp, "fixations": []})):
+                with open(os.path.join(run, name), "w") as handle:
+                    json.dump(body, handle)
+            today = os.path.join(root, "today.json")
+            with open(today, "wb") as handle:
+                handle.write(raw)
+            self.assertEqual(fem_rapport.checked_run(run, "tv", today)[2], {"parts": []})
+            with open(today, "wb") as handle:
+                handle.write(b'{"parts": [1]}')
+            with self.assertRaises(SystemExit) as caught:
+                fem_rapport.checked_run(run, "tv", today)
+            self.assertIn("périmé", str(caught.exception))
+
+    # The field own_sag takes the max of : a turn of the board is no sag, a bow is read whole
+    def test_sag_field(self):
+        top = board({"o": [0, 700, 0], "u": [1, 0, 0], "v": [0, 0, 1], "n": [0, 1, 0]}, 800.0, 500.0, "top")
+        turned = fem_rapport.sag_field(top, {n: [0, 1e-3 * p[0] - 0.2, 0] for n, p in top.nodes.items()})
+        self.assertLess(max(abs(v) for v in turned.values()), 1e-12)
+        bowed = {n: [0, -0.5 * math.sin(math.pi * p[0] / 800), 0] for n, p in top.nodes.items()}
+        self.assertAlmostEqual(max(fem_rapport.sag_field(top, bowed).values()), own_sag(top, bowed)[0], places=12)
 
 
 # TODO : the passes of the contacts, the balance and FEM_POST are only proved by a real run of ccx, none of them

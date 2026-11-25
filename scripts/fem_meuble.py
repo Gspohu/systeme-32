@@ -9,6 +9,7 @@ import math
 import os
 import re
 import sys
+import tempfile
 
 from fem_calculix import CONTACT_K, E_FOOT, GRAVITY, WELD_K, density, read_results, solve, write
 from fem_panneau import Board, add, dot, hole_point, scale
@@ -347,41 +348,13 @@ def main():
             if kind in ("charge non posée", "appui non posé", "contact sans point", "fixation hors matière")]
     if lost:
         raise SystemExit("Simulation non publiée, charges ou appuis non posés : " + " ; ".join(lost))
-    # Groups of boards no weld tie to a support only stand on contacts : friction holds them across, a soft
-    # spring at each corner of their lowest board stands in for it
-    root = list(range(len(boards)))
-
-    def find(k):
-        while (root[k] != k):
-            root[k] = root[root[k]]
-            k = root[k]
-        return k
-    owner = {n: b.index for b in boards for n in b.nodes}
-    # A tie belongs to the board of the nodes it rides on
-    owner.update({node: owner[shares[0][0]] for node, _, shares in ties})
-    for weld in welds:
-        root[find(owner[weld["a"]])] = find(owner[weld["b"]])
-    held = {find(owner[n]) for n in list(fixed) + list(upright)}
-    friction = []
-    groups = {}
-    for board in boards:
-        groups.setdefault(find(board.index), []).append(board)
-    for key, members in groups.items():
-        if key in held:
-            continue
-        lowest = min(members, key=lambda b: b.lo[1])
-        # A corner a curved outline cuts off has no node
-        corners = [(0, 0, 0), (2 * lowest.cells_u, 0, 0), (0, 2 * lowest.cells_v, 0),
-                   (2 * lowest.cells_u, 2 * lowest.cells_v, 0)]
-        friction += [lowest.grid[key] for key in corners if key in lowest.grid]
-        notes.append(("tenu par frottement", ", ".join(sorted(b.name for b in members)), ""))
+    friction, loose = friction_of(boards, welds, fixed, upright, ties)
+    notes += [("tenu par frottement", ", ".join(sorted(b.name for b in members)), "") for members in loose]
     wood = [b for b in boards if b.part["role"] != "foot"]
     # Off the bricks kept : a curved board weighs what its outline holds, not it's rectangle
     weight = sum(b.area() * b.thick * density(TABLE, b.part) for b in wood) * GRAVITY
     applied = weight + sum(load["total"] for load in loads)
-    watched = set(n for w in welds for n in (w["a"], w["b"])) | set(n for c in contacts for n in (c[0], c[1]))
-    for board in boards:
-        watched |= set(board.nodes)
+    watched = watched_of(boards, welds, contacts)
     active = [c[3] <= 0.0 for c in contacts]
     path = os.path.join(OUT, JOB + ".inp")
     history = []
@@ -402,6 +375,12 @@ def main():
         history = kept.get("passes", [])
         settled = set(kept.get("actifs", []))
         active = [k in settled for k in range(len(contacts))]
+        # The node numbers read in the .dat are those of the deck solved only if this build writes it again byte
+        # for byte : a change of the code since the run would renumber them without a word
+        if (deck_digest(boards, welds, contacts, active, fixed, upright, loads, friction, watched, ties)
+                != kept.get("sha256_inp")):
+            raise SystemExit("FEM_POST refusé : le code reconstruit un autre deck que celui résolu. Relancer le calcul "
+                             "sans FEM_POST.")
     for rounds in range(0 if os.environ.get("FEM_POST") == "1" else PASSES):
         write(path, boards, welds, contacts, active, fixed, upright, loads, friction, watched, TABLE, ties)
         disp, totals, finished = solve(OUT, JOB)
@@ -468,10 +447,11 @@ def main():
                           "epaisseur_mm": board.thick, "box": [board.lo, board.hi],
                           "contour": [add(add(board.origin, scale(board.along, u)), scale(board.across, v))
                                       for u, v in board.shape] if board.shape else None})
-    fasteners = [w for w in welds if w["type"] != "foot"]
+    springs = [w for w in welds if w["type"] != "foot"]
+    fasteners = merged_fasteners(springs)
     report = {"source": SOURCE, "empreinte": FINGERPRINT, "maille_mm": CELL, "panneaux": len(wood), "noeuds": nodes,
               "briques": bricks,
-              "soudures": len(fasteners), "contacts": len(contacts), "points_fixes": len(fixed), "pieds": len(feet),
+              "soudures": len(springs), "vis_et_tourillons": len(fasteners),"contacts": len(contacts), "points_fixes": len(fixed), "pieds": len(feet),
               "appuis_sol": len(upright), "charges_pieds": sorted(feet, key=lambda f: -f["effort_N"]),
               "pied_modele": {"cote_mm": FOOT_SIDE, "E_MPa": E_FOOT,
                               "source": "fût AXILO 78 Ø 30 (Häfele 637.76.35x), carré de même aire ; plastique sans module "
@@ -499,6 +479,72 @@ def main():
         json.dump(report, f, ensure_ascii=False, indent=1)
     print(json.dumps({k: report[k] for k in ("panneaux", "noeuds", "soudures", "contacts", "poids_bois_N",
                                              "charge_totale_N", "reactions_N")}, ensure_ascii=False))
+
+
+def friction_of(boards, welds, fixed, upright, ties):
+    """Groups of boards no weld tie to a support, and the corners of their lowest board a soft spring holds across"""
+    # They only stand on contacts : friction holds them across, a spring of FRICTION_K at each corner of their lowest
+    # board stands in for it
+    root = list(range(len(boards)))
+
+    def find(k):
+        while (root[k] != k):
+            root[k] = root[root[k]]
+            k = root[k]
+        return k
+    owner = {n: b.index for b in boards for n in b.nodes}
+    # A tie belongs to the board of the nodes it rides on
+    owner.update({node: owner[shares[0][0]] for node, _, shares in ties})
+    for weld in welds:
+        root[find(owner[weld["a"]])] = find(owner[weld["b"]])
+    held = {find(owner[n]) for n in list(fixed) + list(upright)}
+    friction, loose, groups = [], [], {}
+    for board in boards:
+        groups.setdefault(find(board.index), []).append(board)
+    for key, members in groups.items():
+        if key in held:
+            continue
+        lowest = min(members, key=lambda b: b.lo[1])
+        # A corner a curved outline cuts off has no node
+        corners = [(0, 0, 0), (2 * lowest.cells_u, 0, 0), (0, 2 * lowest.cells_v, 0),
+                   (2 * lowest.cells_u, 2 * lowest.cells_v, 0)]
+        friction += [lowest.grid[key] for key in corners if key in lowest.grid]
+        loose.append(members)
+    return friction, loose
+
+
+def watched_of(boards, welds, contacts):
+    """The nodes whose displacement the .dat prints : every board node and each end of a weld or a contact"""
+    watched = set(n for w in welds for n in (w["a"], w["b"])) | set(n for c in contacts for n in (c[0], c[1]))
+    for board in boards:
+        watched |= set(board.nodes)
+    return watched
+
+
+def deck_digest(boards, welds, contacts, active, fixed, upright, loads, friction, watched, ties):
+    """SHA-256 of the deck this build writes, written in a folder of its own and thrown away"""
+    with tempfile.TemporaryDirectory() as folder:
+        path = os.path.join(folder, "deck.inp")
+        write(path, boards, welds, contacts, active, fixed, upright, loads, friction, watched, TABLE, ties)
+        return sha256_of(path)
+
+
+def merged_fasteners(springs):
+    """One entry for each fastener : a screw drilled through both boards gives a weld from each hole, at one point"""
+    # Both springs are in the deck, side by side : the fastener carries their sum, each of them half of it
+    merged = {}
+    for weld in springs:
+        key = (weld["type"], tuple(sorted(weld["pieces"])), tuple(round(x, 2) for x in weld["position"]))
+        if key not in merged:
+            merged[key] = {**weld, "composantes_N": list(weld["composantes_N"]), "soudures": 0}
+        one = merged[key]
+        # The pieces in the order of the first weld : the other hole sees them the other way round
+        sign = 1 if weld["pieces"] == one["pieces"] else -1
+        if (one["soudures"] > 0):
+            one["composantes_N"] = [one["composantes_N"][k] + sign * weld["composantes_N"][k] for k in range(3)]
+        one["soudures"] += 1
+        one["effort_N"] = math.hypot(*one["composantes_N"])
+    return sorted(merged.values(), key=lambda w: -w["effort_N"])
 
 
 def wrong_forces(contacts, active, disp):
