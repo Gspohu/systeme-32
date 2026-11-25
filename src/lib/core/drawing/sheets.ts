@@ -183,7 +183,7 @@ function dims(it: Item): string
 const SOURCE_PITCH = 2.7;
 
 // Cover : what is inside the set, the legend, the workshop conventions and every source
-function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
+export function cover(p: Project, a: Analysis, bom: Bom, forWorkshop = false): Draft
 {
     const canvas = new Canvas();
     heading(canvas, p.name);

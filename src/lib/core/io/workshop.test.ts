@@ -5,7 +5,9 @@ import { drawingSet, workshopArchive } from "./workshop";
 import { A3, Canvas, MARGIN, TITLE_BLOCK_H, TITLE_BLOCK_W, frameAndTitle, inkBox, textWidth,
         type Prim } from "../drawing/display";
 import { segmentHits } from "../drawing/workpiece";
+import { cover } from "../drawing/sheets";
 import { computeOutputs } from "../outputs";
+import type { Project } from "../model";
 import { dresser, tvWall } from "../templates";
 import { newDevice } from "../factory";
 
@@ -163,6 +165,17 @@ function glyphs(q: Extract<Prim, { k: "text" }>): { x: number; y: number; w: num
 }
 
 
+// The words of the cover alone : building the 140 sheets of the dresser 3 times to read it ran past the timeout on CI
+function coverText(p: Project): string
+{
+    const o = computeOutputs(p);
+    return cover(p, o.analysis, o.bom).canvas.prims.map((q) =>
+    {
+        return q.k === "text" ? q.t : "";
+    }).join(" ");
+}
+
+
 // The segments a primitive strokes : a rectangle and a polygon by their sides, never their inside
 function strokes(q: Prim): [number, number, number, number][]
 {
@@ -255,19 +268,11 @@ describe("cover", () =>
     {
         for (const make of [tvWall, dresser])
         {
-            const p = make();
-            const text = drawingSet(p, computeOutputs(p))[0]!.prims.map((q) =>
-            {
-                return q.k === "text" ? q.t : "";
-            }).join(" ");
+            const text = coverText(make());
             expect(text, make.name).not.toContain("non imprimée");
             expect(text, make.name).toContain("Code du travail R4541-9");
         }
-        const tv = tvWall();
-        const text = drawingSet(tv, computeOutputs(tv))[0]!.prims.map((q) =>
-        {
-            return q.k === "text" ? q.t : "";
-        }).join(" ");
+        const text = coverText(tvWall());
         expect(text).toContain("Freebox Server mini 4K : appareil L 180 x H 45 x P 190, 0,66 kg");
         expect(text).not.toContain("0,66 kg, 0,0 kg à vide");
     });
@@ -285,10 +290,7 @@ describe("cover", () =>
                 p.items.push(newDevice({ name: `Lampe de Guebwiller ${k}`, width: 100, height: 100, depth: 100,
                                          massKg: 1, source: "mesurée", x: 3000 + 120 * k, y: 0, z: 0 }));
             }
-            const text = drawingSet(p, computeOutputs(p))[0]!.prims.map((q) =>
-            {
-                return q.k === "text" ? q.t : "";
-            }).join(" ");
+            const text = coverText(p);
             expect(text.includes("Code du travail R4541-9") || /\d+ source\(s\) non imprimée\(s\)/.test(text),
                    `${extra} de plus`).toBe(true);
         }
