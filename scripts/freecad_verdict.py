@@ -33,6 +33,11 @@ def reasons(out, piece, marker):
     why += [f"visserie, {key} : {len(screws[key])}" for key in ("misplaced", "unrouted") if screws.get(key)]
     if not screws.get("valid"):
         why.append("visserie : un modèle de vis invalide ou à plusieurs solides")
+    # A report from before this check never says its pages were read
+    if "struck_texts" not in screws:
+        why.append("plans : textes barrés non contrôlés, passe d'interface antérieure au contrôle")
+    why += [f"{s['page']} : '{s['text']}' barré par un trait à ({s['x']}, {s['y']}) mm"
+            for s in screws.get("struck_texts", [])]
     if (check.get("parts_json") != check.get("links")):
         why.append(f"contrôle : {check.get('links')} liens pour {check.get('parts_json')} pièces du JSON")
     if check.get("no_material"):

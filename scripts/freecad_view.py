@@ -6,6 +6,8 @@
 import json
 import os
 import re
+import sys
+import tempfile
 import traceback
 
 import FreeCAD as App
@@ -18,6 +20,9 @@ DOC = os.environ["S32_DOC"]
 IMAGE = os.environ["S32_IMAGE"]
 OUT = os.environ["S32_STEP_DIR"]
 FAILED = IMAGE + ".erreur.txt"
+sys.path.insert(0, os.environ.get("S32_SCRIPTS", os.path.dirname(os.path.abspath(__file__))))
+# Glyphs measured this many times larger than drawn : Qt takes a whole number of pixels
+INK_SCALE = 100.0
 # Started from the command line a macro runs before the event loop : it waits for it
 START_MS = 2000
 # Zinc plated steel, what the data of the hardware list say the screws are
@@ -26,8 +31,6 @@ SCREW_COLOUR = (0.78, 0.79, 0.80, 0.0)
 SCREW_TYPES = {"countersunk": "DIN7505", "pan": "DIN7996", "metric": "ISO7380-1"}
 # DIN7505 starts at 3 : the Ø2.5 of the niche lining is a DIN7997 wood screw, head 4.7 x 1.5 (din7997def.csv)
 SMALL_COUNTERSUNK = ("DIN7997", 3.0)
-# The text of the dimensions of the sheets, mm (display.ts, dimH)
-DIM_TEXT = 2.2
 # Room round the text of a cell, pixels : its margins and the grid line
 CELL_PAD = 12
 ROW_PAD = 6
@@ -95,19 +98,36 @@ def settled(page, limit=120.0):
         Gui.updateGui()
 
 
+def text_ink(text, family, size):
+    """The box of a text's glyphs from the start of its baseline, in the units of its size, as Qt draws them"""
+    font = QtGui.QFont()
+    font.setFamilies([f.strip() for f in family.split(",") if f.strip()])
+    # A pixel size is a whole number : measured 100 times larger
+    font.setPixelSize(max(1, int(round(size * INK_SCALE))))
+    r = QtGui.QFontMetricsF(font).tightBoundingRect(text)
+    return (r.left() / INK_SCALE, r.top() / INK_SCALE, r.right() / INK_SCALE, r.bottom() / INK_SCALE)
+
+
 def export_pages(doc):
-    """Each TechDraw page as a PDF beside the document, the plans read without opening FreeCAD"""
+    """Each TechDraw page as a PDF beside the document, the plans read without opening FreeCAD, and the texts a line
+    runs through on it, read from the same page exported as SVG"""
     import TechDrawGui
+    from plans_check import crossed_texts
     folder = os.path.join(os.path.dirname(DOC), "plans_" + os.path.splitext(os.path.basename(DOC))[0])
     os.makedirs(folder, exist_ok=True)
     written = []
-    for page in [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]:
-        page.ViewObject.show()
-        settled(page)
-        path = os.path.join(folder, file_name(page.Label) + ".pdf")
-        TechDrawGui.exportPageAsPdf(page, path)
-        written.append(path)
-    return written
+    struck = []
+    with tempfile.TemporaryDirectory() as scratch:
+        for page in [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]:
+            page.ViewObject.show()
+            settled(page)
+            path = os.path.join(folder, file_name(page.Label) + ".pdf")
+            TechDrawGui.exportPageAsPdf(page, path)
+            written.append(path)
+            svg = os.path.join(scratch, "page.svg")
+            TechDrawGui.exportPageAsSvg(page, svg)
+            struck += [dict(found, page=page.Label) for found in crossed_texts(svg, text_ink)]
+    return written, struck
 
 
 def screw_type(screw):
@@ -331,8 +351,16 @@ def run():
             o.Tip.ViewObject.Visibility = True
             vo.Visibility = False
         elif (o.TypeId == "TechDraw::DrawViewDimension"):
-            # A setting of the view only, set here : the size the sheet writes its dimensions at
-            vo.Fontsize = DIM_TEXT
+            # Settings of the view only, set here : left to the preferences of whoever builds, the line would land
+            # elsewhere than where the sheet keeps its marks clear of it (svg.ts, DIMENSION)
+            style = model["dimensions"]
+            vo.Font = style["font"]
+            vo.Fontsize = style["text"]
+            vo.Arrowsize = style["arrow"]
+            vo.LineWidth = style["lineWidth"]
+            vo.LineSpacingFactorISO = style["spacingFactor"]
+            vo.GapFactorISO = style["gapFactor"]
+            vo.StandardAndStyle = "ISO Oriented"
         elif o.TypeId in ("TechDraw::DrawViewPart", "TechDraw::DrawViewSection"):
             # The widths the sheet draws with : left to TechDraw's 0.7 a hole a few mm accross came out a black dot
             # and both faces of a board one band, and each reader's settigns would decide
@@ -341,6 +369,11 @@ def run():
             vo.HiddenWidth = strokes["hidden"]
             vo.IsoWidth = strokes["thin"]
             vo.ExtraWidth = strokes["thin"]
+            # The build draws the cutting lines itself (section_marks.py) : TechDraw's arrow of 11 mm ran over the
+            # next letter, and its extension lines came out as an SCN with no colour in the PDF. A setting of this
+            # view only, the preferences stay as they are
+            if (o.TypeId == "TechDraw::DrawViewSection"):
+                o.BaseView.ViewObject.ShowSectionLine = False
         elif o.TypeId in ("Assembly::AssemblyObject", "App::Link"):
             # What a document saved without a GUI said isn't always what its view providers read on opening
             vo.Visibility = True
@@ -363,7 +396,7 @@ def run():
     view.saveImage(IMAGE, 1600, 1000, "White")
     fit_sheets(doc)
     doc.save()
-    report["pages"] = export_pages(doc)
+    report["pages"], report["struck_texts"] = export_pages(doc)
     report["steps_written"] = export_steps(doc, model, root, subs, drawn)
     report["expected_step_solids"] = (len(model["parts"]) + sum(len(p.get("bands", [])) +
                                                                 (1 if p.get("bandInner") else 0)

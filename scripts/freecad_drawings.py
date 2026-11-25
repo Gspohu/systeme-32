@@ -9,14 +9,13 @@ from xml.sax.saxutils import escape
 
 import FreeCAD as App
 
+import section_marks
+
 A3_W = 420
 A3_H = 297
 # A spreadsheet cell is sized in pixels at 96 dpi, and so is its text on a TechDraw page (DrawViewSpreadsheet.cpp
 # writes TextSize as the font-size of the cell's own svg)
 MM_PER_PX = 25.4 / 96
-# How far off the outline the sheet sets its overall dimensions, mm of paper
-DIM_OFF = 6
-UPRIGHT_DIM_OFF = 12
 # The lines a long owner or title runs on, left empty when it fits on the one before
 CONTINUATION = {"legal_owner_2", "legal_owner_3", "supplementary_title_2"}
 # 1:5, 2:1 for an enlargement, or the first of a sheet of two parts drawn at 2 scales, 1:2, 1:5
@@ -42,7 +41,7 @@ def axes(frame, su, sv):
     return App.Vector(0, 0, -1), right
 
 
-def overall_dimensions(doc, page, view, box, upright):
+def overall_dimensions(doc, page, view, box, upright, style):
     """The 2 overall dimensions of the sheet, each between the outermost vertices the projection has, never by index.
     Each made with the length it must read, the box of the sheet over the scale, and what could not be made"""
     edges = [e.BoundBox for e in view.getVisibleEdges()]
@@ -78,11 +77,11 @@ def overall_dimensions(doc, page, view, box, upright):
         # Where the sheet has them, the length under the outline and the width on its left, off the centre of the view
         # A front read standing has its height on the right, clear of the u arrow at its origin (workpiece.ts)
         if (kind == "DistanceX"):
-            dim.X, dim.Y = 0, -(box["h"] / 2 + DIM_OFF)
+            dim.X, dim.Y = 0, -(box["h"] / 2 + style["offset"])
         elif upright:
-            dim.X, dim.Y = box["w"] / 2 + UPRIGHT_DIM_OFF, 0
+            dim.X, dim.Y = box["w"] / 2 + style["uprightOffset"], 0
         else:
-            dim.X, dim.Y = -(box["w"] / 2 + DIM_OFF), 0
+            dim.X, dim.Y = -(box["w"] / 2 + style["offset"]), 0
         made.append((dim, length))
     return made, lost
 
@@ -157,7 +156,9 @@ SECTION_AXES = {"x": ((-1, 0, 0), (0, -1, 0)), "y": ((0, 0, 1), (1, 0, 0))}
 BASE_SCALE = 25
 SECTION_SCALE = 20
 SECTION_GAP = 6
-SECTION_LINE_RUN = 14
+# How far a corner of the projected model may land from the drawn outline before the marks are taken as misplaced, mm
+PROOF_TOL = 0.5
+TEXT_FAMILY = "Helvetica, Arial, sans-serif"
 # Width of a bold Helvetica letter for its size, on average over a french title
 TITLE_EM = 0.6
 # A whole number of millimetres : TechDraw cuts a font size down to one in a French locale
@@ -205,6 +206,7 @@ def make_sections(doc, model, assemblies, group, template_path):
         base.Scale = 1 / BASE_SCALE
         doc.recompute()
         direction, right = SECTION_AXES[axis]
+        marks, run, mark_faults, proof = cut_marks(base, source, planes, direction, axis, model)
         views = [(base, f"Mur du fond, 1:{BASE_SCALE}")]
         for s in planes:
             sec = doc.addObject("TechDraw::DrawViewSection", "Coupe")
@@ -220,26 +222,84 @@ def make_sections(doc, model, assemblies, group, template_path):
             sec.Scale = 1 / SECTION_SCALE
             views.append((sec, s["title"]))
         doc.recompute()
-        captions, lost = lay_out(views, model["sectionRoom"], cuts_low=axis == "y")
+        captions, lost = lay_out(views, model["sectionRoom"], run, cuts_low=axis == "y")
         overlay(doc, page, model["sectionRoom"]["heading"])
         overlay(doc, page, captions).Label = f"{page.Label}, titres des vues"
+        # TechDraw's own lines are hidden on the base view (freecad_view.py) : their arrows ran over the next letter
+        body = section_marks.marks_svg(marks, base.X.Value, A3_H - base.Y.Value, model["sectionRoom"]["titleSize"],
+                                       model["strokes"], model["dashes"]["centre"], TEXT_FAMILY)
+        overlay(doc, page, f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {A3_W} {A3_H}" width="{A3_W}mm" '
+                           f'height="{A3_H}mm">\n{body}\n</svg>\n').Label = f"{page.Label}, repères de coupe"
         doc.recompute()
-        made.append({"page": page.Label, "faults": title_block_faults(template, fields)
+        made.append({"page": page.Label, "faults": title_block_faults(template, fields) + mark_faults
                      + [f"{item} : aucun assemblage à projeter" for item in missing]
                      + [f"{title} : ne tient pas sur la planche" for title in lost],
-                     "invalid": [o.Label for o in page.Views if "Invalid" in o.State or "Error" in o.State]})
+                     "projection_off": proof, "invalid": [o.Label for o in page.Views if "Invalid" in o.State or
+                                                          "Error" in o.State]})
     return made
+
+
+def bounds(view):
+    boxes = [e.BoundBox for e in view.getVisibleEdges()]
+    return (min(b.XMin for b in boxes), max(b.XMax for b in boxes), min(b.YMin for b in boxes),
+            max(b.YMax for b in boxes))
 
 
 def extent(view):
     """Width and height of a computed view on the paper, and how far its middle sits off the point it's placed by"""
-    boxes = [e.BoundBox for e in view.getVisibleEdges()]
-    x0, x1 = min(b.XMin for b in boxes), max(b.XMax for b in boxes)
-    y0, y1 = min(b.YMin for b in boxes), max(b.YMax for b in boxes)
+    x0, x1, y0, y1 = bounds(view)
     return x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2
 
 
-def lay_out(views, room, cuts_low=False):
+def cut_marks(base, source, planes, direction, axis, model):
+    """The lines of the cuts over the base view, relative to the point it's placed by with y down the page, the room
+    they take round its outline, and what is wrong with them. A point of the model lands on the paper at
+    projectPoint(p - getGeometricCenter()) x Scale : proved on the corners of the model before any line is trusted"""
+    import Part
+    x0, x1, y0, y1 = bounds(base)
+    centre = base.getGeometricCenter()
+
+    def paper(p):
+        q = base.projectPoint(p - centre) * base.Scale
+        return q.x, q.y
+    box = App.BoundBox()
+    for link in source:
+        shape = Part.getShape(link)
+        # The assemblies above the link move it too
+        group = link.getParentGeoFeatureGroup()
+        while group is not None:
+            shape.Placement = group.Placement.multiply(shape.Placement)
+            group = group.getParentGeoFeatureGroup()
+        box.add(shape.optimalBoundingBox())
+    faults = []
+    # The front view has x to the right and z up : the lowest corner on the bottom left of the outline, y up
+    low = paper(App.Vector(box.XMin, box.YMin, box.ZMin))
+    high = paper(App.Vector(box.XMax, box.YMax, box.ZMax))
+    off = max(abs(low[0] - x0), abs(low[1] - y0), abs(high[0] - x1), abs(high[1] - y1))
+    if (off > PROOF_TOL):
+        faults.append(f"{base.Label} : projection des coupes fausse, un coin du modèle à {off:.2f} mm du contour "
+                      f"dessiné (bas gauche {low[0]:.2f}, {low[1]:.2f} pour {x0:.2f}, {y0:.2f})")
+    origin = App.Vector(*planes[0]["origin"])
+    # The arrows point the way the section is seen, away from its Direction, the side of the viewer
+    there = paper(origin - App.Vector(*direction))
+    here = paper(origin)
+    turn = there[0] - here[0] if axis == "x" else here[1] - there[1]
+    if (abs(turn) < 1e-6):
+        faults.append(f"{base.Label} : sens d'observation des coupes perpendiculaire à la feuille")
+    sight = 1 if turn > 0 else -1
+    cuts = []
+    for s in planes:
+        px, py = paper(App.Vector(*s["origin"]))
+        cuts.append((s["letter"], px if axis == "x" else -py))
+    lo, hi = (-y1, -y0) if axis == "x" else (x0, x1)
+    marks, missed = section_marks.lay_marks(cuts, lo, hi, sight, axis == "x", model["sectionRoom"]["titleSize"],
+                                            model["dimensions"]["arrow"])
+    rx0, ry0, rx1, ry1 = section_marks.reach(marks)
+    run = max(0.0, x0 - rx0, rx1 - x1, -y1 - ry0, ry1 + y0) + section_marks.AIR
+    return marks, run, faults + [f"{base.Label} : {m}" for m in missed], round(off, 4)
+
+
+def lay_out(views, room, run, cuts_low=False):
     """Each view in the first place free from the top left, its title over it, as sections.ts lays its sheets out.
     With cuts_low the sections fill the sheet up from the top of the title block, the lowest cut nearest to it"""
     taken = []
@@ -249,7 +309,7 @@ def lay_out(views, room, cuts_low=False):
     for k, (view, title) in enumerate(views):
         w, h, cx, cy = extent(view)
         # The lines of the cuts run past the base view, their letters on their ends
-        pad = SECTION_LINE_RUN if k == 0 else 0
+        pad = run if k == 0 else 0
         # Its name bold, what follows the first comma on a smaller line : a cut 20 mm wide no longer takes 80
         name, _, rest = title.partition(", ")
         head = size + (SUBTITLE_SIZE + 1 if rest else 0)
@@ -398,7 +458,7 @@ def make_drawings(doc, model, bodies):
             view.Y = A3_H - (box["y"] + box["h"] / 2)
             doc.recompute()
             # u up the sheet : a front drawn standing
-            placed, missed = overall_dimensions(doc, page, view, box, v["su"][1] != 0)
+            placed, missed = overall_dimensions(doc, page, view, box, v["su"][1] != 0, model["dimensions"])
             dims += placed
             lost += missed
         missing = []

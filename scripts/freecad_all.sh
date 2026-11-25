@@ -26,7 +26,8 @@ do
     : > "$marker"
     view_code=0
     flatpak run --env=S32_JSON="$json" --env=S32_DOC="$OUT/$piece.FCStd" --env=S32_IMAGE="$OUT/$piece.png" \
-        --env=S32_STEP_DIR="$OUT/step_$piece" "$APP" "$HERE/freecad_view.py" > "$OUT/$piece.view.log" 2>&1 \
+        --env=S32_STEP_DIR="$OUT/step_$piece" --env=S32_SCRIPTS="$HERE" "$APP" "$HERE/freecad_view.py" \
+        > "$OUT/$piece.view.log" 2>&1 \
         || view_code=$?
     if [ -s "$OUT/$piece.png.erreur.txt" ]
     then
