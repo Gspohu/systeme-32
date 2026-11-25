@@ -13,7 +13,8 @@ import { sectionSheets } from "./sections";
 import { roomPlan } from "./plan";
 import { itemViews } from "./item_views";
 import { partSheets } from "./workpiece";
-import { checkSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
+import { checkSheets, costSheets, cutListSheets, hardwareSheets, nestingSheets, pbsSheets } from "./lists";
+import { computeCost } from "../costing";
 import { assemblySheets, gammeSequences } from "./assembly_sheets";
 import { fabricationSheets } from "./fabrication_sheets";
 import { calcNoteSheets } from "./calc_note_sheets";
@@ -62,6 +63,8 @@ export function buildSheets(p: Project, a: Analysis, bom: Bom, nesting: NestResu
     }
     drafts.push(...partSheets(bom, a.build.fitted), ...cutListSheets(bom), ...hardwareSheets(bom));
     drafts.push(...fabricationSheets(fabrication(bom, nesting)));
+    // The estimate the screen and its CSV show, from the same call on the same nesting
+    drafts.push(...costSheets(computeCost(p, bom, nesting, a.build.prints)));
     // The gamme of the film and of the FreeCAD sheet, the one source of the order
     drafts.push(...assemblySheets(gammeSequences((cadModel(p, { analysis: a, bom },
                                                            true) as { gamme: GammeTable[] }).gamme)));
@@ -192,7 +195,7 @@ function cover(p: Project, a: Analysis, bom: Bom, forWorkshop: boolean): Draft
         cursorY += 6;
     };
     canvas.text(MARGIN + 5, cursorY,
-                `Dossier de fabrication : plans cotés, coupes, fiche de débit, quincaillerie, ${forWorkshop ? ""
+                `Dossier de fabrication : plans cotés, coupes, fiche de débit, quincaillerie, chiffrage, ${forWorkshop ? ""
                     : "calepinage, "}gamme, PBS, contrôles.`, 3);
     cursorY += 5;
     const whom = [p.settings.client === "" ? "" : `Client : ${p.settings.client}`,

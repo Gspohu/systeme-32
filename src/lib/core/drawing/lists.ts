@@ -4,7 +4,9 @@ import type { Analysis } from "../analysis";
 import type { Bom, PbsNode } from "../bom";
 import { edgeNotation, sawSize, shapeWord } from "../bom";
 import type { NestResult } from "../nesting";
-import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, fit, textWidth, wrap } from "./display";
+import { COST_HEADER, costCells, costFamilies, decimal, type Cost } from "../costing";
+import { A3, Canvas, MARGIN, SMALL_TEXT, TITLE_BLOCK_H, fit, overlayWidth, textWidth, wrap } from "./display";
+import { MARK_AIR } from "./clear";
 import { heading, pageSuffix, paginateTable, table, type Draft } from "./draft";
 import { FAMILY_LABELS } from "../../data/hardware";
 import { SCREW_ADVICE } from "../../data/screws";
@@ -100,6 +102,120 @@ export function hardwareSheets(bom: Bom): Draft[]
 }
 
 
+// A sheet of the estimate : its rows, and under them the notes those rows send to
+export interface CostPage
+{
+    rows: string[][];
+    notes: string[][];
+}
+
+const COST_COLS = [280, 18, 11, 16, 26, 22, 12];
+const NOTE_COLS = [14, 371];
+const COST_SIZE = 2.2;
+const COST_ROW = 4;
+// Paper between a table and the header of its notes, mm
+const NOTE_GAP = 2;
+
+function rowHeight(row: string[], cols: number[]): number
+{
+    return COST_ROW * Math.max(1, ...row.map((t, k) => { return wrap(t, COST_SIZE, cols[k]! - 1).length; }));
+}
+
+
+// Every line of computeCost family by family, each family closed by its subtotal, then the totals and what they
+// leave out. The date and source of a price go to a numbered note printed on each page that sends to it
+export function costPages(cost: Cost, room: number): CostPage[]
+{
+    const numbers = new Map<string, number>();
+    const notes: string[][] = [];
+    const rows: { cells: string[]; note: number | null }[] = [];
+    for (const family of costFamilies(cost))
+    {
+        for (const l of family.lines)
+        {
+            const cells = costCells(l);
+            const [source, date] = [cells[6]!, cells[7]!];
+            let note: number | null = null;
+            if (source !== "" || date !== "")
+            {
+                const key = `${date}\n${source}`;
+                if (!numbers.has(key))
+                {
+                    numbers.set(key, notes.length + 1);
+                    notes.push([String(notes.length + 1), date === "" ? source : source === "" ? date
+                        : `${date} : ${source}`]);
+                }
+                note = numbers.get(key)!;
+            }
+            rows.push({ cells: [...cells.slice(0, 6), note === null ? "" : String(note)], note });
+        }
+        const open = family.unpriced > 0 ? ` (${family.unpriced} sans prix)` : "";
+        rows.push({ cells: [`Sous-total ${family.label}${open}`, "", "", "", "", decimal(family.subtotal, 2), ""],
+                    note: null });
+    }
+    rows.push({ cells: ["Total HT", "", "", "", "", decimal(cost.total, 2), ""], note: null },
+              { cells: ["Total TTC", "", "", "", "", decimal(cost.totalTtc, 2), ""], note: null });
+    for (const n of cost.notes)
+    {
+        rows.push({ cells: [n, "", "", "", "", "", ""], note: null });
+    }
+    // The height of a page counts its table and its notes together : a row whose note no longer fits moves on with it
+    const pages: CostPage[] = [{ rows: [], notes: [] }];
+    let used = COST_ROW;
+    let noted = 0;
+    for (const r of rows)
+    {
+        let page = pages[pages.length - 1]!;
+        const noteH = (p: CostPage): number =>
+        {
+            if (r.note === null || p.notes.some((n) => { return n[0] === String(r.note); }))
+            {
+                return 0;
+            }
+            return rowHeight(notes[r.note - 1]!, NOTE_COLS) + (p.notes.length === 0 ? NOTE_GAP + COST_ROW : 0);
+        };
+        const h = rowHeight(r.cells, COST_COLS);
+        if (used + h + noted + noteH(page) > room && page.rows.length > 0)
+        {
+            page = { rows: [], notes: [] };
+            pages.push(page);
+            used = COST_ROW;
+            noted = 0;
+        }
+        noted += noteH(page);
+        if (r.note !== null && noteH(page) > 0)
+        {
+            page.notes.push(notes[r.note - 1]!);
+        }
+        page.rows.push(r.cells);
+        used += h;
+    }
+    return pages;
+}
+
+
+export function costSheets(cost: Cost): Draft[]
+{
+    const top = TABLE_TOP + 2;
+    const pages = costPages(cost, TABLE_BOTTOM - top);
+    return pages.map((page, i) =>
+    {
+        const canvas = new Canvas();
+        heading(canvas, `Chiffrage${pageSuffix(i, pages.length)}`);
+        canvas.text(MARGIN + 5, TABLE_TOP - 3, "Prix HT. Ligne sans prix : non comptée. Note : date et source du prix.",
+                    2.3);
+        const y = table(canvas, MARGIN + 5, top, COST_COLS, [...COST_HEADER.slice(0, 6), "Note"], page.rows,
+                        COST_SIZE, COST_ROW);
+        if (page.notes.length > 0)
+        {
+            table(canvas, MARGIN + 5, y + NOTE_GAP, NOTE_COLS, ["Note", "Date et source du prix"], page.notes,
+                  COST_SIZE, COST_ROW);
+        }
+        return { title: "Chiffrage", scale: "-", canvas };
+    });
+}
+
+
 export function nestingSheets(nesting: NestResult): Draft[]
 {
     const out: Draft[] = [];
@@ -129,7 +245,9 @@ export function nestingSheets(nesting: NestResult): Draft[]
                 canvas.rect(x0 + pl.x / scale, y0 + pl.y / scale, pl.w / scale, pl.h / scale, "thin",
                             pl.shaped ? "#e6e6e6" : "#f4f4f4");
                 let label = `${pl.code.split(",")[0]}${pl.rotated ? " (piv.)" : ""}`;
-                if (pl.w / scale <= textWidth(label, SMALL_TEXT) || pl.h / scale <= 2.5)
+                // Measured as it inks, with air both sides : by the narrower estimate a code fitted that printed
+                // over the edge of its piece
+                if (pl.w / scale <= overlayWidth(label, SMALL_TEXT) + 2 * MARK_AIR || pl.h / scale <= 2.5)
                 {
                     legend.push(`${legend.length + 1} = ${label}`);
                     label = `${legend.length}`;

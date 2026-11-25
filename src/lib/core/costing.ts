@@ -259,23 +259,74 @@ export function computeCost(p: Project, bom: Pick<Bom, "offSheet" | "edges" | "h
 }
 
 
+// Euros to the cent and quantities to the hundredth, with the French decimal comma
+export function decimal(v: number | null | undefined, digits: number): string
+{
+    return v === null || v === undefined ? "" : v.toFixed(digits).replace(".", ",");
+}
+
+
+export const COST_HEADER = ["Poste", "Quantité", "Unité", "Achat", "Prix unitaire HT", "Total HT", "Source", "Date"];
+
+// One line as the CSV and the drawing set both print it, in the order of COST_HEADER
+export function costCells(l: CostLine): string[]
+{
+    return [l.label, decimal(l.qty, 2), l.unit, decimal(l.bought, 2), decimal(l.price?.value, 4),
+            l.total === null ? "sans prix" : decimal(l.total, 2), l.price?.source ?? "", l.price?.date ?? ""];
+}
+
+
+export interface CostFamily
+{
+    label: string;
+    lines: CostLine[];
+    // The sum of the line totals shown, to the cent : the lines without a price count for nothing
+    subtotal: number;
+    unpriced: number;
+}
+
+const FAMILIES: [string, string][] = [["board:", "Panneaux"], ["edge:", "Chants"], ["hw:", "Quincaillerie"],
+                                      ["service:", "Façonnage"], ["labour:", "Main-d'oeuvre"], ["ship:", "Port"]];
+
+// The lines grouped by what they buy, in the order above, a key no family claims ending under its own
+export function costFamilies(cost: Cost): CostFamily[]
+{
+    const groups = new Map<string, CostLine[]>();
+    for (const l of cost.lines)
+    {
+        const label = FAMILIES.find(([prefix]) => { return l.key.startsWith(prefix); })?.[1] ?? "Autres";
+        groups.set(label, [...groups.get(label) ?? [], l]);
+    }
+    const order = [...FAMILIES.map((f) => { return f[1]; }), "Autres"];
+    const out: CostFamily[] = [];
+    for (const label of order)
+    {
+        const lines = groups.get(label);
+        if (lines === undefined)
+        {
+            continue;
+        }
+        const sum = lines.reduce((s, l) => { return s + (l.total ?? 0); }, 0);
+        out.push({ label, lines, subtotal: Math.round(sum * 100) / 100, unpriced: lines.filter((l) =>
+        {
+            return l.total === null;
+        }).length });
+    }
+    return out;
+}
+
+
 // The estimate for a buyer to read again : every line with its price and where it comes from, the missing ones
 // listed with no total, tehn the totals and what they leave out
 export function costCsv(cost: Cost): string
 {
-    // Euros to the cent and quantities to the hundredth, with the French decimal comma
-    const num = (v: number | null | undefined, digits: number): string =>
-    {
-        return v === null || v === undefined ? "" : v.toFixed(digits).replace(".", ",");
-    };
-    const rows = [["Poste", "Quantité", "Unité", "Achat", "Prix unitaire HT", "Total HT", "Source", "Date"]];
+    const rows = [COST_HEADER];
     for (const l of cost.lines)
     {
-        rows.push([l.label, num(l.qty, 2), l.unit, num(l.bought, 2), num(l.price?.value, 4),
-                   l.total === null ? "sans prix" : num(l.total, 2), l.price?.source ?? "", l.price?.date ?? ""]);
+        rows.push(costCells(l));
     }
-    rows.push([], ["Total HT", "", "", "", "", num(cost.total, 2)], ["Total TTC", "", "", "",
-                                                                     "", num(cost.totalTtc, 2)]);
+    rows.push([], ["Total HT", "", "", "", "", decimal(cost.total, 2)], ["Total TTC", "", "", "",
+                                                                         "", decimal(cost.totalTtc, 2)]);
     for (const n of cost.notes)
     {
         rows.push([n]);
