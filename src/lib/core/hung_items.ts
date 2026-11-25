@@ -141,9 +141,9 @@ function fitConcealedSupports(w: WallShelf, part: Part, s: Settings, b: Build): 
         const text = `arrachement estimé de ${lo.toFixed(0)} à ${hi.toFixed(0)} daN par cheville en brique creuse `
             + `(charge ${load.toFixed(0)} kg/m² partagée sur ${n} platines, moment repris sur la demi-hauteur de la `
             + `platine ou sur le chant arrière en appui)`;
-        part.notes.push(`Fixation au mur au choix de l'ébéniste : ${text}. Repère : ${yard.low} à ${yard.high} daN pour `
+        part.notes.push(`Fixation au mur au choix de l'ébéniste : ${text}. Repère : ${yard.load} daN pour `
             + `une cheville ${yard.source}. Un scellement chimique avec tamis est conseillé`);
-        b.warnings.push(`${w.name} : ${text}, pour ${yard.low} à ${yard.high} daN cités par fischer sur un autre support. `
+        b.warnings.push(`${w.name} : ${text}, pour ${yard.load} daN cités par fischer sur un autre support. `
             + "Choisir une fixation dont la fiche couvre la brique creuse et cette charge.");
     }
 }

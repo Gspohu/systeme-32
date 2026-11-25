@@ -183,11 +183,14 @@ add({ id: "WALL_SCREW_5x50", family: "D60", label: "Vis 5 x 50 tête fraisée, e
 add({ id: "WALL_SCREW_5x50_PAN", family: "D60", label: "Vis 5 x 50 tête cylindrique, au mur sur rondelle large ou "
          + "dans la lumière d'une platine", brand: "", ref: "Générique", source: ANTI_TIP });
 // Through a back of 8 and its washer of 2 into a plug of 40 : fischer has the screw as long as the plug, the part fixed
-// and one diameter, 55 at least. Threaded over 56, its plain shank of 4 shorter than the 10 it holds, as the push
+// and one diameter, 55 at least. Threaded over 54, its plain shank of 6 shorter than the 10 it holds, as the push
 // through fixing of the DuoPower asks
-add({ id: "WALL_SCREW_5x60_PAN", family: "D60", label: "Vis fischer PowerFast 5 x 60 tête demi-ronde TX, inox A2, au "
-         + "mur à travers le fond sur rondelle large",
-     brand: "fischer", ref: "657385", source: "Alternate, fiche produit EAN 4048962050783" });
+add({ id: "WALL_SCREW_5x60_PAN", family: "D60", label: "Vis fischer PowerFast II 5 x 60 tête cylindrique TX20, filetage "
+         + "total, inox A2, au mur à travers le fond sur rondelle large",
+     brand: "fischer", ref: "574154", source: "fischer, fiche article FPF II PTF 5,0 x 60 A2 (EAN 4048962533620, boîte de "
+         + "50, filetage 54) ; ETA-19/0175 du 22/09/2025, annexe A3",
+     url: "https://www.fischer-international.com/en/products/screws/chipboard-screw-powerfast-ii/"
+         + "chipboard-screws-with-pan-head-tx-drive/chipboard-screws-powerfast-fpf-ii-ptf-a2/574154-fpf-ii-ptf-5-0-x-60-a2-50" });
 // Slat walls : a 20 mm cleat before the 40 mm plug asks for a 70 mm screw, the slats are glued and pinned
 const SLATS = ("Convention d'atelier, pas une donnée fabricant, référence au choix du distributeur");
 add({ id: "WALL_SCREW_5x70", family: "D60", label: "Vis 5 x 70, liteau ou lisse dans le mur, le sol ou le plafond",
@@ -197,7 +200,10 @@ add({ id: "BRAD_1_6x40", family: "D60", label: "Pointe tête homme 1,6 x 40, lat
 add({ id: "PLUG_NYLON_8x40", family: "D60", label: `Cheville nylon universelle ${DIAM}8 x 40, béton ou brique pleine`,
      brand: "", ref: "Générique", source: ANTI_TIP });
 add({ id: "PLUG_DUOPOWER_8x40", family: "D60", label: `Cheville fischer DuoPower ${DIAM}8 x 40, brique creuse`,
-     brand: "fischer", ref: "555008", source: "fischer DuoPower 8 x 40, boîte de 100, charge à lire sur sa fiche" });
+     brand: "fischer", ref: "555008", source: "fischer, fiche technique DuoPower (juin 2020) : 8 x 40, foret 8, perçage "
+         + "50 mini, vis 4,5 à 6, boîte de 100",
+     url: "https://fiproductmedia.azureedge.net/media/Certification%20Documents/Technical%20Datasheets/fischer/"
+         + "TDB_01_DUOPOWER-HD-FR.pdf" });
 add({ id: "PLUG_AERATED", family: "D60", label: "Cheville hélicoïdale pour béton cellulaire", brand: "",
      ref: "Générique", source: ANTI_TIP });
 add({ id: "PLUG_HOLLOW_METAL", family: "D60",
@@ -276,7 +282,7 @@ add({ id: "9209218", family: "D31", label: "Kit 2 profilés SlideLine M h18 (ét
 // Connectors
 add({ id: "262.26.535", family: "D41", label: "Boîtier Minifix 15 sans bord, nickelé, sous pastille au décor",
      brand: "Häfele",
-     ref: "262.26.535", source: `${HAFELE_UK} p. 7.14`, url: "https://assets.daro.com/HafeleLiterature/18T7-14.pdf" });
+     ref: "262.26.535", source: `${HAFELE_UK} p. 7.13`, url: "https://assets.daro.com/HafeleLiterature/18T7-13.pdf" });
 add({ id: "262.28.020", family: "D41", label: `Goujon Minifix S100 B34, filet 8, avant-trou ${DIAM}5`, brand: "Häfele",
      ref: "262.28.020", source: `${HAFELE_UK} p. 7.19`, url: "https://assets.daro.com/HafeleLiterature/18T7-19.pdf" });
 for (const s of CONNECTING_SCREWS)
@@ -313,13 +319,19 @@ add({ id: "GLUE_WOOD", family: "D41", label: "Colle à bois vinylique, flacon, p
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
 add({ id: "GLUE_CYANO", family: "D60", label: "Colle cyanoacrylate, tube, pour les cache-vis des vis définitives",
      brand: "", ref: "Générique", source: "Convention d'atelier, pas une donnée fabricant", perProject: true });
-add({ id: "RESIN_CHEM", family: "D60", label: "Résine polyester de scellement chimique pour maçonnerie, cartouche 300 ml, "
-         + "au pistolet à silicone : chevilles des platines noyées dans la résine en mur creux",
-     brand: "fischer", ref: "4048962519471", source: "Brico Dépôt, fiche produit",
+// ETA-20/0729 table B1.1 p. 10 assesses this mortar with the FIS H 12x50 K below, in perforated and solid brick
+// 563279 is the same cartridge labelled in French, German and Dutch
+add({ id: "RESIN_CHEM", family: "D60", label: "Résine fischer FIS V Plus 300 T, cartouche 300 ml avec 2 mélangeurs FIS "
+         + "MR Plus, au pistolet à silicone : chevilles des platines noyées dans la résine en mur creux",
+     brand: "fischer", ref: "563281", source: "fischer, fiche article FIS V Plus 300 T (EAN 4048962452594, étiquette en "
+         + "allemand) ; ETA-20/0729 du 03/02/2025, tableau B1.1, brique perforée et pleine avec le tamis 12 x 50 K",
+     url: "https://www.fischer-international.com/en/products/chemical-fixings/injection-mortar/injection-mortar-fis-v-plus/"
+         + "563281-fis-v-plus-300-t",
      perProject: true });
 // Made for threaded rods M6 to M8 : the plug of 8 goes into it, no figure of fischer for a plug so set
 add({ id: "RESIN_SIEVE", family: "D60", label: "Tamis d'injection fischer FIS H 12 x 50 K",
-     brand: "fischer", ref: "41900", source: "Domomat, fiche produit EAN 8001132419007" });
+     brand: "fischer", ref: "41900", source: "Domomat, fiche produit EAN 8001132419007 ; ETA-20/0729 du 03/02/2025 "
+         + "(FIS V Plus), brique perforée" });
 // The hole it takes, from the same sheet : drilled 12, 60 deep at least
 export const SIEVE_BORE = { diameter: 12, depth: 60 };
 add({ id: "TAPE_DOUBLE", family: "D60", label: "Adhésif double face mince, rouleau, pour les cache-vis des vis à démonter",

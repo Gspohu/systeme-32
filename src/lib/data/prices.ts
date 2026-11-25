@@ -75,8 +75,9 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
     // (availability guide 2026), no merchant shows a price for 16 : the 19 one stands in until a quote comes
     "board:H1180_ST37:16": entry(perSheet(143.36), "m2", "Estimation au prix du 19 mm (Houdard, 143,36 EUR HT le "
                                  + "panneau) : 16 mm sur commande chez Egger, avec délai, sans prix public"),
-    "board:CHENE_PLAQUE_AGGLO:39": entry(ht(79.57), "m2", "Barillet, Decospan replaqué chêne fil A/B 2800 x 2070 x 39 à "
-                                         + "79,57 EUR TTC/m2, âme aggloméré", READ_ON_2),
+    "board:CHENE_PLAQUE_AGGLO:39": entry(ht(79.57), "m2", "Barillet, réf. 009028020739, Decospan replaqué chêne "
+                                         + "quartier petite maille A/B, livre ouvert, âme aggloméré, 2800 x 2070 x 39 à "
+                                         + "79,57 EUR TTC/m2 (fiche produit Barillet du 19/11/2026)", READ_ON_2),
     "board:W1000_ST9:19": entry(ht(22.82), "m2", `${JHS}, 22,82 EUR TTC/m2 (132,26 le panneau), en stock`),
     "board:SNOW_WHITE_8685:8": entry(ht(22.98), "m2", `${JHS}, réf. 1001137234, 22,98 EUR TTC/m2 (133,22 le panneau `
                                      + "2800 x 2070), en stock", READ_ON_2),
@@ -186,8 +187,9 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                                     + "tête cylindrique non relevée", "2026-11-09", 500),
     "hw:RESIN_SIEVE": entry(ht(33.10 / 50), "u", "Domomat, lot de 50 tamis fischer FIS H 12 x 50 K à 33,10 EUR TTC",
                             "2026-11-18", 50),
-    "hw:WALL_SCREW_5x60_PAN": entry(ht(13.89 / 50), "u", "Alternate, boîte de 50 fischer PowerFast 5 x 60 tête "
-                                    + "demi-ronde à 13,89 EUR TTC, momentanément indisponible", "2026-11-18", 50),
+    "hw:WALL_SCREW_5x60_PAN": entry(ht(12.19 / 50), "u",
+                                    "Alternate, boîte de 50 fischer FPF II PTF 5,0 x 60 A2 (574154, "
+                                    + "EAN 4048962533620) à 12,19 EUR TTC, momentanément indisponible", "2026-11-24", 50),
     "hw:PLUG_DUOPOWER_8x40": entry(ht(8.52 / 100), "u",
                                    "Boîte de 100 à 8,52 EUR relevée sur un comparateur, sans date ni "
         + "vendeur : prix indicatif", "2026-11-04", 100),
@@ -201,8 +203,8 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
                           "2026-11-17", 1),
     "hw:GLUE_CYANO": entry(ht(4.99), "u", "Brico Dépôt, lot de 2 colles cyanoacrylates superglue-3 (tube 3 g + power gel "
                            + "2 g, 3178040660502) à 4,99 EUR TTC", "2026-11-17", 1),
-    "hw:RESIN_CHEM": entry(ht(4.99), "u", "Brico Dépôt, résine polyester gris 300 ml pour scellement chimique maçonnerie "
-                           + "(fischer, 4048962519471) à 4,99 EUR TTC", "2026-11-17", 1),
+    "hw:RESIN_CHEM": entry(ht(24.29), "u", "Alternate, fischer FIS V Plus 300 T 563281 (EAN 4048962452594) à 24,29 EUR "
+                           + "TTC la cartouche, en stock", "2026-11-25", 1),
     "hw:TAPE_DOUBLE": entry(ht(5.99), "u", "Brico Dépôt, ruban adhésif double face intérieur 19 mm x 1,5 m "
                             + "(4046719732203) à 5,99 EUR TTC", "2026-11-17", 1),
 

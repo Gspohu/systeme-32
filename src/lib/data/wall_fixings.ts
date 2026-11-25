@@ -13,13 +13,13 @@ export const PLASTERBOARD_LIMITS = {
 };
 
 
-// No load for a DuoPower 8 x 40 in hollow brick : ETA-22/0512 covers concrete only, an older fischer table gives
-// 0.20 kN in brick Hlz 12, resellers 12 daN. A yardstick for the cabinet maker, not an allowed load
-// https://fischer-international.com/en/products/standard-fixings/plastic-fixings/duopower-eta/564789-duopower-eta-8-x-40-fpf-ii
+// Fischer DuoPower datasheet (June 2020), art. 555008, wood screw of 5 : 25 daN recommended in a hollow brick
+// Hlz 12, safety factor included, one plug in the brick, not the joint. A german brick, this wall never probed :
+// a yardstick for the cabinet maker, not an allowed load
+// https://fiproductmedia.azureedge.net/media/Certification%20Documents/Technical%20Datasheets/fischer/TDB_01_DUOPOWER-HD-FR.pdf
 export const HOLLOW_BRICK_YARDSTICK = {
-    low: 12,
-    high: 20,
-    source: "fischer DuoPower 8 x 40 : 0,20 kN en brique perforée Hlz 12 (ancienne table), ETA-22/0512 limitée au béton",
+    load: 25,
+    source: "fischer DuoPower 8 x 40 (555008) en brique creuse Hlz 12, charge recommandée de la fiche technique 2020",
 };
 
 

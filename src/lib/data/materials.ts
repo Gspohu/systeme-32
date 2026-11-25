@@ -379,11 +379,13 @@ export const DECORS: Decor[] = [
         material: "mdf_veneer",
         ...OAK_VENEER,
     }, 
+    // Barillet product sheet 009028020739 : quarter sliced oak, fine ray, A/B, book matched, long grain
+    // class 1 dry use. Its 0,65 density and 10,45 kg can't be a 39 mm board, the mechanics stay on the Decopanel sheet
     {
         id: "CHENE_PLAQUE_AGGLO",
-        label: "Aggloméré plaqué chêne",
+        label: "Aggloméré replaqué chêne quartier petite maille A/B, livre ouvert",
         brand: "Decospan",
-        ref: "Decopanel CHIPBOARD chêne",
+        ref: "Barillet 009028020739",
         material: "p2_veneer",
         ...OAK_VENEER,
     },

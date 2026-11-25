@@ -103,7 +103,7 @@ const WOOD: ScrewDesignation = { card: "Steel-Generic", coating: "zingué 5 µm"
                                  why: "acier ST zingué 5 µm, fiche Keller & Kalmbach des vis à bois DIN 7997 et 7996" };
 // A2 is the austenitic 18-8 family, 1.4301 its usual grade
 const STAINLESS: ScrewDesignation = { card: "Steel-X5CrNi18-10", coating: "aucun, inox A2",
-                                      why: "fischer PowerFast inox A2, fiche produit Alternate" };
+                                      why: "fischer PowerFast II inox A2, fiche article 574154" };
 export const WASHER_DESIGNATION: ScrewDesignation = { card: "Steel-Generic", coating: "zingué", propertyClass: "100 HV",
                                                       why: "acier de classe 100 HV, ISO 7094:2000 tableau 3, zingué "
                                                            + "d'après la liste de quincaillerie" };

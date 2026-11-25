@@ -188,7 +188,7 @@ export const CONCEALED_SHELF_SUPPORT = {
 };
 
 
-// Häfele U.K. 2018 p. 7.14 and 7.19 : Minifix 15, 19 mm board
+// Häfele U.K. 2018 p. 7.13 and 7.19 : Minifix 15, 19 mm board
 export const MINIFIX = {
     housingDiameter: 15,
     // The 262.26.535 fills 14.5 in the Häfele model, sunk 0.4 under a round of edging
